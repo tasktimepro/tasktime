@@ -75,6 +75,46 @@ export function openReportsViewCommand(context: AgentCommandContext): { route: s
     return openRoute(context, '/reports');
 }
 
+export function openPlannerViewCommand(context: AgentCommandContext, input: { year?: number; week?: number } = {}): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    const hasYear = input.year !== undefined;
+    const hasWeek = input.week !== undefined;
+
+    if (hasYear !== hasWeek) {
+        throw new AgentCommandError('INVALID_INPUT', 'year and week must be provided together for planner navigation.');
+    }
+
+    if (!hasYear && !hasWeek) {
+        return openRoute(context, '/planner');
+    }
+
+    if (!Number.isInteger(input.year) || input.year! < 1 || input.year! > 9999) {
+        throw new AgentCommandError('INVALID_INPUT', 'year must be an integer from 1 to 9999.', { year: input.year });
+    }
+
+    if (!Number.isInteger(input.week) || input.week! < 1 || input.week! > 53) {
+        throw new AgentCommandError('INVALID_INPUT', 'week must be an integer from 1 to 53.', { week: input.week });
+    }
+
+    return openRoute(context, `/planner/${input.year}/${String(input.week).padStart(2, '0')}`);
+}
+
+export function openAccountViewCommand(context: AgentCommandContext, input: { section?: string } = {}): { route: string } {
+    assertReady(context);
+    assertPermission(context, 'navigation');
+
+    const section = input.section || 'preferences';
+    const allowedSections = new Set(['preferences', 'email-templates', 'sync', 'agent', 'data']);
+
+    if (!allowedSections.has(section)) {
+        throw new AgentCommandError('INVALID_INPUT', 'section must be preferences, email-templates, sync, agent, or data.', { section });
+    }
+
+    return openRoute(context, `/account?section=${encodeURIComponent(section)}`);
+}
+
 export function focusRunningTimerCommand(context: AgentCommandContext, input: { timerKey: string }): { route: string; timerKey: string } {
     assertReady(context);
     assertPermission(context, 'navigation');

@@ -8,11 +8,13 @@ import {
     archiveClientCommand,
     archiveBusinessBrandAssetCommand,
     archiveExpenseCategoryCommand,
+    attachPlannerItemCommand,
     archiveProjectCommand,
     archiveTaskCommand,
     cascadeDeleteClientCommand,
     cascadeDeleteProjectCommand,
     cascadeDeleteTaskCommand,
+    clearTimerCommand,
     completeTaskCommand,
     createClientCommand,
     createBusinessInfoCommand,
@@ -53,12 +55,15 @@ import {
     focusRunningTimerCommand,
     getClientOverviewCommand,
     getDashboardSummaryCommand,
+    getProjectNotesCommand,
     getProjectOverviewCommand,
     getReportSummaryCommand,
     getPreferencesCommand,
     getSyncStatusCommand,
     listDriveBackupsCommand,
+    listDailyGoalsCommand,
     listInvoicesCommand,
+    listPlannerAttachmentsCommand,
     listRecentEntriesCommand,
     listTaxReturnPeriodsCommand,
     listClientsCommand,
@@ -78,6 +83,7 @@ import {
     markExpensesTaxUnclaimedCommand,
     markTaxReturnPeriodFiledCommand,
     markTaxReturnPeriodPaidCommand,
+    pauseTimerCommand,
     previewBackupImportJsonCommand,
     previewDeleteClientCommand,
     previewDeleteProjectCommand,
@@ -88,10 +94,14 @@ import {
     restoreBackupJsonCommand,
     restoreDriveBackupCommand,
     downloadDriveBackupJsonCommand,
+    removeDailyGoalCommand,
+    removePlannerAttachmentCommand,
     resumeExpenseRecurrenceCommand,
+    resumeTimerCommand,
     sendProjectQuoteEmailCommand,
     sendInvoiceEmailCommand,
     setDefaultBusinessInfoCommand,
+    setDailyGoalCommand,
     setDefaultEmailTemplateCommand,
     setDefaultInvoiceTemplateCommand,
     setDefaultPaymentMethodCommand,
@@ -102,6 +112,8 @@ import {
     unarchiveProjectCommand,
     unarchiveTaskCommand,
     openDashboardViewCommand,
+    openAccountViewCommand,
+    openPlannerViewCommand,
     openProjectViewCommand,
     openReportsViewCommand,
     previewInvoiceFromUnbilledWorkCommand,
@@ -116,10 +128,13 @@ import {
     updateInvoiceDraftCommand,
     updateInvoiceTemplateCommand,
     updatePaymentMethodCommand,
+    updatePlannerAttachmentCommand,
     updatePreferencesCommand,
     updateProjectCommand,
+    updateProjectNotesCommand,
     updateSyncSettingsCommand,
     updateTaxReturnPeriodCommand,
+    updateTimerCommand,
     updateTimeEntryCommand,
 } from './index';
 
@@ -217,6 +232,7 @@ function createContext(): AgentCommandContext & {
         expenseCategories: Y.Map<string, unknown>;
         expenseRecurrences: Y.Map<string, unknown>;
         plannerAttachments: Y.Map<string, unknown>;
+        dailyGoals: Y.Map<string, unknown>;
         taxReturnPeriods: Y.Map<string, unknown>;
     };
     openedRoutes: string[];
@@ -239,6 +255,7 @@ function createContext(): AgentCommandContext & {
     const expenseCategories = coreDoc.getMap('expenseCategories');
     const expenseRecurrences = coreDoc.getMap('expenseRecurrences');
     const plannerAttachments = coreDoc.getMap('plannerAttachments');
+    const dailyGoals = coreDoc.getMap('dailyGoals');
     const taxReturnPeriods = coreDoc.getMap('taxReturnPeriods');
     const entries = activeEntriesDoc.getMap('timeEntries');
     const openedRoutes: string[] = [];
@@ -289,6 +306,7 @@ function createContext(): AgentCommandContext & {
         expenseCategories,
         expenseRecurrences,
         plannerAttachments,
+        dailyGoals,
         taxReturnPeriods,
         activeTimeEntries: entries,
         getAllTimeEntries: () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean),
@@ -313,8 +331,8 @@ function createContext(): AgentCommandContext & {
             invoiceTemplates: Array.from(invoiceTemplates.values()).map((value) => readEntity(value)).filter(Boolean),
             emailTemplates: Array.from(emailTemplates.values()).map((value) => readEntity(value)).filter(Boolean),
             expenses: Array.from(expenses.values()).map((value) => readEntity(value)).filter(Boolean),
-            dailyGoals: [],
-            plannerAttachments: [],
+            dailyGoals: Array.from(dailyGoals.values()).map((value) => readEntity(value)).filter(Boolean),
+            plannerAttachments: Array.from(plannerAttachments.values()).map((value) => readEntity(value)).filter(Boolean),
             preferences: Object.fromEntries(preferences.entries()),
         })),
         clearAllData: vi.fn(async () => {
@@ -335,6 +353,7 @@ function createContext(): AgentCommandContext & {
             expenseRecurrences.clear();
             taxReturnPeriods.clear();
             plannerAttachments.clear();
+            dailyGoals.clear();
             entries.clear();
         }),
         initialize: vi.fn(async () => undefined),
@@ -437,6 +456,7 @@ function createContext(): AgentCommandContext & {
             expenseCategories,
             expenseRecurrences,
             plannerAttachments,
+            dailyGoals,
             taxReturnPeriods,
         },
         openedRoutes,
@@ -3059,6 +3079,177 @@ describe('agent commands', () => {
         }));
     });
 
+    it('resumes, updates, and approval-confirms timer clearing', async () => {
+        const context = createContext();
+        let now = 100_000;
+        context.now = () => now;
+        createTaskCommand(context, {
+            id: 'task-timer-parity',
+            title: 'Timer parity task',
+            projectId: 'project-1',
+        });
+
+        startTimerCommand(context, { taskId: 'task-timer-parity', note: 'Initial note' });
+        expect(updateTimerCommand(context, {
+            timerKey: 'project-1',
+            note: 'Updated note',
+            startTime: 98_000,
+        })).toEqual(expect.objectContaining({
+            note: 'Updated note',
+            startTime: 98_000,
+        }));
+
+        pauseTimerCommand(context, { timerKey: 'project-1', pausedAt: 104_000 });
+        now = 110_000;
+        expect(resumeTimerCommand(context, { taskId: 'task-timer-parity' })).toEqual(expect.objectContaining({
+            paused: false,
+            pausedElapsedTime: 0,
+            startTime: 104_000,
+        }));
+
+        expect(() => clearTimerCommand(context, {
+            timerKey: 'project-1',
+            confirmClear: true,
+            confirmationText: 'wrong',
+        })).toThrow(/confirmationText/);
+        await expect(executeAgentCommand(context, 'clear_timer', {
+            timerKey: 'project-1',
+            confirmClear: true,
+            confirmationText: 'project-1',
+        })).resolves.toEqual(expect.objectContaining({
+            ok: true,
+            command: 'clear_timer',
+            data: {
+                timerKey: 'project-1',
+                taskId: 'task-timer-parity',
+                cleared: true,
+            },
+        }));
+        expect(context.maps.timers.has('project-1')).toBe(false);
+    });
+
+    it('manages planner attachments, daily goals, and project notes through typed parity commands', async () => {
+        const context = createContext();
+        createTaskCommand(context, {
+            id: 'task-planner-agent',
+            title: 'Planner task',
+            projectId: 'project-1',
+        });
+
+        const weekResult = attachPlannerItemCommand(context, {
+            type: 'task',
+            referenceId: 'task-planner-agent',
+            mode: 'week',
+            weekStartDate: '2026-07-06',
+            includeWeekends: false,
+            estimatedHours: 40,
+        });
+
+        expect(weekResult.created).toHaveLength(5);
+        expect(weekResult.created.map((attachment) => attachment.date)).toEqual([
+            '2026-07-06',
+            '2026-07-07',
+            '2026-07-08',
+            '2026-07-09',
+            '2026-07-10',
+        ]);
+        expect(weekResult.created.map((attachment) => attachment.estimatedHours)).toEqual([8, 8, 8, 8, 8]);
+        expect(() => attachPlannerItemCommand(context, {
+            type: 'task',
+            referenceId: 'task-planner-agent',
+            mode: 'date',
+            date: '2026-07-06',
+        })).toThrow(/already attached/);
+
+        const overwriteResult = attachPlannerItemCommand(context, {
+            type: 'task',
+            referenceId: 'task-planner-agent',
+            mode: 'week',
+            weekStartDate: '2026-07-06',
+            includeWeekends: false,
+            estimatedHours: 20,
+            duplicateMode: 'overwrite',
+        });
+
+        expect(overwriteResult.updated).toHaveLength(5);
+        expect(overwriteResult.updated.map((attachment) => attachment.estimatedHours)).toEqual([4, 4, 4, 4, 4]);
+
+        const firstAttachmentId = weekResult.created[0].id;
+        expect(updatePlannerAttachmentCommand(context, {
+            plannerAttachmentId: firstAttachmentId,
+            estimatedHours: 2.5,
+        })).toEqual(expect.objectContaining({
+            id: firstAttachmentId,
+            estimatedHours: 2.5,
+        }));
+        expect(listPlannerAttachmentsCommand(context, {
+            type: 'task',
+            referenceId: 'task-planner-agent',
+        })).toHaveLength(5);
+        expect(removePlannerAttachmentCommand(context, {
+            plannerAttachmentId: firstAttachmentId,
+        })).toEqual({
+            plannerAttachmentId: firstAttachmentId,
+            referenceId: 'task-planner-agent',
+            type: 'task',
+            removed: true,
+        });
+        expect(context.maps.plannerAttachments.has(firstAttachmentId)).toBe(false);
+
+        const everyWeek = await executeAgentCommand(context, 'attach_planner_item', {
+            type: 'project',
+            referenceId: 'project-1',
+            mode: 'every-week',
+            weekStartDate: '2026-07-06',
+            includeWeekends: false,
+            estimatedHours: 10,
+        });
+        expect(everyWeek).toEqual(expect.objectContaining({
+            ok: true,
+            command: 'attach_planner_item',
+        }));
+
+        expect(setDailyGoalCommand(context, {
+            weekday: 1,
+            targetHours: 30,
+            targetEarnings: -5,
+        })).toEqual(expect.objectContaining({
+            weekday: 1,
+            goal: expect.objectContaining({
+                id: '1',
+                weekday: 1,
+                targetHours: 24,
+                targetEarnings: 0,
+            }),
+            removed: false,
+        }));
+        expect(listDailyGoalsCommand(context)).toHaveLength(1);
+        expect(removeDailyGoalCommand(context, { weekday: 1 })).toEqual({ weekday: 1, removed: true });
+        expect(listDailyGoalsCommand(context)).toEqual([]);
+
+        expect(updateProjectNotesCommand(context, {
+            projectId: 'project-1',
+            plainText: 'Alpha\nBeta',
+        })).toEqual(expect.objectContaining({
+            projectId: 'project-1',
+            plainText: 'Alpha\nBeta',
+            notes: expect.objectContaining({
+                type: 'tiptap-json',
+                plainTextPreview: 'Alpha\nBeta',
+            }),
+        }));
+        expect(getProjectNotesCommand(context, { projectId: 'project-1' })).toEqual(expect.objectContaining({
+            plainText: 'Alpha\nBeta',
+        }));
+        expect(updateProjectNotesCommand(context, {
+            projectId: 'project-1',
+            clear: true,
+        })).toEqual(expect.objectContaining({
+            projectId: 'project-1',
+            plainText: '',
+        }));
+    });
+
     it('rejects manual entries before the task billing cutoff', () => {
         const context = createContext();
         createTaskCommand(context, {
@@ -3735,11 +3926,15 @@ describe('agent commands', () => {
         startTimerCommand(context, { taskId: 'task-1' });
 
         expect(openDashboardViewCommand(context)).toEqual({ route: '/' });
+        expect(openPlannerViewCommand(context, { year: 2026, week: 5 })).toEqual({ route: '/planner/2026/05' });
+        expect(openAccountViewCommand(context, { section: 'agent' })).toEqual({ route: '/account?section=agent' });
         expect(openProjectViewCommand(context, { projectId: 'project-1' })).toEqual({ route: '/projects/project-1' });
         expect(openReportsViewCommand(context)).toEqual({ route: '/reports' });
         expect(focusRunningTimerCommand(context, { timerKey: 'project-1' })).toEqual({ route: '/', timerKey: 'project-1' });
-        expect(context.openedRoutes).toEqual(['/', '/projects/project-1', '/reports', '/']);
+        expect(context.openedRoutes).toEqual(['/', '/planner/2026/05', '/account?section=agent', '/projects/project-1', '/reports', '/']);
         expect(() => openProjectViewCommand(context, { projectId: 'missing' })).toThrow(AgentCommandError);
+        expect(() => openPlannerViewCommand(context, { year: 2026 })).toThrow(AgentCommandError);
+        expect(() => openAccountViewCommand(context, { section: 'missing' })).toThrow(AgentCommandError);
     });
 
     it('returns bounded read-only query summaries without exposing raw store records', async () => {
@@ -4842,6 +5037,377 @@ describe('agent commands', () => {
                     notes: 'Dispatcher draft note',
                 }),
             }),
+        }));
+    });
+
+    it('preserves UI-shaped invoice composer state across agent draft edit and finalize', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'billing', 'navigation']);
+        context.now = () => Date.parse('2026-06-25T12:00:00Z');
+
+        createTaskCommand(context, {
+            id: 'task-composition',
+            title: 'Composition task',
+            projectId: 'project-1',
+            billable: true,
+        });
+        createTaskCommand(context, {
+            id: 'subtask-composition',
+            title: 'Composition subtask',
+            projectId: 'project-1',
+            parentTaskId: 'task-composition',
+            billable: true,
+        });
+        context.maps.businessInfos.set('business-composition', objectToYMap({
+            id: 'business-composition',
+            name: 'Composition Business',
+            businessName: 'Composition Business LLC',
+        }));
+        context.maps.paymentMethods.set('payment-composition', objectToYMap({
+            id: 'payment-composition',
+            title: 'Composition Wire',
+        }));
+        context.maps.invoiceTemplates.set('template-composition', objectToYMap({
+            id: 'template-composition',
+            name: 'Composition Template',
+            useSequentialNumbers: false,
+            logoPlacement: 'invoice-left-logo-right',
+        }));
+        context.maps.expenses.set('expense-composition', objectToYMap({
+            id: 'expense-composition',
+            title: 'Composition expense',
+            date: '2026-06-12',
+            supplierName: 'Composition Vendor',
+            currency: 'USD',
+            amount: 25,
+            paidOn: null,
+            paymentStatus: 'unpaid',
+            clientId: 'client-1',
+            projectId: 'project-1',
+            businessId: null,
+            categoryId: null,
+            isPersonal: false,
+            billable: true,
+            billingStatus: 'unbilled',
+            invoiceId: null,
+        }));
+        context.maps.expenses.set('expense-client-composition', objectToYMap({
+            id: 'expense-client-composition',
+            title: 'Client-level composition expense',
+            date: '2026-06-13',
+            supplierName: 'Client Vendor',
+            currency: 'USD',
+            amount: 15,
+            paidOn: null,
+            paymentStatus: 'unpaid',
+            clientId: 'client-1',
+            projectId: null,
+            businessId: null,
+            categoryId: null,
+            isPersonal: false,
+            billable: true,
+            billingStatus: 'unbilled',
+            invoiceId: null,
+        }));
+        context.maps.invoices.set('invoice-composition-draft', objectToYMap({
+            id: 'invoice-composition-draft',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'COMP-1',
+            date: '2026-06-20',
+            status: 'draft',
+            items: [],
+            subtotal: 0,
+            tax: 0,
+            taxRate: 0,
+            total: 0,
+            currency: 'USD',
+            createdAt: Date.parse('2026-06-20T12:00:00Z'),
+        }));
+
+        const composerUpdates = {
+            project: {
+                id: 'project-1',
+                title: 'Project One',
+            },
+            projectId: 'project-1',
+            projectIds: ['project-1', 'project-1'],
+            projectBreakdowns: [{
+                projectId: 'project-1',
+                projectTitle: 'Project One',
+                clientId: 'client-1',
+                pricingMode: 'hourly',
+                tasks: [{
+                    id: 'task-composition',
+                    title: 'Composition task',
+                    hours: 2,
+                    originalHours: 1,
+                    hourlyRate: 100,
+                    projectHourlyRate: 100,
+                    useFlatRate: false,
+                    isMerged: true,
+                    mergedSubtasks: [{
+                        id: 'subtask-composition',
+                        title: 'Composition subtask',
+                        hours: 0.5,
+                        originalHours: 0.5,
+                        hourlyRate: 100,
+                        useFlatRate: false,
+                    }],
+                }],
+                expenseItems: [{
+                    id: 'expense-composition',
+                    title: 'Composition expense',
+                    amount: 25,
+                    projectId: 'project-1',
+                }],
+                totalHours: 2.5,
+                subtotal: 225,
+                allocatedDiscount: 20,
+                allocatedShipping: 5,
+                allocatedTax: 22.5,
+                allocatedTotal: 232.5,
+            }],
+            clientExpenseItems: [{
+                id: 'expense-client-composition',
+                title: 'Client-level composition expense',
+                amount: 15,
+                projectId: null,
+            }],
+            invoiceOnlyExpenseItems: [{
+                id: 'invoice-only-composition',
+                title: 'Invoice-only composition expense',
+                amount: 10,
+            }],
+            client: {
+                id: 'client-1',
+                title: 'Client One',
+            },
+            clientId: 'client-1',
+            businessInfo: {
+                id: 'business-composition',
+                businessName: 'Composition Business LLC',
+            },
+            businessInfoId: 'business-composition',
+            paymentMethod: {
+                id: 'payment-composition',
+                title: 'Composition Wire',
+            },
+            paymentMethodId: 'payment-composition',
+            invoiceNumber: 'COMP-2',
+            date: '2026-06-25',
+            dateOverride: '2026-06-25',
+            dueDate: '2026-07-25',
+            items: [{
+                description: 'Composition task',
+                quantity: 2,
+                rate: 100,
+                amount: 200,
+                projectId: 'project-1',
+                taskId: 'task-composition',
+                lineType: 'task',
+            }, {
+                description: 'Composition expense',
+                quantity: 1,
+                rate: 25,
+                amount: 25,
+                projectId: 'project-1',
+                expenseId: 'expense-composition',
+                lineType: 'expense',
+            }, {
+                description: 'Client-level composition expense',
+                quantity: 1,
+                rate: 15,
+                amount: 15,
+                expenseId: 'expense-client-composition',
+                lineType: 'expense',
+            }, {
+                description: 'Invoice-only composition expense',
+                quantity: 1,
+                rate: 10,
+                amount: 10,
+                lineType: 'custom',
+            }],
+            tasks: [{
+                id: 'task-composition',
+                title: 'Composition task',
+                hours: 2,
+                originalHours: 1,
+                hourlyRate: 100,
+                projectHourlyRate: 100,
+                useFlatRate: false,
+                isMerged: true,
+                mergedSubtasks: [{
+                    id: 'subtask-composition',
+                    title: 'Composition subtask',
+                    hours: 0.5,
+                    originalHours: 0.5,
+                    hourlyRate: 100,
+                    useFlatRate: false,
+                }],
+            }],
+            additionalTasks: [{
+                id: 'manual-composition',
+                title: 'Manual composition item',
+                useFlatRate: true,
+                flatRate: 50,
+                quantity: 1,
+            }],
+            expenseItems: [{
+                id: 'expense-composition',
+                title: 'Composition expense',
+                amount: 25,
+                projectId: 'project-1',
+            }, {
+                id: 'expense-client-composition',
+                title: 'Client-level composition expense',
+                amount: 15,
+                projectId: null,
+            }],
+            taskFlatRates: {
+                'task-composition': 200,
+            },
+            useFlatRate: {
+                'task-composition': false,
+            },
+            taskHourlyRates: {
+                'task-composition': 100,
+            },
+            taskQuantities: {
+                'task-composition': 2,
+            },
+            mergedSubtasks: {
+                'task-composition': true,
+            },
+            note: 'Internal composition note',
+            notes: 'Visible composition note',
+            totalHours: 2.5,
+            subtotal: 250,
+            discount: 20,
+            discountType: 'fixed',
+            discountValue: 20,
+            shipping: 5,
+            tax: 22.5,
+            taxRate: 9,
+            taxLabel: 'VAT',
+            taxOverride: {
+                enabled: true,
+                label: 'VAT',
+                rate: 9,
+            },
+            billingPeriodPreset: 'custom',
+            billingPeriodStart: '2026-06-01',
+            billingPeriodEnd: '2026-06-30',
+            currency: 'USD',
+            template: {
+                id: 'template-composition',
+                name: 'Composition Template',
+            },
+            templateId: 'template-composition',
+            brandingSnapshot: {
+                businessInfoId: 'business-composition',
+                templateId: 'template-composition',
+                layoutStyle: 'classic',
+                logoPlacement: 'invoice-left-logo-right',
+                showBusinessLogo: false,
+                useBusinessPrimaryColor: true,
+                primaryColor: '#123456',
+                logoAssetId: null,
+                logoAssetMeta: null,
+            },
+            htmlContent: '<section>Rendered composition invoice</section>',
+        };
+
+        const updated = updateInvoiceDraftCommand(context, {
+            invoiceId: 'invoice-composition-draft',
+            updates: composerUpdates,
+        });
+
+        expect(updated.invoice).toEqual(expect.objectContaining({
+            id: 'invoice-composition-draft',
+            invoiceNumber: 'COMP-2',
+            status: 'draft',
+            projectIds: ['project-1'],
+            projectBreakdowns: composerUpdates.projectBreakdowns,
+            clientExpenseItems: composerUpdates.clientExpenseItems,
+            invoiceOnlyExpenseItems: composerUpdates.invoiceOnlyExpenseItems,
+            businessInfo: composerUpdates.businessInfo,
+            paymentMethod: composerUpdates.paymentMethod,
+            dateOverride: '2026-06-25',
+            tasks: composerUpdates.tasks,
+            additionalTasks: composerUpdates.additionalTasks,
+            taskFlatRates: composerUpdates.taskFlatRates,
+            useFlatRate: composerUpdates.useFlatRate,
+            taskHourlyRates: composerUpdates.taskHourlyRates,
+            taskQuantities: composerUpdates.taskQuantities,
+            mergedSubtasks: composerUpdates.mergedSubtasks,
+            discountType: 'fixed',
+            discountValue: 20,
+            taxLabel: 'VAT',
+            taxOverride: composerUpdates.taxOverride,
+            brandingSnapshot: composerUpdates.brandingSnapshot,
+            htmlContent: '<section>Rendered composition invoice</section>',
+            subtotal: 250,
+            tax: 22.5,
+            total: 257.5,
+            updatedAt: Date.parse('2026-06-25T12:00:00Z'),
+        }));
+        expect(updated.sideEffects).toEqual({
+            createsInvoice: false,
+            marksEntriesBilled: false,
+            marksExpensesBilled: false,
+            updatesTaskBillingCutoffs: false,
+            updatesProjectInvoiceReferences: false,
+            advancesInvoiceSequence: false,
+        });
+
+        const finalized = await finalizeInvoiceCommand(context, {
+            invoiceId: 'invoice-composition-draft',
+            confirmFinalize: true,
+        });
+
+        expect(finalized.invoice).toEqual(expect.objectContaining({
+            id: 'invoice-composition-draft',
+            status: 'sent',
+            invoiceNumber: 'COMP-2',
+            projectIds: ['project-1'],
+            projectBreakdowns: composerUpdates.projectBreakdowns,
+            clientExpenseItems: composerUpdates.clientExpenseItems,
+            invoiceOnlyExpenseItems: composerUpdates.invoiceOnlyExpenseItems,
+            tasks: composerUpdates.tasks,
+            additionalTasks: composerUpdates.additionalTasks,
+            taskFlatRates: composerUpdates.taskFlatRates,
+            useFlatRate: composerUpdates.useFlatRate,
+            taskHourlyRates: composerUpdates.taskHourlyRates,
+            taskQuantities: composerUpdates.taskQuantities,
+            mergedSubtasks: composerUpdates.mergedSubtasks,
+            taxOverride: composerUpdates.taxOverride,
+            brandingSnapshot: composerUpdates.brandingSnapshot,
+            htmlContent: '<section>Rendered composition invoice</section>',
+            billingStateSnapshot: expect.objectContaining({
+                taskLastBilledAt: {
+                    'task-composition': null,
+                    'subtask-composition': null,
+                },
+            }),
+        }));
+        expect(finalized).toEqual(expect.objectContaining({
+            billedEntryCount: 0,
+            billedExpenseCount: 2,
+            updatedProjectInvoiceReferences: true,
+            advancedInvoiceSequence: false,
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.expenses, 'expense-composition')).toEqual(expect.objectContaining({
+            billingStatus: 'billed',
+            invoiceId: 'invoice-composition-draft',
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.expenses, 'expense-client-composition')).toEqual(expect.objectContaining({
+            billingStatus: 'billed',
+            invoiceId: 'invoice-composition-draft',
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.projects, 'project-1')).toEqual(expect.objectContaining({
+            invoiceIds: ['invoice-composition-draft'],
         }));
     });
 

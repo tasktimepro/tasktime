@@ -20,9 +20,34 @@ export interface PauseTimerCommandInput {
     pausedAt?: number;
 }
 
+export interface ResumeTimerCommandInput {
+    timerKey?: string;
+    taskId?: string;
+}
+
 export interface StopTimerCommandInput {
     timerKey?: string;
     taskId?: string;
+}
+
+export interface ClearTimerCommandInput {
+    timerKey?: string;
+    taskId?: string;
+    confirmClear?: boolean;
+    confirmationText?: string;
+}
+
+export interface ClearTimerResult {
+    timerKey: string;
+    taskId: string;
+    cleared: true;
+}
+
+export interface UpdateTimerCommandInput {
+    timerKey?: string;
+    taskId?: string;
+    startTime?: number;
+    note?: string | null;
 }
 
 export interface AddManualTimeEntryCommandInput {
@@ -223,6 +248,42 @@ export function pauseTimerCommand(context: AgentCommandContext, input: PauseTime
     };
 }
 
+export function resumeTimerCommand(context: AgentCommandContext, input: ResumeTimerCommandInput): MultiTimerState {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const timerKey = resolveTimerKey(context, input);
+    const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent resume timer ${timerKey}`);
+
+    if (!timer) {
+        throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
+    }
+
+    if (!timer.paused) {
+        return timer;
+    }
+
+    const pausedTime = timer.pausedElapsedTime || 0;
+    const now = getNow(context);
+    const updates = {
+        startTime: now - pausedTime,
+        paused: false,
+        pausedElapsedTime: 0,
+        lastActive: now,
+    };
+    const merged = validateCollectionEntity<MultiTimerState>('timers', {
+        ...timer,
+        ...updates,
+    }, `agent resume timer ${timerKey}`);
+
+    context.store.coreDoc.transact(() => {
+        updateEntityFields(context.store.timers as any, timerKey, updates);
+    });
+
+    markMeaningfulActivity('timer_resume');
+    return merged;
+}
+
 export function stopTimerCommand(context: AgentCommandContext, input: StopTimerCommandInput): { timerKey: string; entry: TimeEntry; durationMs: number } {
     assertReady(context);
     assertPermission(context, 'write');
@@ -266,6 +327,83 @@ export function stopTimerCommand(context: AgentCommandContext, input: StopTimerC
         entry,
         durationMs: Math.max(0, entry.end - entry.start),
     };
+}
+
+export function clearTimerCommand(context: AgentCommandContext, input: ClearTimerCommandInput): ClearTimerResult {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const timerKey = resolveTimerKey(context, input);
+
+    if (input.confirmClear !== true) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmClear must be true to clear a timer.', { timerKey });
+    }
+
+    if (input.confirmationText !== timerKey) {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmationText must match timerKey to clear a timer.', { timerKey });
+    }
+
+    const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent clear timer ${timerKey}`);
+
+    if (!timer) {
+        throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
+    }
+
+    context.store.coreDoc.transact(() => {
+        context.store.timers.delete(timerKey);
+    });
+
+    markMeaningfulActivity('timer_clear');
+
+    return {
+        timerKey,
+        taskId: timer.taskId,
+        cleared: true,
+    };
+}
+
+export function updateTimerCommand(context: AgentCommandContext, input: UpdateTimerCommandInput): MultiTimerState {
+    assertReady(context);
+    assertPermission(context, 'write');
+
+    const timerKey = resolveTimerKey(context, input);
+    const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent update timer ${timerKey}`);
+
+    if (!timer) {
+        throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
+    }
+
+    if (input.startTime === undefined && input.note === undefined) {
+        throw new AgentCommandError('INVALID_INPUT', 'startTime or note is required to update a timer.', { timerKey });
+    }
+
+    const updates: Record<string, unknown> = {
+        lastActive: getNow(context),
+    };
+
+    if (input.startTime !== undefined) {
+        if (typeof input.startTime !== 'number' || !Number.isFinite(input.startTime)) {
+            throw new AgentCommandError('INVALID_INPUT', 'startTime must be a finite timestamp.', { timerKey });
+        }
+
+        updates.startTime = input.startTime;
+    }
+
+    if (input.note !== undefined) {
+        updates.note = typeof input.note === 'string' ? input.note : '';
+    }
+
+    const merged = validateCollectionEntity<MultiTimerState>('timers', {
+        ...timer,
+        ...updates,
+    }, `agent update timer ${timerKey}`);
+
+    context.store.coreDoc.transact(() => {
+        updateEntityFields(context.store.timers as any, timerKey, updates);
+    });
+
+    markMeaningfulActivity('timer_update');
+    return merged;
 }
 
 export function addManualTimeEntryCommand(context: AgentCommandContext, input: AddManualTimeEntryCommandInput): TimeEntry {

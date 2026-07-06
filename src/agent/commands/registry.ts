@@ -79,13 +79,27 @@ import {
 } from './settings';
 import {
     addManualTimeEntryCommand,
+    clearTimerCommand,
     deleteTimeEntryCommand,
     getActiveTimersCommand,
     pauseTimerCommand,
+    resumeTimerCommand,
     startTimerCommand,
     stopTimerCommand,
+    updateTimerCommand,
     updateTimeEntryCommand,
 } from './timers';
+import {
+    attachPlannerItemCommand,
+    getProjectNotesCommand,
+    listDailyGoalsCommand,
+    listPlannerAttachmentsCommand,
+    removeDailyGoalCommand,
+    removePlannerAttachmentCommand,
+    setDailyGoalCommand,
+    updatePlannerAttachmentCommand,
+    updateProjectNotesCommand,
+} from './planner';
 import {
     createExpenseCommand,
     createExpenseRecurrenceCommand,
@@ -127,10 +141,12 @@ import {
 } from './invoices';
 import {
     focusRunningTimerCommand,
+    openAccountViewCommand,
     openClientViewCommand,
     openDashboardViewCommand,
     openExpensesViewCommand,
     openInvoiceViewCommand,
+    openPlannerViewCommand,
     openProjectViewCommand,
     openReportsViewCommand,
 } from './navigation';
@@ -206,10 +222,22 @@ export type AgentCommandName =
     | 'get_active_timers'
     | 'start_timer'
     | 'pause_timer'
+    | 'resume_timer'
     | 'stop_timer'
+    | 'clear_timer'
+    | 'update_timer'
     | 'add_manual_time_entry'
     | 'update_time_entry'
     | 'delete_time_entry'
+    | 'list_planner_attachments'
+    | 'attach_planner_item'
+    | 'update_planner_attachment'
+    | 'remove_planner_attachment'
+    | 'list_daily_goals'
+    | 'set_daily_goal'
+    | 'remove_daily_goal'
+    | 'get_project_notes'
+    | 'update_project_notes'
     | 'list_expenses'
     | 'create_expense'
     | 'delete_expense'
@@ -263,6 +291,8 @@ export type AgentCommandName =
     | 'find_unbilled_time'
     | 'list_recent_entries'
     | 'open_dashboard_view'
+    | 'open_planner_view'
+    | 'open_account_view'
     | 'open_project_view'
     | 'open_client_view'
     | 'open_invoice_view'
@@ -665,11 +695,30 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         scopes: ['write'],
         handler: pauseTimerCommand,
     },
+    resume_timer: {
+        name: 'resume_timer',
+        description: 'Resume a paused timer by timer key or task context.',
+        scopes: ['write'],
+        handler: resumeTimerCommand,
+    },
     stop_timer: {
         name: 'stop_timer',
         description: 'Stop a timer and create the corresponding time entry.',
         scopes: ['write'],
         handler: stopTimerCommand,
+    },
+    clear_timer: {
+        name: 'clear_timer',
+        description: 'Discard an active timer without creating a time entry after explicit command confirmation and browser approval.',
+        scopes: ['write'],
+        requiresApproval: true,
+        handler: clearTimerCommand,
+    },
+    update_timer: {
+        name: 'update_timer',
+        description: 'Update an active timer note and/or start time using the same timer state the UI uses.',
+        scopes: ['write'],
+        handler: updateTimerCommand,
     },
     add_manual_time_entry: {
         name: 'add_manual_time_entry',
@@ -689,6 +738,60 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         scopes: ['write'],
         requiresApproval: true,
         handler: deleteTimeEntryCommand,
+    },
+    list_planner_attachments: {
+        name: 'list_planner_attachments',
+        description: 'List planner attachments, optionally filtered by type, reference, mode, date, or weekday.',
+        scopes: ['read'],
+        handler: listPlannerAttachmentsCommand,
+    },
+    attach_planner_item: {
+        name: 'attach_planner_item',
+        description: 'Attach a client, project, or task to the planner for a date, weekday, static pin, this week, or every week.',
+        scopes: ['write'],
+        handler: attachPlannerItemCommand,
+    },
+    update_planner_attachment: {
+        name: 'update_planner_attachment',
+        description: 'Update planner attachment options such as estimated hours.',
+        scopes: ['write'],
+        handler: updatePlannerAttachmentCommand,
+    },
+    remove_planner_attachment: {
+        name: 'remove_planner_attachment',
+        description: 'Remove one planner attachment without deleting the referenced client, project, or task.',
+        scopes: ['write'],
+        handler: removePlannerAttachmentCommand,
+    },
+    list_daily_goals: {
+        name: 'list_daily_goals',
+        description: 'List weekday daily planner goals.',
+        scopes: ['read'],
+        handler: listDailyGoalsCommand,
+    },
+    set_daily_goal: {
+        name: 'set_daily_goal',
+        description: 'Set or clear a weekday daily goal using planner UI-compatible hour and earnings validation.',
+        scopes: ['write'],
+        handler: setDailyGoalCommand,
+    },
+    remove_daily_goal: {
+        name: 'remove_daily_goal',
+        description: 'Remove a weekday daily goal.',
+        scopes: ['write'],
+        handler: removeDailyGoalCommand,
+    },
+    get_project_notes: {
+        name: 'get_project_notes',
+        description: 'Read project notes in the same persisted TipTap JSON format used by the UI, plus plain text.',
+        scopes: ['read'],
+        handler: getProjectNotesCommand,
+    },
+    update_project_notes: {
+        name: 'update_project_notes',
+        description: 'Update project notes with plain text or TipTap JSON through the same persisted notes payload format used by the UI.',
+        scopes: ['write'],
+        handler: updateProjectNotesCommand,
     },
     list_expenses: {
         name: 'list_expenses',
@@ -1022,6 +1125,18 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         description: 'Open the dashboard route in the paired TaskTime app session.',
         scopes: ['navigation'],
         handler: (context) => openDashboardViewCommand(context),
+    },
+    open_planner_view: {
+        name: 'open_planner_view',
+        description: 'Open the planner route, optionally for a specific year/week, in the paired TaskTime app session.',
+        scopes: ['navigation'],
+        handler: openPlannerViewCommand,
+    },
+    open_account_view: {
+        name: 'open_account_view',
+        description: 'Open the account route, optionally focused on a specific Account section such as Agent Access.',
+        scopes: ['navigation'],
+        handler: openAccountViewCommand,
     },
     open_project_view: {
         name: 'open_project_view',

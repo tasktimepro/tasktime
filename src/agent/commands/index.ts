@@ -4,6 +4,7 @@ export * from './clients';
 export * from './settings';
 export * from './tax';
 export * from './timers';
+export * from './planner';
 export * from './expenses';
 export * from './invoices';
 export * from './navigation';

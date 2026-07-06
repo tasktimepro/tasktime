@@ -1081,6 +1081,19 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
         },
     },
     {
+        name: 'resume_timer',
+        description: 'Resume a paused timer by timer key or task ID.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                timerKey: optionalString,
+                taskId: optionalString,
+            },
+            additionalProperties: false,
+        },
+    },
+    {
         name: 'stop_timer',
         description: 'Stop a timer and create the matching time entry.',
         scopes: ['write'],
@@ -1089,6 +1102,37 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
             properties: {
                 timerKey: optionalString,
                 taskId: optionalString,
+            },
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'clear_timer',
+        description: 'Discard an active timer without creating a time entry after explicit confirmation and visible browser approval.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                timerKey: optionalString,
+                taskId: optionalString,
+                confirmClear: optionalBoolean,
+                confirmationText: optionalString,
+            },
+            required: ['confirmClear', 'confirmationText'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'update_timer',
+        description: 'Update an active timer note and/or start timestamp.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                timerKey: optionalString,
+                taskId: optionalString,
+                startTime: optionalNumber,
+                note: nullableString,
             },
             additionalProperties: false,
         },
@@ -1141,6 +1185,143 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
                 confirmationText: optionalString,
             },
             required: ['entryId', 'confirmDelete', 'confirmationText'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'list_planner_attachments',
+        description: 'List planner attachments, optionally filtered by entity, mode, date, or weekday.',
+        scopes: ['read'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', enum: ['client', 'project', 'task'] },
+                referenceId: optionalString,
+                mode: { type: 'string', enum: ['static', 'date', 'weekday'] },
+                date: optionalString,
+                weekday: optionalNumber,
+            },
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'attach_planner_item',
+        description: 'Attach a client, project, or task to the planner for a static pin, date, weekday, this week, or every week.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', enum: ['client', 'project', 'task'] },
+                referenceId: optionalString,
+                mode: { type: 'string', enum: ['static', 'date', 'weekday', 'week', 'every-week'] },
+                date: nullableString,
+                weekday: { type: ['number', 'null'] },
+                weekStartDate: nullableString,
+                includeWeekends: optionalBoolean,
+                estimatedHours: { type: ['number', 'null'] },
+                duplicateMode: { type: 'string', enum: ['reject', 'skip', 'overwrite'] },
+                idempotencyKey: optionalString,
+            },
+            required: ['type', 'referenceId', 'mode'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'update_planner_attachment',
+        description: 'Update planner attachment options such as estimated hours.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                plannerAttachmentId: optionalString,
+                estimatedHours: { type: ['number', 'null'] },
+            },
+            required: ['plannerAttachmentId'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'remove_planner_attachment',
+        description: 'Remove one planner attachment without deleting the referenced entity.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                plannerAttachmentId: optionalString,
+            },
+            required: ['plannerAttachmentId'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'list_daily_goals',
+        description: 'List weekday daily planner goals.',
+        scopes: ['read'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                weekday: optionalNumber,
+            },
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'set_daily_goal',
+        description: 'Set or clear a weekday daily planner goal.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                weekday: optionalNumber,
+                targetHours: { type: ['number', 'null'] },
+                targetEarnings: { type: ['number', 'null'] },
+            },
+            required: ['weekday'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'remove_daily_goal',
+        description: 'Remove a weekday daily planner goal.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                weekday: optionalNumber,
+            },
+            required: ['weekday'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_project_notes',
+        description: 'Read project notes in persisted TipTap JSON format plus plain text.',
+        scopes: ['read'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                projectId: optionalString,
+            },
+            required: ['projectId'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'update_project_notes',
+        description: 'Update project notes with plain text or TipTap JSON using the same persisted notes payload as the UI.',
+        scopes: ['write'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                projectId: optionalString,
+                plainText: optionalString,
+                content: {
+                    type: ['object', 'null'],
+                    additionalProperties: true,
+                },
+                clear: optionalBoolean,
+            },
+            required: ['projectId'],
             additionalProperties: false,
         },
     },
@@ -1986,6 +2167,34 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
         description: 'Open the TaskTime dashboard route in the paired app session.',
         scopes: ['navigation'],
         inputSchema: emptySchema,
+    },
+    {
+        name: 'open_planner_view',
+        description: 'Open the TaskTime planner route, optionally for a specific year and week.',
+        scopes: ['navigation'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                year: optionalNumber,
+                week: optionalNumber,
+            },
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'open_account_view',
+        description: 'Open the TaskTime account route, optionally focused on a specific Account section.',
+        scopes: ['navigation'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                section: {
+                    type: 'string',
+                    enum: ['preferences', 'email-templates', 'sync', 'agent', 'data'],
+                },
+            },
+            additionalProperties: false,
+        },
     },
     {
         name: 'open_project_view',
