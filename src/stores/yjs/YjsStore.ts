@@ -844,13 +844,14 @@ export class YjsStore {
     /**
      * Trigger Drive sync with optional force control.
      */
-    async syncDrive(options?: { allowPull?: boolean; force?: boolean }): Promise<void> {
+    async syncDrive(options?: { allowPull?: boolean; force?: boolean; forceFullState?: boolean }): Promise<void> {
         if (!this.driveProvider) {
             return;
         }
 
         await this.driveProvider.sync(options?.force ?? false, {
             allowPull: options?.allowPull,
+            forceFullState: options?.forceFullState,
         });
 
         const syncState = this.driveProvider.getState();
@@ -873,10 +874,11 @@ export class YjsStore {
      * Force immediate sync with Google Drive
      * @param options - Optional sync options (e.g., allowPull: false for backup mode)
      */
-    async forceDriveSync(options?: { allowPull?: boolean }): Promise<void> {
+    async forceDriveSync(options?: { allowPull?: boolean; forceFullState?: boolean }): Promise<void> {
         await this.syncDrive({
             ...options,
             force: true,
+            forceFullState: options?.forceFullState ?? options?.allowPull !== false,
         });
     }
 
@@ -1010,7 +1012,7 @@ export class YjsStore {
 
         if (shouldRefreshFromCloud) {
             try {
-                await this.forceDriveSync({ allowPull: true });
+                await this.forceDriveSync({ allowPull: true, forceFullState: false });
             } catch {
                 throw new Error('Unable to refresh cloud data before export. Please check your connection and try again.');
             }

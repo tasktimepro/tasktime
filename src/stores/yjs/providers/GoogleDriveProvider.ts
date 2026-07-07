@@ -104,6 +104,11 @@ type ConnectOptions = {
     bootstrapPullIfPristine?: boolean;
 };
 
+type SyncOptions = {
+    allowPull?: boolean;
+    forceFullState?: boolean;
+};
+
 export class YjsDriveProvider {
 
     private docManager: YjsDocManager;
@@ -127,6 +132,7 @@ export class YjsDriveProvider {
     private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     private isSyncing: boolean = false;
     private forceFullStateDocs: Set<DocName> = new Set();
+    private verifyFullStateDocs: Set<DocName> = new Set();
     private lifecycleListenersAttached: boolean = false;
 
     // Track which state versions and deltas we've already applied locally
@@ -149,6 +155,23 @@ export class YjsDriveProvider {
 
         if (added) {
             this.log('sync: queued full-state upload for reconnect docs', { docs: docNames });
+            this.updatePendingState();
+        }
+    }
+
+    private markDocsForFullStateVerification(docNames: DocName[]): void {
+        let added = false;
+
+        for (const docName of docNames) {
+            if (!this.verifyFullStateDocs.has(docName)) {
+                this.verifyFullStateDocs.add(docName);
+                added = true;
+            }
+        }
+
+        if (added) {
+            this.log('sync: queued full-state verification upload', { docs: docNames });
+            markPendingChanges();
             this.updatePendingState();
         }
     }
@@ -630,6 +653,7 @@ export class YjsDriveProvider {
         this.connected = false;
         this.pendingDeltas.clear();
         this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
+        this.verifyFullStateDocs.clear();
         this.appliedStateVersions.clear();
         this.appliedDeltaIds.clear();
         this.setState('idle');
@@ -685,6 +709,7 @@ export class YjsDriveProvider {
         // Reset local sync tracking
         this.pendingDeltas.clear();
         this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
+        this.verifyFullStateDocs.clear();
         this.appliedStateVersions.clear();
         this.appliedDeltaIds.clear();
         this.updatePendingState();
@@ -745,7 +770,7 @@ export class YjsDriveProvider {
      * Perform a full sync of all loaded documents
      * @param force - If true, bypasses the isSyncing guard and throttle (for manual Sync Now / visibility change)
      */
-    async sync(force: boolean = false, options: { allowPull?: boolean } = {}): Promise<void> {
+    async sync(force: boolean = false, options: SyncOptions = {}): Promise<void> {
         // Force sync supersedes any pending debounced sync
         if (force && this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
@@ -799,7 +824,7 @@ export class YjsDriveProvider {
     /**
      * Inner sync implementation (runs under the Web Lock)
      */
-    private async syncInner(force: boolean, options: { allowPull?: boolean }): Promise<void> {
+    private async syncInner(force: boolean, options: SyncOptions): Promise<void> {
         // Wait for current sync to finish if forcing
         if (this.isSyncing && force) {
             this.log('sync(force): waiting for current sync to complete...');
@@ -854,8 +879,8 @@ export class YjsDriveProvider {
                 manifestChanged = await this.manifest.hasManifestChanged();
                 
                 if (manifestChanged || force) {
-                    // Reload manifest from Drive to get latest changes
-                    // Use lightweight reload (no file listing) since we already have the file cache
+                    // Reload manifest from Drive to get latest changes and recover
+                    // any sync files that were uploaded but lost from the manifest.
                     this.setPhase('downloading');
                     await this.manifest.reload();
                     this.lastPullAt = Date.now();
@@ -881,6 +906,10 @@ export class YjsDriveProvider {
 
             const shouldPull = allowPull && (manifestChanged || force);
 
+            if (force && options.forceFullState === true) {
+                this.markDocsForFullStateVerification(loadedDocs);
+            }
+
             // Sync each loaded document (pull if manifest changed, always push pending)
             for (const docName of loadedDocs) {
                 await this.syncDoc(docName, shouldPull);
@@ -895,7 +924,11 @@ export class YjsDriveProvider {
             }
 
             this.setState('idle');
+            const hasRemainingLocalChanges = this.hasInMemoryLocalChangesToPush();
             markSyncCompleted(); // Persist successful sync completion
+            if (hasRemainingLocalChanges) {
+                markPendingChanges();
+            }
 
             // Trigger post-sync callback (e.g., backup)
             try {
@@ -959,12 +992,18 @@ export class YjsDriveProvider {
         return false;
     }
 
+    private hasInMemoryLocalChangesToPush(): boolean {
+        return this.forceFullStateDocs.size > 0
+            || this.verifyFullStateDocs.size > 0
+            || this.hasPendingDeltas();
+    }
+
     /**
      * Check if there are local changes that need to be pushed
      * This includes in-memory pending deltas and persisted state from previous sessions
      */
     hasLocalChangesToPush(): boolean {
-        if (this.forceFullStateDocs.size > 0) {
+        if (this.forceFullStateDocs.size > 0 || this.verifyFullStateDocs.size > 0) {
             return true;
         }
 
@@ -998,7 +1037,10 @@ export class YjsDriveProvider {
         // 2. Push local changes
         const pendingCount = this.pendingDeltas.get(docName)?.length ?? 0;
         const needsInitialState = docManifest.stateVersion === 0;
-        const shouldUpload = this.forceFullStateDocs.has(docName) || pendingCount > 0 || needsInitialState;
+        const shouldUpload = this.forceFullStateDocs.has(docName)
+            || this.verifyFullStateDocs.has(docName)
+            || pendingCount > 0
+            || needsInitialState;
 
         if (shouldUpload) {
             if (!silent) this.setPhase('uploading');
@@ -1006,17 +1048,34 @@ export class YjsDriveProvider {
 
         if (this.forceFullStateDocs.has(docName)) {
             // Push full state after reconnect to capture offline changes
-            // Note: pushFullState handles its own error recovery and will re-add to forceFullStateDocs on failure
             const uploadedBatch = [...(this.pendingDeltas.get(docName) ?? [])];
             this.forceFullStateDocs.delete(docName); // Remove before push
-            await this.pushFullState(docName, doc, true);
-            // If pushFullState failed, it re-added to forceFullStateDocs, so don't clear pending
-            if (!this.forceFullStateDocs.has(docName)) {
-                // Success - clear only the updates already included in the uploaded full state.
-                this.clearUploadedPendingPrefix(docName, uploadedBatch);
+            const uploaded = await this.pushFullState(docName, doc, true);
+
+            if (!uploaded) {
+                this.forceFullStateDocs.add(docName);
+                throw new Error(`Failed to upload full Drive state for ${docName}`);
             }
+
+            // Success - clear only the updates already included in the uploaded full state.
+            this.clearUploadedPendingPrefix(docName, uploadedBatch);
+        } else if (this.verifyFullStateDocs.has(docName)) {
+            const uploadedBatch = [...(this.pendingDeltas.get(docName) ?? [])];
+            this.verifyFullStateDocs.delete(docName);
+            const uploaded = await this.pushFullState(docName, doc, false);
+
+            if (!uploaded) {
+                this.verifyFullStateDocs.add(docName);
+                throw new Error(`Failed to verify full Drive state for ${docName}`);
+            }
+
+            this.clearUploadedPendingPrefix(docName, uploadedBatch);
         } else {
-            await this.pushDeltas(docName, doc);
+            const uploaded = await this.pushDeltas(docName, doc);
+
+            if (!uploaded) {
+                throw new Error(`Failed to upload Drive delta for ${docName}`);
+            }
         }
 
         // 3. Compact if needed
@@ -1151,16 +1210,16 @@ export class YjsDriveProvider {
     /**
      * Push pending local deltas for a document
      */
-    private async pushDeltas(docName: DocName, doc: Y.Doc): Promise<void> {
+    private async pushDeltas(docName: DocName, doc: Y.Doc): Promise<boolean> {
         const pending = this.pendingDeltas.get(docName);
         if (!pending || pending.length === 0) {
             // No pending deltas - but we might need to push initial state
             const docManifest = this.manifest.getDocManifest(docName);
             if (!docManifest || docManifest.stateVersion === 0) {
                 // First time syncing this doc - push full state
-                await this.pushFullState(docName, doc);
+                return this.pushFullState(docName, doc);
             }
-            return;
+            return true;
         }
 
         const uploadedBatch = [...pending];
@@ -1192,6 +1251,7 @@ export class YjsDriveProvider {
             this.updatePendingState();
 
             this.log(`push: delta ${deltaId} for ${docName}`, { bytes: mergedDelta.length });
+            return true;
         } catch (error) {
             // Preserve pending deltas so they retry on next sync
             console.error(`[DriveSync] Failed to push delta for ${docName}, will retry on next sync`, error);
@@ -1204,16 +1264,16 @@ export class YjsDriveProvider {
                     queuedUpdates: uploadedBatch.length,
                 },
             });
-            // Don't rethrow - let sync continue with other docs and retry later
+            return false;
         }
     }
 
     /**
      * Push full state for initial sync
      */
-    private async pushFullState(docName: DocName, doc: Y.Doc, clearDeltas: boolean = false): Promise<void> {
+    private async pushFullState(docName: DocName, doc: Y.Doc, clearDeltas: boolean = false): Promise<boolean> {
         const fullState = encodeStateAsUpdate(doc);
-        if (fullState.length === 0) return; // Empty doc
+        if (fullState.length === 0) return true; // Empty doc
 
         const docManifest = this.manifest.ensureDocManifest(docName);
         const stateFileName = docManifest.stateFile;
@@ -1258,9 +1318,8 @@ export class YjsDriveProvider {
             this.log(`push: full state for ${docName}`, { bytes: fullState.length, version: nextStateVersion });
 
             this.updatePendingState();
+            return true;
         } catch (error) {
-            // Keep doc in forceFullStateDocs so it retries on next sync
-            this.forceFullStateDocs.add(docName);
             console.error(`[DriveSync] Failed to push full state for ${docName}, will retry`, error);
             captureDriveIncident({
                 incidentKey: 'drive.full_state_upload_failed',
@@ -1272,7 +1331,7 @@ export class YjsDriveProvider {
                     bytes: fullState.length,
                 },
             });
-            // Don't rethrow - let sync continue with other docs
+            return false;
         }
     }
 

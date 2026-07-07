@@ -37,7 +37,20 @@ function createProviderWithCoreDoc(coreDoc) {
 
 describe('YjsDriveProvider', () => {
     beforeEach(() => {
+        const storage = new Map()
+
         vi.clearAllMocks()
+        localStorage.getItem.mockImplementation((key) => storage.get(key))
+        localStorage.setItem.mockImplementation((key, value) => {
+            storage.set(key, value)
+        })
+        localStorage.removeItem.mockImplementation((key) => {
+            storage.delete(key)
+        })
+        localStorage.clear.mockImplementation(() => {
+            storage.clear()
+        })
+        localStorage.clear()
     })
 
     it('only establishes the connection without syncing on manual-mode connect', async () => {
@@ -337,6 +350,102 @@ describe('YjsDriveProvider', () => {
                 queuedUpdates: 1,
             }),
         }))
+    })
+
+    it('keeps durable pending state when a queued delta upload fails during sync', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const capturedUpdates = []
+
+        liveDoc.on('update', (update) => {
+            capturedUpdates.push(update)
+        })
+
+        liveDoc.transact(() => {
+            liveDoc.getMap('projects').set('project-1', objectToYMap({
+                id: 'project-1',
+                title: 'Must retry',
+            }))
+        })
+
+        const manifestDoc = {
+            stateFile: 'tasktime-yjs-core.bin',
+            stateVersion: 1,
+            lastCompaction: '2026-06-04T00:00:00.000Z',
+            deltas: [],
+        }
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.pendingDeltas.set('core', [capturedUpdates[0]])
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: true,
+            syncInterrupted: false,
+            syncStartedAt: null,
+            lastSyncCompletedAt: null,
+        }))
+        provider.manifest = {
+            hasManifestChanged: vi.fn(async () => false),
+            getDocManifest: vi.fn(() => manifestDoc),
+            ensureDocManifest: vi.fn(() => manifestDoc),
+            createFile: vi.fn(async () => {
+                throw new Error('delta upload failed')
+            }),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+
+        await provider.sync(false, { allowPull: true })
+
+        const persisted = JSON.parse(localStorage.getItem('tasktime-sync-state'))
+        expect(provider.getState()).toBe('error')
+        expect(provider.pendingDeltas.get('core')).toHaveLength(1)
+        expect(persisted.hasPendingChanges).toBe(true)
+        expect(persisted.syncInterrupted).toBe(false)
+    })
+
+    it('uploads full document state on forced verification sync even without queued deltas', async () => {
+        const liveDoc = new Y.Doc()
+        liveDoc.getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Verify me',
+        }))
+
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const manifestDoc = {
+            stateFile: 'tasktime-yjs-core.bin',
+            stateVersion: 1,
+            lastCompaction: '2026-06-04T00:00:00.000Z',
+            deltas: [],
+        }
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.appliedStateVersions.set('core', 1)
+        provider.manifest = {
+            hasManifestChanged: vi.fn(async () => false),
+            reload: vi.fn(async () => {}),
+            getDocManifest: vi.fn(() => manifestDoc),
+            ensureDocManifest: vi.fn(() => manifestDoc),
+            getFileId: vi.fn(() => 'core-state-id'),
+            updateFile: vi.fn(async () => '2026-06-04T00:00:01.000Z'),
+            createFile: vi.fn(async () => 'core-state-id'),
+            setFileId: vi.fn(),
+            updateDocManifest: vi.fn((_, update) => {
+                Object.assign(manifestDoc, update)
+            }),
+            save: vi.fn(async () => {}),
+            isDirty: vi.fn(() => false),
+        }
+
+        await provider.sync(true, { allowPull: true, forceFullState: true })
+
+        expect(provider.manifest.updateFile).toHaveBeenCalledWith('core-state-id', 'tasktime-yjs-core.bin', expect.any(Blob))
+        expect(provider.manifest.updateDocManifest).toHaveBeenCalledWith('core', expect.not.objectContaining({
+            deltas: [],
+        }))
+        expect(provider.getState()).toBe('idle')
+        expect(JSON.parse(localStorage.getItem('tasktime-sync-state')).hasPendingChanges).toBe(false)
     })
 
     it('captures unrecoverable missing Drive files as incidents', async () => {

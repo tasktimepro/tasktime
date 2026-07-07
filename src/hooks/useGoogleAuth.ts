@@ -36,6 +36,7 @@ type SignOutFromWorker = (options?: { revoke?: boolean }) => Promise<void>;
 const SIGN_IN_CAPACITY_EXCEEDED_ERROR = 'Google Drive sign-in is temporarily unavailable because the sync service reached its daily sign-in limit. Please try again tomorrow.';
 const AUTH_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
 const AUTH_CONFIG_INCIDENT_THROTTLE_MS = 60 * 60 * 1000;
+const AUTH_INIT_RETRY_DELAYS_MS = [500, 1500];
 
 const HAD_PREVIOUS_SESSION_KEY = 'google-auth-had-previous-session';
 
@@ -168,6 +169,59 @@ function shouldCaptureSignInIncident(error: Error): boolean {
         message === 'Authentication popup was closed before sign-in completed.' ||
         message === 'Authentication timed out. Please try again.'
     );
+}
+
+function isRetryableAuthInitError(error: unknown): boolean {
+
+    return error instanceof TypeError;
+}
+
+function isRetryableAuthInitResponse(response: Response): boolean {
+
+    return response.status === 0 || response.status === 408 || response.status >= 500;
+}
+
+function waitForAuthInitRetry(delayMs: number): Promise<void> {
+
+    return new Promise(resolve => {
+        window.setTimeout(resolve, delayMs);
+    });
+}
+
+async function requestAuthInitWithRetry(
+    redirectUri: string,
+    onRetry?: (attempt: number, delayMs: number) => void,
+): Promise<Response> {
+
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt <= AUTH_INIT_RETRY_DELAYS_MS.length; attempt++) {
+        try {
+            const response = await fetch(SYNC_WORKER_CONFIG.endpoints.authInit, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ redirectUri }),
+            });
+
+            if (response.ok || !isRetryableAuthInitResponse(response) || attempt === AUTH_INIT_RETRY_DELAYS_MS.length) {
+                return response;
+            }
+
+            lastError = new Error(`Failed to initialize auth flow (${response.status})`);
+        } catch (error) {
+            lastError = error;
+
+            if (!isRetryableAuthInitError(error) || attempt === AUTH_INIT_RETRY_DELAYS_MS.length) {
+                throw error;
+            }
+        }
+
+        const retryDelayMs = AUTH_INIT_RETRY_DELAYS_MS[attempt];
+        onRetry?.(attempt + 1, retryDelayMs);
+        await waitForAuthInitRetry(retryDelayMs);
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Failed to initialize auth flow');
 }
 
 function captureGoogleAuthIncident(
@@ -308,21 +362,30 @@ export const useGoogleAuth = () => {
 
         let popup: Window | null = null;
         let failedStep = 'open-popup';
+        let authInitRetryCount = 0;
 
         try {
             popup = openPendingAuthPopup();
             failedStep = 'auth-init';
 
-            // 1. Get auth URL from Worker
-            const initResponse = await fetch(SYNC_WORKER_CONFIG.endpoints.authInit, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    redirectUri: `${window.location.origin}/auth/callback`,
-                }),
+            // 1. Get auth URL from Worker. The popup is already open to preserve
+            // the user gesture on mobile, so brief network failures can be retried
+            // without requiring the user to tap Connect again.
+            const redirectUri = `${window.location.origin}/auth/callback`;
+            const initResponse = await requestAuthInitWithRetry(redirectUri, (attempt) => {
+                authInitRetryCount = attempt;
+                updatePendingAuthPopupMessage(
+                    popup,
+                    attempt === 1
+                        ? 'Still connecting Google Drive...'
+                        : 'Retrying Google Drive connection...',
+                );
             });
 
-            if (!initResponse.ok) throw new Error('Failed to initialize auth flow');
+            if (!initResponse.ok) {
+                const errorMessage = await readResponseError(initResponse, 'Failed to initialize auth flow');
+                throw new Error(errorMessage);
+            }
 
             const { authUrl, state: authState } = await initResponse.json();
             sessionStorage.setItem('google_auth_state', authState);
@@ -342,7 +405,7 @@ export const useGoogleAuth = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     code,
-                    redirectUri: `${window.location.origin}/auth/callback`,
+                    redirectUri,
                 }),
             });
 
@@ -408,6 +471,7 @@ export const useGoogleAuth = () => {
                     {
                         step: failedStep,
                         workerOrigin: getEndpointOrigin(SYNC_WORKER_CONFIG.endpoints.authInit),
+                        authInitRetryCount,
                     },
                 );
             }
@@ -692,6 +756,22 @@ function renderPendingAuthPopup(popup: Window): void {
 
         popupDocument.head.replaceChildren(viewport, title, style);
         popupDocument.body.replaceChildren(message);
+    } catch {
+        // Ignore cross-browser document access failures for blank popups.
+    }
+}
+
+function updatePendingAuthPopupMessage(popup: Window | null, text: string): void {
+
+    if (!popup) {
+        return;
+    }
+
+    try {
+        const message = popup.document.body.querySelector('p');
+        if (message) {
+            message.textContent = text;
+        }
     } catch {
         // Ignore cross-browser document access failures for blank popups.
     }

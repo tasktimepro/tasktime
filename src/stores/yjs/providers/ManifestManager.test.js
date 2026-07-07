@@ -83,6 +83,73 @@ describe('ManifestManager', () => {
         expect(fetchMock.mock.calls[1][0]).toContain('pageToken=next-page')
     })
 
+    it('recovers missing manifest references for existing sync files on load', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(jsonResponse({
+                files: [
+                    { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:00.000Z' },
+                    { id: 'core-state-id', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-06-04T00:00:01.000Z' },
+                    { id: 'core-delta-id', name: 'tasktime-yjs-core-delta-abcd1234.bin', modifiedTime: '2026-06-04T00:00:02.000Z' },
+                ],
+            }, { status: 200 }))
+            .mockResolvedValueOnce(jsonResponse({
+                version: 1,
+                deviceId: 'device-1',
+                lastSync: '2026-06-04T00:00:00.000Z',
+                documents: {},
+            }, { status: 200 }))
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const manager = new ManifestManager('token-123')
+        const manifest = await manager.load()
+
+        expect(manifest.documents.core).toEqual(expect.objectContaining({
+            stateFile: 'tasktime-yjs-core.bin',
+            stateVersion: 1,
+            deltas: [{ id: 'abcd1234', timestamp: '2026-06-04T00:00:02.000Z' }],
+        }))
+        expect(manager.isDirty()).toBe(true)
+    })
+
+    it('recovers missing delta references during manifest reload', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(jsonResponse({ modifiedTime: '2026-06-04T00:00:03.000Z' }, { status: 200 }))
+            .mockResolvedValueOnce(jsonResponse({
+                version: 1,
+                deviceId: 'device-1',
+                lastSync: '2026-06-04T00:00:00.000Z',
+                documents: {
+                    core: {
+                        stateFile: 'tasktime-yjs-core.bin',
+                        stateVersion: 2,
+                        lastCompaction: '2026-06-04T00:00:01.000Z',
+                        deltas: [],
+                    },
+                },
+            }, { status: 200 }))
+            .mockResolvedValueOnce(jsonResponse({
+                files: [
+                    { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:03.000Z' },
+                    { id: 'core-state-id', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-06-04T00:00:01.000Z' },
+                    { id: 'core-delta-id', name: 'tasktime-yjs-core-delta-lost9999.bin', modifiedTime: '2026-06-04T00:00:02.000Z' },
+                ],
+            }, { status: 200 }))
+
+        vi.stubGlobal('fetch', fetchMock)
+
+        const manager = new ManifestManager('token-123')
+        manager.manifestFileId = 'manifest-id'
+        manager.lastManifestModifiedTime = '2026-06-04T00:00:00.000Z'
+
+        const manifest = await manager.reload()
+
+        expect(manifest.documents.core.deltas).toEqual([
+            { id: 'lost9999', timestamp: '2026-06-04T00:00:02.000Z' },
+        ])
+        expect(manager.isDirty()).toBe(true)
+    })
+
     it('identifies Drive file-not-found errors from download and upload paths', () => {
         expect(isDriveFileNotFoundError(new Error('Drive API error 404: {"error":{"message":"File not found: abc."}}'))).toBe(true)
         expect(isDriveFileNotFoundError(new Error('Drive update error 404: {"error":{"message":"File not found: abc."}}'))).toBe(true)

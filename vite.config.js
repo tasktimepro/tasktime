@@ -95,6 +95,9 @@ export default defineConfig({
     strictPort: true, // Exit if port is already in use instead of automatically trying the next available port
     host: 'localhost',
     proxy: publicRouteProxy,
+    watch: {
+      ignored: ['**/coverage/**', '**/dist/**', '**/blog/dist/**'],
+    },
     // Handle SPA routing - redirect all requests to index.html
     historyApiFallback: true
   },

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useGoogleAuth, _resetValidationCache } from './useGoogleAuth'
 import { getStoredSession, clearStoredSession } from '@/utils/googleAuthStorage'
@@ -51,6 +51,10 @@ describe('useGoogleAuth', () => {
         window.sessionStorage.clear()
         vi.stubGlobal('fetch', vi.fn())
         vi.spyOn(window, 'open').mockImplementation(() => createPopupStub())
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     it('clears stored session when auth status passes but Drive access is denied', async () => {
@@ -138,9 +142,92 @@ describe('useGoogleAuth', () => {
         expect(clearStoredSession).not.toHaveBeenCalled()
     })
 
-    it('returns an actionable error when the sync worker is unreachable during sign-in', async () => {
+    it('retries a transient auth init network failure without requiring another user tap', async () => {
         getStoredSession.mockResolvedValue(null)
-        fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+
+        fetch
+            .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                    state: 'oauth-state',
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    sessionId: 'session-retried',
+                    user: {
+                        id: 'user-retried',
+                        email: 'retry@example.com',
+                    },
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ authenticated: true }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        vi.useFakeTimers()
+
+        let signInPromise
+
+        act(() => {
+            signInPromise = result.current.signIn()
+        })
+
+        await act(async () => {
+            await Promise.resolve()
+        })
+
+        expect(popup.document.body.textContent).toContain('Still connecting Google Drive')
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500)
+        })
+
+        await act(async () => {
+            await Promise.resolve()
+        })
+
+        expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'auth-code',
+                    state: 'oauth-state',
+                },
+            }))
+        })
+
+        await act(async () => {
+            await signInPromise
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.user?.email).toBe('retry@example.com')
+        expect(fetch).toHaveBeenCalledWith('https://worker.example/auth/init', expect.any(Object))
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'auth.sign_in_failed',
+        }))
+    })
+
+    it('returns an actionable error when the sync worker is unreachable after auth init retries', async () => {
+        getStoredSession.mockResolvedValue(null)
+        fetch.mockRejectedValue(new TypeError('Failed to fetch'))
 
         const { result } = renderHook(() => useGoogleAuth())
 
@@ -149,18 +236,36 @@ describe('useGoogleAuth', () => {
         })
 
         let thrownError
+        let signInPromise
+
+        vi.useFakeTimers()
+
+        act(() => {
+            signInPromise = result.current.signIn().catch(error => {
+                thrownError = error
+            })
+        })
 
         await act(async () => {
-            try {
-                await result.current.signIn()
-            } catch (error) {
-                thrownError = error
-            }
+            await Promise.resolve()
+        })
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500)
+        })
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(1500)
+        })
+
+        await act(async () => {
+            await signInPromise
         })
 
         expect(thrownError).toBeInstanceOf(Error)
         expect(thrownError.message).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
         expect(result.current.error).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
+        expect(fetch).toHaveBeenCalledTimes(3)
         expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
             incidentKey: 'auth.sign_in_failed',
             context: expect.objectContaining({

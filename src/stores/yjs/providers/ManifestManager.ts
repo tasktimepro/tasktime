@@ -18,6 +18,15 @@ import { SYNC_WORKER_CONFIG } from '@/config/google';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const MANIFEST_FILE_NAME = 'tasktime-yjs-manifest.json';
+const SYNC_FILE_PREFIX = 'tasktime-yjs-';
+const SYNC_FILE_SUFFIX = '.bin';
+const DELTA_FILE_MARKER = '-delta-';
+
+interface AppDataFile {
+    id: string;
+    name: string;
+    modifiedTime: string;
+}
 
 export interface DeltaInfo {
     id: string;
@@ -36,6 +45,41 @@ export interface Manifest {
     deviceId: string;
     lastSync: string;
     documents: Record<string, DocManifest>;
+}
+
+function isKnownSyncDocName(docName: string): boolean {
+    return docName === 'core'
+        || docName === 'entries-active'
+        || docName === 'tasks-archived'
+        || docName === 'invoices-archived'
+        || docName === 'expenses-archived'
+        || /^entries-\d+$/.test(docName);
+}
+
+function parseSyncFileName(fileName: string): { docName: string; deltaId?: string } | null {
+    if (!fileName.startsWith(SYNC_FILE_PREFIX) || !fileName.endsWith(SYNC_FILE_SUFFIX)) {
+        return null;
+    }
+
+    const stem = fileName.slice(SYNC_FILE_PREFIX.length, -SYNC_FILE_SUFFIX.length);
+    const deltaMarkerIndex = stem.lastIndexOf(DELTA_FILE_MARKER);
+
+    if (deltaMarkerIndex > 0) {
+        const docName = stem.slice(0, deltaMarkerIndex);
+        const deltaId = stem.slice(deltaMarkerIndex + DELTA_FILE_MARKER.length);
+
+        if (deltaId && isKnownSyncDocName(docName)) {
+            return { docName, deltaId };
+        }
+
+        return null;
+    }
+
+    if (isKnownSyncDocName(stem)) {
+        return { docName: stem };
+    }
+
+    return null;
 }
 
 export function isDriveFileNotFoundError(error: unknown): boolean {
@@ -146,6 +190,8 @@ export class ManifestManager {
             this.fileIdCache.set(file.name, file.id);
         }
 
+        this.reconcileManifestWithFiles(files);
+
         return this.manifest;
     }
 
@@ -205,8 +251,8 @@ export class ManifestManager {
     }
 
     /**
-     * Lightweight reload: download just the manifest content without listing all files.
-     * Use this when we already have the manifestFileId and file cache from a previous load().
+     * Reload manifest content and refresh the appData file cache.
+     * Use this when we already have the manifestFileId from a previous load().
      * Falls back to full load() if we don't have the manifest file ID.
      */
     async reload(): Promise<Manifest> {
@@ -216,15 +262,22 @@ export class ManifestManager {
         }
 
         try {
-            // Fetch manifest metadata (modifiedTime) and content
-            const [metaResponse, content] = await Promise.all([
+            // Fetch manifest metadata, content, and the file list so orphaned
+            // delta files from concurrent manifest writes can be recovered.
+            const [metaResponse, content, files] = await Promise.all([
                 this.request(`/files/${this.manifestFileId}?fields=modifiedTime`),
                 this.downloadFileAsJson(this.manifestFileId),
+                this.listAppDataFiles(),
             ]);
 
             const { modifiedTime } = await metaResponse.json();
             this.lastManifestModifiedTime = modifiedTime;
             this.manifest = content as Manifest;
+            this.fileIdCache.clear();
+            for (const file of files) {
+                this.fileIdCache.set(file.name, file.id);
+            }
+            this.reconcileManifestWithFiles(files);
 
             console.log('[ManifestManager] Reloaded manifest (lightweight)');
             return this.manifest;
@@ -445,11 +498,86 @@ export class ManifestManager {
     /**
      * Refresh file ID cache from Drive
      */
-    async refreshFileCache(): Promise<void> {
+    async refreshFileCache(): Promise<AppDataFile[]> {
         const files = await this.listAppDataFiles();
         this.fileIdCache.clear();
         for (const file of files) {
             this.fileIdCache.set(file.name, file.id);
+        }
+        return files;
+    }
+
+    private ensureRecoveredDocManifest(docName: string, modifiedTime: string): DocManifest {
+        if (!this.manifest) {
+            throw new Error('Manifest not loaded');
+        }
+
+        const existing = this.manifest.documents[docName];
+        if (existing) {
+            return existing;
+        }
+
+        const recovered: DocManifest = {
+            stateFile: `${SYNC_FILE_PREFIX}${docName}${SYNC_FILE_SUFFIX}`,
+            stateVersion: 0,
+            lastCompaction: modifiedTime,
+            deltas: [],
+        };
+
+        this.manifest.documents[docName] = recovered;
+        this._dirty = true;
+        return recovered;
+    }
+
+    private reconcileManifestWithFiles(files: AppDataFile[]): void {
+        if (!this.manifest) {
+            return;
+        }
+
+        let recoveredDocCount = 0;
+        let recoveredDeltaCount = 0;
+
+        for (const file of files) {
+            const parsed = parseSyncFileName(file.name);
+            if (!parsed) {
+                continue;
+            }
+
+            const doc = this.ensureRecoveredDocManifest(parsed.docName, file.modifiedTime);
+
+            if (!parsed.deltaId) {
+                if (doc.stateFile !== file.name) {
+                    doc.stateFile = file.name;
+                    this._dirty = true;
+                }
+
+                if (doc.stateVersion === 0) {
+                    doc.stateVersion = 1;
+                    doc.lastCompaction = file.modifiedTime;
+                    recoveredDocCount++;
+                    this._dirty = true;
+                }
+
+                continue;
+            }
+
+            if (doc.deltas.some((delta) => delta.id === parsed.deltaId)) {
+                continue;
+            }
+
+            doc.deltas.push({
+                id: parsed.deltaId,
+                timestamp: file.modifiedTime,
+            });
+            recoveredDeltaCount++;
+            this._dirty = true;
+        }
+
+        if (recoveredDocCount > 0 || recoveredDeltaCount > 0) {
+            console.warn('[ManifestManager] Recovered missing sync file references from Drive file list', {
+                documents: recoveredDocCount,
+                deltas: recoveredDeltaCount,
+            });
         }
     }
 
@@ -588,8 +716,8 @@ export class ManifestManager {
     /**
      * List all files in appDataFolder
      */
-    async listAppDataFiles(): Promise<Array<{ id: string; name: string; modifiedTime: string }>> {
-        const allFiles: Array<{ id: string; name: string; modifiedTime: string }> = [];
+    async listAppDataFiles(): Promise<AppDataFile[]> {
+        const allFiles: AppDataFile[] = [];
         const query = encodeURIComponent('trashed=false');
         let pageToken: string | null = null;
 

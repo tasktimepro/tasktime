@@ -61,7 +61,7 @@ export interface YjsContextValue {
     /** Auto-sync mode */
     autoSyncMode: AutoSyncMode;
     /** Manually trigger Drive sync */
-    forceSyncDrive: (options?: { allowPull?: boolean }) => Promise<void>;
+    forceSyncDrive: (options?: { allowPull?: boolean; forceFullState?: boolean }) => Promise<void>;
     /** Disconnect Drive sync */
     disconnectDrive: () => void;
     /** Wipe all TaskTime Pro files from Drive */
@@ -97,6 +97,7 @@ interface YjsProviderProps {
 type DriveSyncOptions = {
     allowPull?: boolean;
     force?: boolean;
+    forceFullState?: boolean;
 };
 
 type RunSyncWithAuthHandling = (options?: DriveSyncOptions) => Promise<void>;

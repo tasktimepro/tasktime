@@ -243,6 +243,40 @@ describe('YjsStore reconnect sync tracking', () => {
         store.destroy()
     })
 
+    it('uses full-state verification for default manual sync now', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+
+        await store.forceDriveSync()
+
+        expect(provider.sync).toHaveBeenCalledWith(true, {
+            allowPull: undefined,
+            forceFullState: true,
+        })
+
+        store.destroy()
+    })
+
+    it('does not default forced push-only syncs to full-state verification', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+
+        await store.forceDriveSync({ allowPull: false })
+
+        expect(provider.sync).toHaveBeenCalledWith(true, {
+            allowPull: false,
+            forceFullState: false,
+        })
+
+        store.destroy()
+    })
+
     it('clears disconnected dirty docs after manual sync succeeds with no provider work pending', async () => {
         const store = new YjsStore()
         await store.initialize()
@@ -338,7 +372,7 @@ describe('YjsStore reconnect sync tracking', () => {
             refreshFromCloud: true,
         })).rejects.toThrow('Unable to refresh cloud data before export')
 
-        expect(provider.sync).toHaveBeenCalledWith(true, { allowPull: true })
+        expect(provider.sync).toHaveBeenCalledWith(true, { allowPull: true, forceFullState: false })
         expect(provider.syncAndSubscribeDoc).not.toHaveBeenCalled()
 
         store.destroy()
@@ -786,7 +820,7 @@ describe('YjsStore timer reconciliation', () => {
             refreshFromCloud: true,
         })
 
-        expect(provider.sync).toHaveBeenCalledWith(true, { allowPull: true })
+        expect(provider.sync).toHaveBeenCalledWith(true, { allowPull: true, forceFullState: false })
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('tasks-archived', { allowPull: true })
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('invoices-archived', { allowPull: true })
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('expenses-archived', { allowPull: true })
