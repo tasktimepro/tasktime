@@ -7,13 +7,12 @@
     ".codex-plugin/",
     ".mcp.json",
     "LICENSE",
+    "LICENSE.agent-bridge",
     "README.md",
     "scripts/",
-    "skills/"
+    "skills/",
+    "vendor/"
   ],
-  "dependencies": {
-    "@tasktimepro/agent-bridge": "^0.1.0"
-  },
   "keywords": [
     "tasktime",
     "openclaw",
@@ -24,7 +23,7 @@
     "local-first"
   ],
   "homepage": "https://tasktime.pro/agents/openclaw/",
-  "license": "MIT-0",
+  "license": "(MIT-0 AND AGPL-3.0-only)",
   "publishConfig": {
     "access": "public"
   }

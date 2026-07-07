@@ -7,7 +7,7 @@
     "url": "https://tasktime.pro"
   },
   "homepage": "https://tasktime.pro/agents/openclaw/",
-  "license": "MIT-0",
+  "license": "(MIT-0 AND AGPL-3.0-only)",
   "keywords": [
     "tasktime",
     "openclaw",

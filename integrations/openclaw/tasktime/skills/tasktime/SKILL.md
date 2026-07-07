@@ -7,7 +7,7 @@ metadata:
     homepage: https://tasktime.pro/agents/openclaw/
     requires:
       bins:
-        - tasktime-agent-bridge
+        - node
     install:
       - kind: node
         package: "@tasktimepro/agent-bridge"
@@ -39,7 +39,7 @@ Launch the bridge as an MCP stdio server:
 tasktime-agent-bridge --app-url https://tasktime.pro
 ```
 
-Require a running paired TaskTime Pro browser session before reading or mutating data. The user grants first-use access in TaskTime Pro under Account > Agent Access. If the OpenClaw bundle installed the MCP server, expect TaskTime Pro tools to be exposed with the server prefix, such as `tasktime__list_projects`.
+If this skill was installed through the TaskTime Pro OpenClaw bundle, use the bundle-provided MCP server instead of requiring a global `tasktime-agent-bridge` binary. Require a running paired TaskTime Pro browser session before reading or mutating data. The user grants first-use access in TaskTime Pro under Account > Agent Access. If the OpenClaw bundle installed the MCP server, expect TaskTime Pro tools to be exposed with the server prefix, such as `tasktime__list_projects`.
 
 Call `tools/list` at runtime because available tools depend on the granted bridge scopes. Default scopes are `read`, `write`, and `navigation`; optional scopes are `billing`, `export`, and `email`.
 
