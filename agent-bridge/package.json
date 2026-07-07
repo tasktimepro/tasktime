@@ -1,11 +1,11 @@
 {
   "name": "@tasktimepro/agent-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local MCP stdio server for same-device TaskTime Pro agent access.",
   "mcpName": "pro.tasktime/agent-bridge",
   "type": "module",
   "bin": {
-    "tasktime-agent-bridge": "./dist/tasktime-agent-bridge.mjs"
+    "tasktime-agent-bridge": "dist/tasktime-agent-bridge.mjs"
   },
   "files": [
     "dist/tasktime-agent-bridge.mjs",
