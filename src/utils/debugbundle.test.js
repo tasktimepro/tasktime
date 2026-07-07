@@ -58,6 +58,7 @@ describe('debugbundle utility', () => {
 
     it('falls back to development and production environments when none is configured', async () => {
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+        vi.stubEnv('VITE_DEBUGBUNDLE_ENVIRONMENT', undefined)
         vi.stubEnv('PROD', false)
 
         let debugBundleModule = await loadDebugBundleModule()
@@ -72,6 +73,7 @@ describe('debugbundle utility', () => {
         vi.resetModules()
         vi.clearAllMocks()
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+        vi.stubEnv('VITE_DEBUGBUNDLE_ENVIRONMENT', undefined)
         vi.stubEnv('PROD', true)
 
         debugBundleModule = await loadDebugBundleModule()
