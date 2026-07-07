@@ -198,12 +198,7 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 4. All Drive API calls go through Worker with session ID
 5. Worker auto-refreshes access tokens as needed
 
-**Worker commands (Makefile):**
-```bash
-make worker-deploy    # Deploy Worker (requires CLOUDFLARE_API_TOKEN env var)
-make worker-logs      # View Worker logs
-make worker-secret    # Set a secret (KEY=... VALUE=...)
-```
+**Worker operations:** Deployment, logs, D1/KV commands, and secret management live in the private infrastructure repository, not in the public app Makefile.
 
 **Local development:** Set `VITE_SYNC_WORKER_URL` in `.env.local`
 
