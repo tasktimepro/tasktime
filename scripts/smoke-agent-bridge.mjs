@@ -79,7 +79,7 @@ try {
     'tools/call before pairing should report UNAVAILABLE'
   )
 
-  console.log('TaskTime agent bridge smoke test passed.')
+  console.log('TaskTime Pro agent bridge smoke test passed.')
 } finally {
   child.kill('SIGTERM')
   await waitForExit()

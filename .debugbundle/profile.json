@@ -148,6 +148,6 @@
     "last_reviewed_at": "2026-05-26T18:40:00.000Z",
     "validation_status": "agent-validated",
     "skill_path": ".agents/skills/debugbundle",
-    "notes": "Validated for the Cloudflare Pages React SPA, Astro public site, and Cloudflare Worker deployment used by TaskTime."
+    "notes": "Validated for the Cloudflare Pages React SPA, Astro public site, and Cloudflare Worker deployment used by TaskTime Pro."
   }
 }

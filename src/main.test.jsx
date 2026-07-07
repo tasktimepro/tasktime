@@ -76,8 +76,8 @@ describe('main entrypoint', () => {
         })
         window.dispatchEvent(rejectionEvent)
 
-        expect(consoleErrorSpy).toHaveBeenNthCalledWith(1, '[TaskTime] Uncaught error:', uncaughtError)
-        expect(consoleErrorSpy).toHaveBeenNthCalledWith(2, '[TaskTime] Unhandled promise rejection:', 'nope')
+        expect(consoleErrorSpy).toHaveBeenNthCalledWith(1, '[TaskTime Pro] Uncaught error:', uncaughtError)
+        expect(consoleErrorSpy).toHaveBeenNthCalledWith(2, '[TaskTime Pro] Unhandled promise rejection:', 'nope')
         expect(initializeDebugBundleSpy).toHaveBeenCalledTimes(1)
         expect(captureDebugBundleGlobalErrorSpy).toHaveBeenCalledWith(uncaughtError, expect.objectContaining({
             message: 'boom',
@@ -104,7 +104,7 @@ describe('main entrypoint', () => {
 
         window.dispatchEvent(cspViolationEvent)
 
-        expect(consoleErrorSpy).not.toHaveBeenCalledWith('[TaskTime] Content Security Policy violation:', cspViolationEvent)
+        expect(consoleErrorSpy).not.toHaveBeenCalledWith('[TaskTime Pro] Content Security Policy violation:', cspViolationEvent)
 
         consoleErrorSpy.mockRestore()
     })

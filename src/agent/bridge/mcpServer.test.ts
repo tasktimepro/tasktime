@@ -690,12 +690,12 @@ describe('McpBridgeJsonRpcServer', () => {
                     ok: false,
                     error: expect.objectContaining({
                         code: 'UNAVAILABLE',
-                        message: 'No TaskTime app session is connected.',
+                        message: 'No TaskTime Pro app session is connected.',
                         details: {
                             recovery: {
                                 action: 'launch_tasktime',
                                 reason: 'authoritative_app_session_required',
-                                message: 'Open TaskTime and connect the local agent bridge, then retry the tool call.',
+                                message: 'Open TaskTime Pro and connect the local agent bridge, then retry the tool call.',
                             },
                         },
                     }),

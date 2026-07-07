@@ -24,8 +24,8 @@ describe('OnboardingModal', () => {
 
         render(<OnboardingModal isOpen onComplete={vi.fn()} />)
 
-        expect(screen.getByText(/Welcome to TaskTime\./i)).toBeInTheDocument()
-        expect(screen.queryByText('TaskTime setup')).not.toBeInTheDocument()
+        expect(screen.getByText(/Welcome to TaskTime Pro\./i)).toBeInTheDocument()
+        expect(screen.queryByText('TaskTime Pro setup')).not.toBeInTheDocument()
         expect(screen.queryByRole('list', { name: 'Setup progress' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Close dialog' })).not.toBeInTheDocument()
         expect(screen.getByText('1 of 3')).toBeInTheDocument()
@@ -53,7 +53,7 @@ describe('OnboardingModal', () => {
 
         await user.click(screen.getByRole('button', { name: 'Next' }))
 
-        expect(screen.getByText(/Working with TaskTime/i)).toBeInTheDocument()
+        expect(screen.getByText(/Working with TaskTime Pro/i)).toBeInTheDocument()
         expect(screen.getByText('Dashboard')).toBeInTheDocument()
         expect(screen.getByText('Projects')).toBeInTheDocument()
         expect(screen.getByText('Tasks')).toBeInTheDocument()

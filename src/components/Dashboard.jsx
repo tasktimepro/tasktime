@@ -1056,7 +1056,7 @@ const Dashboard = ({
         const expenseCount = unseenItems.filter((item) => item.type === 'expense').length;
         const firstTitle = unseenItems[0]?.title || '';
 
-        new window.Notification('TaskTime', {
+        new window.Notification('TaskTime Pro', {
             body: buildTodoNotificationBody({ taskCount, expenseCount, firstTitle }),
             tag: `tasktime-todo-${todayStr}`,
         });

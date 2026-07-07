@@ -2,13 +2,13 @@
 title: "Why Local-First Software Is a Better Deal for Freelancers"
 description: "Local-first means your data lives on your device — not someone else's server. Here's why that matters more than you'd think for freelance work."
 publishedAt: "2026-04-08"
-excerpt: "What does 'local-first' actually mean? And why should you care? A plain-English explanation of how local-first tools like TaskTime keep you in control."
+excerpt: "What does 'local-first' actually mean? And why should you care? A plain-English explanation of how local-first tools like TaskTime Pro keep you in control."
 category: "invoicing"
 tags: ["local-first", "invoicing", "freelancers", "privacy"]
 keywords: ["local-first invoicing software", "private invoice app", "freelancer invoicing software", "local-first software"]
 featured: true
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "Why Local-First Software Is a Better Deal for Freelancers"
 socialDescription: "Local-first means your data lives on your device, not someone else's server. Here's why freelancers should care."
 draft: false
@@ -31,7 +31,7 @@ Here's what day-to-day freelancing looks like with a local-first approach:
 
 "But what if I use two devices?" — totally fair question.
 
-Local-first doesn't mean local-only. TaskTime, for example, lets you sync across devices through your own Google Drive. The data goes from your browser to your Drive account — we never touch it or even see it.
+Local-first doesn't mean local-only. TaskTime Pro, for example, lets you sync across devices through your own Google Drive. The data goes from your browser to your Drive account — we never touch it or even see it.
 
 So you get the convenience of sync without the privacy trade-off of storing everything on a company's servers.
 
@@ -39,4 +39,4 @@ So you get the convenience of sync without the privacy trade-off of storing ever
 
 If you've been using cloud-first tools your whole freelance career, switching to something local-first feels surprisingly good. Everything is faster. You stop worrying about whether you saved. And you realize how much of the "product" in most SaaS tools is really just managing the connection to their servers.
 
-[Give TaskTime a try](/) — it runs right in your browser, no sign-up required.
+[Give TaskTime Pro a try](/) — it runs right in your browser, no sign-up required.

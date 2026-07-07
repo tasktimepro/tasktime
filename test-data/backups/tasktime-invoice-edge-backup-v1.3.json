@@ -1,0 +1,653 @@
+{
+  "version": "1.3",
+  "exportDate": "2026-05-21T12:00:00.000Z",
+  "backupType": "manual",
+  "projects": [
+    {
+      "id": "proj-atlas-platform",
+      "title": "Atlas Platform",
+      "description": "Product sprint work with mixed invoice states.",
+      "invoiceIds": ["inv-edge-001", "inv-edge-002"],
+      "hourlyRate": 145,
+      "preferredClientId": "client-atlas",
+      "isPersonal": false,
+      "archived": false,
+      "color": "#0EA5E9",
+      "billableTimeIncrementMinutes": 15
+    },
+    {
+      "id": "proj-atlas-support",
+      "title": "Atlas Support Retainer",
+      "description": "Retainer project used for draft invoice coverage.",
+      "invoiceIds": ["inv-edge-003"],
+      "hourlyRate": 130,
+      "preferredClientId": "client-atlas",
+      "isPersonal": false,
+      "archived": false,
+      "color": "#22C55E",
+      "billableTimeIncrementMinutes": 30
+    },
+    {
+      "id": "proj-beta-launch",
+      "title": "Beta Retail Launch",
+      "description": "Launch prep with overdue and sent invoices.",
+      "invoiceIds": ["inv-edge-004", "inv-edge-002"],
+      "hourlyRate": 180,
+      "preferredClientId": "client-beta",
+      "isPersonal": false,
+      "archived": false,
+      "color": "#F97316",
+      "billableTimeIncrementMinutes": 15
+    },
+    {
+      "id": "proj-legacy-cleanup",
+      "title": "Legacy Archive Cleanup",
+      "description": "Historical invoice retained for archived invoice coverage.",
+      "invoiceIds": ["inv-edge-archived"],
+      "hourlyRate": 110,
+      "preferredClientId": "client-beta",
+      "isPersonal": false,
+      "archived": true,
+      "archivedOnDate": "2025-12-31",
+      "color": "#7C3AED",
+      "billableTimeIncrementMinutes": 30
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-atlas-discovery",
+      "projectId": "proj-atlas-platform",
+      "title": "Discovery and Scope",
+      "billable": true,
+      "billableSetByUser": true,
+      "completed": true,
+      "completedOnDate": "2026-05-02"
+    },
+    {
+      "id": "task-atlas-polish",
+      "projectId": "proj-atlas-platform",
+      "parentTaskId": "task-atlas-discovery",
+      "title": "QA Follow-up",
+      "billable": true,
+      "billableSetByUser": true,
+      "completed": false
+    },
+    {
+      "id": "task-atlas-retainer",
+      "projectId": "proj-atlas-support",
+      "title": "Retainer Planning",
+      "billable": true,
+      "billableSetByUser": true,
+      "recurring": {
+        "type": "monthly",
+        "monthlyType": "first"
+      }
+    },
+    {
+      "id": "task-beta-release",
+      "projectId": "proj-beta-launch",
+      "title": "Release Readiness",
+      "billable": true,
+      "billableSetByUser": true,
+      "completed": false
+    },
+    {
+      "id": "task-legacy-cleanup",
+      "projectId": "proj-legacy-cleanup",
+      "title": "Archive Cleanup",
+      "billable": true,
+      "billableSetByUser": true,
+      "archived": true,
+      "archivedOnDate": "2025-12-31",
+      "completed": true,
+      "completedOnDate": "2025-11-10"
+    }
+  ],
+  "timeEntries": [
+    {
+      "id": "entry-atlas-billed",
+      "taskId": "task-atlas-discovery",
+      "start": 1777713300000,
+      "end": 1777721400000,
+      "note": "Atlas planning session.",
+      "source": "manual",
+      "billedHourlyRate": 145,
+      "billedAt": 1777629600000,
+      "billedInvoiceId": "inv-edge-001",
+      "billedDurationMs": 8100000,
+      "billingIncrementMinutes": 15
+    },
+    {
+      "id": "entry-atlas-followup",
+      "taskId": "task-atlas-polish",
+      "start": 1778068800000,
+      "end": 1778072400000,
+      "note": "Final QA pass before handoff.",
+      "source": "timer",
+      "billedHourlyRate": null,
+      "billedAt": null,
+      "billedInvoiceId": null,
+      "billedDurationMs": null,
+      "billingIncrementMinutes": 15,
+      "_stoppedTimerKey": "proj-atlas-platform",
+      "_stoppedTimerInstanceId": "invoice-edge-timer-1"
+    },
+    {
+      "id": "entry-beta-release",
+      "taskId": "task-beta-release",
+      "start": 1775808000000,
+      "end": 1775826000000,
+      "note": "Pre-launch bug bash and sign-off.",
+      "source": "manual",
+      "billedHourlyRate": 180,
+      "billedAt": 1776245400000,
+      "billedInvoiceId": "inv-edge-002",
+      "billedDurationMs": 18000000,
+      "billingIncrementMinutes": 15
+    },
+    {
+      "id": "entry-legacy-cleanup",
+      "taskId": "task-legacy-cleanup",
+      "start": 1762779600000,
+      "end": 1762790400000,
+      "note": "Historical archive cleanup.",
+      "source": "manual",
+      "billedHourlyRate": 110,
+      "billedAt": 1765800000000,
+      "billedInvoiceId": "inv-edge-archived",
+      "billedDurationMs": 10800000,
+      "billingIncrementMinutes": 30
+    }
+  ],
+  "invoices": [
+    {
+      "id": "inv-edge-001",
+      "projectId": "proj-atlas-platform",
+      "clientId": "client-atlas",
+      "businessInfoId": "biz-edge-main",
+      "templateId": "tpl-edge-standard",
+      "invoiceNumber": "EDGE-2026-001",
+      "date": "2026-05-01",
+      "dueDate": "2026-05-15",
+      "status": "paid",
+      "items": [
+        {
+          "description": "Discovery and Scope",
+          "quantity": 2.25,
+          "rate": 145,
+          "amount": 326.25,
+          "taskId": "task-atlas-discovery"
+        },
+        {
+          "description": "QA Follow-up",
+          "quantity": 1,
+          "rate": 145,
+          "amount": 145,
+          "taskId": "task-atlas-polish"
+        }
+      ],
+      "subtotal": 471.25,
+      "tax": 94.25,
+      "taxRate": 20,
+      "total": 565.5,
+      "notes": "Paid invoice in a non-preferred currency to exercise payment snapshots.",
+      "paymentMethodId": "pm-edge-bank",
+      "billingPeriodPreset": "custom",
+      "billingPeriodStart": "2026-05-01",
+      "billingPeriodEnd": "2026-05-07",
+      "currency": "USD",
+      "paidAt": 1777629600000,
+      "paymentCurrencySnapshot": {
+        "capturedAt": 1777629600000,
+        "sourceCurrency": "USD",
+        "sourceAmount": 565.5,
+        "preferredCurrencyAtPayment": "EUR",
+        "preferredCurrencyAmount": 520.26
+      },
+      "sentAt": 1777622400000,
+      "sentToEmail": "billing@atlas.example"
+    },
+    {
+      "id": "inv-edge-002",
+      "projectId": "proj-beta-launch",
+      "clientId": "client-beta",
+      "businessInfoId": "biz-edge-eu",
+      "templateId": "tpl-edge-no-tax",
+      "invoiceNumber": "EDGE-2026-002",
+      "date": "2026-05-08",
+      "dueDate": "2026-05-10",
+      "status": "overdue",
+      "items": [
+        {
+          "description": "Release Readiness",
+          "quantity": 5,
+          "rate": 180,
+          "amount": 900,
+          "taskId": "task-beta-release"
+        },
+        {
+          "description": "Launch travel reimbursement",
+          "quantity": 1,
+          "rate": 220,
+          "amount": 220,
+          "expenseId": "expense-beta-travel",
+          "supplierName": "ICE Rail"
+        }
+      ],
+      "subtotal": 1120,
+      "tax": 0,
+      "taxRate": 0,
+      "total": 1120,
+      "notes": "Client tax disabled; invoice should remain tax-free and overdue.",
+      "paymentMethodId": "pm-edge-wise",
+      "billingPeriodPreset": "custom",
+      "billingPeriodStart": "2026-04-01",
+      "billingPeriodEnd": "2026-05-08",
+      "currency": "EUR",
+      "paidAt": null,
+      "paymentCurrencySnapshot": null,
+      "sentAt": 1776245400000,
+      "sentToEmail": "finance@beta.example"
+    },
+    {
+      "id": "inv-edge-003",
+      "projectId": "proj-atlas-support",
+      "clientId": "client-atlas",
+      "businessInfoId": "biz-edge-main",
+      "templateId": "tpl-edge-standard",
+      "invoiceNumber": "EDGE-2026-003",
+      "date": "2026-05-20",
+      "dueDate": null,
+      "status": "draft",
+      "items": [
+        {
+          "description": "Retainer Planning",
+          "quantity": 3,
+          "rate": 130,
+          "amount": 390,
+          "taskId": "task-atlas-retainer"
+        }
+      ],
+      "subtotal": 390,
+      "tax": 78,
+      "taxRate": 20,
+      "total": 468,
+      "notes": "Draft invoice left editable for invoice generator regression coverage.",
+      "paymentMethodId": "pm-edge-bank",
+      "billingPeriodPreset": "all-time",
+      "billingPeriodStart": null,
+      "billingPeriodEnd": null,
+      "currency": "USD",
+      "paidAt": null,
+      "paymentCurrencySnapshot": null,
+      "sentAt": null,
+      "sentToEmail": null
+    },
+    {
+      "id": "inv-edge-004",
+      "projectId": "proj-beta-launch",
+      "clientId": "client-beta",
+      "businessInfoId": "biz-edge-eu",
+      "templateId": "tpl-edge-no-tax",
+      "invoiceNumber": "EDGE-2026-004",
+      "date": "2026-05-21",
+      "dueDate": "2026-06-10",
+      "status": "sent",
+      "items": [
+        {
+          "description": "Launch Checklist",
+          "quantity": 2.5,
+          "rate": 180,
+          "amount": 450,
+          "taskId": "task-beta-release"
+        }
+      ],
+      "subtotal": 450,
+      "tax": 0,
+      "taxRate": 0,
+      "total": 450,
+      "notes": "Sent invoice that should remain in the outstanding bucket.",
+      "paymentMethodId": "pm-edge-wise",
+      "billingPeriodPreset": "last-month",
+      "billingPeriodStart": "2026-04-01",
+      "billingPeriodEnd": "2026-04-30",
+      "currency": "EUR",
+      "paidAt": null,
+      "paymentCurrencySnapshot": null,
+      "sentAt": 1778072400000,
+      "sentToEmail": "finance@beta.example"
+    },
+    {
+      "id": "inv-edge-archived",
+      "projectId": "proj-legacy-cleanup",
+      "clientId": "client-beta",
+      "businessInfoId": "biz-edge-main",
+      "templateId": "tpl-edge-standard",
+      "invoiceNumber": "EDGE-2025-014",
+      "date": "2025-11-30",
+      "dueDate": "2025-12-15",
+      "status": "paid",
+      "items": [
+        {
+          "description": "Archive Cleanup",
+          "quantity": 3,
+          "rate": 110,
+          "amount": 330,
+          "taskId": "task-legacy-cleanup"
+        }
+      ],
+      "subtotal": 330,
+      "tax": 0,
+      "taxRate": 0,
+      "total": 330,
+      "notes": "Historical paid invoice used for archived invoice import coverage.",
+      "paymentMethodId": "pm-edge-bank",
+      "billingPeriodPreset": "all-time",
+      "billingPeriodStart": null,
+      "billingPeriodEnd": null,
+      "currency": "USD",
+      "paidAt": 1765800000000,
+      "paymentCurrencySnapshot": {
+        "capturedAt": 1765800000000,
+        "sourceCurrency": "USD",
+        "sourceAmount": 330,
+        "preferredCurrencyAtPayment": "EUR",
+        "preferredCurrencyAmount": 303.6
+      },
+      "sentAt": 1762790400000,
+      "sentToEmail": "finance@beta.example"
+    }
+  ],
+  "paymentMethods": [
+    {
+      "id": "pm-edge-bank",
+      "title": "USD Operating Account",
+      "fullName": "Edge Cases Studio LLC",
+      "bank": "Mercury",
+      "iban": "US00EDGE0000000001",
+      "swift": "MRCYUS00",
+      "bankAddress": "1 Market St, San Francisco, CA",
+      "paypal": "accounts@edge.example",
+      "custom": [],
+      "isDefault": true,
+      "instructions": "Include the invoice number in the payment reference."
+    },
+    {
+      "id": "pm-edge-wise",
+      "title": "EUR Collections Account",
+      "fullName": "Edge Cases Studio GmbH",
+      "bank": "Wise",
+      "iban": "DE44500105175407324931",
+      "swift": "TRWIDEFF",
+      "bankAddress": "Unter den Linden 1, Berlin",
+      "paypal": "eu@edge.example",
+      "custom": [
+        {
+          "label": "Reference",
+          "value": "Use invoice number only"
+        }
+      ],
+      "isDefault": false,
+      "instructions": "Preferred for EUR clients."
+    }
+  ],
+  "expenseCategories": [
+    {
+      "id": "cat-edge-travel",
+      "name": "Travel",
+      "group": "Operations",
+      "isDefault": true,
+      "archived": false
+    },
+    {
+      "id": "cat-edge-hosting",
+      "name": "Hosting",
+      "group": "Operations",
+      "isDefault": false,
+      "archived": false
+    }
+  ],
+  "taxReturnPeriods": [
+    {
+      "id": "trp-edge-2025",
+      "title": "Historical 2025 Taxes",
+      "type": "sales-tax",
+      "startDate": "2025-01-01",
+      "endDate": "2025-12-31",
+      "businessInfoId": "biz-edge-main",
+      "status": "paid",
+      "filedAt": 1764547200000,
+      "paidAt": 1765800000000,
+      "notes": "Historical period kept for archived records."
+    }
+  ],
+  "businessInfos": [
+    {
+      "id": "biz-edge-main",
+      "title": "Edge Cases Studio",
+      "name": "Edge Cases Studio",
+      "businessName": "Edge Cases Studio LLC",
+      "email": "hello@edge.example",
+      "phone": "+1 415 555 0110",
+      "address": "500 Howard St",
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94105",
+      "country": "USA",
+      "registrationNumber": "EDGE-LLC-01",
+      "taxNumber": "12-9988776",
+      "taxId": "US12-9988776",
+      "isDefault": true,
+      "taxEnabled": true,
+      "taxLabel": "VAT",
+      "taxRate": 20
+    },
+    {
+      "id": "biz-edge-eu",
+      "title": "Edge Cases EU",
+      "name": "Edge Cases EU",
+      "businessName": "Edge Cases EU GmbH",
+      "email": "eu@edge.example",
+      "phone": "+49 30 5555 0170",
+      "address": "Unter den Linden 1",
+      "city": "Berlin",
+      "state": "Berlin",
+      "zip": "10117",
+      "country": "Germany",
+      "registrationNumber": "HRB 445566",
+      "taxNumber": "DE998877665",
+      "taxId": "DE998877665",
+      "isDefault": false,
+      "taxEnabled": false,
+      "taxLabel": "VAT",
+      "taxRate": 0
+    }
+  ],
+  "clients": [
+    {
+      "id": "client-atlas",
+      "title": "Atlas Labs",
+      "clientName": "Atlas Laboratories Inc.",
+      "contactPerson": "Morgan Lee",
+      "email": "billing@atlas.example",
+      "phone": "+1 646 555 0111",
+      "address": "80 Broad St",
+      "city": "New York",
+      "state": "NY",
+      "zip": "10004",
+      "country": "USA",
+      "notes": "Primary invoice edge-case client.",
+      "disableTax": false,
+      "defaultHourlyRate": 145,
+      "hourlyRate": 145,
+      "defaultCurrency": "USD",
+      "archived": false,
+      "color": "#0EA5E9"
+    },
+    {
+      "id": "client-beta",
+      "title": "Beta Retail",
+      "clientName": "Beta Retail GmbH",
+      "contactPerson": "Anika Roth",
+      "email": "finance@beta.example",
+      "phone": "+49 40 555 0192",
+      "address": "Spitalerstrasse 10",
+      "city": "Hamburg",
+      "state": "Hamburg",
+      "zip": "20095",
+      "country": "Germany",
+      "notes": "Tax-disabled client used for overdue and sent invoice coverage.",
+      "disableTax": true,
+      "defaultHourlyRate": 180,
+      "hourlyRate": 180,
+      "defaultCurrency": "EUR",
+      "archived": false,
+      "color": "#F97316"
+    }
+  ],
+  "invoiceTemplates": [
+    {
+      "id": "tpl-edge-standard",
+      "name": "Edge Standard",
+      "prefix": "EDGE",
+      "invoiceNumberFormat": "EDGE-{year}-{sequential}",
+      "useSequentialNumbers": true,
+      "currentSequentialNumber": 4,
+      "sequentialNumberDigits": 3,
+      "defaultNotes": "Payment due in 14 days.",
+      "defaultTaxRate": 20,
+      "dueDateType": "fixed-days",
+      "defaultDueDays": 14,
+      "isDefault": true
+    },
+    {
+      "id": "tpl-edge-no-tax",
+      "name": "Edge No Tax",
+      "prefix": "EDGE-EU",
+      "invoiceNumberFormat": "EDGE-{year}-{sequential}",
+      "useSequentialNumbers": true,
+      "currentSequentialNumber": 4,
+      "sequentialNumberDigits": 3,
+      "defaultNotes": "Issued without tax by client agreement.",
+      "defaultTaxRate": 0,
+      "dueDateType": "fixed-days",
+      "defaultDueDays": 21,
+      "isDefault": false
+    }
+  ],
+  "emailTemplates": [
+    {
+      "id": "email-edge-default",
+      "name": "Invoice Email",
+      "type": "invoice",
+      "fromName": "Edge Cases Studio",
+      "replyTo": "billing@edge.example",
+      "subject": "Invoice {{invoiceNumber}}",
+      "sendBody": "Hi {{clientName}},\n\nPlease find invoice {{invoiceNumber}} attached.\n\nThanks,\n{{businessName}}",
+      "reminderBody": "Hi {{clientName}},\n\nA reminder that invoice {{invoiceNumber}} is still open.\n\nThanks,\n{{businessName}}",
+      "attachmentTitle": "{{invoiceNumber}}.pdf",
+      "isDefault": true
+    }
+  ],
+  "expenses": [
+    {
+      "id": "expense-beta-travel",
+      "title": "Launch travel reimbursement",
+      "date": "2026-05-04",
+      "supplierName": "ICE Rail",
+      "receiptNumber": "ICE-7788",
+      "currency": "EUR",
+      "amount": 220,
+      "paidOn": "2026-05-04",
+      "paidBy": "pm-edge-wise",
+      "paymentStatus": "paid",
+      "paymentMode": "manual",
+      "clientId": "client-beta",
+      "projectId": "proj-beta-launch",
+      "businessId": "biz-edge-eu",
+      "categoryId": "cat-edge-travel",
+      "isPersonal": false,
+      "billable": true,
+      "billingStatus": "billed",
+      "invoiceId": "inv-edge-002",
+      "billedAt": 1776245400000,
+      "isRecurring": false,
+      "recurrenceId": null,
+      "amountType": "fixed",
+      "taxNumber": null,
+      "isTaxExempt": true,
+      "amountExcludingTax": null,
+      "taxLabel": null,
+      "taxRate": null,
+      "taxClaimStatus": "excluded",
+      "taxClaimPeriodId": null,
+      "taxClaimedAt": null,
+      "paymentCurrencySnapshot": {
+        "capturedAt": 1777622400000,
+        "sourceCurrency": "EUR",
+        "sourceAmount": 220,
+        "preferredCurrencyAtPayment": "EUR",
+        "preferredCurrencyAmount": 220
+      }
+    },
+    {
+      "id": "expense-legacy-hosting",
+      "title": "Legacy hosting",
+      "date": "2025-10-15",
+      "supplierName": "Render",
+      "receiptNumber": "REN-1001",
+      "currency": "USD",
+      "amount": 49,
+      "paidOn": "2025-10-15",
+      "paidBy": "pm-edge-bank",
+      "paymentStatus": "paid",
+      "paymentMode": "manual",
+      "clientId": null,
+      "projectId": null,
+      "businessId": "biz-edge-main",
+      "categoryId": "cat-edge-hosting",
+      "isPersonal": false,
+      "billable": false,
+      "billingStatus": "unbilled",
+      "invoiceId": null,
+      "billedAt": null,
+      "isRecurring": false,
+      "recurrenceId": null,
+      "amountType": "fixed",
+      "taxNumber": "12-9988776",
+      "isTaxExempt": true,
+      "amountExcludingTax": null,
+      "taxLabel": null,
+      "taxRate": null,
+      "taxClaimStatus": "excluded",
+      "taxClaimPeriodId": "trp-edge-2025",
+      "taxClaimedAt": null,
+      "paymentCurrencySnapshot": {
+        "capturedAt": 1765800000000,
+        "sourceCurrency": "USD",
+        "sourceAmount": 49,
+        "preferredCurrencyAtPayment": "EUR",
+        "preferredCurrencyAmount": 45.08
+      }
+    }
+  ],
+  "expenseRecurrences": [],
+  "dailyGoals": [],
+  "plannerAttachments": [],
+  "preferences": {
+    "currency": "EUR",
+    "dateFormat": "yyyy-MM-dd",
+    "timeFormat": "24h",
+    "theme": "system",
+    "defaultView": "invoices",
+    "weekStartsOn": 1,
+    "showCompletedTasks": true,
+    "defaultBillable": true,
+    "projectSort": "name",
+    "clientSort": "name",
+    "autoSyncEnabled": true,
+    "autoSyncMode": "backup",
+    "backupEnabled": true,
+    "backupFrequencyHours": 24
+  }
+}

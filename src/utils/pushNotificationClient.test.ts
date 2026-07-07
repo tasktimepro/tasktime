@@ -200,7 +200,7 @@ describe('pushNotificationClient', () => {
 
         await vi.advanceTimersByTimeAsync(100);
         await expect(registrationPromise).rejects.toThrow(
-            'TaskTime push reminders are not ready on this device yet. Reload and try again.',
+            'TaskTime Pro push reminders are not ready on this device yet. Reload and try again.',
         );
     });
 

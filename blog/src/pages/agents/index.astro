@@ -5,14 +5,14 @@ import AgentDocsLayout from '../../layouts/AgentDocsLayout.astro';
 const highlights = [
     'MCP over stdio is the primary v1 agent interface.',
     'The paired browser app remains the only mutation owner.',
-    'TaskTime must be open and explicitly paired before an agent can use local data.',
+    'TaskTime Pro must be open and explicitly paired before an agent can use local data.',
     'Sensitive actions require approval checks.',
 ];
 ---
 
 <AgentDocsLayout
     pageKey="overview"
-    title="TaskTime for AI Agents"
+    title="TaskTime Pro for AI Agents"
     description={AGENT_DOCS_DESCRIPTION}
     canonicalPath="/agents/"
     highlights={highlights}
@@ -20,14 +20,14 @@ const highlights = [
     <section>
         <h2>What This Is</h2>
         <p>
-            TaskTime exposes a same-device local agent bridge for personal AI agents that need structured access to
+            TaskTime Pro exposes a same-device local agent bridge for personal AI agents that need structured access to
             task management, time tracking, expenses, reports, and invoicing. Agents use MCP tools such as
             <code>create_task</code>, <code>start_timer</code>, <code>preview_invoice_from_unbilled_work</code>, and
             <code>open_project_view</code> instead of clicking through the browser UI.
         </p>
         <p>
-            This keeps TaskTime local-first. The bridge does not open IndexedDB, does not write raw Yjs data, and does
-            not create a cloud control channel. A running TaskTime browser session executes commands through the same
+            This keeps TaskTime Pro local-first. The bridge does not open IndexedDB, does not write raw Yjs data, and does
+            not create a cloud control channel. A running TaskTime Pro browser session executes commands through the same
             app-level command surface that protects the normal UI.
         </p>
     </section>
@@ -39,14 +39,14 @@ const highlights = [
                 <h3>Local MCP bridge</h3>
                 <p>
                     Agent hosts launch <code>tasktime-agent-bridge</code> and speak line-delimited MCP JSON-RPC over
-                    stdio. The bridge provides <code>tools/list</code>, <code>tools/call</code>, and TaskTime approval
+                    stdio. The bridge provides <code>tools/list</code>, <code>tools/call</code>, and TaskTime Pro approval
                     token support.
                 </p>
             </article>
             <article class="agent-info-card">
                 <h3>Paired browser session</h3>
                 <p>
-                    TaskTime connects to the local bridge from Account &gt; Agent Access after the user enters or opens
+                    TaskTime Pro connects to the local bridge from Account &gt; Agent Access after the user enters or opens
                     pairing details. The browser app owns data validation, mutations, downloads, email sends, sync
                     behavior, and navigation.
                 </p>
@@ -78,7 +78,7 @@ const highlights = [
     <section>
         <h2>Important Boundaries</h2>
         <p>
-            TaskTime agent access is not a remote API. It is designed for a local personal agent working on the same
+            TaskTime Pro agent access is not a remote API. It is designed for a local personal agent working on the same
             device as the user. The user grants access, chooses scopes, can revoke access, and remains able to inspect
             or continue the work in the visible browser app.
         </p>

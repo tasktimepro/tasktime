@@ -1,14 +1,14 @@
 ---
 title: "Monthly Freelance Reports: Revenue, Expenses, Profit, and Hours in One View"
-description: "Use TaskTime monthly reports to review issued invoices, received payments, expenses, estimated profit, tax totals, hours worked, and uninvoiced work."
+description: "Use TaskTime Pro monthly reports to review issued invoices, received payments, expenses, estimated profit, tax totals, hours worked, and uninvoiced work."
 publishedAt: "2026-06-13"
 excerpt: "A monthly freelance report should answer what you billed, what got paid, what you spent, what is overdue, and what work still needs to be invoiced."
 category: "workflow"
 tags: ["reports", "monthly report", "freelancers", "bookkeeping"]
 keywords: ["monthly freelance report", "freelance monthly report template", "freelancer revenue report", "freelance profit report", "monthly accounting report for freelancers", "invoice and expense report", "freelance dashboard"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
-socialTitle: "Monthly Freelance Reports in TaskTime"
+ogImageAlt: "TaskTime Pro app icon"
+socialTitle: "Monthly Freelance Reports in TaskTime Pro"
 socialDescription: "Review revenue, payments, expenses, estimated profit, tax totals, hours, and uninvoiced work in one monthly freelance report."
 draft: false
 ---
@@ -19,7 +19,7 @@ What did I invoice? What actually got paid? What did I spend? What is still over
 
 Those questions sound basic, but many freelancers still answer them with a spreadsheet assembled from invoices, bank records, timesheets, and memory.
 
-TaskTime reports are meant to make that monthly review easier.
+TaskTime Pro reports are meant to make that monthly review easier.
 
 ## Start with the overview
 
@@ -56,13 +56,13 @@ What money actually came in this month?
 
 Both matter. If you invoice a lot but payments are delayed, the month can look good on paper while cash flow is tight. If old invoices were paid this month, cash flow may look strong even if new work slowed down.
 
-TaskTime lets you filter income by invoice date or paid date so you can review the month from the angle that matters.
+TaskTime Pro lets you filter income by invoice date or paid date so you can review the month from the angle that matters.
 
 ## Review expenses while they are still fresh
 
 Expenses are easiest to fix while you still remember them.
 
-In TaskTime, monthly reports can include expenses with supplier, category, project, client, payment status, billing status, tax amount, and claim status.
+In TaskTime Pro, monthly reports can include expenses with supplier, category, project, client, payment status, billing status, tax amount, and claim status.
 
 That helps you catch problems early:
 
@@ -77,7 +77,7 @@ Waiting until tax season makes all of this harder. A monthly expense review turn
 
 ## Use estimated profit as a practical signal
 
-Estimated profit in TaskTime is a reporting estimate based on paid revenue minus filtered expenses.
+Estimated profit in TaskTime Pro is a reporting estimate based on paid revenue minus filtered expenses.
 
 It is not a full accounting profit and loss statement. It does not replace tax advice or formal bookkeeping. But it is still useful.
 
@@ -94,7 +94,7 @@ For solo freelancers, that is often enough to make better decisions before the e
 
 Revenue is only part of the story. Time matters too.
 
-TaskTime monthly reports can show total hours and billable utilization. That helps answer:
+TaskTime Pro monthly reports can show total hours and billable utilization. That helps answer:
 
 - How much did I work?
 - How much of that time was billable?
@@ -107,7 +107,7 @@ This is useful even if you do not bill hourly. Billable utilization shows whethe
 
 Missed billable work is one of the easiest ways freelancers lose money.
 
-TaskTime reports can show uninvoiced work: billable hours and billable expenses that exist in your records but are not yet on an invoice.
+TaskTime Pro reports can show uninvoiced work: billable hours and billable expenses that exist in your records but are not yet on an invoice.
 
 That gives you a monthly safety check.
 
@@ -117,7 +117,7 @@ Before closing the month, review the uninvoiced work total. If something should 
 
 Once the month looks right, exports are there for bookkeeping.
 
-TaskTime supports monthly report exports such as:
+TaskTime Pro supports monthly report exports such as:
 
 - Monthly summary CSV
 - Monthly invoices CSV
@@ -149,7 +149,7 @@ That should take minutes, not hours, if the work was tracked throughout the mont
 
 A spreadsheet can calculate totals, but it does not know your workflow.
 
-TaskTime reports know how your records connect:
+TaskTime Pro reports know how your records connect:
 
 - Time entries belong to tasks
 - Tasks belong to projects
@@ -162,4 +162,4 @@ That means the monthly report is not a separate admin project. It is a view of t
 
 ---
 
-**Want to try it?** [Open TaskTime](/), go to Reports, choose Last Month, and review your first monthly freelance report.
+**Want to try it?** [Open TaskTime Pro](/), go to Reports, choose Last Month, and review your first monthly freelance report.

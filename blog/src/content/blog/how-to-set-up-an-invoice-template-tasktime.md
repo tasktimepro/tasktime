@@ -1,14 +1,14 @@
 ---
-title: "How to Set Up an Invoice Template in TaskTime"
-description: "A practical guide to creating a custom invoice template in TaskTime, including layout options, invoice numbering, due dates, branding, and sample previews."
+title: "How to Set Up an Invoice Template in TaskTime Pro"
+description: "A practical guide to creating a custom invoice template in TaskTime Pro, including layout options, invoice numbering, due dates, branding, and sample previews."
 publishedAt: "2026-06-06"
 excerpt: "Set up a reusable invoice template with numbering rules, payment terms, layout options, billing-period display, and branding from your business settings."
 category: "invoicing"
 tags: ["invoice templates", "guide", "branding", "invoicing"]
 keywords: ["how to set up an invoice template", "custom invoice template guide", "invoice template with logo", "freelance invoice template setup", "branded invoice template", "invoice numbering format", "invoice due date template"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
-socialTitle: "How to Set Up an Invoice Template in TaskTime"
+ogImageAlt: "TaskTime Pro app icon"
+socialTitle: "How to Set Up an Invoice Template in TaskTime Pro"
 socialDescription: "Create a reusable invoice template with layout options, invoice numbering, due dates, billing-period display, and business branding."
 draft: false
 ---
@@ -17,7 +17,7 @@ A good invoice template does two jobs.
 
 First, it makes the invoice look professional. Second, it prevents you from repeating the same setup work every time you bill a client.
 
-In TaskTime, an invoice template controls the structure of the invoice: numbering, due date rules, layout, header alignment, billing-period visibility, project-title visibility, and how branding from your business settings should appear.
+In TaskTime Pro, an invoice template controls the structure of the invoice: numbering, due date rules, layout, header alignment, billing-period visibility, project-title visibility, and how branding from your business settings should appear.
 
 Here is the practical setup.
 
@@ -25,7 +25,7 @@ Here is the practical setup.
 
 Before creating the template, set up your business profile.
 
-That profile is where TaskTime stores the sender details that can appear on invoices:
+That profile is where TaskTime Pro stores the sender details that can appear on invoices:
 
 - Business or personal name
 - Email and phone
@@ -60,7 +60,7 @@ If this is the template you will use most often, mark it as the default.
 
 ## Choose the layout style
 
-TaskTime currently gives you two layout styles:
+TaskTime Pro currently gives you two layout styles:
 
 - Minimal
 - Classic
@@ -73,7 +73,7 @@ This choice is about readability, not decoration. The invoice still needs to be 
 
 The header controls where the invoice label and logo appear.
 
-TaskTime supports:
+TaskTime Pro supports:
 
 - Invoice left, logo right
 - Invoice and logo center
@@ -87,7 +87,7 @@ Use the preview before deciding. The right option is the one that makes the invo
 
 Invoice numbers should be consistent and easy to trace.
 
-TaskTime lets you define an invoice number format using variables such as:
+TaskTime Pro lets you define an invoice number format using variables such as:
 
 - `{projectId}`
 - `{timestamp}`
@@ -117,7 +117,7 @@ If your country or accountant expects a specific numbering pattern, use that pat
 
 Payment terms should not be typed manually on every invoice.
 
-In TaskTime, the template can define the due date as:
+In TaskTime Pro, the template can define the due date as:
 
 - Fixed days from invoice date
 - Fixed weeks from invoice date
@@ -130,7 +130,7 @@ If you mostly send monthly invoices, a fixed-days rule keeps the template simple
 
 ## Decide what invoice content should appear
 
-TaskTime templates can show or hide details such as:
+TaskTime Pro templates can show or hide details such as:
 
 - Billing period
 - Project title
@@ -154,7 +154,7 @@ This is especially useful if you run multiple businesses or separate brands. You
 
 ## Preview before using the template
 
-TaskTime includes invoice template preview and sample PDF download.
+TaskTime Pro includes invoice template preview and sample PDF download.
 
 Use that before sending the first real invoice. Check:
 
@@ -212,4 +212,4 @@ That is the real value of a custom invoice template for freelancers: less format
 
 ---
 
-**Want to try it?** [Open TaskTime](/), create a business profile, and preview your first custom invoice template before sending a real invoice.
+**Want to try it?** [Open TaskTime Pro](/), create a business profile, and preview your first custom invoice template before sending a real invoice.

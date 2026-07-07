@@ -270,7 +270,7 @@ describe('Dashboard', () => {
         }
 
         expect(notifications[0]).toEqual({
-            title: 'TaskTime',
+            title: 'TaskTime Pro',
             options: {
                 body: '1 task and 1 expense are due today.',
                 tag: 'tasktime-todo-2026-03-24',

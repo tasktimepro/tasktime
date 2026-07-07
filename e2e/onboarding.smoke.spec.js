@@ -5,7 +5,7 @@ test.describe('Onboarding smoke', () => {
 
         await page.goto('/');
 
-        const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime setup' });
+        const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime Pro setup' });
         await expect(onboardingDialog).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
@@ -13,18 +13,18 @@ test.describe('Onboarding smoke', () => {
 
         await page.reload();
 
-        const reloadedOnboardingDialog = page.getByRole('dialog', { name: 'TaskTime setup' });
+        const reloadedOnboardingDialog = page.getByRole('dialog', { name: 'TaskTime Pro setup' });
         await expect(reloadedOnboardingDialog).toBeVisible();
-        await expect(reloadedOnboardingDialog.getByText('Welcome to TaskTime.')).toBeVisible();
+        await expect(reloadedOnboardingDialog.getByText('Welcome to TaskTime Pro.')).toBeVisible();
     });
 
     test('walks through the current onboarding steps and stays dismissed after completion', async ({ page }) => {
 
         await page.goto('/');
 
-        const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime setup' });
+        const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime Pro setup' });
         await expect(onboardingDialog).toBeVisible();
-        await expect(onboardingDialog.getByText('Welcome to TaskTime.')).toBeVisible();
+        await expect(onboardingDialog.getByText('Welcome to TaskTime Pro.')).toBeVisible();
         await expect(onboardingDialog.getByText('1 of 3')).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
@@ -32,7 +32,7 @@ test.describe('Onboarding smoke', () => {
         await expect(onboardingDialog.getByText('2 of 3')).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
-        await expect(onboardingDialog.getByRole('heading', { name: 'Working with TaskTime' })).toBeVisible();
+        await expect(onboardingDialog.getByRole('heading', { name: 'Working with TaskTime Pro' })).toBeVisible();
         await expect(onboardingDialog.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
         await expect(onboardingDialog.getByRole('heading', { name: 'Projects' })).toBeVisible();
         await expect(onboardingDialog.getByRole('heading', { name: 'Tasks' })).toBeVisible();
@@ -50,6 +50,6 @@ test.describe('Onboarding smoke', () => {
         await page.goto('/');
         await page.reload();
 
-        await expect(page.getByRole('dialog', { name: 'TaskTime setup' })).toHaveCount(0);
+        await expect(page.getByRole('dialog', { name: 'TaskTime Pro setup' })).toHaveCount(0);
     });
 });

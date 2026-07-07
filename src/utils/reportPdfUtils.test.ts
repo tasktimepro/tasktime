@@ -30,7 +30,7 @@ describe('reportPdfUtils', () => {
 
     it('builds a monthly report html document with summary and breakdown sections', () => {
         const html = buildMonthlyReportHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             categoryBreakdown: [
                 { label: 'Software & subscriptions', value: 'EUR120.00' },
             ],
@@ -47,12 +47,12 @@ describe('reportPdfUtils', () => {
                 { label: 'Acme', value: 'EUR1220.00' },
             ],
             projectBreakdown: [
-                { label: 'TaskTime', value: 'EUR1220.00' },
+                { label: 'TaskTime Pro', value: 'EUR1220.00' },
             ],
         });
 
-        expect(html).toContain('TaskTime Monthly Report');
-        expect(html).toContain('TaskTime Studio');
+        expect(html).toContain('TaskTime Pro Monthly Report');
+        expect(html).toContain('TaskTime Pro Studio');
         expect(html).toContain('Revenue Issued');
         expect(html).toContain('Top Clients');
         expect(html).toContain('Top Projects');
@@ -62,7 +62,7 @@ describe('reportPdfUtils', () => {
 
     it('builds a client statement html document with summary and statement sections', () => {
         const html = buildClientStatementHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             clientLabel: 'Acme',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
@@ -82,7 +82,7 @@ describe('reportPdfUtils', () => {
             ],
         });
 
-        expect(html).toContain('TaskTime Client Statement');
+        expect(html).toContain('TaskTime Pro Client Statement');
         expect(html).toContain('Acme');
         expect(html).toContain('Opening Balance');
         expect(html).toContain('Payments in Period');
@@ -94,7 +94,7 @@ describe('reportPdfUtils', () => {
             clientLabel: 'Acme',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
-            projectLabel: 'TaskTime',
+            projectLabel: 'TaskTime Pro',
             summaryRows: [
                 { label: 'Total worked', value: '3h 30m' },
                 { label: 'Billable worked', value: '2h 30m' },
@@ -104,8 +104,8 @@ describe('reportPdfUtils', () => {
             ],
         });
 
-        expect(html).toContain('TaskTime Project Work Summary');
-        expect(html).toContain('TaskTime');
+        expect(html).toContain('TaskTime Pro Project Work Summary');
+        expect(html).toContain('TaskTime Pro');
         expect(html).toContain('Summary');
         expect(html).toContain('Tasks');
         expect(html).toContain('Setup');
@@ -113,7 +113,7 @@ describe('reportPdfUtils', () => {
 
     it('builds an issued invoices report html document with invoice rows', () => {
         const html = buildInvoicesReportHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
             summarySections: [
@@ -128,8 +128,8 @@ describe('reportPdfUtils', () => {
                 {
                     invoiceNumber: 'INV-001',
                     client: 'Acme',
-                    business: 'TaskTime Studio',
-                    project: 'TaskTime',
+                    business: 'TaskTime Pro Studio',
+                    project: 'TaskTime Pro',
                     invoiceDate: 'Apr 12, 2026',
                     dueDate: 'Apr 26, 2026',
                     paidDate: 'Apr 20, 2026',
@@ -142,7 +142,7 @@ describe('reportPdfUtils', () => {
             ],
         });
 
-        expect(html).toContain('TaskTime Issued Invoices Report');
+        expect(html).toContain('TaskTime Pro Issued Invoices Report');
         expect(html).toContain('By status');
         expect(html).toContain('INV-001');
         expect(html).toContain('Acme');
@@ -151,7 +151,7 @@ describe('reportPdfUtils', () => {
 
     it('builds an outstanding invoices report html document with aging and invoice rows', () => {
         const html = buildOutstandingReportHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
             referenceDateLabel: 'Apr 30, 2026',
@@ -174,7 +174,7 @@ describe('reportPdfUtils', () => {
             ],
         });
 
-        expect(html).toContain('TaskTime Outstanding Invoices Report');
+        expect(html).toContain('TaskTime Pro Outstanding Invoices Report');
         expect(html).toContain('Aging Buckets');
         expect(html).toContain('INV-002');
         expect(html).toContain('29');
@@ -183,7 +183,7 @@ describe('reportPdfUtils', () => {
 
     it('builds an expenses report html document with summary and expense rows', () => {
         const html = buildExpensesReportHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
             summaryRows: [
@@ -197,9 +197,9 @@ describe('reportPdfUtils', () => {
                     title: 'Hosting',
                     supplier: 'Cloud Host',
                     category: 'Software & subscriptions',
-                    business: 'TaskTime Studio',
+                    business: 'TaskTime Pro Studio',
                     client: 'Acme',
-                    project: 'TaskTime',
+                    project: 'TaskTime Pro',
                     paymentStatus: 'paid',
                     billingStatus: 'unbilled',
                     netAmount: 'EUR100.00',
@@ -209,7 +209,7 @@ describe('reportPdfUtils', () => {
             ],
         });
 
-        expect(html).toContain('TaskTime Expenses Report');
+        expect(html).toContain('TaskTime Pro Expenses Report');
         expect(html).toContain('Ex VAT');
         expect(html).toContain('Hosting');
         expect(html).toContain('Cloud Host');
@@ -219,7 +219,7 @@ describe('reportPdfUtils', () => {
 
     it('renders empty-state rows and escapes unsafe labels across report builders', () => {
         const monthlyHtml = buildMonthlyReportHtml({
-            businessLabel: 'TaskTime <Studio>',
+            businessLabel: 'TaskTime Pro <Studio>',
             categoryBreakdown: [],
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1 < Apr 30',
@@ -235,7 +235,7 @@ describe('reportPdfUtils', () => {
             ],
         });
 
-        expect(monthlyHtml).toContain('TaskTime &lt;Studio&gt;');
+        expect(monthlyHtml).toContain('TaskTime Pro &lt;Studio&gt;');
         expect(monthlyHtml).toContain('Apr 1 &lt; Apr 30');
         expect(monthlyHtml).toContain('Quoted &quot;total&quot;');
         expect(monthlyHtml).toContain('O&#39;Reilly');
@@ -243,7 +243,7 @@ describe('reportPdfUtils', () => {
         expect(monthlyHtml).toContain('No review issues in this period');
 
         const statementHtml = buildClientStatementHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             clientLabel: 'Acme',
             generatedAtLabel: '2026-05-21',
             openingRows: [],
@@ -264,7 +264,7 @@ describe('reportPdfUtils', () => {
             clientLabel: 'Acme',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
-            projectLabel: 'TaskTime',
+            projectLabel: 'TaskTime Pro',
             summaryRows: [
                 { label: 'Total worked', value: '0h' },
             ],
@@ -274,7 +274,7 @@ describe('reportPdfUtils', () => {
         expect(projectHtml).toContain('No worked tasks in this period');
 
         const invoicesHtml = buildInvoicesReportHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
             rows: [],
@@ -285,7 +285,7 @@ describe('reportPdfUtils', () => {
 
         const outstandingHtml = buildOutstandingReportHtml({
             agingRows: [],
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             generatedAtLabel: '2026-05-21',
             invoiceRows: [],
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
@@ -299,7 +299,7 @@ describe('reportPdfUtils', () => {
         expect(outstandingHtml).toContain('No outstanding invoices in this period');
 
         const expensesHtml = buildExpensesReportHtml({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
             rows: [],
@@ -313,7 +313,7 @@ describe('reportPdfUtils', () => {
 
     it('exports every report pdf via generatePDF with the built html and filename', async () => {
         await exportMonthlyReportPdf({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             categoryBreakdown: [],
             filename: 'monthly.pdf',
             generatedAtLabel: '2026-05-21',
@@ -326,7 +326,7 @@ describe('reportPdfUtils', () => {
         });
 
         await exportClientStatementPdf({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             clientLabel: 'Acme',
             filename: 'statement.pdf',
             generatedAtLabel: '2026-05-21',
@@ -345,7 +345,7 @@ describe('reportPdfUtils', () => {
             filename: 'project.pdf',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
-            projectLabel: 'TaskTime',
+            projectLabel: 'TaskTime Pro',
             summaryRows: [
                 { label: 'Total worked', value: '0h' },
             ],
@@ -353,7 +353,7 @@ describe('reportPdfUtils', () => {
         });
 
         await exportInvoicesReportPdf({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             filename: 'invoices.pdf',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
@@ -362,7 +362,7 @@ describe('reportPdfUtils', () => {
 
         await exportOutstandingReportPdf({
             agingRows: [],
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             filename: 'outstanding.pdf',
             generatedAtLabel: '2026-05-21',
             invoiceRows: [],
@@ -374,7 +374,7 @@ describe('reportPdfUtils', () => {
         });
 
         await exportExpensesReportPdf({
-            businessLabel: 'TaskTime Studio',
+            businessLabel: 'TaskTime Pro Studio',
             filename: 'expenses.pdf',
             generatedAtLabel: '2026-05-21',
             periodLabel: 'Apr 1, 2026 - Apr 30, 2026',
@@ -385,11 +385,11 @@ describe('reportPdfUtils', () => {
         });
 
         expect(pdfMocks.generatePDF).toHaveBeenCalledTimes(6);
-        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(1, expect.stringContaining('TaskTime Monthly Report'), 'monthly.pdf');
-        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(2, expect.stringContaining('TaskTime Client Statement'), 'statement.pdf');
-        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(3, expect.stringContaining('TaskTime Project Work Summary'), 'project.pdf');
-        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(4, expect.stringContaining('TaskTime Issued Invoices Report'), 'invoices.pdf');
-        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(5, expect.stringContaining('TaskTime Outstanding Invoices Report'), 'outstanding.pdf');
-        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(6, expect.stringContaining('TaskTime Expenses Report'), 'expenses.pdf');
+        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(1, expect.stringContaining('TaskTime Pro Monthly Report'), 'monthly.pdf');
+        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(2, expect.stringContaining('TaskTime Pro Client Statement'), 'statement.pdf');
+        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(3, expect.stringContaining('TaskTime Pro Project Work Summary'), 'project.pdf');
+        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(4, expect.stringContaining('TaskTime Pro Issued Invoices Report'), 'invoices.pdf');
+        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(5, expect.stringContaining('TaskTime Pro Outstanding Invoices Report'), 'outstanding.pdf');
+        expect(pdfMocks.generatePDF).toHaveBeenNthCalledWith(6, expect.stringContaining('TaskTime Pro Expenses Report'), 'expenses.pdf');
     });
 });

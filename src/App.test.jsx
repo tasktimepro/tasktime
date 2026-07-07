@@ -537,7 +537,7 @@ describe('App component', () => {
 
     it('renders the desktop sidebar and not the mobile dock on larger screens', () => {
         render(<App />)
-        expect(screen.getByText('TaskTime')).toBeInTheDocument()
+        expect(screen.getByText('TaskTime Pro')).toBeInTheDocument()
         expect(screen.getByText('Dashboard')).toBeInTheDocument()
         expect(screen.getByText('Clients')).toBeInTheDocument()
         expect(screen.getByText('Projects')).toBeInTheDocument()
@@ -551,7 +551,7 @@ describe('App component', () => {
         render(<App />)
 
         expect(screen.getByTestId('auth-callback')).toBeInTheDocument()
-        expect(screen.queryByText('TaskTime')).not.toBeInTheDocument()
+        expect(screen.queryByText('TaskTime Pro')).not.toBeInTheDocument()
         expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
         expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
     })
@@ -574,7 +574,7 @@ describe('App component', () => {
         expect(screen.getByRole('button', { name: 'Planner' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Expenses' })).toBeInTheDocument()
-        expect(screen.queryByText('TaskTime')).not.toBeInTheDocument()
+        expect(screen.queryByText('TaskTime Pro')).not.toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: 'More' }))
 

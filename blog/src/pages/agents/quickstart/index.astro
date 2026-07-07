@@ -3,7 +3,7 @@ import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
 
 const highlights = [
     'Install or launch the packaged bridge binary.',
-    'Open TaskTime with the bridge pairing URL or Account > Agent Access.',
+    'Open TaskTime Pro with the bridge pairing URL or Account > Agent Access.',
     'Use MCP tools only after the browser app is paired.',
     'Retry with the launch recovery hint when no app session is available.',
 ];
@@ -24,17 +24,17 @@ const callToolExample = JSON.stringify({
 
 <AgentDocsLayout
     pageKey="quickstart"
-    title="TaskTime MCP Quickstart"
-    description="Launch the TaskTime local agent bridge, pair it with the browser app, and make the first MCP tool call from a same-device AI agent."
+    title="TaskTime Pro MCP Quickstart"
+    description="Launch the TaskTime Pro local agent bridge, pair it with the browser app, and make the first MCP tool call from a same-device AI agent."
     canonicalPath="/agents/quickstart/"
     highlights={highlights}
 >
     <section>
-        <h2>1. Discover TaskTime</h2>
+        <h2>1. Discover TaskTime Pro</h2>
         <p>
             Start from <a href="/llms.txt">llms.txt</a> or
             <a href="/.well-known/tasktime-agent.json">/.well-known/tasktime-agent.json</a>. The manifest identifies
-            TaskTime as a local-first task, time tracking, expense, invoicing, and reporting app with a local MCP bridge.
+            TaskTime Pro as a local-first task, time tracking, expense, invoicing, and reporting app with a local MCP bridge.
         </p>
     </section>
 
@@ -46,8 +46,8 @@ const callToolExample = JSON.stringify({
         </p>
         <pre><code>tasktime-agent-bridge --app-url https://tasktime.pro</code></pre>
         <p>
-            The bridge binary package is <code>@tasktime/agent-bridge</code>. OpenClaw-compatible installs can use the
-            <code>@tasktime/openclaw</code> bundle, which contributes the TaskTime skill and MCP server config. For
+            The bridge binary package is <code>@tasktimepro/agent-bridge</code>. OpenClaw-compatible installs can use the
+            <code>@tasktimepro/openclaw</code> bundle, which contributes the TaskTime Pro skill and MCP server config. For
             local development, point <code>--app-url</code> at the local app origin, usually
             <code>http://localhost:3101</code>. The bridge prints a launch URL for
             <code>/account?section=agent</code> with the endpoint, pairing ID, and pairing code already filled in.
@@ -57,7 +57,7 @@ const callToolExample = JSON.stringify({
     <section>
         <h2>3. Pair The Browser App</h2>
         <p>
-            TaskTime must be open in a browser tab. The user approves the local bridge in Account &gt; Agent Access.
+            TaskTime Pro must be open in a browser tab. The user approves the local bridge in Account &gt; Agent Access.
             First-use access is explicit; localhost discovery is not treated as permission.
         </p>
         <ul class="agent-check-list">
@@ -81,7 +81,7 @@ const callToolExample = JSON.stringify({
     <section>
         <h2>5. Call A Tool</h2>
         <p>
-            Use <code>tools/call</code> with a supported TaskTime tool name and JSON arguments. The bridge forwards the
+            Use <code>tools/call</code> with a supported TaskTime Pro tool name and JSON arguments. The bridge forwards the
             request to the paired browser app, which returns structured results.
         </p>
         <pre><code>{callToolExample}</code></pre>
@@ -90,10 +90,10 @@ const callToolExample = JSON.stringify({
     <section>
         <h2>Recovery Behavior</h2>
         <p>
-            If a tool call fails because no authoritative TaskTime app session is paired, the MCP error includes a
+            If a tool call fails because no authoritative TaskTime Pro app session is paired, the MCP error includes a
             recovery hint with <code>action: "launch_tasktime"</code> and
             <code>reason: "authoritative_app_session_required"</code>. Agent hosts should guide the user to launch and
-            pair TaskTime, then retry the tool call.
+            pair TaskTime Pro, then retry the tool call.
         </p>
     </section>
 </AgentDocsLayout>

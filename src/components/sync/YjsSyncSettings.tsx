@@ -758,10 +758,10 @@ export default function YjsSyncSettings() {
             >
                 <div className="space-y-3 text-sm text-muted-foreground">
                     <p>
-                        Device backup is intended for using TaskTime on one device. It uploads this device's changes to Drive, but it does not automatically keep other devices up to date.
+                        Device backup is intended for using TaskTime Pro on one device. It uploads this device's changes to Drive, but it does not automatically keep other devices up to date.
                     </p>
                     <p>
-                        Use Sync between devices if you use TaskTime on both your phone and computer.
+                        Use Sync between devices if you use TaskTime Pro on both your phone and computer.
                     </p>
                 </div>
             </Modal>
@@ -793,7 +793,7 @@ export default function YjsSyncSettings() {
             >
                 <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                        This will permanently delete TaskTime sync files from Google Drive and disconnect this device.
+                        This will permanently delete TaskTime Pro sync files from Google Drive and disconnect this device.
                         Your local data will remain on this device, but we recommend that you <strong>export your data before this action</strong>.
                     </p>
                     <label className="flex items-start gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm">

@@ -1,19 +1,19 @@
 ---
-title: "Quote Stage, Estimates, and Project Budgets in TaskTime"
-description: "TaskTime now supports quote-stage projects, task estimates, target amounts, deadlines, and project budget tracking for freelancers."
+title: "Quote Stage, Estimates, and Project Budgets in TaskTime Pro"
+description: "TaskTime Pro now supports quote-stage projects, task estimates, target amounts, deadlines, and project budget tracking for freelancers."
 publishedAt: "2026-05-29"
 excerpt: "Plan and track freelance work more clearly with quote-stage projects, estimated hours, quote amounts, targets, deadlines, and simple project progress tracking."
 category: "planning"
 tags: ["quotes", "estimates", "project budgeting", "planning"]
 keywords: ["freelance project estimates", "project budget tracker for freelancers", "quote stage project management", "estimate vs actual hours", "freelance quote tracking", "project target amount", "freelancer budgeting tool", "quote to invoice workflow"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
-socialTitle: "Quote Stage, Estimates, and Project Budgets in TaskTime"
+ogImageAlt: "TaskTime Pro app icon"
+socialTitle: "Quote Stage, Estimates, and Project Budgets in TaskTime Pro"
 socialDescription: "Use quote-stage projects, task estimates, target amounts, and deadlines to plan freelance work from early scoping through active delivery."
 draft: false
 ---
 
-TaskTime now has a better way to plan and track client work from early scoping through active delivery: Quote stage, task estimates, target amounts, project budgets, and deadlines.
+TaskTime Pro now has a better way to plan and track client work from early scoping through active delivery: Quote stage, task estimates, target amounts, project budgets, and deadlines.
 
 This update helps with the part of freelancing where you are scoping the work, estimating hours, agreeing on a quote, and then keeping the project realistic once the work is underway. It gives you a cleaner way to move from planning into active delivery without splitting that context across different tools.
 
@@ -52,7 +52,7 @@ It can show:
 - Remaining amount to target
 - Deadline status
 
-The goal is not to turn TaskTime into heavy project management software. It is to answer the practical questions freelancers ask while work is still moving:
+The goal is not to turn TaskTime Pro into heavy project management software. It is to answer the practical questions freelancers ask while work is still moving:
 
 - Are we still close to the estimate?
 - Is this project drifting past the budget?
@@ -73,7 +73,7 @@ For searches like "quote to invoice workflow" or "freelance project budgeting to
 
 Freelance projects often go wrong quietly. A few small tasks take longer than expected, a deadline moves closer, and the original quote stops matching reality.
 
-TaskTime now gives you a lightweight way to catch that earlier:
+TaskTime Pro now gives you a lightweight way to catch that earlier:
 
 - Estimate the work before it starts
 - See actual hours as they accumulate
@@ -85,6 +85,6 @@ It is simple on purpose. The point is clearer freelance project planning, not mo
 
 ## Try it
 
-Open a client project in TaskTime, set it to Quote stage, add a few estimated tasks, and use Planning & Progress to compare the plan with the work as it develops.
+Open a client project in TaskTime Pro, set it to Quote stage, add a few estimated tasks, and use Planning & Progress to compare the plan with the work as it develops.
 
-If you have been looking for a private freelance project planner with estimates, budget tracking, time tracking, and invoicing in one place, this update brings those pieces closer together. [Open TaskTime](/) and try it.
+If you have been looking for a private freelance project planner with estimates, budget tracking, time tracking, and invoicing in one place, this update brings those pieces closer together. [Open TaskTime Pro](/) and try it.

@@ -324,7 +324,7 @@ const Preferences = ({ preferences = {}, updatePreferences }) => {
                             <CustomCheckbox
                                 checked={autoHideTotalsOnRevisit}
                                 onChange={handleAutoHideTotalsToggle}
-                                label="Always auto-hide totals when returning to TaskTime"
+                                label="Always auto-hide totals when returning to TaskTime Pro"
                             />
                             <p className="text-sm text-muted-foreground">
                                 Totals will hide again whenever you revisit the tab.

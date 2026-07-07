@@ -84,7 +84,7 @@ vi.mock('./providers/BackupManager', () => ({
 import { YjsStore } from './YjsStore.ts'
 
 const readFixture = (fileName) => JSON.parse(
-    readFileSync(path.resolve(process.cwd(), 'docs/test-data', fileName), 'utf8')
+    readFileSync(path.resolve(process.cwd(), 'test-data/backups', fileName), 'utf8')
 )
 
 const fixtures = [

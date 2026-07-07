@@ -63,7 +63,7 @@ export function consumeAppVersionUpdateToast(currentVersion: string): PostReload
 
         return {
             level: 'success',
-            message: 'TaskTime was updated',
+            message: 'TaskTime Pro was updated',
         };
     } catch {
         return null;

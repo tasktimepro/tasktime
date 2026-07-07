@@ -1,4 +1,4 @@
-# Agent Instructions for TaskTime
+# Agent Instructions for TaskTime Pro
 
 > **Purpose:** Guidelines and context for AI agents working on this codebase  
 > **Last Updated:** May 20, 2026
@@ -23,7 +23,7 @@
 
 ## 📁 Project Overview
 
-**TaskTime** is a local-first task time tracking and invoicing app.
+**TaskTime Pro** is a local-first task time tracking and invoicing app.
 
 - **Framework:** React 19 + Vite
 - **Styling:** Tailwind CSS
@@ -133,7 +133,7 @@ src/
 
 ### 🔄 Sync System - Yjs (ACTIVE)
 
-**TaskTime uses Yjs for conflict-free sync.** The system is in `src/stores/yjs/`:
+**TaskTime Pro uses Yjs for conflict-free sync.** The system is in `src/stores/yjs/`:
 
 - **CRDT-based sync** - Conflicts resolved automatically by Yjs
 - **Multi-document architecture** - Data split for scaling
@@ -188,7 +188,7 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 **Token persistence is handled by a Cloudflare Worker** to solve OAuth token expiry:
 
 - **Worker URL:** `https://sync.tasktime.pro`
-- **Source:** `cloudflare/` folder (TypeScript, no node_modules)
+- **Source:** private operational Worker source. The public repository mirror intentionally excludes this implementation.
 - **Features:** Secure refresh token storage, auto-refresh, Drive API proxy
 
 **How it works:**
@@ -281,7 +281,7 @@ docker compose run --rm app npm run <script>
 - [x] Dashboard and RecentTasks migrated to Yjs hooks
 - [x] useTaskState migrated to Yjs hooks
 - [x] `syncableEntity.ts` deleted (no longer needed)
-- [x] Cloudflare Worker deployed (`cloudflare/` folder)
+- [x] Cloudflare Worker deployed (private operational source; excluded from the public mirror)
 - [x] Worker-based auth flow (OAuth popup → Worker proxy)
 - [x] Encrypted refresh token storage in Cloudflare KV
 
@@ -295,8 +295,8 @@ docker compose run --rm app npm run <script>
 
 | Document | Purpose |
 |----------|---------|
-| `docs/project_overview.md` | Full technical documentation |
-| `docs/yjs-sync-implementation-plan.md` | Yjs sync architecture |
+| `tasktime-infra/docs/project_overview.md` | Private full technical documentation, available only in the local/private infra checkout |
+| `tasktime-infra/docs/yjs-sync-implementation-plan.md` | Private Yjs sync architecture notes, available only in the local/private infra checkout |
 | `_implan.md` | Original project plan and preferences |
 | `README.md` | User-facing documentation |
 
@@ -304,12 +304,12 @@ docker compose run --rm app npm run <script>
 
 ## 💡 Tips for Future Sessions
 
-1. **Read `docs/project_overview.md` first** — It has the full architecture
+1. **Read `tasktime-infra/docs/project_overview.md` first when it exists locally** — It has the full architecture
 2. **Check this file for rules** — Especially the "no legacy code" rule
 3. **App.jsx uses Yjs hooks** — All state is managed by Yjs
 4. **Keep tests updated** — Add or adjust tests whenever behavior changes
 5. **Use Yjs hooks directly** — `useProjects()`, `useTasks()`, etc. from `src/hooks/`
-6. **Review `docs/yjs-sync-implementation-plan.md`** — Understand the CRDT-based sync system
+6. **Review `tasktime-infra/docs/yjs-sync-implementation-plan.md` when it exists locally** — Understand the CRDT-based sync system
 7. **Subtasks cannot be recurring** — The project UI disallows recurring subtasks; avoid adding recurring-specific logic to subtask components.
 
 ---

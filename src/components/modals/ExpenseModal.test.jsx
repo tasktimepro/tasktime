@@ -519,7 +519,7 @@ describe('ExpenseModal', () => {
             }
         ]
         businessInfosMocks.businessInfos = [
-            { id: 'business-1', title: 'TaskTime LLC', taxNumber: 'TAX-123' }
+            { id: 'business-1', title: 'TaskTime Pro LLC', taxNumber: 'TAX-123' }
         ]
         businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
         projectsMocks.getProjectsByClient.mockReturnValue(projectsMocks.projects)
@@ -597,7 +597,7 @@ describe('ExpenseModal', () => {
     it('saves a business-only expense without requiring a client', async () => {
         const user = userEvent.setup()
         businessInfosMocks.businessInfos = [
-            { id: 'business-1', title: 'TaskTime LLC', taxNumber: 'TAX-123' }
+            { id: 'business-1', title: 'TaskTime Pro LLC', taxNumber: 'TAX-123' }
         ]
         businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
 
@@ -621,7 +621,7 @@ describe('ExpenseModal', () => {
     it('requires a client when a business expense is billable', async () => {
         const user = userEvent.setup()
         businessInfosMocks.businessInfos = [
-            { id: 'business-1', title: 'TaskTime LLC', taxNumber: 'TAX-123' }
+            { id: 'business-1', title: 'TaskTime Pro LLC', taxNumber: 'TAX-123' }
         ]
         businessInfosMocks.defaultBusinessInfo = businessInfosMocks.businessInfos[0]
 
@@ -642,7 +642,7 @@ describe('ExpenseModal', () => {
         businessInfosMocks.businessInfos = [
             {
                 id: 'business-1',
-                title: 'TaskTime LLC',
+                title: 'TaskTime Pro LLC',
                 taxNumber: 'TAX-123',
                 taxEnabled: true,
                 taxLabel: 'VAT',
@@ -692,7 +692,7 @@ describe('ExpenseModal', () => {
         businessInfosMocks.businessInfos = [
             {
                 id: 'business-1',
-                title: 'TaskTime LLC',
+                title: 'TaskTime Pro LLC',
                 taxNumber: 'TAX-123',
                 taxEnabled: true,
                 taxLabel: 'VAT',
@@ -731,7 +731,7 @@ describe('ExpenseModal', () => {
         businessInfosMocks.businessInfos = [
             {
                 id: 'business-1',
-                title: 'TaskTime LLC',
+                title: 'TaskTime Pro LLC',
                 taxNumber: 'TAX-123',
                 taxEnabled: true,
                 taxLabel: 'VAT',
@@ -760,7 +760,7 @@ describe('ExpenseModal', () => {
         businessInfosMocks.businessInfos = [
             {
                 id: 'business-1',
-                title: 'TaskTime LLC',
+                title: 'TaskTime Pro LLC',
                 taxNumber: 'TAX-123',
                 taxEnabled: true,
                 taxLabel: 'VAT',

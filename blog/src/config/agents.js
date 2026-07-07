@@ -1,16 +1,16 @@
 export const AGENT_DOCS_LAST_UPDATED = '2026-07-06';
 
-export const AGENT_DOCS_DESCRIPTION = 'Use TaskTime with same-device AI agents through the local MCP agent bridge for private task management, time tracking, expenses, invoicing, reports, and app navigation.';
+export const AGENT_DOCS_DESCRIPTION = 'Use TaskTime Pro with same-device AI agents through the local MCP agent bridge for private task management, time tracking, expenses, invoicing, reports, and app navigation.';
 
 export const AGENT_DOCS_KEYWORDS = [
-    'TaskTime AI agent',
-    'TaskTime MCP',
-    'TaskTime local agent bridge',
+    'TaskTime Pro AI agent',
+    'TaskTime Pro MCP',
+    'TaskTime Pro local agent bridge',
     'MCP time tracking',
     'local-first invoicing agent',
     'AI agent task manager',
-    'OpenClaw TaskTime',
-    'TaskTime agent tools',
+    'OpenClaw TaskTime Pro',
+    'TaskTime Pro agent tools',
 ];
 
 export const AGENT_DOCS_NAV_ITEMS = [
@@ -18,13 +18,13 @@ export const AGENT_DOCS_NAV_ITEMS = [
         href: '/agents/',
         key: 'overview',
         label: 'Overview',
-        summary: 'How TaskTime exposes a local-first agent interface.',
+        summary: 'How TaskTime Pro exposes a local-first agent interface.',
     },
     {
         href: '/agents/quickstart/',
         key: 'quickstart',
         label: 'Quickstart',
-        summary: 'Launch the bridge, pair TaskTime, and make the first MCP call.',
+        summary: 'Launch the bridge, pair TaskTime Pro, and make the first MCP call.',
     },
     {
         href: '/agents/security/',
@@ -56,12 +56,12 @@ export const AGENT_DISCOVERY_LINKS = [
     {
         href: '/llms.txt',
         label: 'llms.txt',
-        summary: 'Short index for agents discovering TaskTime documentation.',
+        summary: 'Short index for agents discovering TaskTime Pro documentation.',
     },
     {
         href: '/.well-known/tasktime-agent.json',
         label: 'Site manifest',
-        summary: 'Public TaskTime local agent bridge discovery metadata.',
+        summary: 'Public TaskTime Pro local agent bridge discovery metadata.',
     },
     {
         href: '/agents/tasktime-agent-bridge.json',

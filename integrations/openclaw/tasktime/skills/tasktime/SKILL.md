@@ -1,6 +1,7 @@
 ---
 name: tasktime
-description: Use TaskTime through its local MCP bridge for task management, time tracking, expenses, reports, invoices, project quotes, planner notes, backups, sync settings, app navigation, or account data. Trigger when a user asks an agent to inspect or operate TaskTime data, set up TaskTime agent access, recover a TaskTime bridge session, or choose the correct TaskTime MCP tool.
+description: Use TaskTime Pro through its local MCP bridge for task management, time tracking, expenses, reports, invoices, project quotes, planner notes, backups, sync settings, app navigation, or account data. Trigger when a user asks an agent to inspect or operate TaskTime Pro data, set up TaskTime Pro agent access, recover a TaskTime Pro bridge session, or choose the correct TaskTime Pro MCP tool.
+license: MIT-0
 metadata:
   openclaw:
     homepage: https://tasktime.pro/agents/openclaw/
@@ -9,16 +10,16 @@ metadata:
         - tasktime-agent-bridge
     install:
       - kind: node
-        package: "@tasktime/agent-bridge"
+        package: "@tasktimepro/agent-bridge"
         bins:
           - tasktime-agent-bridge
 ---
 
-# TaskTime
+# TaskTime Pro
 
 ## Overview
 
-Use TaskTime MCP tools before browser UI automation. TaskTime is local-first customer data, so treat the paired browser app as the authority and never ask the user to reset browser data or Drive sync state as a normal fix.
+Use TaskTime Pro MCP tools before browser UI automation. TaskTime Pro is local-first customer data, so treat the paired browser app as the authority and never ask the user to reset browser data or Drive sync state as a normal fix.
 
 Public references:
 
@@ -38,15 +39,15 @@ Launch the bridge as an MCP stdio server:
 tasktime-agent-bridge --app-url https://tasktime.pro
 ```
 
-Require a running paired TaskTime browser session before reading or mutating data. The user grants first-use access in TaskTime under Account > Agent Access. If the OpenClaw bundle installed the MCP server, expect TaskTime tools to be exposed with the server prefix, such as `tasktime__list_projects`.
+Require a running paired TaskTime Pro browser session before reading or mutating data. The user grants first-use access in TaskTime Pro under Account > Agent Access. If the OpenClaw bundle installed the MCP server, expect TaskTime Pro tools to be exposed with the server prefix, such as `tasktime__list_projects`.
 
 Call `tools/list` at runtime because available tools depend on the granted bridge scopes. Default scopes are `read`, `write`, and `navigation`; optional scopes are `billing`, `export`, and `email`.
 
 ## Operating Rules
 
 - Use MCP tools for data work and UI automation only for visual validation or unsupported workflows.
-- Preserve TaskTime's local-only boundary. Do not expose the bridge through public interfaces or tunnels.
-- Use a valid exact-input TaskTime approval token or the browser-visible prompt for approval-gated actions.
+- Preserve TaskTime Pro's local-only boundary. Do not expose the bridge through public interfaces or tunnels.
+- Use a valid exact-input TaskTime Pro approval token or the browser-visible prompt for approval-gated actions.
 - Do not invent raw Yjs, IndexedDB, invoice, sync, or billing mutations outside the bridge.
 - Prefer read/preview tools before write, billing, export, email, or destructive actions.
 - Keep the user in control for invoice finalization, email sending, export, account data deletion, and cascade deletes.
@@ -63,6 +64,6 @@ Call `tools/list` at runtime because available tools depend on the granted bridg
 
 ## Recovery
 
-If a tool call returns an unavailable app-session error with `launch_tasktime`, open or guide the user to TaskTime, pair Account > Agent Access, then retry. Do not treat this as a generic failure.
+If a tool call returns an unavailable app-session error with `launch_tasktime`, open or guide the user to TaskTime Pro, pair Account > Agent Access, then retry. Do not treat this as a generic failure.
 
 Use DebugBundle only for runtime or customer-facing incidents, endpoint downtime, health checks, webhook or notification failures, noisy captured incidents, or symptoms likely to have generated captured events. For deterministic local code, docs, UI, refactor, or test failures, inspect source and tests first.

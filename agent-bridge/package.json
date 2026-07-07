@@ -1,7 +1,7 @@
 {
-  "name": "@tasktime/agent-bridge",
+  "name": "@tasktimepro/agent-bridge",
   "version": "0.1.0",
-  "description": "Local MCP stdio bridge for same-device TaskTime agent access.",
+  "description": "Local MCP stdio bridge for same-device TaskTime Pro agent access.",
   "type": "module",
   "bin": {
     "tasktime-agent-bridge": "./dist/tasktime-agent-bridge.mjs"
@@ -22,7 +22,7 @@
     "local-first"
   ],
   "homepage": "https://tasktime.pro/agents/",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
   }

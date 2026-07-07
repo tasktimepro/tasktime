@@ -1,7 +1,7 @@
 {
-  "name": "@tasktime/openclaw",
+  "name": "@tasktimepro/openclaw",
   "version": "0.1.0",
-  "description": "OpenClaw-compatible TaskTime bundle with MCP server configuration and skill instructions.",
+  "description": "OpenClaw-compatible TaskTime Pro bundle with MCP server configuration and skill instructions.",
   "type": "module",
   "files": [
     ".codex-plugin/",
@@ -11,7 +11,7 @@
     "skills/"
   ],
   "dependencies": {
-    "@tasktime/agent-bridge": "^0.1.0"
+    "@tasktimepro/agent-bridge": "^0.1.0"
   },
   "keywords": [
     "tasktime",
@@ -23,7 +23,7 @@
     "local-first"
   ],
   "homepage": "https://tasktime.pro/agents/openclaw/",
-  "license": "MIT",
+  "license": "MIT-0",
   "publishConfig": {
     "access": "public"
   }

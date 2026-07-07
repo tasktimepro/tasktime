@@ -7,7 +7,7 @@ category: "time-tracking"
 tags: ["free", "time tracking", "freelancers", "timer"]
 keywords: ["free task timer", "free time tracker app", "task timer no signup", "free timer for freelancers", "best free task timer"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "The Best Free Task Timer for Freelancers (No Account Needed)"
 socialDescription: "Most 'free' task timers are trials in disguise. Here's what a genuinely free timer looks like for freelancers."
 draft: false
@@ -36,9 +36,9 @@ A basic stopwatch app can technically track time. But if you're freelancing, you
 
 Task-level timing means every time entry is tied to a specific piece of work: "Write proposal for Client X" or "Fix navigation bug on landing page." When it's time to invoice, you're not guessing — you've got a clean record of what happened and how long it took.
 
-## How TaskTime handles this
+## How TaskTime Pro handles this
 
-In TaskTime, timers are built into your task list. You click the play button on a task, do your work, and stop it when you're done. The time entry gets logged automatically — tied to the task, tied to the project.
+In TaskTime Pro, timers are built into your task list. You click the play button on a task, do your work, and stop it when you're done. The time entry gets logged automatically — tied to the task, tied to the project.
 
 You can run multiple timers across different projects (one per project at a time), pause without losing progress, and add manual entries for time you forgot to track.
 
@@ -46,7 +46,7 @@ There's no free tier because there's no paid tier. The whole app is free. No lim
 
 ## The catch? There isn't one
 
-Seriously. TaskTime runs in your browser and stores everything locally on your device. There's no server to fund, which means there's no reason to charge you or restrict features behind a paywall.
+Seriously. TaskTime Pro runs in your browser and stores everything locally on your device. There's no server to fund, which means there's no reason to charge you or restrict features behind a paywall.
 
 If you want sync across devices, you can connect your own Google Drive — but that's optional. The timer works perfectly fine without it.
 

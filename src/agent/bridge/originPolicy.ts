@@ -74,7 +74,7 @@ export function isAllowedTaskTimeOrigin(origin: string | undefined | null, allow
 
 export function assertAllowedTaskTimeOrigin(origin: string | undefined | null, allowedOrigins?: Iterable<string>): void {
     if (!isAllowedTaskTimeOrigin(origin, allowedOrigins)) {
-        throw new AgentCommandError('PERMISSION_DENIED', 'Origin is not allowed to connect to the TaskTime agent bridge.', {
+        throw new AgentCommandError('PERMISSION_DENIED', 'Origin is not allowed to connect to the TaskTime Pro agent bridge.', {
             origin: origin || null,
         });
     }

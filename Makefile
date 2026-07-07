@@ -1,9 +1,11 @@
-# TaskTime Makefile
+# TaskTime Pro Makefile
 # Shorthand commands for common Docker operations
 
 APP_RUN = docker compose run --rm app
 WORKER_ENV_FILE ?= .env.worker.local
 METRICS_DB_NAME ?= tasktime-metrics
+INFRA_DIR ?= tasktime-infra
+WORKER_DIR ?= $(INFRA_DIR)/cloudflare
 
 ifneq ("$(wildcard $(WORKER_ENV_FILE))","")
 include $(WORKER_ENV_FILE)
@@ -16,7 +18,7 @@ PREVIEW_PORT ?= 3101
 
 # Default target - show help
 help:
-	@echo "TaskTime Development Commands"
+	@echo "TaskTime Pro Development Commands"
 	@echo "=============================="
 	@echo ""
 	@echo "  make dev      - Start development server (docker compose up)"
@@ -206,23 +208,23 @@ npm:
 # Set CLOUDFLARE_API_TOKEN in your environment or .env.worker.local
 # Create token at: https://dash.cloudflare.com/profile/api-tokens
 # Required permissions: Account Settings (Read), D1 (Edit), Workers KV Storage (Edit), Workers Scripts (Edit)
-# If deploying the custom domain route in cloudflare/wrangler.toml, also add Zone: Workers Routes (Edit)
+# If deploying the custom domain route in $(WORKER_DIR)/wrangler.toml, also add Zone: Workers Routes (Edit)
 # and ensure the token can access the zone that hosts sync.tasktime.pro.
 # Also ensure the token's Account Resources include the target Cloudflare account.
 # Example .env.worker.local contents:
 # CLOUDFLARE_API_TOKEN=your-token-here
 
-# Start local Worker for push testing. Requires cloudflare/.dev.vars.
+# Start local Worker for push testing. Requires $(WORKER_DIR)/.dev.vars.
 worker-dev-push-local:
-	cd cloudflare && npx wrangler dev --local --port 8787
+	cd $(WORKER_DIR) && npx wrangler dev --local --port 8787
 
-# Apply SQL to local Wrangler D1 (usage: make worker-d1-apply-local DB=tasktime-push SQL=cloudflare/sql/004_push_notifications.sql)
+# Apply SQL to local Wrangler D1 (usage: make worker-d1-apply-local DB=tasktime-push SQL=tasktime-infra/cloudflare/sql/004_push_notifications.sql)
 worker-d1-apply-local:
 	@if [ -z "$(DB)" ] || [ -z "$(SQL)" ]; then \
 		echo "Usage: make worker-d1-apply-local DB=<database-name> SQL=<sql-file>"; \
 		exit 1; \
 	fi
-	@cd cloudflare && npx wrangler d1 execute $(DB) --local --file $(patsubst cloudflare/%,%,$(SQL))
+	@cd $(WORKER_DIR) && npx wrangler d1 execute $(DB) --local --file $(patsubst $(WORKER_DIR)/%,%,$(patsubst cloudflare/%,%,$(SQL)))
 
 # Create KV namespaces (run once)
 worker-kv-create:
@@ -231,11 +233,11 @@ worker-kv-create:
 		echo "Create token at: https://dash.cloudflare.com/profile/api-tokens"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler kv:namespace create SESSIONS
 	@echo ""
-	@echo "Copy the ID above and update cloudflare/wrangler.toml"
+	@echo "Copy the ID above and update $(WORKER_DIR)/wrangler.toml"
 	@echo "Then run: make worker-kv-create-preview"
 
 worker-kv-create-preview:
@@ -243,11 +245,11 @@ worker-kv-create-preview:
 		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler kv:namespace create SESSIONS --preview
 	@echo ""
-	@echo "Copy the preview_id above and update cloudflare/wrangler.toml"
+	@echo "Copy the preview_id above and update $(WORKER_DIR)/wrangler.toml"
 
 # Set a secret (usage: make worker-secret NAME=GOOGLE_CLIENT_ID VALUE=xxx)
 worker-secret:
@@ -259,7 +261,7 @@ worker-secret:
 		echo "Usage: make worker-secret NAME=<secret-name> VALUE=<secret-value>"; \
 		exit 1; \
 	fi
-	@cd cloudflare && echo "$(VALUE)" | docker run --rm -i -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && echo "$(VALUE)" | docker run --rm -i -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler secret put $(NAME)
 
@@ -269,7 +271,7 @@ worker-deploy:
 		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler deploy
 
@@ -279,7 +281,7 @@ worker-logs:
 		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -it -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -it -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler tail
 
@@ -289,7 +291,7 @@ worker-d1-list:
 		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler d1 list
 
@@ -303,11 +305,11 @@ worker-d1-create:
 		echo "Usage: make worker-d1-create NAME=<database-name>"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler d1 create $(NAME)
 
-# Apply SQL to a remote D1 database (usage: make worker-d1-apply DB=tasktime-metrics SQL=cloudflare/sql/metrics_schema.sql)
+# Apply SQL to a remote D1 database (usage: make worker-d1-apply DB=tasktime-metrics SQL=tasktime-infra/cloudflare/sql/metrics_schema.sql)
 worker-d1-apply:
 	@if [ -z "$(CLOUDFLARE_API_TOKEN)" ]; then \
 		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
@@ -317,9 +319,9 @@ worker-d1-apply:
 		echo "Usage: make worker-d1-apply DB=<database-name> SQL=<sql-file>"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
-		node:20-alpine npx wrangler d1 execute $(DB) --remote --file /app/$(patsubst cloudflare/%,%,$(SQL))
+		node:20-alpine npx wrangler d1 execute $(DB) --remote --file /app/$(patsubst $(WORKER_DIR)/%,%,$(patsubst cloudflare/%,%,$(SQL)))
 
 # Weekly usage summary from the metrics D1 database
 worker-metrics-weekly:
@@ -327,7 +329,7 @@ worker-metrics-weekly:
 		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT device_hash) AS weekly_active_devices, COUNT(DISTINCT dedupe_hash) AS weekly_active_people_approx, COALESCE(SUM(session_count), 0) AS weekly_sessions, COUNT(DISTINCT CASE WHEN sync_person_hash IS NOT NULL THEN sync_person_hash END) AS weekly_synced_people FROM daily_device_usage WHERE day >= date('now', '-6 day') AND meaningful_action_count >= 2"
 
@@ -337,7 +339,7 @@ worker-metrics-monthly:
 		echo "Error: CLOUDFLARE_API_TOKEN not set"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT device_hash) AS monthly_active_devices, COUNT(DISTINCT dedupe_hash) AS monthly_active_people_approx, COALESCE(SUM(session_count), 0) AS monthly_sessions, COUNT(DISTINCT CASE WHEN sync_person_hash IS NOT NULL THEN sync_person_hash END) AS monthly_synced_people FROM daily_device_usage WHERE day >= date('now', '-29 day') AND meaningful_action_count >= 2"
 
@@ -355,7 +357,7 @@ worker-metrics-action-weekly:
 		echo "Error: ACTION must contain only letters, numbers, and underscores"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS weekly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS weekly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER)), 0) AS weekly_occurrences FROM daily_device_usage WHERE day >= date('now', '-6 day')"
 
@@ -373,6 +375,6 @@ worker-metrics-action-monthly:
 		echo "Error: ACTION must contain only letters, numbers, and underscores"; \
 		exit 1; \
 	fi
-	@cd cloudflare && docker run --rm -v "$$(pwd):/app" -w /app \
+	@cd $(WORKER_DIR) && docker run --rm -v "$$(pwd):/app" -w /app \
 		-e CLOUDFLARE_API_TOKEN \
 		node:20-alpine npx wrangler d1 execute $(METRICS_DB_NAME) --remote --command "SELECT COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN device_hash END) AS monthly_devices, COUNT(DISTINCT CASE WHEN COALESCE(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER), 0) > 0 THEN dedupe_hash END) AS monthly_people_approx, COALESCE(SUM(CAST(json_extract(action_counts_json, '$$.$(ACTION)') AS INTEGER)), 0) AS monthly_occurrences FROM daily_device_usage WHERE day >= date('now', '-29 day')"

@@ -189,7 +189,7 @@ test.describe('Backup smoke', () => {
     });
 
     test('imports the broad sample backup and previews an imported invoice in edit mode', async ({ page }) => {
-        const fixturePath = path.resolve(process.cwd(), 'docs/test-data/tasktime-sample-backup-v1.3.json');
+        const fixturePath = path.resolve(process.cwd(), 'test-data/backups/tasktime-sample-backup-v1.3.json');
 
         await freezePageTime(page, FIXED_SMOKE_TIME);
         await importBackupFixture(page, fixturePath);

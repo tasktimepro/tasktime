@@ -64,7 +64,7 @@ export interface YjsContextValue {
     forceSyncDrive: (options?: { allowPull?: boolean }) => Promise<void>;
     /** Disconnect Drive sync */
     disconnectDrive: () => void;
-    /** Wipe all TaskTime files from Drive */
+    /** Wipe all TaskTime Pro files from Drive */
     wipeDriveData: () => Promise<void>;
     /** Load time entries for a specific year */
     loadEntriesForYear: (year: number) => Promise<Y.Map<string, TimeEntry>>;
@@ -194,7 +194,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 captureDebugBundleIncident({
                     incidentKey: 'yjs.store_initialize_failed',
                     name: 'TaskTimeStoreInitializationError',
-                    message: 'TaskTime Yjs store initialization failed',
+                    message: 'TaskTime Pro Yjs store initialization failed',
                     error,
                     throttleMs: YJS_INCIDENT_THROTTLE_MS,
                 });
@@ -218,7 +218,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 captureDebugBundleIncident({
                     incidentKey: 'yjs.persistence_quota_exceeded',
                     name: 'TaskTimePersistenceQuotaExceeded',
-                    message: 'TaskTime Yjs persistence quota was exceeded',
+                    message: 'TaskTime Pro Yjs persistence quota was exceeded',
                     error,
                     context: { docName },
                     throttleMs: YJS_INCIDENT_THROTTLE_MS,
@@ -228,7 +228,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 captureDebugBundleIncident({
                     incidentKey: 'yjs.persistence_error',
                     name: 'TaskTimePersistenceError',
-                    message: 'TaskTime Yjs persistence failed',
+                    message: 'TaskTime Pro Yjs persistence failed',
                     error,
                     context: { docName },
                     throttleMs: YJS_INCIDENT_THROTTLE_MS,
@@ -350,7 +350,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             captureDebugBundleIncident({
                 incidentKey: 'drive.sync_failed_repeatedly',
                 name: 'TaskTimeDriveSyncError',
-                message: 'TaskTime Drive sync failed repeatedly',
+                message: 'TaskTime Pro Drive sync failed repeatedly',
                 context: {
                     autoSyncEnabled,
                     autoSyncMode,

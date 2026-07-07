@@ -1,9 +1,9 @@
 export const SITE_URL = 'https://tasktime.pro';
-export const SITE_NAME = 'TaskTime';
+export const SITE_NAME = 'TaskTime Pro';
 export const SITE_DESCRIPTION = 'Local-first task management, time tracking, expenses, and invoicing for freelancers and solo professionals.';
 export const BLOG_BASE_PATH = '/blog';
 export const DEFAULT_SOCIAL_IMAGE = '/icons/web-app-manifest-512x512.png';
-export const DEFAULT_SOCIAL_IMAGE_ALT = 'TaskTime app icon';
+export const DEFAULT_SOCIAL_IMAGE_ALT = 'TaskTime Pro app icon';
 export const TASKTIME_SOCIAL_URL = 'https://x.com/tasktimepro';
 
 export function toCanonicalUrl(pathname, baseUrl = SITE_URL) {

@@ -9,7 +9,7 @@ const LAST_UPDATED_ISO = '2026-05-31';
 <PublicPageLayout
     pageKey="privacy"
     title="Privacy Policy"
-    summary="TaskTime is a local-first app. Your data lives in your browser and, if you choose, in your own Google Drive. We cannot see it, we do not collect it, and optional services are designed to avoid storing personal app data."
+    summary="TaskTime Pro is a local-first app. Your data lives in your browser and, if you choose, in your own Google Drive. We cannot see it, we do not collect it, and optional services are designed to avoid storing personal app data."
     lastUpdated={LAST_UPDATED}
     lastUpdatedIso={LAST_UPDATED_ISO}
     highlights={[
@@ -22,7 +22,7 @@ const LAST_UPDATED_ISO = '2026-05-31';
     <section>
         <h2>1. We cannot access your data</h2>
         <p>
-            TaskTime stores all of your projects, tasks, time entries, expenses, invoices, and preferences directly in your browser using IndexedDB. That data never leaves your device unless you explicitly turn on Google Drive sync, and even then it goes straight to <strong>your own</strong> Google Drive account &mdash; not to any server we operate.
+            TaskTime Pro stores all of your projects, tasks, time entries, expenses, invoices, and preferences directly in your browser using IndexedDB. That data never leaves your device unless you explicitly turn on Google Drive sync, and even then it goes straight to <strong>your own</strong> Google Drive account &mdash; not to any server we operate.
         </p>
         <p>
             We have no database of user content. We cannot look up, read, or recover your data because we simply do not have it.
@@ -32,20 +32,20 @@ const LAST_UPDATED_ISO = '2026-05-31';
     <section>
         <h2>2. Google Drive sync goes to your own Drive</h2>
         <p>
-            If you connect Google Drive, TaskTime syncs your data between your browser and a hidden app-data folder inside <strong>your own</strong> Google Drive storage. The files belong to you and are accessible only through your Google account. We do not have access to your Google Drive or its contents.
+            If you connect Google Drive, TaskTime Pro syncs your data between your browser and a hidden app-data folder inside <strong>your own</strong> Google Drive storage. The files belong to you and are accessible only through your Google account. We do not have access to your Google Drive or its contents.
         </p>
         <p>
             To make sync work, a small authentication service handles the Google sign-in flow and keeps your OAuth session alive. That service sees a session identifier and an encrypted refresh token &mdash; it never sees, stores, or inspects the actual files being synced. All file data travels directly between your browser and Google&apos;s servers.
         </p>
         <p>
-            Sync is entirely optional. TaskTime works fully offline without it, and you can disconnect at any time.
+            Sync is entirely optional. TaskTime Pro works fully offline without it, and you can disconnect at any time.
         </p>
     </section>
 
     <section>
         <h2>3. No cookies, no tracking</h2>
         <p>
-            TaskTime does not use cookies, advertising pixels, or any form of cross-site tracking. The app uses your browser&apos;s local storage (localStorage and IndexedDB) only to keep your workspace available and to remember your preferences.
+            TaskTime Pro does not use cookies, advertising pixels, or any form of cross-site tracking. The app uses your browser&apos;s local storage (localStorage and IndexedDB) only to keep your workspace available and to remember your preferences.
         </p>
         <p>
             The app does send anonymous, aggregate usage counters &mdash; things like &ldquo;a session happened today&rdquo; or &ldquo;N tasks were created.&rdquo; These are plain numeric tallies with no content, no identifiers, and no way to reconstruct what you were working on. They help us understand whether features are being used at all.
@@ -64,7 +64,7 @@ const LAST_UPDATED_ISO = '2026-05-31';
             When you send an invoice by email, a minimal audit record is saved: a hashed identifier derived from your sync session, a hashed form of the recipient&apos;s address, and a timestamp. This is used only to enforce monthly sending limits and prevent duplicate sends. No invoice content, PDF data, or message body is stored server-side.
         </p>
         <p>
-            If you enable system reminders, TaskTime stores only the browser push subscription needed for delivery and generic reminder timestamps. We do not store task names, expense details, notes, amounts, client or project names, or other personal app data for this service. Turning reminders off removes the device subscription and cancels future scheduled reminders.
+            If you enable system reminders, TaskTime Pro stores only the browser push subscription needed for delivery and generic reminder timestamps. We do not store task names, expense details, notes, amounts, client or project names, or other personal app data for this service. Turning reminders off removes the device subscription and cancels future scheduled reminders.
         </p>
         <p>
             That is the complete list. There is no user database, no email list, and no third-party analytics.
@@ -74,7 +74,7 @@ const LAST_UPDATED_ISO = '2026-05-31';
     <section>
         <h2>5. Invoice email sending</h2>
         <p>
-            TaskTime lets you send invoices directly to your clients by email. When you use this feature, your browser generates a PDF of the invoice and sends it, along with your message, to <strong>Resend</strong> (resend.com) &mdash; a third-party email delivery service &mdash; for delivery to the recipient. By using this feature you are sharing that invoice data with Resend, and their <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">privacy policy</a> applies to how they handle and deliver the message.
+            TaskTime Pro lets you send invoices directly to your clients by email. When you use this feature, your browser generates a PDF of the invoice and sends it, along with your message, to <strong>Resend</strong> (resend.com) &mdash; a third-party email delivery service &mdash; for delivery to the recipient. By using this feature you are sharing that invoice data with Resend, and their <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">privacy policy</a> applies to how they handle and deliver the message.
         </p>
         <p>
             Resend is used solely to deliver the email on your behalf. We do not use it for marketing, advertising, or tracking.
@@ -105,7 +105,7 @@ const LAST_UPDATED_ISO = '2026-05-31';
     <section>
         <h2>9. Changes to this policy</h2>
         <p>
-            This policy may be updated as TaskTime evolves. The current version will always be posted here with the date it was last changed.
+            This policy may be updated as TaskTime Pro evolves. The current version will always be posted here with the date it was last changed.
         </p>
     </section>
 </PublicPageLayout>

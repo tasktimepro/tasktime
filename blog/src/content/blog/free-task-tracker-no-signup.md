@@ -7,7 +7,7 @@ category: "planning"
 tags: ["free", "tasks", "freelancers", "productivity"]
 keywords: ["free task tracker", "task tracker no signup", "free task list app", "free project task manager", "task tracker no account"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "A Free Task Tracker That Doesn't Require Sign-Up"
 socialDescription: "Most task trackers want your email first. Here's a genuinely free one that works instantly — no account needed."
 draft: false
@@ -37,9 +37,9 @@ For most freelancers, the requirements are pretty simple:
 - **Fast entry.** Adding a task should take seconds, not clicks through a modal wizard.
 - **Works right away.** Open the app, start adding tasks. No account creation, no email verification, no waiting for a confirmation link.
 
-## How TaskTime does it
+## How TaskTime Pro does it
 
-TaskTime is a task tracker that lives in your browser. You open it, create a project, and start adding tasks. That's it — no account, no sign-up, no email.
+TaskTime Pro is a task tracker that lives in your browser. You open it, create a project, and start adding tasks. That's it — no account, no sign-up, no email.
 
 Your tasks support subtasks, so you can break bigger deliverables into manageable pieces. Each task can have a timer attached, and when you complete work, the time entries stay connected to the right task and project.
 
@@ -51,4 +51,4 @@ If you want to access your tasks across devices, you can optionally sync through
 
 Here's how to tell if a task tracker is genuinely free: open it in a private browser window. Can you create a project and add tasks without entering an email address? If yes, it's free. If not, it's a trial.
 
-[TaskTime passes that test](/) — give it a try and see for yourself.
+[TaskTime Pro passes that test](/) — give it a try and see for yourself.

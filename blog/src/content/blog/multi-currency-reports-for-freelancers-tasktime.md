@@ -1,13 +1,13 @@
 ---
 title: "Multi-Currency Reports for Freelancers: Convert Client Currencies Automatically"
-description: "TaskTime reports can convert invoices and expenses from different client currencies into your preferred currency for overviews, totals, and cash-flow checks."
+description: "TaskTime Pro reports can convert invoices and expenses from different client currencies into your preferred currency for overviews, totals, and cash-flow checks."
 publishedAt: "2026-06-10"
-excerpt: "Work with clients in USD, EUR, GBP, CHF, or other currencies? TaskTime can show source-currency details and preferred-currency totals in reports and dashboard overviews."
+excerpt: "Work with clients in USD, EUR, GBP, CHF, or other currencies? TaskTime Pro can show source-currency details and preferred-currency totals in reports and dashboard overviews."
 category: "workflow"
 tags: ["reports", "multi-currency", "freelancers", "accounting"]
 keywords: ["multi-currency reports", "multi currency invoicing for freelancers", "freelance currency conversion", "convert client currencies", "multi-currency accounting reports", "invoice currency conversion", "preferred currency reports"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "Multi-Currency Reports for Freelancers"
 socialDescription: "Convert client invoice and expense currencies into your preferred currency for clearer freelance reports, totals, and overviews."
 draft: false
@@ -19,7 +19,7 @@ One client pays in USD, another in EUR, another in GBP, and a recurring software
 
 If you want to know how the month is going, you do not want a mental math exercise. You want a clear total in your preferred currency, with the option to inspect the original currencies when needed.
 
-That is what TaskTime's multi-currency reporting is designed for.
+That is what TaskTime Pro's multi-currency reporting is designed for.
 
 ## The problem with source currencies
 
@@ -38,7 +38,7 @@ But source currencies are not enough for overview reporting. A monthly report th
 
 ## Preferred currency gives you the overview
 
-TaskTime lets you set a preferred currency.
+TaskTime Pro lets you set a preferred currency.
 
 Reports can then show totals in that preferred currency when exchange rates are available. That gives you a cleaner view of:
 
@@ -59,7 +59,7 @@ For searches like "multi-currency reports" or "multi-currency accounting reports
 
 Preferred-currency totals are useful, but they should not hide the original records.
 
-TaskTime reports include a currency display option:
+TaskTime Pro reports include a currency display option:
 
 - Preferred currency
 - Source currencies
@@ -81,13 +81,13 @@ Multi-currency handling appears across the places where freelancers usually need
 - Expense summaries
 - Uninvoiced work summaries
 
-The goal is consistency. If you are looking at paid revenue, outstanding balances, or filtered expense totals, TaskTime tries to present the information in the currency view you selected.
+The goal is consistency. If you are looking at paid revenue, outstanding balances, or filtered expense totals, TaskTime Pro tries to present the information in the currency view you selected.
 
 ## Why payment snapshots matter
 
 Exchange rates move.
 
-If a USD invoice was paid weeks ago and your preferred currency is EUR, the converted value should not drift every time you open the dashboard. For paid invoices and paid expenses, TaskTime can use captured payment conversion details where available.
+If a USD invoice was paid weeks ago and your preferred currency is EUR, the converted value should not drift every time you open the dashboard. For paid invoices and paid expenses, TaskTime Pro can use captured payment conversion details where available.
 
 That helps reports reflect the payment context more closely instead of constantly recalculating old paid items with today's rate.
 
@@ -97,7 +97,7 @@ For unpaid or current reporting totals, live or cached exchange rates can still 
 
 Currency conversion should fail carefully.
 
-If exchange rates are unavailable, TaskTime warns you and falls back to original amounts where needed. That is better than silently showing a total that looks precise but is missing a conversion.
+If exchange rates are unavailable, TaskTime Pro warns you and falls back to original amounts where needed. That is better than silently showing a total that looks precise but is missing a conversion.
 
 This can happen if:
 
@@ -112,7 +112,7 @@ In those cases, source-currency display is still useful. You can see the origina
 
 Multi-currency reporting is extremely useful for business visibility, but it is still a reporting aid.
 
-Taxes, VAT, exchange-rate rules, and accounting treatment can depend on your country, payment date, invoice date, accounting basis, and local rules. TaskTime gives you organized records and estimated converted totals. It does not replace professional tax or accounting advice.
+Taxes, VAT, exchange-rate rules, and accounting treatment can depend on your country, payment date, invoice date, accounting basis, and local rules. TaskTime Pro gives you organized records and estimated converted totals. It does not replace professional tax or accounting advice.
 
 That is why the source records remain visible and exports stay useful. Your accountant can review the original invoice currencies, dates, totals, and payment details.
 
@@ -135,10 +135,10 @@ You can do currency conversion in a spreadsheet, but the manual work adds up qui
 
 You need to copy invoice totals, copy expense totals, choose exchange rates, remember which date basis you used, and avoid overwriting formulas. Then you need to repeat it next month.
 
-TaskTime already has the invoice, expense, client, project, payment, and currency data. Reports use that connected data to give you totals without rebuilding the same spreadsheet every time.
+TaskTime Pro already has the invoice, expense, client, project, payment, and currency data. Reports use that connected data to give you totals without rebuilding the same spreadsheet every time.
 
 That is the advantage of multi-currency reports for freelancers: not just currency conversion, but conversion connected to the work, invoices, expenses, and payment status you already track.
 
 ---
 
-**Want to try it?** [Open TaskTime](/), set your preferred currency, and review a report with Preferred currency and Source currencies side by side.
+**Want to try it?** [Open TaskTime Pro](/), set your preferred currency, and review a report with Preferred currency and Source currencies side by side.

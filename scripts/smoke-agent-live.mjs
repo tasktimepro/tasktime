@@ -168,7 +168,7 @@ try {
     taskTitle,
     invoiceSmoke,
   }, null, 2))
-  console.log('TaskTime live agent MCP smoke test passed.')
+  console.log('TaskTime Pro live agent MCP smoke test passed.')
 } finally {
   if (browser) {
     await browser.close().catch(() => {})

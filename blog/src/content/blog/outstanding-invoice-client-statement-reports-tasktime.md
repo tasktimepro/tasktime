@@ -1,15 +1,15 @@
 ---
 title: "Outstanding Invoice Reports and Client Statements for Freelancers"
-description: "Track unpaid invoices, overdue balances, aging buckets, payments, and client activity with TaskTime outstanding invoice reports and client statements."
+description: "Track unpaid invoices, overdue balances, aging buckets, payments, and client activity with TaskTime Pro outstanding invoice reports and client statements."
 publishedAt: "2026-06-17"
 excerpt: "A clear outstanding invoice report helps freelancers follow up faster, understand cash flow, and send clients a cleaner statement of what is open and paid."
 category: "invoicing"
 tags: ["reports", "invoicing", "cash flow", "freelancers"]
 keywords: ["outstanding invoice report", "client statement for freelancers", "freelance invoice tracking", "overdue invoice report", "unpaid invoice tracker", "invoice aging report", "freelancer cash flow report"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "Outstanding Invoice Reports and Client Statements for Freelancers"
-socialDescription: "Use TaskTime reports to track unpaid invoices, overdue balances, invoice aging, payments, and client statement activity."
+socialDescription: "Use TaskTime Pro reports to track unpaid invoices, overdue balances, invoice aging, payments, and client statement activity."
 draft: false
 ---
 
@@ -23,7 +23,7 @@ That is where outstanding invoice reports and client statements help.
 
 An outstanding invoice report focuses on unpaid invoices.
 
-In TaskTime, it helps answer:
+In TaskTime Pro, it helps answer:
 
 - Which invoices are still open?
 - Which invoices are overdue?
@@ -43,7 +43,7 @@ Late payment is easier to handle early.
 
 If you only notice unpaid invoices when cash gets tight, the follow-up is already late. A weekly or monthly outstanding invoice review keeps the list visible.
 
-TaskTime separates outstanding and overdue invoices in report summaries, so you can see both:
+TaskTime Pro separates outstanding and overdue invoices in report summaries, so you can see both:
 
 - Outstanding: invoices still open
 - Overdue: open invoices past their due date
@@ -56,7 +56,7 @@ An invoice that is two days overdue is different from one that is forty-five day
 
 Invoice aging helps you prioritize. Instead of treating every unpaid invoice the same, you can focus on the older balances first.
 
-TaskTime's outstanding report includes overdue context, due dates, and days overdue so you can decide what needs a friendly reminder, what needs a firmer note, and what may need a direct conversation.
+TaskTime Pro's outstanding report includes overdue context, due dates, and days overdue so you can decide what needs a friendly reminder, what needs a firmer note, and what may need a direct conversation.
 
 ## Client statements are the bigger picture
 
@@ -78,7 +78,7 @@ For freelancers, a client statement can make you look much more organized withou
 
 Reports are more useful when the filter matches the question.
 
-In TaskTime, you can filter reports by:
+In TaskTime Pro, you can filter reports by:
 
 - Period
 - Business profile
@@ -102,7 +102,7 @@ The filter step keeps exports smaller and more useful.
 
 If you invoice international clients, outstanding balances may exist in multiple currencies.
 
-TaskTime can show report totals in your preferred currency when exchange rates are available, or show source currencies when you want the original invoice amounts.
+TaskTime Pro can show report totals in your preferred currency when exchange rates are available, or show source currencies when you want the original invoice amounts.
 
 That matters for follow-up. A client should see the amount in the currency you invoiced them. Your own cash-flow overview may be easier in your preferred currency.
 
@@ -112,7 +112,7 @@ Both views are useful for different reasons.
 
 Sometimes the report is just for you. Sometimes you need a file.
 
-TaskTime can export report data so you can share it, archive it, or send it to your accountant.
+TaskTime Pro can export report data so you can share it, archive it, or send it to your accountant.
 
 For outstanding invoices, that gives you structured records with invoice number, client, business, project, invoice date, due date, status, days overdue, currency, and total.
 
@@ -142,4 +142,4 @@ That is the real benefit for freelancers: fewer payment surprises, clearer follo
 
 ---
 
-**Want to try it?** [Open TaskTime](/), go to Reports, and review your outstanding invoices before the next payment reminder.
+**Want to try it?** [Open TaskTime Pro](/), go to Reports, and review your outstanding invoices before the next payment reminder.

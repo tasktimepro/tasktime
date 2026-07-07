@@ -7,7 +7,7 @@ category: "expenses"
 tags: ["privacy", "expenses", "freelancers", "tips"]
 keywords: ["privacy expense tracker", "offline expense tracker for freelancers", "private expense tracking app", "freelancer expense tracker"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "How to Track Expenses as a Freelancer Without Giving Up Your Privacy"
 socialDescription: "A no-nonsense guide to tracking freelancer expenses privately — without cloud-first assumptions or bloated dashboards."
 draft: false
@@ -26,9 +26,9 @@ Forget the AI-powered receipt scanning and the 47 integrations. For most freelan
 - **Billable vs. non-billable.** You need to know which expenses to pass through to clients and which are your own overhead.
 - **Reliable export.** At minimum, you should be able to get your expenses out as a file you can hand to your accountant.
 
-## How TaskTime keeps it simple and private
+## How TaskTime Pro keeps it simple and private
 
-In TaskTime, expenses live right alongside your projects, tasks, and invoices. You log an expense, tag it to a project, mark it as billable or not, and move on. Recurring expenses get created automatically.
+In TaskTime Pro, expenses live right alongside your projects, tasks, and invoices. You log an expense, tag it to a project, mark it as billable or not, and move on. Recurring expenses get created automatically.
 
 The key difference: all of this stays in your browser. There's no server storing your expense data, no account required, and no third-party access. If you want a backup, you sync to your own Google Drive — and that's between you and Google, not us.
 

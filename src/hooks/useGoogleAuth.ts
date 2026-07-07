@@ -95,7 +95,7 @@ const notifyAuthSubscribers = () => {
             console.error('Auth subscriber error:', error);
             captureGoogleAuthIncident(
                 'auth.subscriber_callback_failed',
-                'TaskTime Google auth subscriber callback failed',
+                'TaskTime Pro Google auth subscriber callback failed',
                 error,
                 {},
                 30 * 60 * 1000,
@@ -403,7 +403,7 @@ export const useGoogleAuth = () => {
             if (shouldCaptureSignInIncident(authError)) {
                 captureGoogleAuthIncident(
                     'auth.sign_in_failed',
-                    'TaskTime Google Drive sign-in failed',
+                    'TaskTime Pro Google Drive sign-in failed',
                     authError,
                     {
                         step: failedStep,
@@ -484,7 +484,7 @@ export const useGoogleAuth = () => {
             console.error('[useGoogleAuth] Worker URL not configured');
             captureGoogleAuthIncident(
                 'auth.worker_config_missing',
-                'TaskTime Google Drive sync worker URL is missing',
+                'TaskTime Pro Google Drive sync worker URL is missing',
                 new Error('Sync Worker not configured'),
                 {},
                 AUTH_CONFIG_INCIDENT_THROTTLE_MS,

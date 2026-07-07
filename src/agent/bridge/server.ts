@@ -290,7 +290,7 @@ export class BridgeAppSessionServer {
             action: 'access_revoked',
             clientId: revokedByClientId,
         });
-        this.rejectPendingResponses(new AgentCommandError('PERMISSION_DENIED', 'TaskTime agent bridge access was revoked.'));
+        this.rejectPendingResponses(new AgentCommandError('PERMISSION_DENIED', 'TaskTime Pro agent bridge access was revoked.'));
 
         for (const client of this.clients) {
             client.close();
@@ -305,7 +305,7 @@ export class BridgeAppSessionServer {
         approval?: AgentAppSessionApprovalToken
     ): AgentAppSessionRequest {
         if (!client.session) {
-            throw new AgentCommandError('PERMISSION_DENIED', 'TaskTime app session is not paired.');
+            throw new AgentCommandError('PERMISSION_DENIED', 'TaskTime Pro app session is not paired.');
         }
 
         const request: AgentAppSessionRequest = {
@@ -388,13 +388,13 @@ export class BridgeAppSessionServer {
 
     private getAuthoritativeClient(): BridgeWebSocketClient {
         if (this.clients.size === 0) {
-            throw new AgentCommandError('UNAVAILABLE', 'No TaskTime app session is connected.');
+            throw new AgentCommandError('UNAVAILABLE', 'No TaskTime Pro app session is connected.');
         }
 
         const client = Array.from(this.clients).find((item) => item.id === this.authoritativeClientId);
 
         if (!client) {
-            throw new AgentCommandError('UNAVAILABLE', 'No authoritative TaskTime app session is available.');
+            throw new AgentCommandError('UNAVAILABLE', 'No authoritative TaskTime Pro app session is available.');
         }
 
         return client;
@@ -512,7 +512,7 @@ export class BridgeAppSessionServer {
                 return null;
             }
 
-            throw new AgentCommandError('PERMISSION_DENIED', 'Pairing credentials are required for the TaskTime agent bridge.');
+            throw new AgentCommandError('PERMISSION_DENIED', 'Pairing credentials are required for the TaskTime Pro agent bridge.');
         }
 
         const now = pairing.now ? pairing.now() : Date.now();
@@ -641,7 +641,7 @@ export class BridgeAppSessionServer {
                 if (wasAuthoritative) {
                     this.electAuthoritativeClient();
                 }
-                this.rejectPendingResponses(new AgentCommandError('UNAVAILABLE', 'TaskTime app session disconnected.'), client);
+                this.rejectPendingResponses(new AgentCommandError('UNAVAILABLE', 'TaskTime Pro app session disconnected.'), client);
                 this.audit({
                     action: 'session_disconnected',
                     clientId: client.id,

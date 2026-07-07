@@ -431,7 +431,7 @@ describe('AgentBridgeSettings', () => {
                 command: 'mark_invoice_paid',
                 error: {
                     code: 'PERMISSION_DENIED',
-                    message: 'Agent command was not approved in TaskTime.',
+                    message: 'Agent command was not approved in TaskTime Pro.',
                 },
             },
         }));
@@ -486,7 +486,7 @@ describe('AgentBridgeSettings', () => {
                 command: 'mark_invoice_paid',
                 error: {
                     code: 'PERMISSION_DENIED',
-                    message: 'Agent command was not approved in TaskTime.',
+                    message: 'Agent command was not approved in TaskTime Pro.',
                 },
             },
         }));
@@ -604,7 +604,7 @@ describe('AgentBridgeSettings', () => {
 
         rerender(
             <AgentBridgeProvider>
-                <div>Different TaskTime route</div>
+                <div>Different TaskTime Pro route</div>
             </AgentBridgeProvider>
         );
 

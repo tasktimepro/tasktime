@@ -7,7 +7,7 @@ category: "invoicing"
 tags: ["privacy", "invoicing", "offline", "freelancers"]
 keywords: ["private invoicing app", "invoicing app without cloud", "offline invoice generator", "invoice app that works offline", "private invoice tool"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "A Private Invoicing App That Works Without the Cloud"
 socialDescription: "Your invoices contain sensitive data. Here's an invoicing app that keeps it all on your device — no cloud required."
 draft: false
@@ -39,13 +39,13 @@ An invoicing app that works without the cloud is simpler than it sounds:
 - **No account means no data on their end.** If there's no sign-up, there's nothing to store about you.
 - **Sync is opt-in, on your terms.** If you *want* backup or multi-device access, you decide where the data goes.
 
-## How TaskTime approaches this
+## How TaskTime Pro approaches this
 
-TaskTime is a PWA — a progressive web app — that runs entirely in your browser. Your invoices, client records, and business info are stored locally. The app works offline, so you can create and review invoices without connectivity.
+TaskTime Pro is a PWA — a progressive web app — that runs entirely in your browser. Your invoices, client records, and business info are stored locally. The app works offline, so you can create and review invoices without connectivity.
 
 When you generate an invoice, the PDF is created right in your browser. No server round-trip, no upload. The file goes from your device to wherever you choose to save it.
 
-If you want your invoicing data available on another device, you can connect Google Drive for sync. The data goes from your browser to your Drive account — TaskTime never stores or processes it.
+If you want your invoicing data available on another device, you can connect Google Drive for sync. The data goes from your browser to your Drive account — TaskTime Pro never stores or processes it.
 
 There's no account to create. No monthly fee. No server holding your billing history. You control your financial records completely, and you can export everything at any time.
 

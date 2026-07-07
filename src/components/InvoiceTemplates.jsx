@@ -207,7 +207,7 @@ const InvoiceTemplates = ({
             taxLabel: 'Tax',
             paymentMethod: {
                 fullName: 'Owen Farrugia',
-                bank: 'TaskTime Bank',
+                bank: 'TaskTime Pro Bank',
                 iban: 'GB29NWBK60161331926819',
                 swift: 'TTIMEGB2L',
                 custom: [{ label: 'Reference', value: 'Use invoice number as payment reference' }],

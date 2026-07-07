@@ -299,7 +299,7 @@ export const generatePDF = (
                     console.error('PDF generation failed:', error);
                     captureInvoicePdfIncident({
                         incidentKey: 'invoice.pdf_generation_failed',
-                        message: 'TaskTime invoice PDF generation failed',
+                        message: 'TaskTime Pro invoice PDF generation failed',
                         error,
                         context: {
                             operation: 'download',
@@ -313,7 +313,7 @@ export const generatePDF = (
             console.error('PDF generation error:', error);
             captureInvoicePdfIncident({
                 incidentKey: 'invoice.pdf_generation_failed',
-                message: 'TaskTime invoice PDF generation failed',
+                message: 'TaskTime Pro invoice PDF generation failed',
                 error,
                 context: {
                     operation: 'download',
@@ -347,7 +347,7 @@ export const generatePDFBlob = (
                 .catch((error: unknown) => {
                     captureInvoicePdfIncident({
                         incidentKey: 'invoice.pdf_blob_generation_failed',
-                        message: 'TaskTime invoice PDF blob generation failed',
+                        message: 'TaskTime Pro invoice PDF blob generation failed',
                         error,
                         context: {
                             operation: 'blob',
@@ -359,7 +359,7 @@ export const generatePDFBlob = (
         } catch (error) {
             captureInvoicePdfIncident({
                 incidentKey: 'invoice.pdf_blob_generation_failed',
-                message: 'TaskTime invoice PDF blob generation failed',
+                message: 'TaskTime Pro invoice PDF blob generation failed',
                 error,
                 context: {
                     operation: 'blob',
@@ -391,7 +391,7 @@ export const generatePDFBase64 = (htmlContent: string): Promise<string> => {
                     const error = new Error('Failed to convert PDF to base64');
                     captureInvoicePdfIncident({
                         incidentKey: 'invoice.pdf_base64_generation_failed',
-                        message: 'TaskTime invoice PDF base64 conversion failed',
+                        message: 'TaskTime Pro invoice PDF base64 conversion failed',
                         error,
                         context: {
                             operation: 'base64',

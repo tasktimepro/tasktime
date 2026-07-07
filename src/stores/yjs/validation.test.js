@@ -32,7 +32,7 @@ describe('Yjs validation', () => {
 
         try {
             globalThis.Function = vi.fn(() => {
-                throw new Error('Zod JIT should not execute under TaskTime CSP')
+                throw new Error('Zod JIT should not execute under TaskTime Pro CSP')
             })
 
             expect(validateCollectionEntity('projects', {

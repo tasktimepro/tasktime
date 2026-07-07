@@ -303,7 +303,7 @@ const EmailPreviewModal = ({
                     captureDebugBundleIncident({
                         incidentKey: 'invoice.email_send_unexpected_failed',
                         name: 'TaskTimeInvoiceEmailUnexpectedFailure',
-                        message: 'TaskTime invoice email flow failed unexpectedly',
+                        message: 'TaskTime Pro invoice email flow failed unexpectedly',
                         error: err,
                         context: {
                             stage: failureStage,

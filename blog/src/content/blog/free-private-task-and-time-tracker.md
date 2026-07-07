@@ -7,7 +7,7 @@ category: "privacy"
 tags: ["free", "privacy", "time tracking", "tasks"]
 keywords: ["free private task and time tracker", "private time tracker", "task tracker that doesn't sell data", "no cloud time tracker", "free private tracker"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "Free and Private: A Task and Time Tracker That Doesn't Collect Your Data"
 socialDescription: "Most free tools are free because they collect your data. Here's a task and time tracker that's free because it doesn't need to."
 draft: false
@@ -34,9 +34,9 @@ A task and time tracker is genuinely private when:
 - **Sync goes to your own storage.** If the tool offers sync, it should go to your cloud account (like Google Drive), not theirs.
 - **No telemetry on your work.** The tool shouldn't phone home with what projects you have or how many hours you tracked.
 
-## How TaskTime pulls this off
+## How TaskTime Pro pulls this off
 
-TaskTime stores everything in your browser's local storage using a technology called CRDTs. When you create tasks, start timers, or log time entries, that data lives on your device and nowhere else.
+TaskTime Pro stores everything in your browser's local storage using a technology called CRDTs. When you create tasks, start timers, or log time entries, that data lives on your device and nowhere else.
 
 There's no user account. There's no backend database with your information. We don't run analytics on your projects or track what features you use inside the app.
 

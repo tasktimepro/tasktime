@@ -124,10 +124,10 @@ export function getNotificationPermissionFailureMessage(permission: Notification
 
 function getServiceWorkerUnavailableMessage(isDev: boolean): string {
     if (isDev) {
-        return 'TaskTime push reminders require the preview or deployed app. The Vite dev server disables the app service worker.';
+        return 'TaskTime Pro push reminders require the preview or deployed app. The Vite dev server disables the app service worker.';
     }
 
-    return 'TaskTime push reminders are not ready on this device yet. Reload and try again.';
+    return 'TaskTime Pro push reminders are not ready on this device yet. Reload and try again.';
 }
 
 export async function getReadyServiceWorkerRegistration({

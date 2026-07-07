@@ -82,7 +82,7 @@ describe('postReloadToast', () => {
 
         expect(consumeAppVersionUpdateToast('1.2.3')).toEqual({
             level: 'success',
-            message: 'TaskTime was updated',
+            message: 'TaskTime Pro was updated',
         })
         expect(localStorageMock.setItem).toHaveBeenCalledWith('tasktime-last-seen-app-version', '1.2.3')
     })

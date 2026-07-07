@@ -133,8 +133,8 @@ describe('service worker caching', () => {
         expect(event.waitUntil).toHaveBeenCalled()
         await event.waitUntil.mock.calls[0][0]
 
-        expect(globalThis.self.registration.showNotification).toHaveBeenCalledWith('TaskTime', {
-            body: 'TaskTime has a reminder for you.',
+        expect(globalThis.self.registration.showNotification).toHaveBeenCalledWith('TaskTime Pro', {
+            body: 'TaskTime Pro has a reminder for you.',
             tag: 'tasktime-reminder',
             renotify: false,
             data: {
@@ -145,7 +145,7 @@ describe('service worker caching', () => {
         })
     })
 
-    it('opens TaskTime when a notification is clicked and no client is open', async () => {
+    it('opens TaskTime Pro when a notification is clicked and no client is open', async () => {
 
         const event = {
             notification: {

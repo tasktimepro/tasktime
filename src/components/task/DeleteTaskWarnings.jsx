@@ -23,7 +23,7 @@ const DeleteTaskWarnings = ({ summary, taskCount = 1 }) => {
             {summary.hasBilledTime && (
                 <Notice
                     title={`${subject} ${verb} time that is already recorded on an invoice.`}
-                    description={`Deleting ${objectPronoun} will not remove historical invoices or their line items, but it will remove the live task and time entry records from TaskTime.`}
+                    description={`Deleting ${objectPronoun} will not remove historical invoices or their line items, but it will remove the live task and time entry records from TaskTime Pro.`}
                     variant="warning"
                 />
             )}

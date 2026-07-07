@@ -1,4 +1,4 @@
-# TaskTime Public Site
+# TaskTime Pro Public Site
 
 Static Astro public pages served under `/blog`, `/agents`, `/privacy`, `/terms`, and `/contact`.
 

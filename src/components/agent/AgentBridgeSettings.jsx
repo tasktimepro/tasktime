@@ -203,7 +203,7 @@ export default function AgentBridgeSettings() {
                         {!agentAccessEnabled && (
                             <Notice
                                 title="Agent access disabled"
-                                description="Pairing is blocked and any connected local bridge session has been revoked for this page session. Standard TaskTime features are unchanged."
+                                description="Pairing is blocked and any connected local bridge session has been revoked for this page session. Standard TaskTime Pro features are unchanged."
                                 variant="default"
                                 compact
                             />

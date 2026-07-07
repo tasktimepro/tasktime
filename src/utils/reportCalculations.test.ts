@@ -596,7 +596,7 @@ describe('reportCalculations', () => {
                 ['client-2', { id: 'client-2', title: 'Globex' }],
             ]),
             businessInfosById: new Map([
-                ['business-1', { id: 'business-1', businessName: 'TaskTime Studio' }],
+                ['business-1', { id: 'business-1', businessName: 'TaskTime Pro Studio' }],
                 ['business-2', { id: 'business-2', businessName: 'Other Studio' }],
             ]),
         });
@@ -608,7 +608,7 @@ describe('reportCalculations', () => {
             totalByCurrency: { EUR: 120, USD: 50 },
         });
         expect(summary.totalsByBusiness[0]).toEqual({
-            label: 'TaskTime Studio',
+            label: 'TaskTime Pro Studio',
             count: 2,
             totalByCurrency: { EUR: 360 },
         });
@@ -644,7 +644,7 @@ describe('reportCalculations', () => {
                 ['client-1', { id: 'client-1', title: 'Acme' }],
             ]),
             businessInfosById: new Map([
-                ['business-1', { id: 'business-1', businessName: 'TaskTime Studio' }],
+                ['business-1', { id: 'business-1', businessName: 'TaskTime Pro Studio' }],
             ]),
         });
 

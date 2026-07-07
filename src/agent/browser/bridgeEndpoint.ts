@@ -87,7 +87,7 @@ export function getAgentBridgeConnectionDiagnostics(
         diagnostics.push({
             severity: 'error',
             title: 'Endpoint is not local',
-            message: 'For v1, TaskTime only connects to loopback bridge hosts such as 127.0.0.1, localhost, or [::1].',
+            message: 'For v1, TaskTime Pro only connects to loopback bridge hosts such as 127.0.0.1, localhost, or [::1].',
         });
     }
 

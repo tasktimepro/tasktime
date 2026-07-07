@@ -230,7 +230,7 @@ export class YjsDriveProvider {
             console.error('[YjsDriveProvider] Page-exit sync failed:', error);
             captureDriveIncident({
                 incidentKey: 'drive.page_exit_sync_failed',
-                message: 'TaskTime could not flush pending Drive sync changes during page exit',
+                message: 'TaskTime Pro could not flush pending Drive sync changes during page exit',
                 error,
                 context: { trigger, mode: this.syncMode },
                 throttleMs: 10 * 60 * 1000,
@@ -266,7 +266,7 @@ export class YjsDriveProvider {
             if (!recoveredFileId) {
                 captureDriveIncident({
                     incidentKey: 'drive.remote_file_missing_after_recovery',
-                    message: 'TaskTime could not recover a Drive sync file after refreshing the file cache',
+                    message: 'TaskTime Pro could not recover a Drive sync file after refreshing the file cache',
                     error,
                     context: { fileName, fileId },
                     throttleMs: 30 * 60 * 1000,
@@ -280,7 +280,7 @@ export class YjsDriveProvider {
                 if (isDriveFileNotFoundError(retryError)) {
                     captureDriveIncident({
                         incidentKey: 'drive.remote_file_missing_after_recovery',
-                        message: 'TaskTime could not recover a Drive sync file after refreshing the file cache',
+                        message: 'TaskTime Pro could not recover a Drive sync file after refreshing the file cache',
                         error: retryError,
                         context: { fileName, fileId: recoveredFileId, originalFileId: fileId },
                         throttleMs: 30 * 60 * 1000,
@@ -404,7 +404,7 @@ export class YjsDriveProvider {
             console.warn(`[YjsDriveProvider] Validation warning after ${source} for ${docName} (update applied anyway):`, error);
             captureDriveIncident({
                 incidentKey: 'drive.remote_validation_warning',
-                message: 'TaskTime applied a remote Drive update that failed validation',
+                message: 'TaskTime Pro applied a remote Drive update that failed validation',
                 error,
                 context: { docName, source },
                 throttleMs: DRIVE_VALIDATION_INCIDENT_THROTTLE_MS,
@@ -589,7 +589,7 @@ export class YjsDriveProvider {
             if (!(error instanceof AuthorizationError)) {
                 captureDriveIncident({
                     incidentKey: 'drive.connect_failed',
-                    message: 'TaskTime could not connect to Google Drive sync',
+                    message: 'TaskTime Pro could not connect to Google Drive sync',
                     error,
                     context: { mode },
                 });
@@ -641,7 +641,7 @@ export class YjsDriveProvider {
     }
 
     /**
-     * Wipe all TaskTime files from Drive appDataFolder
+     * Wipe all TaskTime Pro files from Drive appDataFolder
      * This deletes the manifest and all document/delta files.
      */
     async wipeDriveData(): Promise<void> {
@@ -910,7 +910,7 @@ export class YjsDriveProvider {
             if (!(error instanceof AuthorizationError) && !(error instanceof BackupModeRemoteChangedError)) {
                 captureDriveIncident({
                     incidentKey: 'drive.sync_failed',
-                    message: 'TaskTime Drive sync failed',
+                    message: 'TaskTime Pro Drive sync failed',
                     error,
                     context: {
                         allowPull,
@@ -1197,7 +1197,7 @@ export class YjsDriveProvider {
             console.error(`[DriveSync] Failed to push delta for ${docName}, will retry on next sync`, error);
             captureDriveIncident({
                 incidentKey: 'drive.delta_upload_failed',
-                message: 'TaskTime could not upload a Drive delta update',
+                message: 'TaskTime Pro could not upload a Drive delta update',
                 error,
                 context: {
                     docName,
@@ -1264,7 +1264,7 @@ export class YjsDriveProvider {
             console.error(`[DriveSync] Failed to push full state for ${docName}, will retry`, error);
             captureDriveIncident({
                 incidentKey: 'drive.full_state_upload_failed',
-                message: 'TaskTime could not upload a full Drive document state',
+                message: 'TaskTime Pro could not upload a full Drive document state',
                 error,
                 context: {
                     clearDeltas,

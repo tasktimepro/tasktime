@@ -177,7 +177,7 @@ export function parseBackupImportJson(backupJson: string): NormalizedBackupImpor
     }
 
     if (parsed.version && (typeof parsed.version !== 'string' || !SUPPORTED_BACKUP_IMPORT_VERSIONS.includes(parsed.version))) {
-        throw new Error(`Unsupported export version "${String(parsed.version)}". Supported: ${SUPPORTED_BACKUP_IMPORT_VERSIONS.join(', ')}. You may need to update TaskTime.`);
+        throw new Error(`Unsupported export version "${String(parsed.version)}". Supported: ${SUPPORTED_BACKUP_IMPORT_VERSIONS.join(', ')}. You may need to update TaskTime Pro.`);
     }
 
     const projects = assertArray(parsed.projects, 'projects') as Project[];

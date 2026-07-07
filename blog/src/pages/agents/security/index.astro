@@ -11,15 +11,15 @@ const highlights = [
 
 <AgentDocsLayout
     pageKey="security"
-    title="TaskTime Agent Security Model"
-    description="How TaskTime protects local-first task, time, expense, invoice, export, sync, and account data when an AI agent uses the local MCP bridge."
+    title="TaskTime Pro Agent Security Model"
+    description="How TaskTime Pro protects local-first task, time, expense, invoice, export, sync, and account data when an AI agent uses the local MCP bridge."
     canonicalPath="/agents/security/"
     highlights={highlights}
 >
     <section>
         <h2>Local-Only Access</h2>
         <p>
-            The TaskTime local agent bridge binds to loopback hosts such as <code>127.0.0.1</code>,
+            The TaskTime Pro local agent bridge binds to loopback hosts such as <code>127.0.0.1</code>,
             <code>localhost</code>, and <code>::1</code>. It is not a public API, not a cloud relay, and not a remote
             device control surface. Agent hosts should not tunnel it or expose it on public interfaces.
         </p>
@@ -28,7 +28,7 @@ const highlights = [
     <section>
         <h2>Browser App As Mutation Owner</h2>
         <p>
-            The bridge forwards commands to the paired TaskTime browser app. It does not open IndexedDB, does not parse
+            The bridge forwards commands to the paired TaskTime Pro browser app. It does not open IndexedDB, does not parse
             Yjs documents, and does not write raw storage patches. This preserves the same validation, persistence,
             sync, invoice, and deletion rules used by the normal UI.
         </p>
@@ -40,7 +40,7 @@ const highlights = [
             <li>Pairing requires a bridge endpoint, pairing ID, and pairing code shown by the local bridge.</li>
             <li>The pairing code is time-limited and should be treated as a local secret.</li>
             <li>Account &gt; Agent Access shows paired status, scopes, current activity, and local activity history.</li>
-            <li>The user can disconnect or revoke local agent access without clearing TaskTime data.</li>
+            <li>The user can disconnect or revoke local agent access without clearing TaskTime Pro data.</li>
         </ul>
     </section>
 
@@ -93,9 +93,9 @@ const highlights = [
         <h2>Approval-Gated Actions</h2>
         <p>
             Destructive, billing, restore, email, export-adjacent, sync, and account-data commands can require explicit
-            confirmation plus TaskTime approval. A trusted local approval token can satisfy that gate only when a trusted
+            confirmation plus TaskTime Pro approval. A trusted local approval token can satisfy that gate only when a trusted
             local grant exists, the token matches the exact command input hash, and the browser app verifies it.
-            Otherwise, TaskTime shows the visible browser approval prompt.
+            Otherwise, TaskTime Pro shows the visible browser approval prompt.
         </p>
         <p>
             Without a valid approval token, the app falls back to the normal visible approval prompt and fails closed if

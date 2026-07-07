@@ -150,7 +150,7 @@ export function parseTaskTimeAgentBridgeCliOptions(
 
 export function getTaskTimeAgentBridgeCliUsage(): string {
     return [
-        'TaskTime local agent bridge',
+        'TaskTime Pro local agent bridge',
         '',
         'Usage:',
         '  tasktime-agent-bridge [options]',
@@ -161,13 +161,13 @@ export function getTaskTimeAgentBridgeCliUsage(): string {
         '  --path <path>                 App-session WebSocket path. Default: /tasktime-agent',
         '  --scopes <list>               Comma-separated scopes. Default: read,write,navigation',
         '  --scope <scope>               Add one scope. Can be repeated.',
-        '  --origin <origin>             Allowed TaskTime browser origin. Can be repeated.',
+        '  --origin <origin>             Allowed TaskTime Pro browser origin. Can be repeated.',
         '  --pairing-ttl-ms <ms>         Pairing code lifetime. Default: 300000',
         '  --session-ttl-ms <ms>         App-session token lifetime.',
         '  --command-timeout-ms <ms>     App command timeout. Default: 120000',
         '  --tool-rate-limit <count>     Max MCP tools/call requests per window. Default: 120. Use 0 to disable.',
         '  --tool-rate-window-ms <ms>    MCP tools/call rate-limit window. Default: 60000',
-        '  --app-url <url>               Print a TaskTime launch URL with pairing details.',
+        '  --app-url <url>               Print a TaskTime Pro launch URL with pairing details.',
         '  --manifest                    Print local agent discovery metadata as JSON and exit.',
         '  --help                        Show this help.',
         '',
@@ -181,7 +181,7 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
         schemaVersion: 1,
         app: {
             id: 'pro.tasktime',
-            name: 'TaskTime',
+            name: 'TaskTime Pro',
             category: 'task-time-invoicing',
             localFirst: true,
         },
@@ -196,12 +196,12 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
             debugging: 'https://tasktime.pro/agents/debugging/',
         },
         bridge: {
-            packageName: '@tasktime/agent-bridge',
+            packageName: '@tasktimepro/agent-bridge',
             binary: 'tasktime-agent-bridge',
             transport: 'mcp-stdio-json-rpc',
             install: {
-                npmPackage: '@tasktime/agent-bridge',
-                openClawBundlePackage: '@tasktime/openclaw',
+                npmPackage: '@tasktimepro/agent-bridge',
+                openClawBundlePackage: '@tasktimepro/openclaw',
             },
             appSession: {
                 protocol: 'websocket',
@@ -257,7 +257,7 @@ export function buildTaskTimeAgentBridgeLaunchUrl(challenge: BridgePairingChalle
 
 export function formatPairingInstructions(challenge: BridgePairingChallenge, appUrl?: string): string {
     const lines = [
-        'TaskTime local agent bridge is running.',
+        'TaskTime Pro local agent bridge is running.',
         `App endpoint: ${challenge.endpoint}`,
         `Pairing ID: ${challenge.id}`,
         `Pairing code: ${challenge.code}`,
@@ -266,12 +266,12 @@ export function formatPairingInstructions(challenge: BridgePairingChallenge, app
     ];
 
     if (appUrl) {
-        lines.push(`TaskTime launch URL: ${buildTaskTimeAgentBridgeLaunchUrl(challenge, appUrl)}`);
+        lines.push(`TaskTime Pro launch URL: ${buildTaskTimeAgentBridgeLaunchUrl(challenge, appUrl)}`);
     }
 
     lines.push(
         '',
-        'Open TaskTime and connect the agent bridge using the endpoint, pairing ID, and pairing code above.'
+        'Open TaskTime Pro and connect the agent bridge using the endpoint, pairing ID, and pairing code above.'
     );
 
     return lines.join('\n');
@@ -307,7 +307,7 @@ export async function startTaskTimeAgentBridgeCli(
         output: io.stdout,
         server: mcp,
         onError: (error) => {
-            io.stderr.write(`TaskTime MCP bridge error: ${error.message}\n`);
+            io.stderr.write(`TaskTime Pro MCP bridge error: ${error.message}\n`);
         },
     });
 
@@ -484,7 +484,7 @@ function isCliEntrypoint(): boolean {
 
 if (isCliEntrypoint()) {
     runTaskTimeAgentBridgeCli().catch((error) => {
-        process.stderr.write(`TaskTime local agent bridge failed: ${error instanceof Error ? error.message : String(error)}\n`);
+        process.stderr.write(`TaskTime Pro local agent bridge failed: ${error instanceof Error ? error.message : String(error)}\n`);
         process.exitCode = 1;
     });
 }

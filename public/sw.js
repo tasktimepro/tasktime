@@ -130,8 +130,8 @@ function getPushNotificationData(event) {
 
 self.addEventListener('push', (event) => {
     const data = getPushNotificationData(event);
-    const title = typeof data.title === 'string' ? data.title : 'TaskTime';
-    const body = typeof data.body === 'string' ? data.body : 'TaskTime has a reminder for you.';
+    const title = typeof data.title === 'string' ? data.title : 'TaskTime Pro';
+    const body = typeof data.body === 'string' ? data.body : 'TaskTime Pro has a reminder for you.';
 
     event.waitUntil(
         self.registration.showNotification(title, {

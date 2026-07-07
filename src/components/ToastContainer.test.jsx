@@ -102,7 +102,7 @@ describe('ToastProvider', () => {
 
         consumePostReloadToastMock.mockReturnValue({
             level: 'success',
-            message: 'TaskTime was updated'
+            message: 'TaskTime Pro was updated'
         })
 
         render(
@@ -111,14 +111,14 @@ describe('ToastProvider', () => {
             </ToastProvider>
         )
 
-        expect(toastMocks.success).toHaveBeenCalledWith('TaskTime was updated', undefined)
+        expect(toastMocks.success).toHaveBeenCalledWith('TaskTime Pro was updated', undefined)
     })
 
     it('dispatches an app update success toast when a new build is detected on startup', () => {
 
         consumeAppVersionUpdateToastMock.mockReturnValue({
             level: 'success',
-            message: 'TaskTime was updated'
+            message: 'TaskTime Pro was updated'
         })
 
         render(
@@ -127,7 +127,7 @@ describe('ToastProvider', () => {
             </ToastProvider>
         )
 
-        expect(toastMocks.success).toHaveBeenCalledWith('TaskTime was updated', undefined)
+        expect(toastMocks.success).toHaveBeenCalledWith('TaskTime Pro was updated', undefined)
     })
 
     it('prefers the queued post-reload toast over the startup version toast', () => {
@@ -138,7 +138,7 @@ describe('ToastProvider', () => {
         })
         consumeAppVersionUpdateToastMock.mockReturnValue({
             level: 'success',
-            message: 'TaskTime was updated'
+            message: 'TaskTime Pro was updated'
         })
 
         render(

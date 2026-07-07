@@ -8,7 +8,7 @@ export function assertReady(context: AgentCommandContext): void {
     const isReady = context.isReady ?? context.store.isReady;
 
     if (!isReady) {
-        throw new AgentCommandError('APP_NOT_READY', 'TaskTime is not ready yet.');
+        throw new AgentCommandError('APP_NOT_READY', 'TaskTime Pro is not ready yet.');
     }
 }
 

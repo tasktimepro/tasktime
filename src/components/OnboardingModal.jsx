@@ -34,7 +34,7 @@ const BENEFIT_CARDS = [
     {
         icon: ShieldIcon,
         title: 'Privacy first',
-        description: 'You own the data. TaskTime can never access or see your data.',
+        description: 'You own the data. TaskTime Pro can never access or see your data.',
     },
     {
         icon: CloudCheckIcon,
@@ -59,7 +59,7 @@ const BENEFIT_CARDS = [
     {
         icon: DocumentTextIcon,
         title: 'Invoices',
-        description: 'Turn tracked work and costs into invoices, then send them directly from TaskTime when you’re ready to bill',
+        description: 'Turn tracked work and costs into invoices, then send them directly from TaskTime Pro when you’re ready to bill',
     },
 ];
 
@@ -202,10 +202,10 @@ const OnboardingModal = ({
                         </div>
                         <div className="space-y-3">
                             <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                                Welcome to TaskTime.
+                                Welcome to TaskTime Pro.
                             </h3>
                             <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                                TaskTime is a local-first task and time management app that helps you plan your work, track your time and expenses, and easily generate invoices.
+                                TaskTime Pro is a local-first task and time management app that helps you plan your work, track your time and expenses, and easily generate invoices.
                             </p>
                         </div>
                     </div>
@@ -232,7 +232,7 @@ const OnboardingModal = ({
                             Sync with Google Drive
                         </h3>
                         <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                            Connect your Google Drive to privately sync TaskTime across devices.
+                            Connect your Google Drive to privately sync TaskTime Pro across devices.
                         </p>
                     </div>
 
@@ -275,7 +275,7 @@ const OnboardingModal = ({
                             <LayersIcon className="h-6 w-6 text-foreground" />
                         </div>
                         <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                            Working with TaskTime
+                            Working with TaskTime Pro
                         </h3>
                         <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
                             Projects, tasks, clients, and expenses work together so you can plan, track time, and bill without jumping between tools.
@@ -343,7 +343,7 @@ const OnboardingModal = ({
         <Modal
             isOpen={isOpen}
             onClose={handleSkip}
-            title="TaskTime setup"
+            title="TaskTime Pro setup"
             hideHeader
             size="3xl"
             className="sm:max-w-[52rem]"

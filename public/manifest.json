@@ -1,6 +1,6 @@
 {
-  "name": "TaskTime",
-  "short_name": "TaskTime",
+  "name": "TaskTime Pro",
+  "short_name": "TaskTime Pro",
   "description": "Track your time by the task. Invoice without the mess.",
   "start_url": "/",
   "display": "standalone",

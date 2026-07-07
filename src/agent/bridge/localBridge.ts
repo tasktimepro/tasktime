@@ -132,15 +132,15 @@ export class LocalAgentBridge {
             : Array.from(this.approvalGrants.values()).find((item) => hasAllScopes(item.scopes, requestedScopes)) ?? null;
 
         if (!grant) {
-            throw new AgentCommandError('UNAVAILABLE', 'No trusted TaskTime approval grant is available for this bridge process.');
+            throw new AgentCommandError('UNAVAILABLE', 'No trusted TaskTime Pro approval grant is available for this bridge process.');
         }
 
         if (grant.expiresAt != null && grant.expiresAt <= now) {
-            throw new AgentCommandError('PERMISSION_DENIED', 'Trusted TaskTime approval grant expired.');
+            throw new AgentCommandError('PERMISSION_DENIED', 'Trusted TaskTime Pro approval grant expired.');
         }
 
         if (!hasAllScopes(grant.scopes, requestedScopes)) {
-            throw new AgentCommandError('PERMISSION_DENIED', 'Trusted TaskTime approval grant does not cover the requested scopes.');
+            throw new AgentCommandError('PERMISSION_DENIED', 'Trusted TaskTime Pro approval grant does not cover the requested scopes.');
         }
 
         return createBridgeApprovalToken({

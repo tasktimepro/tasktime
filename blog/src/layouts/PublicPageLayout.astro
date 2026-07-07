@@ -21,7 +21,7 @@ const {
     lastUpdatedIso,
     highlights = [],
     canonicalPath = Astro.url.pathname,
-    socialTitle = `${title} | TaskTime`,
+    socialTitle = `${title} | TaskTime Pro`,
     socialDescription = summary,
     socialImage = DEFAULT_SOCIAL_IMAGE,
     socialImageAlt = DEFAULT_SOCIAL_IMAGE_ALT,
@@ -29,7 +29,7 @@ const {
 
 const siteUrl = Astro.site ?? new URL(SITE_URL);
 const canonicalUrl = toCanonicalUrl(canonicalPath, siteUrl);
-const pageTitle = `${title} | TaskTime`;
+const pageTitle = `${title} | TaskTime Pro`;
 const socialImageUrl = new URL(socialImage, SITE_URL).toString();
 const currentYear = new Date().getFullYear();
 const organizationId = toAbsoluteUrl('/#organization', SITE_URL);
@@ -133,7 +133,7 @@ const structuredData = {
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:image" content={socialImageUrl} />
         <meta property="og:image:alt" content={socialImageAlt} />
-        <meta property="og:site_name" content="TaskTime" />
+        <meta property="og:site_name" content="TaskTime Pro" />
         <meta property="og:locale" content="en_US" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={socialTitle} />
@@ -147,7 +147,7 @@ const structuredData = {
             <header class="site-header">
                 <a class="brand" href="/">
                     <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
-                    <span class="brand-label">TaskTime</span>
+                    <span class="brand-label">TaskTime Pro</span>
                 </a>
                 <nav class="site-nav" aria-label="Primary">
                     <a href="/agents/">Agents</a>
@@ -169,7 +169,7 @@ const structuredData = {
                             <path d="m19.07 4.93-1.41 1.41"></path>
                         </svg>
                     </button>
-                    <a href="/" class="cta-button">Open TaskTime</a>
+                    <a href="/" class="cta-button">Open TaskTime Pro</a>
                 </nav>
             </header>
 
@@ -220,10 +220,10 @@ const structuredData = {
             <footer class="site-footer">
                 <p class="footer-copyright">
                     <span class="footer-copyright-icon" aria-hidden="true">&copy;</span>
-                    <span>{currentYear} TaskTime. All rights reserved.</span>
+                    <span>{currentYear} TaskTime Pro. All rights reserved.</span>
                 </p>
                 <div class="footer-links">
-                    <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime on X">
+                    <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime Pro on X">
                         <img src="/x.svg" alt="" aria-hidden="true" width="16" height="16" loading="lazy" />
                     </a>
                     <a href="/agents/">Agents</a>

@@ -186,7 +186,7 @@ vi.mock('@/hooks/useProjects.ts', () => ({
         projects: [
             {
                 id: 'project-1',
-                title: 'TaskTime',
+                title: 'TaskTime Pro',
                 preferredClientId: 'client-1',
                 hourlyRate: 100,
             },
@@ -216,7 +216,7 @@ vi.mock('@/hooks/useBusinessInfos.ts', () => ({
         businessInfos: [
             {
                 id: 'business-1',
-                businessName: 'TaskTime Studio',
+                businessName: 'TaskTime Pro Studio',
                 country: 'SI',
             },
         ],

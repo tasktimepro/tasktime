@@ -7,7 +7,7 @@ category: "time-tracking"
 tags: ["time tracking", "tips", "invoicing", "freelancers"]
 keywords: ["offline time tracker with invoicing", "time tracker invoice app", "freelancer time tracking tips", "best time tracker for freelancers"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "5 Time Tracking Tips Every Freelancer Should Know"
 socialDescription: "Practical time-tracking tips for freelancers — from starting timers on real tasks to turning tracked time into invoices without the mess."
 draft: false
@@ -21,13 +21,13 @@ The problem isn't laziness — it's usually that the workflow is just annoying e
 
 "Design work" tells you nothing two weeks later. Instead, track time against specific tasks like "Redesign homepage hero section" or "Write blog post draft for Client X."
 
-In TaskTime, timers are tied directly to tasks within projects. When you look back at your week, you can see exactly what you worked on and how long each piece took — which makes invoicing a breeze.
+In TaskTime Pro, timers are tied directly to tasks within projects. When you look back at your week, you can see exactly what you worked on and how long each piece took — which makes invoicing a breeze.
 
 ## 2. Use timers for active work, manual entries for the rest
 
 Not everything fits neatly into a start-stop timer. Maybe you spent 45 minutes on a call and forgot to start the timer. No problem — just add a manual time entry after the fact.
 
-The best time-tracking workflow uses both: timers when you're heads-down, and manual entries to fill in the gaps. TaskTime supports both equally, so you're never stuck.
+The best time-tracking workflow uses both: timers when you're heads-down, and manual entries to fill in the gaps. TaskTime Pro supports both equally, so you're never stuck.
 
 ## 3. Don't wait until Friday to review your week
 
@@ -35,7 +35,7 @@ Quick daily check: did today's tracked time actually reflect what you worked on?
 
 ## 4. Keep your time tracker open (or in your face)
 
-The number one reason people forget to track time is that the tool is buried in a tab somewhere. TaskTime works as a PWA, which means you can install it and keep it in your dock or home screen.
+The number one reason people forget to track time is that the tool is buried in a tab somewhere. TaskTime Pro works as a PWA, which means you can install it and keep it in your dock or home screen.
 
 Out of sight, out of mind. Keep it visible.
 
@@ -43,7 +43,7 @@ Out of sight, out of mind. Keep it visible.
 
 The best part of good time tracking is a painless invoice. If your tracked time lives in the same tool as your invoices, you don't need to copy hours into a spreadsheet or a separate billing app.
 
-In TaskTime, you create an invoice from a project, and the tracked time is right there. No exporting, no re-entering, no guessing.
+In TaskTime Pro, you create an invoice from a project, and the tracked time is right there. No exporting, no re-entering, no guessing.
 
 ---
 

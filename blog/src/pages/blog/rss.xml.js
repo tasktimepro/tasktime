@@ -8,7 +8,7 @@ export async function GET() {
     );
 
     return rss({
-        title: 'TaskTime Blog',
+        title: 'TaskTime Pro Blog',
         description: 'Privacy-first invoicing, task tracking, expense tracking, and local-first freelancer workflows.',
         site: SITE_URL,
         items: posts.map((post) => ({

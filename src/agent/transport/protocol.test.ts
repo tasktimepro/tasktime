@@ -267,7 +267,7 @@ describe('agent app-session protocol', () => {
             command: 'mark_invoice_paid',
             error: {
                 code: 'PERMISSION_DENIED',
-                message: 'Agent command was not approved in TaskTime.',
+                message: 'Agent command was not approved in TaskTime Pro.',
             },
         });
 

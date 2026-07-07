@@ -13,23 +13,23 @@ const highlights = [
 <AgentDocsLayout
     pageKey="openclaw"
     title="OpenClaw And Agent Platform Integration"
-    description="How OpenClaw-style local agent platforms can discover TaskTime, launch the local MCP bridge, pair the browser app, and use Skill-style instructions safely."
+    description="How OpenClaw-style local agent platforms can discover TaskTime Pro, launch the local MCP bridge, pair the browser app, and use Skill-style instructions safely."
     canonicalPath="/agents/openclaw/"
     highlights={highlights}
 >
     <section>
         <h2>Discovery Flow</h2>
         <p>
-            A local agent platform should discover TaskTime in two stages. First, fetch the public discovery files from
-            TaskTime. Then, when the user chooses TaskTime locally, launch the packaged bridge and inspect its local
+            A local agent platform should discover TaskTime Pro in two stages. First, fetch the public discovery files from
+            TaskTime Pro. Then, when the user chooses TaskTime Pro locally, launch the packaged bridge and inspect its local
             manifest.
         </p>
         <ol class="agent-step-list">
             <li>Read <a href="/llms.txt"><code>/llms.txt</code></a> for the compact agent-oriented entry point.</li>
             <li>Read <a href="/.well-known/tasktime-agent.json"><code>/.well-known/tasktime-agent.json</code></a> for public app and bridge metadata.</li>
             <li>Launch <code>tasktime-agent-bridge --manifest</code> to confirm the installed local bridge contract.</li>
-            <li>Launch <code>tasktime-agent-bridge --app-url &lt;TaskTime URL&gt;</code> as the MCP stdio server.</li>
-            <li>Open the TaskTime pairing URL and ask the user to approve Account &gt; Agent Access.</li>
+            <li>Launch <code>tasktime-agent-bridge --app-url &lt;TaskTime Pro URL&gt;</code> as the MCP stdio server.</li>
+            <li>Open the TaskTime Pro pairing URL and ask the user to approve Account &gt; Agent Access.</li>
             <li>Call <code>tools/list</code> and operate only within granted scopes.</li>
         </ol>
     </section>
@@ -39,7 +39,7 @@ const highlights = [
         <p>
             Agent platforms that support skill files can fetch <a href="/agents/skill.md"><code>/agents/skill.md</code></a>.
             It points to the manifest, MCP tool catalog, quickstart, security notes, and debugging guide. It also tells
-            the agent to keep TaskTime local-first, use MCP tools before UI automation, and preserve TaskTime approval
+            the agent to keep TaskTime Pro local-first, use MCP tools before UI automation, and preserve TaskTime Pro approval
             semantics for sensitive actions.
         </p>
     </section>
@@ -47,29 +47,29 @@ const highlights = [
     <section>
         <h2>OpenClaw Bundle</h2>
         <p>
-            The prepared OpenClaw-compatible bundle package is <code>@tasktime/openclaw</code>. It ships a
-            Codex-compatible bundle marker, a TaskTime skill root, and a <code>.mcp.json</code> entry that launches
-            the local bridge through <code>@tasktime/agent-bridge</code>.
+            The prepared OpenClaw-compatible bundle package is <code>@tasktimepro/openclaw</code>. It ships a
+            Codex-compatible bundle marker, a TaskTime Pro skill root, and a <code>.mcp.json</code> entry that launches
+            the local bridge through <code>@tasktimepro/agent-bridge</code>.
         </p>
         <ul class="agent-check-list">
             <li>Bundle marker: <code>.codex-plugin/plugin.json</code>.</li>
             <li>Skill root: <code>skills/tasktime/SKILL.md</code>.</li>
             <li>MCP server key: <code>tasktime</code>.</li>
-            <li>Bridge package: <code>@tasktime/agent-bridge</code>, binary <code>tasktime-agent-bridge</code>.</li>
+            <li>Bridge package: <code>@tasktimepro/agent-bridge</code>, binary <code>tasktime-agent-bridge</code>.</li>
             <li>OpenClaw tool names can be prefixed, such as <code>tasktime__list_projects</code>.</li>
         </ul>
         <p>
             This bundle intentionally does not include <code>openclaw.plugin.json</code>. That keeps OpenClaw on the
             safer compatible-bundle path where it maps the skill and MCP server directly. A native OpenClaw plugin
-            should be added only if TaskTime needs in-process OpenClaw runtime entrypoints later.
+            should be added only if TaskTime Pro needs in-process OpenClaw runtime entrypoints later.
         </p>
     </section>
 
     <section>
         <h2>Publishing Notes</h2>
         <ul class="agent-check-list">
-            <li>Describe TaskTime as a local-first task, time tracking, expense, invoice, report, and planning app.</li>
-            <li>Use “TaskTime MCP”, “local agent bridge”, and “local-first invoicing agent” in package metadata where accurate.</li>
+            <li>Describe TaskTime Pro as a local-first task, time tracking, expense, invoice, report, and planning app.</li>
+            <li>Use “TaskTime Pro MCP”, “local agent bridge”, and “local-first invoicing agent” in package metadata where accurate.</li>
             <li>Point human setup docs to <a href="/agents/quickstart/">/agents/quickstart/</a>.</li>
             <li>Point security review docs to <a href="/agents/security/">/agents/security/</a>.</li>
             <li>Point machine readers to <a href="/agents/mcp-tools.json">/agents/mcp-tools.json</a>.</li>
@@ -80,10 +80,10 @@ const highlights = [
         <h2>Consent Boundary</h2>
         <p>
             OpenClaw-style launch assistance can reduce setup friction, but it must not create silent first-use access.
-            A user still explicitly grants TaskTime bridge access before an agent can read or mutate local TaskTime data.
+            A user still explicitly grants TaskTime Pro bridge access before an agent can read or mutate local TaskTime Pro data.
         </p>
         <p>
-            For later sensitive operations, a chat confirmation can produce a TaskTime approval token only when a trusted
+            For later sensitive operations, a chat confirmation can produce a TaskTime Pro approval token only when a trusted
             local grant exists. The browser app remains the final verifier and can reject stale, replayed, tampered,
             under-scoped, or revoked approval tokens.
         </p>

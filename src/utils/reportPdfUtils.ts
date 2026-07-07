@@ -235,7 +235,7 @@ export const buildMonthlyReportHtml = ({
     return `
         <div style="font-family: Arial, sans-serif; color: #111827; padding: 24px;">
             <header style="margin-bottom: 24px;">
-                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Monthly Report</h1>
+                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Pro Monthly Report</h1>
                 <p style="margin: 0; font-size: 14px; color: #4b5563;">Period: ${escapeHtml(periodLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Business: ${escapeHtml(businessLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Generated: ${escapeHtml(generatedAtLabel)}</p>
@@ -324,7 +324,7 @@ export const buildClientStatementHtml = ({
     return `
         <div style="font-family: Arial, sans-serif; color: #111827; padding: 24px;">
             <header style="margin-bottom: 24px;">
-                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Client Statement</h1>
+                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Pro Client Statement</h1>
                 <p style="margin: 0; font-size: 14px; color: #4b5563;">Client: ${escapeHtml(clientLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Business: ${escapeHtml(businessLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Period: ${escapeHtml(periodLabel)}</p>
@@ -430,7 +430,7 @@ export const buildProjectWorkSummaryHtml = ({
     return `
         <div style="font-family: Arial, sans-serif; color: #111827; padding: 24px;">
             <header style="margin-bottom: 24px;">
-                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Project Work Summary</h1>
+                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Pro Project Work Summary</h1>
                 <p style="margin: 0; font-size: 14px; color: #4b5563;">Project: ${escapeHtml(projectLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Client: ${escapeHtml(clientLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Period: ${escapeHtml(periodLabel)}</p>
@@ -539,7 +539,7 @@ export const buildInvoicesReportHtml = ({
     return `
         <div style="font-family: Arial, sans-serif; color: #111827; padding: 24px;">
             <header style="margin-bottom: 24px;">
-                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Issued Invoices Report</h1>
+                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Pro Issued Invoices Report</h1>
                 <p style="margin: 0; font-size: 14px; color: #4b5563;">Period: ${escapeHtml(periodLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Business: ${escapeHtml(businessLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Generated: ${escapeHtml(generatedAtLabel)}</p>
@@ -610,7 +610,7 @@ export const buildOutstandingReportHtml = ({
     return `
         <div style="font-family: Arial, sans-serif; color: #111827; padding: 24px;">
             <header style="margin-bottom: 24px;">
-                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Outstanding Invoices Report</h1>
+                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Pro Outstanding Invoices Report</h1>
                 <p style="margin: 0; font-size: 14px; color: #4b5563;">Period: ${escapeHtml(periodLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Business: ${escapeHtml(businessLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Reference Date: ${escapeHtml(referenceDateLabel)}</p>
@@ -691,7 +691,7 @@ export const buildExpensesReportHtml = ({
     return `
         <div style="font-family: Arial, sans-serif; color: #111827; padding: 24px;">
             <header style="margin-bottom: 24px;">
-                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Expenses Report</h1>
+                <h1 style="font-size: 24px; margin: 0 0 8px;">TaskTime Pro Expenses Report</h1>
                 <p style="margin: 0; font-size: 14px; color: #4b5563;">Period: ${escapeHtml(periodLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Business: ${escapeHtml(businessLabel)}</p>
                 <p style="margin: 4px 0 0; font-size: 14px; color: #4b5563;">Generated: ${escapeHtml(generatedAtLabel)}</p>

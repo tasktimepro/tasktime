@@ -99,7 +99,7 @@ registerViewportHeightSync()
 window.addEventListener('error', (event) => {
   const error = event.error ?? event.message
 
-  console.error('[TaskTime] Uncaught error:', error)
+  console.error('[TaskTime Pro] Uncaught error:', error)
   captureDebugBundleGlobalError(error, {
     colno: event.colno ?? null,
     filename: event.filename ?? null,
@@ -109,7 +109,7 @@ window.addEventListener('error', (event) => {
 })
 
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('[TaskTime] Unhandled promise rejection:', event.reason)
+  console.error('[TaskTime Pro] Unhandled promise rejection:', event.reason)
   captureDebugBundleUnhandledRejection(event.reason, {
     type: event.type,
   })

@@ -7,7 +7,7 @@ category: "expenses"
 tags: ["free", "expenses", "freelancers", "tools"]
 keywords: ["free expense tracker", "expense tracker no subscription", "freelance expense tracker app", "simple expense tracker free", "free expense tracker for freelancers"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "A Free Expense Tracker for Freelancers Who Want to Keep It Simple"
 socialDescription: "Most expense trackers are built for companies, not freelancers. Here's a free one that fits the way you actually work."
 draft: false
@@ -38,9 +38,9 @@ The bar is honestly pretty low:
 - **Recurring expenses.** That monthly Figma subscription shouldn't need to be entered by hand every month.
 - **No subscription.** An expense tracker that charges you a monthly fee to track expenses is a bit ironic, isn't it?
 
-## How TaskTime handles expenses
+## How TaskTime Pro handles expenses
 
-In TaskTime, expenses are part of your project workflow. You log an expense, tag it to a project, choose a category, and mark it as billable or not. Done.
+In TaskTime Pro, expenses are part of your project workflow. You log an expense, tag it to a project, choose a category, and mark it as billable or not. Done.
 
 Recurring expenses get created automatically on the schedule you set — monthly, weekly, whatever makes sense. When you generate an invoice, billable expenses show up alongside your tracked time. No copying numbers between apps.
 
@@ -52,4 +52,4 @@ One of the best things about keeping expenses organized throughout the year is t
 
 The trick is making it easy enough that you actually do it consistently. If logging an expense takes more than a few seconds, you'll skip it. If it takes two taps, you won't.
 
-[TaskTime makes it two taps](/) — try it and see how fast expense tracking can be.
+[TaskTime Pro makes it two taps](/) — try it and see how fast expense tracking can be.

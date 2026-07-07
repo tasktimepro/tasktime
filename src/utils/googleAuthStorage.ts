@@ -71,7 +71,7 @@ export const getStoredToken = async (): Promise<StoredToken | null> => {
         console.error('Error loading Google auth token from IndexedDB:', error);
         captureAuthStorageIncident(
             'auth.token_storage_read_failed',
-            'TaskTime could not read the Google auth token from IndexedDB',
+            'TaskTime Pro could not read the Google auth token from IndexedDB',
             error,
             { operation: 'read', storageKind: 'token' },
         );
@@ -101,7 +101,7 @@ export const storeToken = async (token: StoredToken): Promise<void> => {
             console.error('IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.');
             captureAuthStorageIncident(
                 'auth.token_storage_quota_exceeded',
-                'TaskTime could not save the Google auth token because IndexedDB quota was exceeded',
+                'TaskTime Pro could not save the Google auth token because IndexedDB quota was exceeded',
                 error,
                 { operation: 'write', storageKind: 'token', quotaExceeded: true },
             );
@@ -109,7 +109,7 @@ export const storeToken = async (token: StoredToken): Promise<void> => {
             console.error('Error saving Google auth token to IndexedDB:', error);
             captureAuthStorageIncident(
                 'auth.token_storage_write_failed',
-                'TaskTime could not save the Google auth token to IndexedDB',
+                'TaskTime Pro could not save the Google auth token to IndexedDB',
                 error,
                 { operation: 'write', storageKind: 'token', quotaExceeded: false },
             );
@@ -129,7 +129,7 @@ export const clearStoredToken = async (): Promise<void> => {
         console.error('Error clearing Google auth token from IndexedDB:', error);
         captureAuthStorageIncident(
             'auth.token_storage_clear_failed',
-            'TaskTime could not clear the Google auth token from IndexedDB',
+            'TaskTime Pro could not clear the Google auth token from IndexedDB',
             error,
             { operation: 'clear', storageKind: 'token' },
         );
@@ -175,7 +175,7 @@ export const getStoredSession = async (): Promise<StoredSession | null> => {
         console.error('Error loading session from IndexedDB:', error);
         captureAuthStorageIncident(
             'auth.session_storage_read_failed',
-            'TaskTime could not read the Google Drive session from IndexedDB',
+            'TaskTime Pro could not read the Google Drive session from IndexedDB',
             error,
             { operation: 'read', storageKind: 'session' },
         );
@@ -195,7 +195,7 @@ export const storeSession = async (session: StoredSession): Promise<void> => {
         console.error('Error saving session to IndexedDB:', error);
         captureAuthStorageIncident(
             'auth.session_storage_write_failed',
-            'TaskTime could not save the Google Drive session to IndexedDB',
+            'TaskTime Pro could not save the Google Drive session to IndexedDB',
             error,
             { operation: 'write', storageKind: 'session' },
         );
@@ -214,7 +214,7 @@ export const clearStoredSession = async (): Promise<void> => {
         console.error('Error clearing session from IndexedDB:', error);
         captureAuthStorageIncident(
             'auth.session_storage_clear_failed',
-            'TaskTime could not clear the Google Drive session from IndexedDB',
+            'TaskTime Pro could not clear the Google Drive session from IndexedDB',
             error,
             { operation: 'clear', storageKind: 'session' },
         );

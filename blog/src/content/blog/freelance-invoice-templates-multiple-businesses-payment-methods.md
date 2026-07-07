@@ -1,5 +1,5 @@
 ---
-title: "Invoice Templates, Multiple Businesses, and Payment Methods in TaskTime"
+title: "Invoice Templates, Multiple Businesses, and Payment Methods in TaskTime Pro"
 description: "Create reusable invoice templates, save multiple business profiles, and add payment methods so every freelance invoice is faster, clearer, and more professional."
 publishedAt: "2026-06-03"
 excerpt: "Freelance invoicing gets easier when templates, business profiles, branding, tax details, and payment instructions are reusable instead of retyped every time."
@@ -7,8 +7,8 @@ category: "invoicing"
 tags: ["invoice templates", "payment methods", "business profiles", "freelancers"]
 keywords: ["freelance invoice templates", "custom invoice template", "multiple business invoicing", "invoice payment methods", "branded invoice template", "invoice templates for freelancers", "freelance invoicing software"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
-socialTitle: "Invoice Templates, Multiple Businesses, and Payment Methods in TaskTime"
+ogImageAlt: "TaskTime Pro app icon"
+socialTitle: "Invoice Templates, Multiple Businesses, and Payment Methods in TaskTime Pro"
 socialDescription: "Use reusable invoice templates, business profiles, branding, and payment methods to send cleaner freelance invoices with less admin."
 draft: false
 ---
@@ -17,13 +17,13 @@ Sending an invoice should not feel like rebuilding the same document from scratc
 
 Most freelancers need the same pieces again and again: a business name, logo, invoice number, due date, tax details, bank details, PayPal address, project work, and payment instructions. The details change, but the structure rarely does.
 
-That is why TaskTime separates invoice templates, business profiles, and payment methods. Each one handles a different part of the invoice, so you can reuse the right setup without copying old PDFs or editing a spreadsheet.
+That is why TaskTime Pro separates invoice templates, business profiles, and payment methods. Each one handles a different part of the invoice, so you can reuse the right setup without copying old PDFs or editing a spreadsheet.
 
 ## What invoice templates are for
 
 An invoice template controls how the invoice behaves and looks.
 
-In TaskTime, templates can define:
+In TaskTime Pro, templates can define:
 
 - Invoice number format
 - Sequential numbering
@@ -51,7 +51,7 @@ You might have:
 - Different VAT or tax details
 - Separate contact details for different types of work
 
-TaskTime lets you save multiple business profiles, then pick the right one when creating an invoice. Each business profile can include sender details such as business name, address, registration number, VAT number, tax number, email, phone, custom fields, tax defaults, logo, and primary brand color.
+TaskTime Pro lets you save multiple business profiles, then pick the right one when creating an invoice. Each business profile can include sender details such as business name, address, registration number, VAT number, tax number, email, phone, custom fields, tax defaults, logo, and primary brand color.
 
 That matters because invoices are legal and financial records. If you operate under more than one business identity, the invoice should show the correct sender details every time.
 
@@ -61,7 +61,7 @@ It also keeps the workflow cleaner. You do not need separate invoicing apps just
 
 Payment details are another place where copy-paste errors can get expensive.
 
-TaskTime payment methods let you save reusable instructions such as:
+TaskTime Pro payment methods let you save reusable instructions such as:
 
 - Full account name
 - Bank name
@@ -77,7 +77,7 @@ Clear payment instructions help clients pay faster because they do not have to s
 
 ## The advantage of keeping the pieces separate
 
-The useful part is not just that TaskTime has templates, businesses, and payment methods. It is that they are separate reusable pieces.
+The useful part is not just that TaskTime Pro has templates, businesses, and payment methods. It is that they are separate reusable pieces.
 
 That gives you combinations like:
 
@@ -95,7 +95,7 @@ Reusable settings give you the speed of copying without the risk of copying the 
 
 Freelancers often search for "branded invoice template" because they want invoices that look professional without needing a design tool.
 
-TaskTime keeps branding simple:
+TaskTime Pro keeps branding simple:
 
 - Add a logo to your business profile
 - Choose a primary color
@@ -136,9 +136,9 @@ You can add more templates, businesses, and payment methods later when you actua
 
 The goal is not to build a complex invoicing system. The goal is to make each invoice faster, clearer, and less error-prone.
 
-## Why this fits the TaskTime workflow
+## Why this fits the TaskTime Pro workflow
 
-TaskTime already connects projects, tracked time, expenses, clients, and invoices. Templates, business profiles, and payment methods complete the last part of the workflow.
+TaskTime Pro already connects projects, tracked time, expenses, clients, and invoices. Templates, business profiles, and payment methods complete the last part of the workflow.
 
 Instead of tracking work in one place and formatting invoices somewhere else, you can keep the invoice setup beside the work it bills for.
 
@@ -146,4 +146,4 @@ That is the practical advantage: less retyping, fewer mistakes, and a more profe
 
 ---
 
-**Want to try it?** [Open TaskTime](/), add your business profile, create a payment method, and set up your first reusable invoice template.
+**Want to try it?** [Open TaskTime Pro](/), add your business profile, create a payment method, and set up your first reusable invoice template.

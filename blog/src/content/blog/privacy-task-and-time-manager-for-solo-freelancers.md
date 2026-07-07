@@ -7,7 +7,7 @@ category: "planning"
 tags: ["productivity", "tasks", "time tracking", "freelancers"]
 keywords: ["privacy task and time manager", "local first task manager for freelancers", "private time manager", "freelancer task manager"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "Why Freelancers Need Their Tasks and Time in One Place"
 socialDescription: "Stop juggling separate apps for tasks, timers, and invoicing. Here's how keeping them together saves time and protects your privacy."
 draft: false
@@ -30,11 +30,11 @@ When your tasks, time tracking, expenses, and invoicing all live in the same too
 
 Here's something people don't think about: if you use four different SaaS tools, four different companies have a piece of your work data. Your task titles (which often contain client names), your work patterns, your billing rates, your client list — scattered across vendors.
 
-With a local-first tool like TaskTime, all of that stays in your browser. One place, under your control. If you add sync, it goes to *your* Google Drive — not someone else's servers.
+With a local-first tool like TaskTime Pro, all of that stays in your browser. One place, under your control. If you add sync, it goes to *your* Google Drive — not someone else's servers.
 
 ## What this looks like in practice
 
-A typical day with TaskTime:
+A typical day with TaskTime Pro:
 
 1. Check your planner to see what's up today
 2. Start a timer on the first task

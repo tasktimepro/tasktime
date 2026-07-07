@@ -407,12 +407,12 @@ describe('createInvoiceHTML', () => {
 
         const html = createInvoiceHTML({
             client: { name: 'Client' },
-            businessInfo: { businessName: 'TaskTime Studio' },
+            businessInfo: { businessName: 'TaskTime Pro Studio' },
             tasks: [{ id: 'task', title: 'Classic Task', hours: 2, hourlyRate: 80 }],
             subtotal: 160,
             totalAmount: 160,
             currency: 'USD',
-            paymentMethod: { bank: 'TaskTime Bank' },
+            paymentMethod: { bank: 'TaskTime Pro Bank' },
             template: {}
         })
 
@@ -504,7 +504,7 @@ describe('createInvoiceHTML', () => {
             totalAmount: 160,
             currency: 'USD',
             note: 'Thanks for your business',
-            paymentMethod: { bank: 'TaskTime Bank' },
+            paymentMethod: { bank: 'TaskTime Pro Bank' },
             template: { layoutStyle: 'classic' }
         })
 
@@ -525,7 +525,7 @@ describe('createInvoiceHTML', () => {
             subtotal: 240,
             totalAmount: 240,
             currency: 'USD',
-            paymentMethod: { bank: 'TaskTime Bank' },
+            paymentMethod: { bank: 'TaskTime Pro Bank' },
             template: { layoutStyle: 'neutral' }
         })
 
@@ -537,7 +537,7 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('<h1 style="color: #111827; margin-bottom: 10px; font-size: 25px; font-weight: 400; letter-spacing: 0.12em;">INVOICE</h1>')
         expect(html).toContain('font-size: 13px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.12em;')
         expect(html).toContain('<h3 style="color: #9ca3af; font-size: 13px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 15px;">Payment Details:</h3>')
-        expect(html).toContain('<p style="margin: 0; line-height: 1.4;"><span style="color: inherit; font-weight: 400;">Bank:</span> TaskTime Bank</p>')
+        expect(html).toContain('<p style="margin: 0; line-height: 1.4;"><span style="color: inherit; font-weight: 400;">Bank:</span> TaskTime Pro Bank</p>')
         expect(html).toContain('break-inside: avoid;')
         expect(html).toContain('border-top: 1px solid #ddd; padding-top: 8px;')
         expect(html).not.toContain('border-top: 1px solid #ddd; padding-top: 10px;')
@@ -552,7 +552,7 @@ describe('createInvoiceHTML', () => {
             subtotal: 80,
             totalAmount: 80,
             currency: 'USD',
-            paymentMethod: { bank: 'TaskTime Bank' },
+            paymentMethod: { bank: 'TaskTime Pro Bank' },
             template: { layoutStyle: 'classic' },
             brandingSnapshot: {
                 layoutStyle: 'neutral',

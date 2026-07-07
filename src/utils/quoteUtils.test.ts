@@ -16,7 +16,7 @@ describe('quoteUtils', () => {
                 { id: 'task-2', title: 'Build', projectId: 'project-1', estimatedHours: 5, billable: true },
             ],
             clients: [{ id: 'client-1', title: 'Acme', clientName: 'Acme Ltd', defaultCurrency: 'USD' }],
-            businessInfos: [{ id: 'business-1', title: 'TaskTime Studio', isDefault: true }],
+            businessInfos: [{ id: 'business-1', title: 'TaskTime Pro Studio', isDefault: true }],
             quoteDate: '2026-05-29',
             quoteTimestamp: '29112233',
         });
@@ -46,7 +46,7 @@ describe('quoteUtils', () => {
             },
             tasks: [{ id: 'task-1', title: 'Planning', projectId: 'project-1', estimatedHours: 6 }],
             clients: [{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }],
-            businessInfos: [{ id: 'business-1', title: 'TaskTime Studio', isDefault: true }],
+            businessInfos: [{ id: 'business-1', title: 'TaskTime Pro Studio', isDefault: true }],
             quoteDate: '2026-05-29',
             quoteTimestamp: '29112233',
         });

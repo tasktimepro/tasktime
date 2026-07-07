@@ -103,7 +103,7 @@ function ReportsPageLoader() {
 }
 
 /** Original browser tab title */
-const ORIGINAL_TITLE = "TaskTime";
+const ORIGINAL_TITLE = "TaskTime Pro";
 const MOBILE_SYNC_SUCCESS_VISIBILITY_MS = 1000;
 const MOBILE_SYNC_FADE_DURATION_MS = 200;
 const MOBILE_SYNC_VISIBLE_KINDS = new Set([
@@ -129,7 +129,7 @@ const PAGE_TITLE_MAP = {
 };
 
 /**
- * Main App component - Entry point for TaskTime
+ * Main App component - Entry point for TaskTime Pro
  * Now powered by Yjs for conflict-free sync
  */
 function App() {
@@ -819,7 +819,7 @@ function AppContent() {
         
         if (isPaused) {
             const pausedTime = formatDurationWithSeconds(timerElapsedTime);
-            document.title = `(Paused) ${pausedTime} - ${currentTaskName} | TaskTime`;
+            document.title = `(Paused) ${pausedTime} - ${currentTaskName} | TaskTime Pro`;
             return;
         }
         
@@ -831,7 +831,7 @@ function AppContent() {
             const formattedTime = formatDurationWithSeconds(elapsed);
             const taskName = tasksRef.current.find(t => t.id === activeTaskId)?.title || currentTaskName;
             
-            document.title = `▶ ${formattedTime} - ${taskName} | TaskTime`;
+            document.title = `▶ ${formattedTime} - ${taskName} | TaskTime Pro`;
         };
         
         updateTitle();
@@ -1073,7 +1073,7 @@ function AppContent() {
         if (timerIsActive && timerTaskId) return;
 
         const pageTitle = PAGE_TITLE_MAP[activeView] || ORIGINAL_TITLE;
-        document.title = pageTitle === ORIGINAL_TITLE ? ORIGINAL_TITLE : `${pageTitle} | TaskTime`;
+        document.title = pageTitle === ORIGINAL_TITLE ? ORIGINAL_TITLE : `${pageTitle} | TaskTime Pro`;
     }, [activeView, timerIsActive, timerTaskId]);
 
     // Handle missing project/client in URL
@@ -1339,7 +1339,7 @@ function AppContent() {
                                 </div>
                                 <div>
                                     <h1 className="text-lg font-bold text-foreground leading-none">
-                                        TaskTime
+                                        TaskTime Pro
                                     </h1>
                                 </div>
                             </button>

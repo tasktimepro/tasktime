@@ -31,7 +31,7 @@ const {
 
 const siteUrl = Astro.site ?? new URL(SITE_URL);
 const canonicalUrl = toCanonicalUrl(canonicalPath, siteUrl);
-const pageTitle = title === 'TaskTime Blog' ? title : `${title} | TaskTime Blog`;
+const pageTitle = title === 'TaskTime Pro Blog' ? title : `${title} | TaskTime Pro Blog`;
 const resolvedSocialTitle = socialTitle ?? pageTitle;
 const resolvedSocialDescription = socialDescription ?? description;
 const socialImageUrl = new URL(socialImage, SITE_URL).toString();
@@ -172,14 +172,14 @@ const structuredData = {
         <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
         <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <link rel="alternate" type="application/rss+xml" title="TaskTime Blog" href="/blog/rss.xml" />
+        <link rel="alternate" type="application/rss+xml" title="TaskTime Pro Blog" href="/blog/rss.xml" />
         <meta property="og:type" content={pageType} />
         <meta property="og:title" content={resolvedSocialTitle} />
         <meta property="og:description" content={resolvedSocialDescription} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:image" content={socialImageUrl} />
         <meta property="og:image:alt" content={socialImageAlt} />
-        <meta property="og:site_name" content="TaskTime" />
+        <meta property="og:site_name" content="TaskTime Pro" />
         <meta property="og:locale" content="en_US" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={resolvedSocialTitle} />
@@ -199,7 +199,7 @@ const structuredData = {
             <header class="site-header">
                 <a class="brand" href="/blog/">
                     <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
-                    <span class="brand-label">TaskTime Blog</span>
+                    <span class="brand-label">TaskTime Pro Blog</span>
                 </a>
                 <nav class="site-nav" aria-label="Primary">
                     <a href="/agents/">Agents</a>
@@ -220,7 +220,7 @@ const structuredData = {
                             <path d="m19.07 4.93-1.41 1.41"></path>
                         </svg>
                     </button>
-                    <a href="/" class="cta-button">Open TaskTime</a>
+                    <a href="/" class="cta-button">Open TaskTime Pro</a>
                 </nav>
             </header>
 
@@ -231,10 +231,10 @@ const structuredData = {
             <footer class="site-footer">
                 <p class="footer-copyright">
                     <span class="footer-copyright-icon" aria-hidden="true">&copy;</span>
-                    <span>{currentYear} TaskTime. All rights reserved.</span>
+                    <span>{currentYear} TaskTime Pro. All rights reserved.</span>
                 </p>
                 <div class="footer-links">
-                    <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime on X">
+                    <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime Pro on X">
                         <img src="/x.svg" alt="" aria-hidden="true" width="16" height="16" loading="lazy" />
                     </a>
                     <a href="/agents/">Agents</a>

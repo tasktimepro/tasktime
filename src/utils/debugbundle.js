@@ -1,6 +1,6 @@
 /**
  * Custom handled incident catalog:
- * ../../docs/debugbundle-custom-incidents.md
+ * ../../tasktime-infra/docs/debugbundle-custom-incidents.md
  */
 
 import { createDebugBundleBrowserSdk } from '@debugbundle/sdk-browser'

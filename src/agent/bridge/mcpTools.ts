@@ -73,13 +73,13 @@ const emptySchema: JsonSchema = {
 export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     {
         name: 'list_projects',
-        description: 'List active TaskTime projects visible to the paired app session.',
+        description: 'List active TaskTime Pro projects visible to the paired app session.',
         scopes: ['read'],
         inputSchema: emptySchema,
     },
     {
         name: 'create_project',
-        description: 'Create a non-archived TaskTime project, optionally linked to an existing preferred client.',
+        description: 'Create a non-archived TaskTime Pro project, optionally linked to an existing preferred client.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -163,7 +163,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'cascade_delete_project',
-        description: 'Delete a project and related non-billed tasks, active time entries, timers, expenses, recurring templates, and planner attachments after preview matching, explicit confirmation, and TaskTime approval. Invoice-linked, billed, or tax-claimed records are rejected.',
+        description: 'Delete a project and related non-billed tasks, active time entries, timers, expenses, recurring templates, and planner attachments after preview matching, explicit confirmation, and TaskTime Pro approval. Invoice-linked, billed, or tax-claimed records are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -202,7 +202,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_project',
-        description: 'Delete one unreferenced project after explicit command confirmation and TaskTime approval.',
+        description: 'Delete one unreferenced project after explicit command confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -217,7 +217,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'list_clients',
-        description: 'List TaskTime clients visible to the paired app session.',
+        description: 'List TaskTime Pro clients visible to the paired app session.',
         scopes: ['read'],
         inputSchema: {
             type: 'object',
@@ -229,7 +229,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'create_client',
-        description: 'Create a non-archived TaskTime client with contact, billing, tax, and notes fields.',
+        description: 'Create a non-archived TaskTime Pro client with contact, billing, tax, and notes fields.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -321,7 +321,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'cascade_delete_client',
-        description: 'Delete a client and either convert linked projects to personal or delete related non-billed project data after preview matching, explicit confirmation, and TaskTime approval. Invoice-linked, billed, or tax-claimed records are rejected.',
+        description: 'Delete a client and either convert linked projects to personal or delete related non-billed project data after preview matching, explicit confirmation, and TaskTime Pro approval. Invoice-linked, billed, or tax-claimed records are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -369,7 +369,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_client',
-        description: 'Delete one unreferenced client after explicit command confirmation and TaskTime approval.',
+        description: 'Delete one unreferenced client after explicit command confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -449,7 +449,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_business_info',
-        description: 'Delete one unreferenced business profile after explicit command confirmation and TaskTime approval. Profiles referenced by invoices, brand assets, expenses, recurring templates, or tax return periods are rejected.',
+        description: 'Delete one unreferenced business profile after explicit command confirmation and TaskTime Pro approval. Profiles referenced by invoices, brand assets, expenses, recurring templates, or tax return periods are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -541,7 +541,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_business_brand_asset',
-        description: 'Delete one unreferenced business logo brand asset after explicit command confirmation and TaskTime approval. Assets referenced by business profiles or invoice snapshots are rejected.',
+        description: 'Delete one unreferenced business logo brand asset after explicit command confirmation and TaskTime Pro approval. Assets referenced by business profiles or invoice snapshots are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -613,7 +613,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_payment_method',
-        description: 'Delete one unreferenced payment method after explicit command confirmation and TaskTime approval. Payment methods referenced by invoices are rejected.',
+        description: 'Delete one unreferenced payment method after explicit command confirmation and TaskTime Pro approval. Payment methods referenced by invoices are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -688,7 +688,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_invoice_template',
-        description: 'Delete one unreferenced invoice template after explicit command confirmation and TaskTime approval. Templates referenced by invoices are rejected.',
+        description: 'Delete one unreferenced invoice template after explicit command confirmation and TaskTime Pro approval. Templates referenced by invoices are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -765,7 +765,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_email_template',
-        description: 'Delete one invoice or quote email template after explicit command confirmation and TaskTime approval.',
+        description: 'Delete one invoice or quote email template after explicit command confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -850,7 +850,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_expense_category',
-        description: 'Delete one unreferenced expense category after explicit command confirmation and TaskTime approval. Categories referenced by expenses or recurring templates are rejected.',
+        description: 'Delete one unreferenced expense category after explicit command confirmation and TaskTime Pro approval. Categories referenced by expenses or recurring templates are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -865,7 +865,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'get_preferences',
-        description: 'Return validated TaskTime user preferences. Sync/backup control state is readable but not mutable through update_preferences.',
+        description: 'Return validated TaskTime Pro user preferences. Sync/backup control state is readable but not mutable through update_preferences.',
         scopes: ['read'],
         inputSchema: emptySchema,
     },
@@ -904,7 +904,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'list_tasks',
-        description: 'List TaskTime tasks, optionally scoped to a project ID.',
+        description: 'List TaskTime Pro tasks, optionally scoped to a project ID.',
         scopes: ['read'],
         inputSchema: {
             type: 'object',
@@ -916,7 +916,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'create_task',
-        description: 'Create a TaskTime task or subtask. Subtasks cannot be recurring.',
+        description: 'Create a TaskTime Pro task or subtask. Subtasks cannot be recurring.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -934,7 +934,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'update_task',
-        description: 'Update an existing TaskTime task.',
+        description: 'Update an existing TaskTime Pro task.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -962,7 +962,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'archive_task',
-        description: 'Archive a task using TaskTime archive behavior. This is not a destructive delete.',
+        description: 'Archive a task using TaskTime Pro archive behavior. This is not a destructive delete.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -975,7 +975,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'unarchive_task',
-        description: 'Restore an archived task using TaskTime unarchive behavior. This is not a destructive recreate.',
+        description: 'Restore an archived task using TaskTime Pro unarchive behavior. This is not a destructive recreate.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1001,7 +1001,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'cascade_delete_task',
-        description: 'Delete a task, descendant tasks, related active time entries, matching timers, and planner attachments after preview matching, explicit confirmation, and TaskTime approval. Billed or invoice-linked tasks are rejected.',
+        description: 'Delete a task, descendant tasks, related active time entries, matching timers, and planner attachments after preview matching, explicit confirmation, and TaskTime Pro approval. Billed or invoice-linked tasks are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1032,7 +1032,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_task',
-        description: 'Delete one unreferenced active or archived task after explicit command confirmation and TaskTime approval.',
+        description: 'Delete one unreferenced active or archived task after explicit command confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1108,7 +1108,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'clear_timer',
-        description: 'Discard an active timer without creating a time entry after explicit confirmation and TaskTime approval.',
+        description: 'Discard an active timer without creating a time entry after explicit confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1139,7 +1139,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'add_manual_time_entry',
-        description: 'Create a manual time entry after TaskTime validates billing cutoffs and overlaps.',
+        description: 'Create a manual time entry after TaskTime Pro validates billing cutoffs and overlaps.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1175,7 +1175,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_time_entry',
-        description: 'Delete one active unbilled time entry after explicit command confirmation and TaskTime approval. Historical and billed entries are rejected.',
+        description: 'Delete one active unbilled time entry after explicit command confirmation and TaskTime Pro approval. Historical and billed entries are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1341,7 +1341,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'create_expense',
-        description: 'Create an expense through the TaskTime command layer.',
+        description: 'Create an expense through the TaskTime Pro command layer.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1362,7 +1362,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_expense',
-        description: 'Delete one active unbilled and unclaimed expense after explicit command confirmation and TaskTime approval. Billed and tax-claimed expenses are rejected.',
+        description: 'Delete one active unbilled and unclaimed expense after explicit command confirmation and TaskTime Pro approval. Billed and tax-claimed expenses are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1471,7 +1471,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_expense_recurrence',
-        description: 'Delete one recurring expense template after explicit command confirmation and TaskTime approval without deleting generated expenses.',
+        description: 'Delete one recurring expense template after explicit command confirmation and TaskTime Pro approval without deleting generated expenses.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1486,7 +1486,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_expense_paid',
-        description: 'Mark an expense paid using existing TaskTime payment snapshot behavior.',
+        description: 'Mark an expense paid using existing TaskTime Pro payment snapshot behavior.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1561,7 +1561,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_tax_return_period_filed',
-        description: 'Mark a tax return period filed after explicit confirmation and TaskTime approval.',
+        description: 'Mark a tax return period filed after explicit confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1576,7 +1576,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_tax_return_period_paid',
-        description: 'Mark a tax return period paid after explicit confirmation and TaskTime approval.',
+        description: 'Mark a tax return period paid after explicit confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1592,7 +1592,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_expenses_tax_claimed',
-        description: 'Mark selected expenses as tax claimed against an existing tax return period after explicit confirmation and TaskTime approval.',
+        description: 'Mark selected expenses as tax claimed against an existing tax return period after explicit confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1611,7 +1611,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_expenses_tax_unclaimed',
-        description: 'Clear tax claim status and period links from selected expenses after explicit confirmation and TaskTime approval.',
+        description: 'Clear tax claim status and period links from selected expenses after explicit confirmation and TaskTime Pro approval.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1720,7 +1720,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_invoice_paid',
-        description: 'Mark an invoice paid after explicit confirmation. Cross-currency invoices require exchange rates so TaskTime can store the existing payment currency snapshot.',
+        description: 'Mark an invoice paid after explicit confirmation. Cross-currency invoices require exchange rates so TaskTime Pro can store the existing payment currency snapshot.',
         scopes: ['read', 'write', 'billing'],
         inputSchema: {
             type: 'object',
@@ -1737,7 +1737,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'mark_invoice_unpaid',
-        description: 'Mark an invoice unpaid after explicit confirmation, matching TaskTime UI status fallback behavior.',
+        description: 'Mark an invoice unpaid after explicit confirmation, matching TaskTime Pro UI status fallback behavior.',
         scopes: ['read', 'write', 'billing'],
         inputSchema: {
             type: 'object',
@@ -1820,7 +1820,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'send_project_quote_email',
-        description: 'Send a non-persistent project quote email through the paired browser app session after explicit confirmation and TaskTime approval. Generates the quote PDF in-browser and does not update invoice records.',
+        description: 'Send a non-persistent project quote email through the paired browser app session after explicit confirmation and TaskTime Pro approval. Generates the quote PDF in-browser and does not update invoice records.',
         scopes: ['read', 'email'],
         inputSchema: {
             type: 'object',
@@ -1857,7 +1857,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'send_invoice_email',
-        description: 'Send an invoice, reminder, or quote email through the paired browser app session after explicit confirmation and TaskTime approval. Generates the PDF in-browser and updates invoice sent metadata when applicable.',
+        description: 'Send an invoice, reminder, or quote email through the paired browser app session after explicit confirmation and TaskTime Pro approval. Generates the PDF in-browser and updates invoice sent metadata when applicable.',
         scopes: ['read', 'write', 'email'],
         inputSchema: {
             type: 'object',
@@ -1881,7 +1881,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'get_dashboard_summary',
-        description: 'Get a bounded summary of current TaskTime work, timers, unbilled time, expenses, and draft invoices.',
+        description: 'Get a bounded summary of current TaskTime Pro work, timers, unbilled time, expenses, and draft invoices.',
         scopes: ['read'],
         inputSchema: emptySchema,
     },
@@ -2015,7 +2015,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'export_backup_json',
-        description: 'Export all TaskTime backup data as a browser-downloaded JSON file without returning backup contents through the bridge.',
+        description: 'Export all TaskTime Pro backup data as a browser-downloaded JSON file without returning backup contents through the bridge.',
         scopes: ['read', 'export'],
         inputSchema: {
             type: 'object',
@@ -2029,13 +2029,13 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'list_drive_backups',
-        description: 'List TaskTime backup snapshots available in Google Drive without returning backup contents.',
+        description: 'List TaskTime Pro backup snapshots available in Google Drive without returning backup contents.',
         scopes: ['read', 'export'],
         inputSchema: emptySchema,
     },
     {
         name: 'create_drive_backup',
-        description: 'Create a TaskTime backup snapshot in Google Drive using the existing backup manager.',
+        description: 'Create a TaskTime Pro backup snapshot in Google Drive using the existing backup manager.',
         scopes: ['read', 'export'],
         inputSchema: emptySchema,
     },
@@ -2055,7 +2055,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'preview_backup_import_json',
-        description: 'Validate a TaskTime backup JSON payload and return version/count metadata without changing current data.',
+        description: 'Validate a TaskTime Pro backup JSON payload and return version/count metadata without changing current data.',
         scopes: ['read'],
         inputSchema: {
             type: 'object',
@@ -2068,7 +2068,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'restore_backup_json',
-        description: 'Replace current local TaskTime data with a validated backup JSON payload after explicit confirmation and TaskTime approval. Requires confirmationText to equal RESTORE.',
+        description: 'Replace current local TaskTime Pro data with a validated backup JSON payload after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
@@ -2083,7 +2083,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'restore_drive_backup',
-        description: 'Replace current local TaskTime data from a selected Google Drive backup after explicit confirmation and TaskTime approval. Requires confirmationText to equal RESTORE.',
+        description: 'Replace current local TaskTime Pro data from a selected Google Drive backup after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
@@ -2121,7 +2121,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_all_account_data',
-        description: 'Delete all local TaskTime data and, when Drive is connected, wipe Drive sync data and backups after explicit confirmation and TaskTime approval. Requires confirmationText to equal DELETE ALL DATA.',
+        description: 'Delete all local TaskTime Pro data and, when Drive is connected, wipe Drive sync data and backups after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal DELETE ALL DATA.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
@@ -2164,13 +2164,13 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'open_dashboard_view',
-        description: 'Open the TaskTime dashboard route in the paired app session.',
+        description: 'Open the TaskTime Pro dashboard route in the paired app session.',
         scopes: ['navigation'],
         inputSchema: emptySchema,
     },
     {
         name: 'open_planner_view',
-        description: 'Open the TaskTime planner route, optionally for a specific year and week.',
+        description: 'Open the TaskTime Pro planner route, optionally for a specific year and week.',
         scopes: ['navigation'],
         inputSchema: {
             type: 'object',
@@ -2183,7 +2183,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'open_account_view',
-        description: 'Open the TaskTime account route, optionally focused on a specific Account section.',
+        description: 'Open the TaskTime Pro account route, optionally focused on a specific Account section.',
         scopes: ['navigation'],
         inputSchema: {
             type: 'object',
@@ -2198,7 +2198,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'open_project_view',
-        description: 'Open a project view in the paired TaskTime app session after validating the project exists.',
+        description: 'Open a project view in the paired TaskTime Pro app session after validating the project exists.',
         scopes: ['navigation'],
         inputSchema: {
             type: 'object',
@@ -2211,7 +2211,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'open_client_view',
-        description: 'Open a client view in the paired TaskTime app session after validating the client exists.',
+        description: 'Open a client view in the paired TaskTime Pro app session after validating the client exists.',
         scopes: ['navigation'],
         inputSchema: {
             type: 'object',
@@ -2249,13 +2249,13 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'open_reports_view',
-        description: 'Open the TaskTime reports route in the paired app session.',
+        description: 'Open the TaskTime Pro reports route in the paired app session.',
         scopes: ['navigation'],
         inputSchema: emptySchema,
     },
     {
         name: 'focus_running_timer',
-        description: 'Focus the TaskTime app on a running timer by timer key or task ID.',
+        description: 'Focus the TaskTime Pro app on a running timer by timer key or task ID.',
         scopes: ['navigation'],
         inputSchema: {
             type: 'object',

@@ -711,7 +711,7 @@ describe('agent bridge websocket helpers', () => {
                 command: 'mark_invoice_paid',
                 inputHash: 'sha256:paid',
                 scopes: ['read', 'write', 'billing'],
-            })).toThrow('No trusted TaskTime approval grant is available for this bridge process.');
+            })).toThrow('No trusted TaskTime Pro approval grant is available for this bridge process.');
             expect(bridge.getAuditEvents()).toEqual(expect.arrayContaining([
                 expect.objectContaining({
                     action: 'approval_grant_revoked',

@@ -169,7 +169,7 @@ export class McpBridgeJsonRpcServer {
         const tool = getMcpToolDefinition(callParams.name);
 
         if (!tool) {
-            return createToolError('INVALID_INPUT', `Unsupported TaskTime tool: ${callParams.name}`);
+            return createToolError('INVALID_INPUT', `Unsupported TaskTime Pro tool: ${callParams.name}`);
         }
 
         const missingScope = tool.scopes.find((scope) => !this.scopes.has(scope));
@@ -203,7 +203,7 @@ export class McpBridgeJsonRpcServer {
 
             return createToolError(
                 'UNAVAILABLE',
-                error instanceof Error ? error.message : 'TaskTime app session is unavailable.',
+                error instanceof Error ? error.message : 'TaskTime Pro app session is unavailable.',
                 getUnavailableAppSessionRecoveryDetails()
             );
         }
@@ -222,7 +222,7 @@ export class McpBridgeJsonRpcServer {
 
     private async createApprovalToken(params: unknown): Promise<unknown> {
         if (!this.bridge.createApprovalToken) {
-            return createToolError('UNAVAILABLE', 'TaskTime approval-token signing is unavailable.');
+            return createToolError('UNAVAILABLE', 'TaskTime Pro approval-token signing is unavailable.');
         }
 
         const tokenParams = params as McpApprovalTokenParams;
@@ -234,7 +234,7 @@ export class McpBridgeJsonRpcServer {
         const tool = getMcpToolDefinition(tokenParams.command);
 
         if (!tool) {
-            return createToolError('INVALID_INPUT', `Unsupported TaskTime tool: ${tokenParams.command}`);
+            return createToolError('INVALID_INPUT', `Unsupported TaskTime Pro tool: ${tokenParams.command}`);
         }
 
         const scopes = parseApprovalScopes(tokenParams.scopes, tool.scopes);
@@ -279,7 +279,7 @@ export class McpBridgeJsonRpcServer {
                 return createToolError(error.code, error.message, getToolErrorDetails(error));
             }
 
-            return createToolError('UNAVAILABLE', error instanceof Error ? error.message : 'TaskTime approval-token signing failed.');
+            return createToolError('UNAVAILABLE', error instanceof Error ? error.message : 'TaskTime Pro approval-token signing failed.');
         }
     }
 
@@ -298,7 +298,7 @@ export class McpBridgeJsonRpcServer {
         if (this.toolCallCount >= this.toolCallRateLimit) {
             const retryAfterMs = Math.max(0, this.toolCallRateWindowMs - (currentTime - this.toolCallWindowStartedAt));
 
-            return createToolError('RATE_LIMITED', 'TaskTime MCP tool call rate limit exceeded.', {
+            return createToolError('RATE_LIMITED', 'TaskTime Pro MCP tool call rate limit exceeded.', {
                 tool: toolName,
                 limit: this.toolCallRateLimit,
                 windowMs: this.toolCallRateWindowMs,
@@ -416,7 +416,7 @@ function getUnavailableAppSessionRecoveryDetails(): Record<string, unknown> {
         recovery: {
             action: 'launch_tasktime',
             reason: 'authoritative_app_session_required',
-            message: 'Open TaskTime and connect the local agent bridge, then retry the tool call.',
+            message: 'Open TaskTime Pro and connect the local agent bridge, then retry the tool call.',
         },
     };
 }

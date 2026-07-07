@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "app": {
     "id": "pro.tasktime",
-    "name": "TaskTime",
+    "name": "TaskTime Pro",
     "category": "task-time-invoicing",
     "localFirst": true
   },
@@ -17,12 +17,12 @@
     "debugging": "https://tasktime.pro/agents/debugging/"
   },
   "bridge": {
-    "packageName": "@tasktime/agent-bridge",
+    "packageName": "@tasktimepro/agent-bridge",
     "binary": "tasktime-agent-bridge",
     "transport": "mcp-stdio-json-rpc",
     "install": {
-      "npmPackage": "@tasktime/agent-bridge",
-      "openClawBundlePackage": "@tasktime/openclaw"
+      "npmPackage": "@tasktimepro/agent-bridge",
+      "openClawBundlePackage": "@tasktimepro/openclaw"
     },
     "appSession": {
       "protocol": "websocket",

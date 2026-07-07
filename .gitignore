@@ -18,6 +18,7 @@ dist-ssr
 coverage
 playwright-report
 test-results
+tasktime-infra/
 
 # Local lint/report scratch files
 .lint-*.txt

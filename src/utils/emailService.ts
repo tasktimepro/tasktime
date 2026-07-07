@@ -77,7 +77,7 @@ export async function sendInvoiceEmail(
         const error = createEmailError('network', 'Sync worker URL is not configured');
         captureInvoiceEmailIncident({
             incidentKey: 'invoice.email_send_network_failed',
-            message: 'TaskTime invoice email send failed to reach the worker',
+            message: 'TaskTime Pro invoice email send failed to reach the worker',
             error,
             context: incidentContext,
         });
@@ -113,7 +113,7 @@ export async function sendInvoiceEmail(
         const networkError = createEmailError('network', 'Unable to reach the email service. Check your connection and try again.');
         captureInvoiceEmailIncident({
             incidentKey: 'invoice.email_send_network_failed',
-            message: 'TaskTime invoice email send failed to reach the worker',
+            message: 'TaskTime Pro invoice email send failed to reach the worker',
             error,
             context: incidentContext,
         });
@@ -172,7 +172,7 @@ export async function sendInvoiceEmail(
         const error = createEmailError('provider', details || 'Email service error. Please try again later.');
         captureInvoiceEmailIncident({
             incidentKey: 'invoice.email_send_provider_failed',
-            message: 'TaskTime invoice email provider request failed',
+            message: 'TaskTime Pro invoice email provider request failed',
             error,
             context: {
                 ...incidentContext,
@@ -185,7 +185,7 @@ export async function sendInvoiceEmail(
     const error = createEmailError('network', details || `Unexpected error (${response.status})`);
     captureInvoiceEmailIncident({
         incidentKey: 'invoice.email_send_network_failed',
-        message: 'TaskTime invoice email send returned an unexpected worker response',
+        message: 'TaskTime Pro invoice email send returned an unexpected worker response',
         error,
         context: {
             ...incidentContext,

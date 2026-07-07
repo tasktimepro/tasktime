@@ -2,6 +2,7 @@
   "name": "tasktime",
   "private": true,
   "version": "1.0.0",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "bin": {
     "tasktime-agent-bridge": "./agent-bridge/dist/tasktime-agent-bridge.mjs"

@@ -4,22 +4,22 @@ import { createPersonalProject, projectsHeadingName } from './helpers/tasktime.j
 const publicRouteExpectations = [
     {
         path: '/blog/',
-        title: 'TaskTime Blog',
+        title: 'TaskTime Pro Blog',
         heading: 'Our Blog',
     },
     {
         path: '/privacy/',
-        title: 'Privacy Policy | TaskTime',
+        title: 'Privacy Policy | TaskTime Pro',
         heading: 'Privacy Policy',
     },
     {
         path: '/terms/',
-        title: 'Terms & Conditions | TaskTime',
+        title: 'Terms & Conditions | TaskTime Pro',
         heading: 'Terms & Conditions',
     },
     {
         path: '/contact/',
-        title: 'Contact | TaskTime',
+        title: 'Contact | TaskTime Pro',
         heading: 'Contact',
     },
 ];

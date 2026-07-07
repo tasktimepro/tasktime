@@ -47,7 +47,7 @@ const TOOL_GROUPS = [
     {
         id: 'navigation',
         title: 'Navigation',
-        description: 'Open TaskTime screens in the paired browser session for human review.',
+        description: 'Open TaskTime Pro screens in the paired browser session for human review.',
     },
     {
         id: 'queries',
@@ -72,7 +72,7 @@ export function getAgentToolCatalog() {
         ],
         app: {
             id: 'pro.tasktime',
-            name: 'TaskTime',
+            name: 'TaskTime Pro',
             localFirst: true,
         },
         bridge: {

@@ -26,7 +26,7 @@ const {
     canonicalPath = Astro.url.pathname,
     highlights = [],
     keywords = AGENT_DOCS_KEYWORDS,
-    socialTitle = `${title} | TaskTime Agent Docs`,
+    socialTitle = `${title} | TaskTime Pro Agent Docs`,
     socialDescription = description,
     socialImage = DEFAULT_SOCIAL_IMAGE,
     socialImageAlt = DEFAULT_SOCIAL_IMAGE_ALT,
@@ -34,7 +34,7 @@ const {
 
 const siteUrl = Astro.site ?? new URL(SITE_URL);
 const canonicalUrl = toCanonicalUrl(canonicalPath, siteUrl);
-const pageTitle = `${title} | TaskTime Agent Docs`;
+const pageTitle = `${title} | TaskTime Pro Agent Docs`;
 const socialImageUrl = new URL(socialImage, SITE_URL).toString();
 const keywordsContent = keywords.join(', ');
 const currentYear = new Date().getFullYear();
@@ -94,9 +94,9 @@ const structuredData = {
         {
             '@type': 'CreativeWorkSeries',
             '@id': docsId,
-            name: 'TaskTime Agent Docs',
+            name: 'TaskTime Pro Agent Docs',
             url: toCanonicalUrl('/agents/', siteUrl),
-            description: 'TaskTime local AI agent and MCP bridge documentation.',
+            description: 'TaskTime Pro local AI agent and MCP bridge documentation.',
             publisher: {
                 '@id': organizationId,
             },
@@ -144,16 +144,16 @@ const structuredData = {
         <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
         <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <link rel="alternate" type="application/rss+xml" title="TaskTime Blog" href="/blog/rss.xml" />
-        <link rel="alternate" type="text/plain" title="TaskTime llms.txt" href="/llms.txt" />
-        <link rel="alternate" type="application/json" title="TaskTime MCP tools" href="/agents/mcp-tools.json" />
+        <link rel="alternate" type="application/rss+xml" title="TaskTime Pro Blog" href="/blog/rss.xml" />
+        <link rel="alternate" type="text/plain" title="TaskTime Pro llms.txt" href="/llms.txt" />
+        <link rel="alternate" type="application/json" title="TaskTime Pro MCP tools" href="/agents/mcp-tools.json" />
         <meta property="og:type" content="article" />
         <meta property="og:title" content={socialTitle} />
         <meta property="og:description" content={socialDescription} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:image" content={socialImageUrl} />
         <meta property="og:image:alt" content={socialImageAlt} />
-        <meta property="og:site_name" content="TaskTime" />
+        <meta property="og:site_name" content="TaskTime Pro" />
         <meta property="og:locale" content="en_US" />
         <meta property="article:modified_time" content={AGENT_DOCS_LAST_UPDATED} />
         <meta property="article:section" content="Agent Documentation" />
@@ -169,7 +169,7 @@ const structuredData = {
             <header class="site-header">
                 <a class="brand" href="/agents/">
                     <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
-                    <span class="brand-label">TaskTime Agent Docs</span>
+                    <span class="brand-label">TaskTime Pro Agent Docs</span>
                 </a>
                 <nav class="site-nav" aria-label="Primary">
                     <a href="/blog/">Blog</a>
@@ -190,7 +190,7 @@ const structuredData = {
                             <path d="m19.07 4.93-1.41 1.41"></path>
                         </svg>
                     </button>
-                    <a href="/" class="cta-button">Open TaskTime</a>
+                    <a href="/" class="cta-button">Open TaskTime Pro</a>
                 </nav>
             </header>
 
@@ -242,7 +242,7 @@ const structuredData = {
 
                     <article class="agent-docs-content">
                         <header class="agent-docs-header">
-                            <p class="eyebrow">TaskTime local agent bridge</p>
+                            <p class="eyebrow">TaskTime Pro local agent bridge</p>
                             <h1>{title}</h1>
                             <p>{description}</p>
                         </header>
@@ -257,10 +257,10 @@ const structuredData = {
             <footer class="site-footer">
                 <p class="footer-copyright">
                     <span class="footer-copyright-icon" aria-hidden="true">&copy;</span>
-                    <span>{currentYear} TaskTime. All rights reserved.</span>
+                    <span>{currentYear} TaskTime Pro. All rights reserved.</span>
                 </p>
                 <div class="footer-links">
-                    <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime on X">
+                    <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime Pro on X">
                         <img src="/x.svg" alt="" aria-hidden="true" width="16" height="16" loading="lazy" />
                     </a>
                     <a href="/agents/">Agents</a>

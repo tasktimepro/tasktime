@@ -17,7 +17,7 @@ function readOutput(stream: PassThrough): Promise<string> {
     });
 }
 
-describe('TaskTime agent bridge CLI', () => {
+describe('TaskTime Pro agent bridge CLI', () => {
     it('parses defaults and explicit scope/origin options', () => {
         expect(parseTaskTimeAgentBridgeCliOptions([], {})).toEqual({
             host: '127.0.0.1',
@@ -133,7 +133,7 @@ describe('TaskTime agent bridge CLI', () => {
             endpoint: 'ws://127.0.0.1:3900/tasktime-agent',
             scopes: ['read', 'write'],
             expiresAt: Date.parse('2026-06-25T12:00:00Z'),
-        }, 'https://tasktime.pro/')).toContain(`TaskTime launch URL: ${launchUrl}`);
+        }, 'https://tasktime.pro/')).toContain(`TaskTime Pro launch URL: ${launchUrl}`);
     });
 
     it('prints local agent discovery metadata without starting the bridge', async () => {
@@ -205,9 +205,9 @@ describe('TaskTime agent bridge CLI', () => {
             })}\n`);
 
             await expect(pendingOutput).resolves.toContain('"tools"');
-            expect(stderrText).toContain('TaskTime local agent bridge is running.');
+            expect(stderrText).toContain('TaskTime Pro local agent bridge is running.');
             expect(stderrText).toContain(runtime.challenge.code);
-            expect(stderrText).toContain('TaskTime launch URL: http://localhost:3101/account?section=agent&agentBridgeEndpoint=');
+            expect(stderrText).toContain('TaskTime Pro launch URL: http://localhost:3101/account?section=agent&agentBridgeEndpoint=');
         } finally {
             await runtime.stop();
         }

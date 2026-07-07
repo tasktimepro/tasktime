@@ -1,15 +1,15 @@
 ---
 title: "Find Uninvoiced Work Before It Slips Through the Cracks"
-description: "TaskTime reports help freelancers find uninvoiced billable hours and expenses, review work by project, and turn tracked work into cleaner invoices."
+description: "TaskTime Pro reports help freelancers find uninvoiced billable hours and expenses, review work by project, and turn tracked work into cleaner invoices."
 publishedAt: "2026-06-20"
-excerpt: "If you track billable time and expenses but forget to invoice them, you lose money quietly. TaskTime reports help catch that work before the month closes."
+excerpt: "If you track billable time and expenses but forget to invoice them, you lose money quietly. TaskTime Pro reports help catch that work before the month closes."
 category: "time-tracking"
 tags: ["reports", "time tracking", "invoicing", "freelancers"]
 keywords: ["uninvoiced work report", "billable hours report", "freelance time tracking reports", "unbilled time tracker", "billable utilization report", "project work summary", "time tracking invoice report"]
 ogImage: "/icons/web-app-manifest-512x512.png"
-ogImageAlt: "TaskTime app icon"
+ogImageAlt: "TaskTime Pro app icon"
 socialTitle: "Find Uninvoiced Work Before It Slips Through the Cracks"
-socialDescription: "Use TaskTime reports to find unbilled time, billable expenses, project work summaries, and billable utilization before sending invoices."
+socialDescription: "Use TaskTime Pro reports to find unbilled time, billable expenses, project work summaries, and billable utilization before sending invoices."
 draft: false
 ---
 
@@ -17,7 +17,7 @@ Missed billable work is one of the quietest ways freelancers lose money.
 
 It usually is not dramatic. You track a small task, forget to add it to an invoice, leave a billable expense unbilled, or finish a project without reviewing the final time entries. One item is not much. Over a year, it adds up.
 
-TaskTime reports help catch that work before it disappears into memory.
+TaskTime Pro reports help catch that work before it disappears into memory.
 
 ## What counts as uninvoiced work?
 
@@ -38,7 +38,7 @@ For searches like "unbilled time tracker" or "uninvoiced work report," this is t
 
 Tracking time is good. Invoicing the right time is better.
 
-A timer can tell you what happened, but it does not help much if the records stay disconnected from billing. TaskTime connects time entries to tasks, tasks to projects, projects to clients, and invoices to the work they bill for.
+A timer can tell you what happened, but it does not help much if the records stay disconnected from billing. TaskTime Pro connects time entries to tasks, tasks to projects, projects to clients, and invoices to the work they bill for.
 
 That connection is what makes reports useful.
 
@@ -66,7 +66,7 @@ Billable utilization is the percentage of tracked time that was billable.
 
 For freelancers, this is a useful business signal. A week full of admin, sales, edits, and unpaid support can feel busy, but billable utilization shows how much of that time actually moved paid work forward.
 
-TaskTime reports include billable utilization so you can compare:
+TaskTime Pro reports include billable utilization so you can compare:
 
 - Total hours worked
 - Billable hours worked
@@ -89,7 +89,7 @@ Billable expenses can also be missed:
 
 If an expense should be passed through to a client, it needs to be visible before the invoice is finalized.
 
-TaskTime reports can include uninvoiced expense totals, and invoice generation can pull billable expenses into the invoice workflow. That reduces the chance that reimbursable costs stay buried in your expense list.
+TaskTime Pro reports can include uninvoiced expense totals, and invoice generation can pull billable expenses into the invoice workflow. That reduces the chance that reimbursable costs stay buried in your expense list.
 
 ## Use project work summaries for client clarity
 
@@ -121,7 +121,7 @@ If your time tracker and invoice tool are separate, uninvoiced work is easy to m
 
 You have to export a timesheet, copy hours into an invoice, remember expenses, and hope nothing was skipped. Every transfer is a chance for a mistake.
 
-TaskTime keeps tasks, timers, time entries, expenses, projects, clients, and invoices in the same workflow. Reports sit on top of that connected data.
+TaskTime Pro keeps tasks, timers, time entries, expenses, projects, clients, and invoices in the same workflow. Reports sit on top of that connected data.
 
 That means invoice prep becomes a review process, not a reconstruction project.
 
@@ -131,8 +131,8 @@ The point is not to obsess over every minute. The point is to stop losing work y
 
 Freelancers already have enough admin. A good billable hours report should make invoice day simpler: review what happened, check what is unbilled, and invoice the right work.
 
-TaskTime reports are built for that exact loop.
+TaskTime Pro reports are built for that exact loop.
 
 ---
 
-**Want to try it?** [Open TaskTime](/), choose your billing period in Reports, and check uninvoiced work before creating your next invoice.
+**Want to try it?** [Open TaskTime Pro](/), choose your billing period in Reports, and check uninvoiced work before creating your next invoice.

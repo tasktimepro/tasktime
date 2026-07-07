@@ -370,7 +370,7 @@ export async function handleAgentAppSessionRequest(
         }
 
         if (!approved) {
-            return errorResponse(rawRequest.requestId, rawRequest.command, 'PERMISSION_DENIED', 'Agent command was not approved in TaskTime.');
+            return errorResponse(rawRequest.requestId, rawRequest.command, 'PERMISSION_DENIED', 'Agent command was not approved in TaskTime Pro.');
         }
     }
 

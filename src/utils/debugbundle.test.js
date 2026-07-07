@@ -117,7 +117,7 @@ describe('debugbundle utility', () => {
 
         expect(captureDebugBundleIncident({
             incidentKey: 'drive.delta_upload_failed',
-            message: 'TaskTime could not upload a Drive delta update',
+            message: 'TaskTime Pro could not upload a Drive delta update',
             error: originalError,
             context: { docName: 'core' },
             throttleMs: 1_000,
@@ -125,7 +125,7 @@ describe('debugbundle utility', () => {
 
         expect(captureDebugBundleIncident({
             incidentKey: 'drive.delta_upload_failed',
-            message: 'TaskTime could not upload a Drive delta update',
+            message: 'TaskTime Pro could not upload a Drive delta update',
             error: originalError,
             context: { docName: 'core' },
             throttleMs: 1_000,
@@ -135,7 +135,7 @@ describe('debugbundle utility', () => {
 
         expect(captureDebugBundleIncident({
             incidentKey: 'drive.delta_upload_failed',
-            message: 'TaskTime could not upload a Drive delta update',
+            message: 'TaskTime Pro could not upload a Drive delta update',
             error: originalError,
             context: { docName: 'core' },
             throttleMs: 1_000,
@@ -147,7 +147,7 @@ describe('debugbundle utility', () => {
 
         expect(capturedIncident).toMatchObject({
             name: 'TaskTimeHandledIncident',
-            message: 'TaskTime could not upload a Drive delta update',
+            message: 'TaskTime Pro could not upload a Drive delta update',
             debugbundleIncidentKey: 'drive.delta_upload_failed',
             debugbundleHandled: true,
             debugbundleContext: { docName: 'core' },
@@ -191,7 +191,7 @@ describe('debugbundle utility', () => {
         expect(captureDebugBundleException(new Error('boom'))).toBe(false)
         expect(captureDebugBundleIncident({
             incidentKey: 'drive.sync_failed',
-            message: 'TaskTime sync failed',
+            message: 'TaskTime Pro sync failed',
         })).toBe(false)
     })
 
@@ -208,13 +208,13 @@ describe('debugbundle utility', () => {
         expect(captureDebugBundleIncident({
             incidentKey: 'drive.sync_failed_repeatedly',
             name: 'TaskTimeDriveSyncError',
-            message: 'TaskTime Drive sync failed repeatedly',
+            message: 'TaskTime Pro Drive sync failed repeatedly',
         })).toBe(true)
 
         expect(captureExceptionSpy).toHaveBeenCalledTimes(1)
         expect(captureExceptionSpy.mock.calls[0][0]).toMatchObject({
             name: 'TaskTimeDriveSyncError',
-            message: 'TaskTime Drive sync failed repeatedly',
+            message: 'TaskTime Pro Drive sync failed repeatedly',
             debugbundleIncidentKey: 'drive.sync_failed_repeatedly',
             debugbundleHandled: true,
         })

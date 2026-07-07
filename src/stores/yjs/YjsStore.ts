@@ -973,7 +973,7 @@ export class YjsStore {
     }
 
     /**
-     * Wipe all TaskTime files from Google Drive (appDataFolder)
+     * Wipe all TaskTime Pro files from Google Drive (appDataFolder)
      */
     async wipeDriveData(): Promise<void> {
         if (!this.driveProvider) {
