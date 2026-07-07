@@ -16,11 +16,12 @@
   "keywords": [
     "tasktime",
     "openclaw",
-    "mcp",
+    "project-management",
+    "task-management",
     "ai-agent",
     "time-tracking",
     "invoicing",
-    "local-first"
+    "expenses"
   ],
   "homepage": "https://tasktime.pro/agents/openclaw/",
   "license": "(MIT-0 AND AGPL-3.0-only)",
