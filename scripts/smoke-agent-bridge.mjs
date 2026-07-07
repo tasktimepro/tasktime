@@ -1,9 +1,15 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { mkdtemp, rm, symlink } from 'node:fs/promises'
 import { Socket } from 'node:net'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const bridgePath = new URL('../agent-bridge/dist/tasktime-agent-bridge.mjs', import.meta.url)
+
+await assertSymlinkManifestWorks()
+
 const child = spawn(process.execPath, [
   bridgePath.pathname,
   '--origin',
@@ -186,5 +192,23 @@ function waitForExit() {
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message)
+  }
+}
+
+async function assertSymlinkManifestWorks() {
+  const tempDir = await mkdtemp(path.join(tmpdir(), 'tasktime-agent-bridge-'))
+  const symlinkPath = path.join(tempDir, 'tasktime-agent-bridge')
+
+  try {
+    await symlink(bridgePath.pathname, symlinkPath)
+
+    const result = spawnSync(symlinkPath, ['--manifest'], {
+      encoding: 'utf8',
+    })
+
+    assert(result.status === 0, `Symlink manifest command failed.\nstderr:\n${result.stderr}`)
+    assert(JSON.parse(result.stdout).bridge?.binary === 'tasktime-agent-bridge', 'Symlink manifest output was invalid.')
+  } finally {
+    await rm(tempDir, { force: true, recursive: true })
   }
 }

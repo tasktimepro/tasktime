@@ -1,4 +1,5 @@
-import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Readable, Writable } from 'node:stream';
 import { LocalAgentBridge } from './localBridge';
 import { McpBridgeJsonRpcServer, startMcpLineDelimitedStdioTransport } from './mcpServer';
@@ -480,7 +481,15 @@ function parseAppUrl(value: string, label: string): string {
 function isCliEntrypoint(): boolean {
     const entry = process.argv[1];
 
-    return Boolean(entry && import.meta.url === pathToFileURL(entry).href);
+    if (!entry) {
+        return false;
+    }
+
+    try {
+        return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+    } catch {
+        return import.meta.url === pathToFileURL(entry).href;
+    }
 }
 
 if (isCliEntrypoint()) {
