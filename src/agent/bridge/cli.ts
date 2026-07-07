@@ -201,6 +201,7 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
             transport: 'mcp-stdio-json-rpc',
             install: {
                 npmPackage: '@tasktimepro/agent-bridge',
+                officialMcpRegistryName: 'pro.tasktime/agent-bridge',
                 openClawBundlePackage: '@tasktimepro/openclaw',
             },
             appSession: {

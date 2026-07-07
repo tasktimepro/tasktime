@@ -4,12 +4,20 @@
 
 The bridge does not read or write TaskTime Pro IndexedDB/Yjs data directly. It starts a loopback app-session endpoint, waits for the running TaskTime Pro browser app to pair through Account > Agent Access, and forwards MCP tool calls to the paired browser app.
 
+Install and run:
+
+```bash
+npx @tasktimepro/agent-bridge --app-url https://tasktime.pro
+```
+
 Useful commands:
 
 ```bash
 tasktime-agent-bridge --manifest
 tasktime-agent-bridge --app-url https://tasktime.pro
 ```
+
+Official MCP Registry name: `pro.tasktime/agent-bridge`.
 
 Public docs:
 

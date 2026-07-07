@@ -1,26 +1,38 @@
 {
   "name": "@tasktimepro/agent-bridge",
   "version": "0.1.0",
-  "description": "Local MCP stdio bridge for same-device TaskTime Pro agent access.",
+  "description": "Local MCP stdio server for same-device TaskTime Pro agent access.",
+  "mcpName": "pro.tasktime/agent-bridge",
   "type": "module",
   "bin": {
     "tasktime-agent-bridge": "./dist/tasktime-agent-bridge.mjs"
   },
   "files": [
     "dist/tasktime-agent-bridge.mjs",
-    "README.md"
+    "README.md",
+    "server.json"
   ],
   "engines": {
     "node": ">=20"
   },
   "keywords": [
     "tasktime",
+    "tasktime-pro",
     "mcp",
+    "mcp-server",
     "ai-agent",
     "time-tracking",
     "invoicing",
     "local-first"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tasktimepro/tasktime.git",
+    "directory": "agent-bridge"
+  },
+  "bugs": {
+    "url": "https://github.com/tasktimepro/tasktime/issues"
+  },
   "homepage": "https://tasktime.pro/agents/",
   "license": "AGPL-3.0-only",
   "publishConfig": {
