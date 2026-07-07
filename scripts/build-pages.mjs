@@ -8,6 +8,10 @@ const repoRoot = path.resolve(__dirname, '..');
 const appDistDir = path.join(repoRoot, 'dist');
 const blogDir = path.join(repoRoot, 'blog');
 const blogDistDir = path.join(blogDir, 'dist');
+const wellKnownAliases = [
+    ['.well-known/mcp-registry-auth', 'mcp-registry-auth'],
+    ['.well-known/tasktime-agent.json', 'tasktime-agent.json'],
+];
 
 function run(command, args, options = {}) {
     const result = spawnSync(command, args, {
@@ -46,6 +50,18 @@ async function mergeAstroOutput() {
     }
 }
 
+async function copyWellKnownAliases() {
+    for (const [source, alias] of wellKnownAliases) {
+        const sourcePath = path.join(appDistDir, source);
+
+        if (!(await pathExists(sourcePath))) {
+            continue;
+        }
+
+        await cp(sourcePath, path.join(appDistDir, alias), { force: true });
+    }
+}
+
 async function main() {
     const blogAstroBinary = path.join(blogDir, 'node_modules', 'astro', 'package.json');
 
@@ -57,6 +73,7 @@ async function main() {
     run('npm', ['run', 'build'], { cwd: blogDir });
 
     await mergeAstroOutput();
+    await copyWellKnownAliases();
 }
 
 await main();
