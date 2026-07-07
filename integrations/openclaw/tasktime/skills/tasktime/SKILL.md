@@ -1,12 +1,11 @@
 ---
 name: tasktime
 description: >-
-  Use TaskTime Pro MCP workflows to inspect and operate local-first TaskTime Pro data:
-  projects, tasks, timers, clients, expenses, invoices, quotes/estimates, reports,
-  planner notes, sync/backups, navigation, account data, setup, pairing recovery,
-  and tool selection. Use only for TaskTime Pro, not unrelated tasktime CLI timers
-  or generic time-tracking tools.
-version: 1.0.1
+  Operate local-first TaskTime Pro through its MCP bridge for task planning,
+  client work, time tracking, expenses, invoices, quotes, reports, planner notes,
+  backups, and app navigation. Use for same-device setup, pairing recovery, tool
+  selection, and approval-gated workflows. Do not use for unrelated tasktime CLI timers.
+version: 1.0.2
 metadata:
   openclaw:
     requires:
