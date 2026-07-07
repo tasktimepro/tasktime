@@ -14,4 +14,4 @@ Useful references:
 - https://tasktime.pro/agents/security/
 - https://tasktime.pro/agents/tools/
 
-License: `MIT-0` for this OpenClaw/ClawHub bundle. The TaskTime Pro bridge binary it launches is licensed separately under `AGPL-3.0-only`.
+License: `MIT-0` for this OpenClaw/ClawHub bundle; see `LICENSE`. The TaskTime Pro bridge binary it launches is licensed separately under `AGPL-3.0-only`.

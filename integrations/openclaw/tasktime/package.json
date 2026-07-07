@@ -6,6 +6,7 @@
   "files": [
     ".codex-plugin/",
     ".mcp.json",
+    "LICENSE",
     "README.md",
     "scripts/",
     "skills/"
