@@ -1,0 +1,63 @@
+name: Publish Agent Bridge to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run npm publish with --dry-run instead of publishing"
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build bridge
+        run: npm run build:agent-bridge
+
+      - name: Smoke test bridge
+        run: npm run smoke:agent-bridge
+
+      - name: Check package version
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          VERSION="$(node -p "require('./agent-bridge/package.json').version")"
+          if npm view "@tasktimepro/agent-bridge@${VERSION}" version >/dev/null 2>&1; then
+            echo "@tasktimepro/agent-bridge@${VERSION} is already published."
+            exit 1
+          fi
+
+      - name: Verify npm package contents
+        working-directory: agent-bridge
+        run: npm pack --dry-run
+
+      - name: Dry-run publish
+        if: ${{ inputs.dry_run == true }}
+        working-directory: agent-bridge
+        run: npm publish --access public --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish package
+        if: ${{ inputs.dry_run == false }}
+        working-directory: agent-bridge
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
