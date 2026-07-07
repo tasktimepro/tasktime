@@ -1,6 +1,6 @@
 /**
  * Custom handled incident catalog:
- * ../../tasktime-infra/docs/debugbundle-custom-incidents.md
+ * Private operations docs contain the handled incident catalog.
  */
 
 import { createDebugBundleBrowserSdk } from '@debugbundle/sdk-browser'

@@ -2,7 +2,7 @@
 
 This file is the source of truth for TaskTime Pro cloud sync behavior. Read it before changing Yjs storage, Google Drive sync, import/export, backups, account deletion, or sync UI.
 
-Handled production incident captures are documented in `tasktime-infra/docs/debugbundle-custom-incidents.md` when the private infra checkout is available. Update that runbook when adding or removing sync/auth/persistence incidents.
+Handled production incident captures are documented in the private operations runbook. Update that runbook when adding or removing sync/auth/persistence incidents.
 
 TaskTime Pro is in production. Existing IndexedDB and Google Drive appDataFolder state is live customer data. Changes must be backwards compatible and must not require users to clear local storage or Drive files.
 

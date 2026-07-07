@@ -295,8 +295,8 @@ docker compose run --rm app npm run <script>
 
 | Document | Purpose |
 |----------|---------|
-| `tasktime-infra/docs/project_overview.md` | Private full technical documentation, available only in the local/private infra checkout |
-| `tasktime-infra/docs/yjs-sync-implementation-plan.md` | Private Yjs sync architecture notes, available only in the local/private infra checkout |
+| Private project overview | Full technical documentation, available only in the private infra/docs checkout |
+| Private Yjs sync plan | Yjs sync architecture notes, available only in the private infra/docs checkout |
 | `_implan.md` | Original project plan and preferences |
 | `README.md` | User-facing documentation |
 
@@ -304,12 +304,12 @@ docker compose run --rm app npm run <script>
 
 ## 💡 Tips for Future Sessions
 
-1. **Read `tasktime-infra/docs/project_overview.md` first when it exists locally** — It has the full architecture
+1. **Read the private project overview first when it exists locally** — It has the full architecture
 2. **Check this file for rules** — Especially the "no legacy code" rule
 3. **App.jsx uses Yjs hooks** — All state is managed by Yjs
 4. **Keep tests updated** — Add or adjust tests whenever behavior changes
 5. **Use Yjs hooks directly** — `useProjects()`, `useTasks()`, etc. from `src/hooks/`
-6. **Review `tasktime-infra/docs/yjs-sync-implementation-plan.md` when it exists locally** — Understand the CRDT-based sync system
+6. **Review the private Yjs sync plan when it exists locally** — Understand the CRDT-based sync system
 7. **Subtasks cannot be recurring** — The project UI disallows recurring subtasks; avoid adding recurring-specific logic to subtask components.
 
 ---

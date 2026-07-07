@@ -45,7 +45,7 @@ TaskTime Pro exposes a same-device local MCP bridge for AI agents through the pa
 
 ## Public Source
 
-TaskTime Pro app and agent bridge source are prepared for a public `tasktimepro/tasktime` mirror under `AGPL-3.0-only`. Private Cloudflare Worker source, deployment workflows, and internal docs are staged locally in the ignored `tasktime-infra/` directory for the future private `tasktimepro/tasktime-infra` repo.
+TaskTime Pro app and agent bridge source are prepared for a public `tasktimepro/tasktime` mirror under `AGPL-3.0-only`. Private Cloudflare Worker source, deployment workflows, and internal runbooks are managed separately outside the public source tree.
 
 ### Build
 

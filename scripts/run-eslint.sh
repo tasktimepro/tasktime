@@ -8,7 +8,7 @@ warm_bind_mount() {
 
 warm_bind_mount
 
-if output=$(eslint . --ignore-pattern 'tasktime-infra/**' 2>&1); then
+if output=$(eslint . 2>&1); then
     printf '%s\n' "$output"
     exit 0
 else
@@ -18,7 +18,7 @@ fi
 case "$output" in
     *"ENOENT: no such file or directory, scandir '/app/src/"*)
         warm_bind_mount
-        exec eslint . --ignore-pattern 'tasktime-infra/**'
+        exec eslint .
         ;;
 esac
 

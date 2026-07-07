@@ -8,6 +8,7 @@
     [x] Make sure this is full-parity with UI and that the agent can really do anything a user can do currently
     [x] Add public Astro agent docs at `/agents/` with `llms.txt`, generated MCP tool JSON, and Skill/OpenClaw pointers
     [x] Prepare final MCP/OpenClaw skill and plugin for publishing package metadata and so on
+    [ ] Publish everything under the new org
 
 ---
 
