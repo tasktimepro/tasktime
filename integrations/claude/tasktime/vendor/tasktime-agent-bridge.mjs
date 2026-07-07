@@ -1371,7 +1371,7 @@ const ci = /* @__PURE__ */ u("$ZodObject", (e, t) => {
             })));
           }
         }
-        
+
         if (${M}.value === undefined) {
           if (${J} in input) {
             newResult[${J}] = undefined;
@@ -1379,7 +1379,7 @@ const ci = /* @__PURE__ */ u("$ZodObject", (e, t) => {
         } else {
           newResult[${J}] = ${M}.value;
         }
-        
+
       `) : I.write(`
         if (${M}.issues.length) {
           payload.issues = payload.issues.concat(${M}.issues.map(iss => ({
@@ -1387,7 +1387,7 @@ const ci = /* @__PURE__ */ u("$ZodObject", (e, t) => {
             path: iss.path ? [${J}, ...iss.path] : [${J}]
           })));
         }
-        
+
         if (${M}.value === undefined) {
           if (${J} in input) {
             newResult[${J}] = undefined;
@@ -1395,7 +1395,7 @@ const ci = /* @__PURE__ */ u("$ZodObject", (e, t) => {
         } else {
           newResult[${J}] = ${M}.value;
         }
-        
+
       `);
     }
     I.write("payload.value = newResult;"), I.write("return payload;");

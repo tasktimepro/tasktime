@@ -1,4 +1,4 @@
-export const AGENT_DOCS_LAST_UPDATED = '2026-07-06';
+export const AGENT_DOCS_LAST_UPDATED = '2026-07-07';
 
 export const AGENT_DOCS_DESCRIPTION = 'Use TaskTime Pro with same-device AI agents through the local MCP agent bridge for private task management, time tracking, expenses, invoicing, reports, and app navigation.';
 
@@ -10,6 +10,8 @@ export const AGENT_DOCS_KEYWORDS = [
     'local-first invoicing agent',
     'AI agent task manager',
     'OpenClaw TaskTime Pro',
+    'Claude Code TaskTime Pro',
+    'TaskTime Pro Claude plugin',
     'TaskTime Pro agent tools',
 ];
 
@@ -45,6 +47,12 @@ export const AGENT_DOCS_NAV_ITEMS = [
         summary: 'Discovery and publishing notes for OpenClaw-style agents.',
     },
     {
+        href: '/agents/claude/',
+        key: 'claude',
+        label: 'Claude Code',
+        summary: 'Claude Code plugin and marketplace install instructions.',
+    },
+    {
         href: '/agents/debugging/',
         key: 'debugging',
         label: 'Debugging',
@@ -77,5 +85,10 @@ export const AGENT_DISCOVERY_LINKS = [
         href: '/agents/skill.md',
         label: 'Skill instructions',
         summary: 'Fetchable Skill-style instructions for agent platforms.',
+    },
+    {
+        href: 'https://github.com/tasktimepro/tasktime/tree/main/integrations/claude/tasktime',
+        label: 'Claude Code plugin',
+        summary: 'GitHub-hosted TaskTime Pro Claude Code plugin bundle.',
     },
 ];

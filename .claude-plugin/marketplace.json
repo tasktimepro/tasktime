@@ -1,0 +1,43 @@
+{
+  "name": "tasktimepro",
+  "description": "TaskTime Pro Claude Code plugins for local-first productivity, time tracking, expenses, invoicing, and agent-ready MCP workflows.",
+  "version": "1.0.0",
+  "owner": {
+    "name": "TaskTime Pro"
+  },
+  "plugins": [
+    {
+      "name": "tasktime",
+      "displayName": "TaskTime Pro",
+      "source": "./integrations/claude/tasktime",
+      "description": "Use TaskTime Pro through its local MCP bridge for tasks, timers, expenses, invoices, reports, and safe app navigation after explicit pairing.",
+      "version": "0.1.0",
+      "author": {
+        "name": "TaskTime Pro",
+        "url": "https://tasktime.pro"
+      },
+      "homepage": "https://tasktime.pro/agents/claude/",
+      "repository": "https://github.com/tasktimepro/tasktime",
+      "license": "MIT-0 AND AGPL-3.0-only",
+      "keywords": [
+        "tasktime",
+        "tasktimepro",
+        "claude-code",
+        "mcp",
+        "time-tracking",
+        "invoicing",
+        "expense-tracking",
+        "local-first",
+        "ai-agent"
+      ],
+      "category": "Productivity",
+      "tags": [
+        "time-tracking",
+        "invoicing",
+        "expense-tracking",
+        "local-first",
+        "mcp"
+      ]
+    }
+  ]
+}

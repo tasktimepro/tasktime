@@ -21,3 +21,4 @@ Agent docs live in `src/pages/agents/`. Machine-readable agent discovery files i
 - `/agents/tasktime-agent-bridge.json`
 - `/agents/mcp-tools.json`
 - `/agents/skill.md`
+- `/agents/claude/`

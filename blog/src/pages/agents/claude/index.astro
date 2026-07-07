@@ -1,0 +1,116 @@
+---
+import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
+
+const highlights = [
+    'Install from the TaskTime Pro GitHub marketplace.',
+    'Claude Code starts the bundled MCP server when the plugin is enabled.',
+    'The browser app still requires explicit Account > Agent Access pairing.',
+    'Submit to the Claude Code plugin directory after local validation.',
+];
+const mcpOnlyConfig = JSON.stringify({
+    mcpServers: {
+        tasktime: {
+            command: 'npx',
+            args: ['-y', '@tasktimepro/agent-bridge', '--app-url', 'https://tasktime.pro'],
+        },
+    },
+}, null, 2);
+---
+
+<AgentDocsLayout
+    pageKey="claude"
+    title="Claude Code Integration"
+    description="How to install the TaskTime Pro Claude Code plugin, launch the bundled local MCP bridge, pair the browser app, and use TaskTime Pro tools safely."
+    canonicalPath="/agents/claude/"
+    highlights={highlights}
+>
+    <section>
+        <h2>What This Provides</h2>
+        <p>
+            TaskTime Pro ships a Claude Code plugin at
+            <code>integrations/claude/tasktime/</code>. It contributes a TaskTime Pro skill and a plugin-managed
+            MCP server that launches the bundled local bridge. Claude Code users do not need to hand-write MCP config
+            when they install the plugin.
+        </p>
+        <p>
+            This is separate from the OpenClaw/ClawHub bundle. The same TaskTime Pro bridge powers both integrations,
+            but Claude Code uses <code>.claude-plugin/plugin.json</code>, a root marketplace file, and Claude's plugin
+            MCP naming rules.
+        </p>
+    </section>
+
+    <section>
+        <h2>Install From GitHub</h2>
+        <p>
+            Add the TaskTime Pro marketplace from GitHub, then install the plugin from that marketplace:
+        </p>
+        <pre><code>/plugin marketplace add tasktimepro/tasktime
+/plugin install tasktime@tasktimepro</code></pre>
+        <p>
+            If Claude Code asks you to reload plugin components, run:
+        </p>
+        <pre><code>/reload-plugins</code></pre>
+    </section>
+
+    <section>
+        <h2>Plugin Contents</h2>
+        <ul class="agent-check-list">
+            <li>Marketplace catalog: <code>.claude-plugin/marketplace.json</code>.</li>
+            <li>Plugin manifest: <code>integrations/claude/tasktime/.claude-plugin/plugin.json</code>.</li>
+            <li>Skill root: <code>integrations/claude/tasktime/skills/tasktime/SKILL.md</code>.</li>
+            <li>MCP server config: <code>integrations/claude/tasktime/.mcp.json</code>.</li>
+            <li>Bundled bridge launcher: <code>scripts/run-tasktime-agent-bridge.mjs</code>.</li>
+            <li>Bundled bridge binary: <code>vendor/tasktime-agent-bridge.mjs</code>.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Pair TaskTime Pro</h2>
+        <p>
+            After installation, Claude Code starts the plugin MCP server automatically when the plugin is enabled.
+            The server appears as <code>plugin:tasktime:tasktime</code>. The user still opens TaskTime Pro and
+            approves the local bridge in Account &gt; Agent Access before Claude can read or mutate local data.
+        </p>
+        <p>
+            Plugin-bundled MCP tools use Claude's scoped tool-name form:
+        </p>
+        <pre><code>mcp__plugin_tasktime_tasktime__list_projects</code></pre>
+    </section>
+
+    <section>
+        <h2>MCP-Only Claude Clients</h2>
+        <p>
+            Claude clients that support MCP but not Claude Code plugins can use the standalone TaskTime Pro bridge
+            package instead. Add an MCP stdio server entry like this:
+        </p>
+        <pre><code>{mcpOnlyConfig}</code></pre>
+        <p>
+            The same pairing and approval model applies: the visible TaskTime Pro browser app must approve Account &gt;
+            Agent Access before tools can operate on local data.
+        </p>
+    </section>
+
+    <section>
+        <h2>Safety Model</h2>
+        <p>
+            The Claude plugin does not create a cloud API or remote-control channel. It launches a same-device stdio
+            bridge. The paired browser app remains the authority for data validation, mutations, downloads, email sends,
+            sync behavior, restore flows, account deletion, and approval-token verification.
+        </p>
+        <ul class="agent-check-list">
+            <li>Use MCP tools before browser UI automation.</li>
+            <li>Inspect or preview before write, billing, export, email, restore, or delete actions.</li>
+            <li>Keep destructive, restore, billing, export, and email actions explicit and approval-gated.</li>
+            <li>Do not directly edit browser storage, Yjs documents, Drive sync files, invoice state, or billing state.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Publishing Path</h2>
+        <p>
+            The GitHub marketplace is the immediate public distribution path. TaskTime Pro can also submit the plugin
+            for Claude Code plugin directory review after running <code>claude plugin validate</code> in an environment
+            with Claude Code installed. Anthropic's official directory is curated separately at Anthropic's discretion.
+        </p>
+    </section>
+</AgentDocsLayout>

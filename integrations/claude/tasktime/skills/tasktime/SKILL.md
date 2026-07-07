@@ -4,20 +4,7 @@ description: >-
   Operate local-first TaskTime Pro through its MCP bridge for task planning,
   client work, time tracking, expenses, invoices, quotes, reports, planner notes,
   backups, app navigation, same-device setup, pairing recovery, tool selection,
-  and approval-gated workflows.
-version: 1.0.3
-metadata:
-  openclaw:
-    requires:
-      bins:
-        - node
-    install:
-      - kind: node
-        package: "@tasktimepro/agent-bridge"
-        bins:
-          - tasktime-agent-bridge
-    skillKey: tasktime
-    homepage: https://tasktime.pro/agents/openclaw/
+  and approval-gated workflows in Claude Code.
 ---
 
 # TaskTime Pro
@@ -28,36 +15,22 @@ Stay on the supported TaskTime Pro bridge surface. Do not directly edit browser 
 
 ## Skill Scope
 
-This is the portable ClawHub skill for TaskTime Pro. It should guide agent clients that need safe TaskTime Pro access through MCP. If a repository or user environment also provides local TaskTime Pro instructions, read those too because they may contain the active app URL, workspace policy, or deployment-specific setup notes.
+This is the Claude Code plugin skill for TaskTime Pro. It should guide Claude Code sessions that need safe TaskTime Pro access through the bundled MCP server.
 
 TaskTime Pro is local-first. The paired browser app is the authority for customer data, validation, navigation, downloads, email sends, sync behavior, backups, restore flows, and account deletion. The bridge is a same-device MCP stdio server that forwards approved commands to that visible app session; it is not a remote API.
 
 ## Connection
 
-Prefer the MCP server when the client exposes it. For a standalone install, the standard stdio command is:
+Install from the TaskTime Pro Claude marketplace:
 
-```json
-{
-  "mcpServers": {
-    "tasktime": {
-      "command": "tasktime-agent-bridge",
-      "args": ["--app-url", "https://tasktime.pro"]
-    }
-  }
-}
+```text
+/plugin marketplace add tasktimepro/tasktime
+/plugin install tasktime@tasktimepro
 ```
 
-If the binary is not already installed, install the bridge package or let OpenClaw install it from the skill metadata:
+When the plugin is enabled, Claude Code starts the bundled `tasktime` MCP server automatically. In Claude Code, the server appears as `plugin:tasktime:tasktime`. Plugin-bundled MCP tools use the full name form `mcp__plugin_tasktime_tasktime__<tool-name>`, for example `mcp__plugin_tasktime_tasktime__list_projects`.
 
-```bash
-npm install -g @tasktimepro/agent-bridge
-```
-
-When installed through the TaskTime Pro OpenClaw bundle, use the bundle-provided MCP server instead of requiring a global binary. The bundle launches its vendored bridge through `.mcp.json`.
-
-The user grants first-use access in TaskTime Pro under Account > Agent Access. Require a running, paired browser session before reading or mutating data. After pairing, call `tools/list` because available tools depend on the granted scopes. Default scopes are `read`, `write`, and `navigation`; optional scopes are `billing`, `export`, and `email`.
-
-OpenClaw may expose tools with the MCP server prefix, for example `tasktime__list_projects` instead of `list_projects`.
+The user grants first-use access in TaskTime Pro under Account > Agent Access. Require a running, paired browser session before reading or mutating data. After pairing, check available tools because they depend on the granted scopes. Default scopes are `read`, `write`, and `navigation`; optional scopes are `billing`, `export`, and `email`.
 
 ## Operating Workflow
 
@@ -82,7 +55,7 @@ OpenClaw may expose tools with the MCP server prefix, for example `tasktime__lis
 
 If a tool call returns an unavailable app-session error with `launch_tasktime`, open or guide the user to TaskTime Pro, pair Account > Agent Access, then retry. Do not treat this as a generic MCP failure.
 
-If tool availability does not match the task, call `tools/list` again and check granted scopes. Ask the user to adjust TaskTime Pro Agent Access only when the missing scope is actually needed.
+If tool availability does not match the task, inspect the MCP server status and granted scopes. Ask the user to adjust TaskTime Pro Agent Access only when the missing scope is actually needed.
 
 ## Safety
 
@@ -94,12 +67,11 @@ If tool availability does not match the task, call `tools/list` again and check 
 
 ## Full Documentation
 
+- Claude setup: https://tasktime.pro/agents/claude/
 - Agent docs: https://tasktime.pro/agents/
 - Quickstart: https://tasktime.pro/agents/quickstart/
 - Security model: https://tasktime.pro/agents/security/
 - MCP tool reference: https://tasktime.pro/agents/tools/
 - Machine-readable MCP tools: https://tasktime.pro/agents/mcp-tools.json
 - Bridge discovery manifest: https://tasktime.pro/.well-known/tasktime-agent.json
-- Claude setup: https://tasktime.pro/agents/claude/
-- OpenClaw setup: https://tasktime.pro/agents/openclaw/
 - Debugging guide: https://tasktime.pro/agents/debugging/

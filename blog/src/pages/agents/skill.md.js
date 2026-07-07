@@ -94,6 +94,7 @@ export function GET() {
         '- MCP tool reference: https://tasktime.pro/agents/tools/',
         '- Machine-readable MCP tools: https://tasktime.pro/agents/mcp-tools.json',
         '- Bridge discovery manifest: https://tasktime.pro/.well-known/tasktime-agent.json',
+        '- Claude setup: https://tasktime.pro/agents/claude/',
         '- OpenClaw setup: https://tasktime.pro/agents/openclaw/',
         '- Debugging guide: https://tasktime.pro/agents/debugging/',
         '',

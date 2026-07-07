@@ -69,6 +69,7 @@ High-level layout:
 src/                              App source, hooks, Yjs stores, utilities, tests
 agent-bridge/                     Publishable @tasktimepro/agent-bridge package
 integrations/openclaw/tasktime/   OpenClaw/ClawHub skill and plugin bundle
+integrations/claude/tasktime/      Claude Code plugin bundle and MCP server config
 blog/                             Astro public site, blog, and agent docs
 public/.well-known/               Agent discovery manifest
 e2e/                              Playwright browser tests
@@ -85,10 +86,13 @@ Useful entry points:
 - `/agents/quickstart/` - bridge launch, pairing, and first MCP call
 - `/agents/security/` - scopes, approvals, revocation, and local-only rules
 - `/agents/tools/` - generated MCP tool reference
+- `/agents/claude/` - Claude Code plugin installation and safety notes
+- `/agents/openclaw/` - OpenClaw/ClawHub installation and publishing notes
 - `/agents/mcp-tools.json` - machine-readable tool catalog
 - `/agents/skill.md` - Skill-style instructions for agent platforms
 - `/llms.txt` and `/.well-known/tasktime-agent.json` - public discovery files
 - `integrations/openclaw/tasktime/` - OpenClaw-compatible skill and plugin bundle
+- `integrations/claude/tasktime/` - Claude Code plugin bundle
 
 ## Data Compatibility
 
@@ -117,3 +121,5 @@ For security issues, see [SECURITY.md](./SECURITY.md).
 TaskTime Pro app and bridge code are licensed under `AGPL-3.0-only`.
 
 The OpenClaw/ClawHub skill bundle in `integrations/openclaw/tasktime/` is licensed under `MIT-0`.
+
+The Claude Code plugin skill bundle in `integrations/claude/tasktime/` is licensed under `MIT-0`.

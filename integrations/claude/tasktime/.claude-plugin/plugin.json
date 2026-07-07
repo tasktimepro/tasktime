@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "tasktime",
+  "displayName": "TaskTime Pro",
+  "version": "0.1.0",
+  "description": "Use TaskTime Pro through its local MCP bridge for tasks, timers, expenses, invoices, reports, and safe app navigation after explicit pairing.",
+  "author": {
+    "name": "TaskTime Pro",
+    "url": "https://tasktime.pro"
+  },
+  "homepage": "https://tasktime.pro/agents/claude/",
+  "repository": "https://github.com/tasktimepro/tasktime",
+  "license": "MIT-0 AND AGPL-3.0-only",
+  "keywords": [
+    "tasktime",
+    "tasktimepro",
+    "claude-code",
+    "mcp",
+    "time-tracking",
+    "invoicing",
+    "expense-tracking",
+    "local-first",
+    "ai-agent"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

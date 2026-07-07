@@ -194,6 +194,8 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
             tools: 'https://tasktime.pro/agents/tools/',
             mcpToolsJson: 'https://tasktime.pro/agents/mcp-tools.json',
             skill: 'https://tasktime.pro/agents/skill.md',
+            claude: 'https://tasktime.pro/agents/claude/',
+            openClaw: 'https://tasktime.pro/agents/openclaw/',
             debugging: 'https://tasktime.pro/agents/debugging/',
         },
         bridge: {
@@ -204,6 +206,9 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
                 npmPackage: '@tasktimepro/agent-bridge',
                 officialMcpRegistryName: 'pro.tasktime/agent-bridge',
                 openClawBundlePackage: '@tasktimepro/openclaw',
+                claudeCodeMarketplace: 'tasktimepro',
+                claudeCodeMarketplaceRepository: 'tasktimepro/tasktime',
+                claudeCodePlugin: 'tasktime',
             },
             appSession: {
                 protocol: 'websocket',

@@ -46,9 +46,10 @@ const callToolExample = JSON.stringify({
         </p>
         <pre><code>tasktime-agent-bridge --app-url https://tasktime.pro</code></pre>
         <p>
-            The bridge binary package is <code>@tasktimepro/agent-bridge</code>. OpenClaw-compatible installs can use the
-            <code>@tasktimepro/openclaw</code> bundle, which contributes the TaskTime Pro skill and MCP server config. For
-            local development, point <code>--app-url</code> at the local app origin, usually
+            The bridge binary package is <code>@tasktimepro/agent-bridge</code>. Claude Code users can use the
+            <a href="/agents/claude/">TaskTime Pro Claude plugin</a>, and OpenClaw-compatible installs can use the
+            <code>@tasktimepro/openclaw</code> bundle. Both contribute TaskTime Pro skill guidance and MCP server config.
+            For local development, point <code>--app-url</code> at the local app origin, usually
             <code>http://localhost:3101</code>. The bridge prints a launch URL for
             <code>/account?section=agent</code> with the endpoint, pairing ID, and pairing code already filled in.
         </p>
