@@ -3,9 +3,9 @@ name: tasktime
 description: >-
   Operate local-first TaskTime Pro through its MCP bridge for task planning,
   client work, time tracking, expenses, invoices, quotes, reports, planner notes,
-  backups, and app navigation. Use for same-device setup, pairing recovery, tool
-  selection, and approval-gated workflows. Do not use for unrelated tasktime CLI timers.
-version: 1.0.2
+  backups, app navigation, same-device setup, pairing recovery, tool selection,
+  and approval-gated workflows.
+version: 1.0.3
 metadata:
   openclaw:
     requires:
@@ -24,7 +24,7 @@ metadata:
 
 Use this skill when a user asks you to work with TaskTime Pro through its local agent bridge: plan or update work, manage tasks and clients, track time, prepare invoice data, inspect reports, handle expenses, open app review screens, or recover agent setup.
 
-Do not use this skill for generic time trackers, the unrelated `tasktime` CLI timer, or direct edits to browser storage, Yjs documents, Google Drive sync files, invoice records, or billing state.
+Stay on the supported TaskTime Pro bridge surface. Do not directly edit browser storage, Yjs documents, Google Drive sync files, invoice records, billing state, or other persisted app data outside TaskTime Pro tools.
 
 ## Skill Scope
 
