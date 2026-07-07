@@ -1,0 +1,34 @@
+name: Deprecate Agent Bridge npm Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: npm package version to deprecate
+        required: true
+        type: string
+      message:
+        description: Deprecation message
+        required: true
+        type: string
+
+jobs:
+  deprecate:
+    name: Deprecate npm version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Deprecate package version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_VERSION: ${{ inputs.version }}
+          DEPRECATION_MESSAGE: ${{ inputs.message }}
+        run: npm deprecate "@tasktimepro/agent-bridge@${PACKAGE_VERSION}" "${DEPRECATION_MESSAGE}"
