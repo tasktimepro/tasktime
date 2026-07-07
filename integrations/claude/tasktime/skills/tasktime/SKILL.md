@@ -24,7 +24,7 @@ TaskTime Pro is local-first. The paired browser app is the authority for custome
 Install from the TaskTime Pro Claude marketplace:
 
 ```text
-/plugin marketplace add tasktimepro/tasktime
+/plugin marketplace add https://github.com/tasktimepro/tasktime
 /plugin install tasktime@tasktimepro
 ```
 

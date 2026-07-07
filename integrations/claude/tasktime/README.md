@@ -9,7 +9,7 @@ TaskTime Pro remains local-first. The plugin launches the same-device TaskTime P
 Add the TaskTime Pro marketplace in Claude Code:
 
 ```text
-/plugin marketplace add tasktimepro/tasktime
+/plugin marketplace add https://github.com/tasktimepro/tasktime
 ```
 
 Install the plugin:

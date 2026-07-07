@@ -6881,7 +6881,7 @@ function bl() {
         officialMcpRegistryName: "pro.tasktime/agent-bridge",
         openClawBundlePackage: "@tasktimepro/openclaw",
         claudeCodeMarketplace: "tasktimepro",
-        claudeCodeMarketplaceRepository: "tasktimepro/tasktime",
+        claudeCodeMarketplaceRepository: "https://github.com/tasktimepro/tasktime",
         claudeCodePlugin: "tasktime"
       },
       appSession: {

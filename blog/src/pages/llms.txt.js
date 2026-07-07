@@ -29,7 +29,7 @@ export function GET() {
         'TaskTime Pro supports same-device AI agent workflows through the packaged `tasktime-agent-bridge` MCP stdio server.',
         'The bridge is local-first: it requires a running paired TaskTime Pro browser app session, does not write IndexedDB or Yjs directly, and does not create a remote control channel.',
         'The browser app remains the mutation owner for tasks, timers, expenses, invoices, reports, exports, sync settings, account data, and navigation.',
-        'Claude Code users can install the TaskTime Pro plugin with `/plugin marketplace add tasktimepro/tasktime` and `/plugin install tasktime@tasktimepro`.',
+        'Claude Code users can install the TaskTime Pro plugin with `/plugin marketplace add https://github.com/tasktimepro/tasktime` and `/plugin install tasktime@tasktimepro`.',
         '',
         '## Preferred Agent Behavior',
         '',
