@@ -2,9 +2,10 @@
 
 ## Priority
 
-[ ] Check about indexing blog issues - ONGOING
+[ ] Fix time entries not showing issue - see screenshots
+[ ] Should we include Code of conduct and Privacy md files at the root of the public repo as well?
 
-[ ] Check about CI for public repo, should we add one or?
+[ ] Check about indexing blog issues - ONGOING
 
 [x] docs/todo/local-agent-bridge-proposal.md
     [x] Make sure this is full-parity with UI and that the agent can really do anything a user can do currently
@@ -26,11 +27,14 @@
 
 [ ] Merge Agents Kit so that we have a proper agent setup/scaffold
 
+
 ---
 
 ## Blog Posts
 
 - Always keep in mind trending words and most likely searched for words for better SEO reachability
+[ ] ...
+
 
 ---
 
@@ -38,6 +42,7 @@
 
 [ ] Task Templates - Create “global” tasks which are assigned a category/tag and these can be assigned to all projects for that category by default (or at a click of a button → import default tasks for this project category)
     [ ] This would be a button under projects page “Create task templates”, then when creating a new project, we can choose a task template to be added
+
 
 ---
 
@@ -47,6 +52,7 @@
     [ ] Also think about about whether currently billed items will become active again/undo billed state?
     [ ] If you cancel an invoice and there is no other future invoice, should the next one take the same sequential number or not?
     [ ] Really think about how an invoice cancellation is typically handled in a system like ours and make sure we do the minimal necessities but not overcomplicate things
+
 
 ---
 

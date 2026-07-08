@@ -16,7 +16,7 @@ const STATIC_ENTRIES = [
     },
     {
         pathname: '/privacy/',
-        lastmod: '2026-05-31',
+        lastmod: '2026-07-08',
         changefreq: 'monthly',
         priority: '0.4',
     },

@@ -11,6 +11,8 @@ TaskTime Pro is a production local-first app. Contributions should keep the app 
 - Do not add new dependencies unless the benefit is clear.
 - Do not commit secrets, provider account IDs, private worker code, deployment workflows, or internal runbooks.
 - Report security issues through the process in [SECURITY.md](./SECURITY.md), not public issues.
+- Follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) in issues, pull requests, discussions, package listings, and other project spaces.
+- Follow [PRIVACY.md](./PRIVACY.md) when sharing logs, screenshots, examples, agent outputs, or bug reports.
 
 ## Development
 

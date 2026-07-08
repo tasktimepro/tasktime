@@ -5,7 +5,7 @@ import {
     parseStoredDate,
     toStorageDate
 } from '../utils/dateUtils';
-import { addDays, endOfMonth, startOfMonth, subDays, subMonths } from 'date-fns';
+import { addDays, endOfDay, endOfMonth, startOfMonth, subDays, subMonths } from 'date-fns';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
@@ -590,11 +590,13 @@ const Dashboard = ({
     const dashboardTimeEntries = useMemo(() => {
         const todayDate = parseStoredDate(todayStr);
         const rangeStart = todayDate ? subDays(todayDate, 29) : null;
+        const rangeEnd = todayDate ? endOfDay(todayDate) : null;
 
         return timeEntries
             .map((entry) => {
                 const task = tasksById.get(entry.taskId) || null;
-                const project = task?.projectId ? projectsById.get(task.projectId) || null : null;
+                const projectId = task?.projectId || entry.projectId || null;
+                const project = projectId ? projectsById.get(projectId) || null : null;
 
                 return {
                     ...entry,
@@ -607,8 +609,8 @@ const Dashboard = ({
                     const entryDateValue = typeof entry.end === 'number' ? entry.end : entry.start;
                     const entryDate = new Date(entryDateValue);
 
-                    if (todayDate && rangeStart) {
-                        return entryDate >= rangeStart && entryDate <= todayDate;
+                    if (rangeStart && rangeEnd) {
+                        return entryDate >= rangeStart && entryDate <= rangeEnd;
                     }
 
                     return true;
@@ -622,8 +624,8 @@ const Dashboard = ({
                     return false;
                 }
 
-                if (todayDate && rangeStart) {
-                    return entryDate >= rangeStart && entryDate <= todayDate;
+                if (rangeStart && rangeEnd) {
+                    return entryDate >= rangeStart && entryDate <= rangeEnd;
                 }
 
                 return true;

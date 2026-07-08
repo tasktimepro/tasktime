@@ -116,7 +116,11 @@ This repository contains the public app, public site, tests, agent bridge, and O
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development expectations, compatibility rules, and pull request guidance.
 
+All contributors are expected to follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+
 For security issues, see [SECURITY.md](./SECURITY.md).
+
+For privacy expectations, see [PRIVACY.md](./PRIVACY.md) and the canonical product policy at https://tasktime.pro/privacy/.
 
 ## License
 

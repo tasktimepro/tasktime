@@ -411,6 +411,7 @@ describe('Dashboard', () => {
 
         expect(screen.getByText('Design sprint')).toBeInTheDocument();
         expect(screen.getByText('Invoice review')).toBeInTheDocument();
+        expect(screen.getByText('Bug bash')).toBeInTheDocument();
         expect(screen.getByText('Invoice follow-up')).toBeInTheDocument();
         expect(screen.getByText('Hosting')).toBeInTheDocument();
         expect(screen.getByText('Email delivery')).toBeInTheDocument();

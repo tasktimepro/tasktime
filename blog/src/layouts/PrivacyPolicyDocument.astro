@@ -2,20 +2,20 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/privacy' } = Astro.props;
-const LAST_UPDATED = '31 May 2026';
-const LAST_UPDATED_ISO = '2026-05-31';
+const LAST_UPDATED = '8 July 2026';
+const LAST_UPDATED_ISO = '2026-07-08';
 ---
 
 <PublicPageLayout
     pageKey="privacy"
     title="Privacy Policy"
-    summary="TaskTime Pro is a local-first app. Your data lives in your browser and, if you choose, in your own Google Drive. We cannot see it, we do not collect it, and optional services are designed to avoid storing personal app data."
+    summary="TaskTime Pro is a local-first app. Your work data lives in your browser and, if you choose, in your own Google Drive. Optional services are designed to avoid storing personal app data."
     lastUpdated={LAST_UPDATED}
     lastUpdatedIso={LAST_UPDATED_ISO}
     highlights={[
-        'Your data never touches our servers. It stays in your browser and your own Google Drive.',
+        'Your app records stay in your browser and, if you choose, your own Google Drive.',
         'We cannot read your projects, tasks, invoices, expenses, or anything else you put in the app.',
-        'No cookies, no tracking.',
+        'No advertising cookies, tracking pixels, or cross-site ad tracking.',
     ]}
     canonicalPath={canonicalPath}
 >
@@ -43,12 +43,12 @@ const LAST_UPDATED_ISO = '2026-05-31';
     </section>
 
     <section>
-        <h2>3. No cookies, no tracking</h2>
+        <h2>3. No advertising cookies or cross-site tracking</h2>
         <p>
             TaskTime Pro does not use cookies, advertising pixels, or any form of cross-site tracking. The app uses your browser&apos;s local storage (localStorage and IndexedDB) only to keep your workspace available and to remember your preferences.
         </p>
         <p>
-            The app does send anonymous, aggregate usage counters &mdash; things like &ldquo;a session happened today&rdquo; or &ldquo;N tasks were created.&rdquo; These are plain numeric tallies with no content, no identifiers, and no way to reconstruct what you were working on. They help us understand whether features are being used at all.
+            The production app may send limited aggregate usage counters &mdash; things like &ldquo;a session happened today&rdquo; or &ldquo;N tasks were created.&rdquo; These are plain numeric tallies with no project names, task names, client names, invoice data, notes, email bodies, Drive file contents, or raw user records. They help us understand whether features are being used at all.
         </p>
     </section>
 
@@ -67,7 +67,7 @@ const LAST_UPDATED_ISO = '2026-05-31';
             If you enable system reminders, TaskTime Pro stores only the browser push subscription needed for delivery and generic reminder timestamps. We do not store task names, expense details, notes, amounts, client or project names, or other personal app data for this service. Turning reminders off removes the device subscription and cancels future scheduled reminders.
         </p>
         <p>
-            That is the complete list. There is no user database, no email list, and no third-party analytics.
+            Runtime diagnostics may also be captured when configured, as described below. There is no user database, no email list, and no advertising analytics.
         </p>
     </section>
 
@@ -82,28 +82,38 @@ const LAST_UPDATED_ISO = '2026-05-31';
     </section>
 
     <section>
-        <h2>6. Data retention</h2>
+        <h2>6. Runtime diagnostics</h2>
+        <p>
+            TaskTime Pro may use DebugBundle or similar diagnostic tooling for production runtime failures when configured. Diagnostics are for investigating crashes, sync failures, email delivery failures, PDF generation failures, and other operational incidents.
+        </p>
+        <p>
+            Diagnostics may include error messages, stack traces, environment labels, app service names, source filenames, line numbers, and limited incident metadata. They are not intended to include your projects, tasks, invoices, expenses, notes, Drive file contents, or other private app records.
+        </p>
+    </section>
+
+    <section>
+        <h2>7. Data retention</h2>
         <p>
             Your local data stays on your device until you delete it or clear your browser storage. Synced copies stay in your Google Drive until you delete them there. The encrypted session token is kept only while your sync connection is active.
         </p>
     </section>
 
     <section>
-        <h2>7. Security</h2>
+        <h2>8. Security</h2>
         <p>
             Because your data lives in your browser and your own Google Drive, its security depends on your device, your browser, and your Google account. We cannot guarantee the security of those systems, but we have deliberately chosen an architecture that keeps your data out of our hands entirely.
         </p>
     </section>
 
     <section>
-        <h2>8. You are in control</h2>
+        <h2>9. You are in control</h2>
         <p>
             You can export your data at any time for backup. You can connect or disconnect Google Drive sync whenever you want. You can delete all local data from the Account page. Because we never have your data in the first place, there is nothing for us to delete on our end.
         </p>
     </section>
 
     <section>
-        <h2>9. Changes to this policy</h2>
+        <h2>10. Changes to this policy</h2>
         <p>
             This policy may be updated as TaskTime Pro evolves. The current version will always be posted here with the date it was last changed.
         </p>
