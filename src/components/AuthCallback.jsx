@@ -72,8 +72,8 @@ export const AuthCallback = () => {
     return (
         <div className="app-viewport-shell flex items-center justify-center">
             <div className="text-center">
-                <Spinner className="mx-auto mb-4 h-8 w-8 text-gray-900" />
-                <p className="text-gray-600">Completing authentication...</p>
+                <Spinner className="mx-auto mb-4 h-8 w-8 text-foreground" />
+                <p className="text-muted-foreground">Completing authentication...</p>
             </div>
         </div>
     );

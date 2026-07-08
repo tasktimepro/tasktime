@@ -9,6 +9,7 @@ const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const updatePreferencesMock = vi.hoisted(() => vi.fn())
 const setDriveSyncPreferencesMock = vi.hoisted(() => vi.fn())
+const storeIsDriveConnectedMock = vi.hoisted(() => vi.fn())
 const wipeDriveDataMock = vi.hoisted(() => vi.fn())
 const deleteAllBackupsMock = vi.hoisted(() => vi.fn())
 const yjsSyncSettingsMocks = vi.hoisted(() => ({
@@ -31,7 +32,10 @@ let consoleErrorSpy
 
 vi.mock('@/contexts/YjsContext', () => ({
     useYjs: () => ({
-        store: { setDriveSyncPreferences: setDriveSyncPreferencesMock },
+        store: {
+            isDriveConnected: storeIsDriveConnectedMock,
+            setDriveSyncPreferences: setDriveSyncPreferencesMock,
+        },
         isReady: true,
         isSyncing: false,
         syncState: yjsSyncSettingsMocks.syncState,
@@ -107,6 +111,7 @@ describe('YjsSyncSettings', () => {
         yjsSyncSettingsMocks.syncPhase = 'idle'
         yjsSyncSettingsMocks.autoSyncEnabled = false
         yjsSyncSettingsMocks.autoSyncMode = 'sync'
+        storeIsDriveConnectedMock.mockReturnValue(false)
         wipeDriveDataMock.mockResolvedValue(undefined)
         deleteAllBackupsMock.mockResolvedValue(undefined)
         yjsSyncSettingsMocks.signOut.mockResolvedValue(undefined)
@@ -126,6 +131,20 @@ describe('YjsSyncSettings', () => {
 
         expect(showErrorMock).toHaveBeenCalledWith('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
         expect(showSuccessMock).not.toHaveBeenCalled()
+    })
+
+    it('does not show a stale connect error after Drive is already connected', async () => {
+        signInMock.mockImplementationOnce(async () => {
+            storeIsDriveConnectedMock.mockReturnValue(true)
+            throw new Error('Google sign-in could not be completed because the session no longer matched. Please try connecting again.')
+        })
+
+        render(<YjsSyncSettings />)
+
+        await userEvent.click(screen.getByRole('button', { name: /connect google drive/i }))
+
+        expect(showErrorMock).not.toHaveBeenCalled()
+        expect(consoleErrorSpy).not.toHaveBeenCalled()
     })
 
     it('uses a full-width action row for disconnect and sync on mobile', () => {

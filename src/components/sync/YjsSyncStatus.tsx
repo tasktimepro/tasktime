@@ -29,7 +29,7 @@ const TooltipContentComponent = TooltipContent as unknown as ComponentType<{
 
 export default function YjsSyncStatus({ className = '', isCompact = false, onActionComplete }: YjsSyncStatusProps) {
 
-    const { isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled, autoSyncMode, lastSyncedAt } = useYjs();
+    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled, autoSyncMode, lastSyncedAt } = useYjs();
     const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
     const { showError } = useToast();
     const { navigateToAccount } = useUrlState();
@@ -138,6 +138,11 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
             await status.onClick();
             onActionComplete?.();
         } catch (error) {
+            if (store.isDriveConnected()) {
+                onActionComplete?.();
+                return;
+            }
+
             console.error('[YjsSyncStatus] Status action failed:', error);
             showError(error instanceof Error ? error.message : 'Google Drive action failed.');
         }

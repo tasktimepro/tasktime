@@ -2,6 +2,7 @@ import * as Y from 'yjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const STORAGE_KEY = 'tasktime-disconnected-dirty-docs'
+const SYNC_STATE_STORAGE_KEY = 'tasktime-sync-state'
 
 const { docs, providerInstances, storage, providerMockState, deletedDatabaseCalls } = vi.hoisted(() => ({
     docs: new Map(),
@@ -196,6 +197,30 @@ describe('YjsStore reconnect sync tracking', () => {
         store.destroy()
     })
 
+    it('allows manual-mode bootstrap when empty local docs only have stale sync markers', async () => {
+        storage.set(STORAGE_KEY, JSON.stringify(['core']))
+        storage.set(SYNC_STATE_STORAGE_KEY, JSON.stringify({
+            hasPendingChanges: true,
+            syncInterrupted: false,
+            syncStartedAt: null,
+            lastSyncCompletedAt: null,
+        }))
+
+        const store = new YjsStore()
+        await store.initialize()
+
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+
+        expect(provider.connect).toHaveBeenCalledWith('manual', { bootstrapPullIfPristine: true })
+        expect(provider.markDocsForFullStateUpload).not.toHaveBeenCalled()
+        expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+        expect(localStorage.getItem(SYNC_STATE_STORAGE_KEY)).toBeUndefined()
+
+        store.destroy()
+    })
+
     it('keeps disconnected dirty docs queued when reconnect leaves provider work pending', async () => {
         const store = new YjsStore()
         await store.initialize()
@@ -382,6 +407,12 @@ describe('YjsStore reconnect sync tracking', () => {
         const store = new YjsStore()
         await store.initialize()
 
+        storage.set(SYNC_STATE_STORAGE_KEY, JSON.stringify({
+            hasPendingChanges: true,
+            syncInterrupted: true,
+            syncStartedAt: Date.now(),
+            lastSyncCompletedAt: null,
+        }))
         docs.set('entries-2019', new Y.Doc())
         docs.set('entries-2035', new Y.Doc())
 
@@ -394,6 +425,7 @@ describe('YjsStore reconnect sync tracking', () => {
             'entries-2019',
             'entries-2035',
         ]))
+        expect(localStorage.getItem(SYNC_STATE_STORAGE_KEY)).toBeUndefined()
     })
 })
 

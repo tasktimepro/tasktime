@@ -22,6 +22,7 @@ import { parseStoredDate } from '@/utils/dateUtils';
 import { getTaskIdsWithDescendants } from '@/utils/taskUtils';
 import { readEntity, objectToYMap, collectEntities, forEachEntity } from './entityUtils';
 import { validateCollectionEntity } from './validation';
+import { clearSyncPersistence } from '@/utils/syncPersistence';
 import type {
     BusinessBrandAsset,
     DocName,
@@ -785,7 +786,14 @@ export class YjsStore {
         this.driveProvider = new YjsDriveProvider(this.docManager, accessToken, sessionId);
         this.driveProvider.setSyncMode(this.driveSyncMode);
 
-        const disconnectedDirtyDocs = this.getDisconnectedDirtyDocs();
+        const bootstrapPullIfPristine = this.driveSyncMode === 'manual' && this.shouldBootstrapRemotePullOnManualConnect();
+
+        if (bootstrapPullIfPristine) {
+            this.clearDisconnectedDirtyDocs();
+            clearSyncPersistence();
+        }
+
+        const disconnectedDirtyDocs = bootstrapPullIfPristine ? [] : this.getDisconnectedDirtyDocs();
         if (disconnectedDirtyDocs.length > 0) {
             this.driveProvider.markDocsForFullStateUpload(disconnectedDirtyDocs);
         }
@@ -808,8 +816,6 @@ export class YjsStore {
             const frequencyHours = (this.preferences.get('backupFrequencyHours') as number) ?? 24;
             this.backupManager.maybeCreateBackup(frequencyHours).catch(console.error);
         });
-
-        const bootstrapPullIfPristine = this.driveSyncMode === 'manual' && this.shouldBootstrapRemotePullOnManualConnect();
 
         await this.driveProvider.connect(this.driveSyncMode, {
             bootstrapPullIfPristine,
@@ -1335,6 +1341,7 @@ export class YjsStore {
         this._archivedExpensesLoading = null;
         this.disconnectedDirtyDocHandlers.clear();
         this.clearDisconnectedDirtyDocs();
+        clearSyncPersistence();
         this._isReady = false;
 
         console.log('[YjsStore] All data cleared');
@@ -1440,10 +1447,6 @@ export class YjsStore {
     }
 
     private shouldBootstrapRemotePullOnManualConnect(): boolean {
-        if (this.disconnectedDirtyDocs.size > 0) {
-            return false;
-        }
-
         return !this.docManager.getLoadedDocs().some((docName) => this.docHasMeaningfulLocalData(docName));
     }
 

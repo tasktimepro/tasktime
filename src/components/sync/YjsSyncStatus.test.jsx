@@ -11,6 +11,9 @@ const showErrorMock = vi.hoisted(() => vi.fn())
 const navigateToAccountMock = vi.hoisted(() => vi.fn())
 const forceSyncDriveMock = vi.hoisted(() => vi.fn())
 const yjsState = vi.hoisted(() => ({
+    store: {
+        isDriveConnected: vi.fn(),
+    },
     isReady: true,
     isSyncing: false,
     syncState: 'idle',
@@ -67,6 +70,7 @@ describe('YjsSyncStatus', () => {
         yjsState.autoSyncEnabled = true
         yjsState.autoSyncMode = 'sync'
         yjsState.lastSyncedAt = null
+        yjsState.store.isDriveConnected.mockReturnValue(false)
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
 
@@ -83,6 +87,20 @@ describe('YjsSyncStatus', () => {
 
         expect(showErrorMock).toHaveBeenCalledWith('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
         expect(navigateToAccountMock).not.toHaveBeenCalled()
+    })
+
+    it('does not show a stale connect error after Drive is already connected', async () => {
+        signInMock.mockImplementationOnce(async () => {
+            yjsState.store.isDriveConnected.mockReturnValue(true)
+            throw new Error('Google sign-in could not be completed because the session no longer matched. Please try connecting again.')
+        })
+
+        render(<YjsSyncStatus />)
+
+        await userEvent.click(screen.getByRole('button', { name: /reconnect to drive/i }))
+
+        expect(showErrorMock).not.toHaveBeenCalled()
+        expect(consoleErrorSpy).not.toHaveBeenCalled()
     })
 
     it('uses a full manual sync when pending changes are clicked', async () => {

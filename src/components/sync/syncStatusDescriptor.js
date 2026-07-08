@@ -5,12 +5,12 @@
  */
 
 import {
+    CloudBackupIcon,
     CloudCheckIcon,
     CloudCogIcon,
     CloudIcon,
     CloudOffIcon,
     CloudSyncIcon,
-    CloudUploadIcon,
     ExclamationTriangleIcon,
 } from '@/components/ui/icons';
 
@@ -179,7 +179,7 @@ export function getYjsSyncStatusDescriptor({
         return {
             kind: SYNC_STATUS_KIND.PENDING,
             text: 'Sync changes',
-            icon: CloudUploadIcon,
+            icon: CloudBackupIcon,
             tone: 'status-warning-text-strong',
             onClick: onManualSync,
         };

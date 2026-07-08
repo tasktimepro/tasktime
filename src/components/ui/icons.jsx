@@ -18,6 +18,7 @@ export {
     Check as CheckIcon,
     CheckSquare as CheckSquareIcon,
     Cloud as CloudIcon,
+    CloudBackup as CloudBackupIcon,
     CloudCheck as CloudCheckIcon,
     CloudDownload as CloudDownloadIcon,
     CloudOff as CloudOffIcon,

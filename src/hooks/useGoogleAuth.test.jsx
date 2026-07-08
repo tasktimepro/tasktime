@@ -275,6 +275,65 @@ describe('useGoogleAuth', () => {
         }))
     })
 
+    it('does not hide auth init network failures just because a stored session appears later', async () => {
+        getStoredSession
+            .mockResolvedValueOnce(null)
+            .mockResolvedValue({
+                sessionId: 'session-existing',
+                userId: 'user-existing',
+                email: 'existing@example.com',
+                createdAt: new Date().toISOString(),
+            })
+        fetch.mockRejectedValue(new TypeError('Failed to fetch'))
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let thrownError
+        let signInPromise
+
+        vi.useFakeTimers()
+
+        act(() => {
+            signInPromise = result.current.signIn().catch(error => {
+                thrownError = error
+            })
+        })
+
+        await act(async () => {
+            await Promise.resolve()
+        })
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500)
+        })
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(1500)
+        })
+
+        await act(async () => {
+            await signInPromise
+        })
+
+        expect(thrownError).toBeInstanceOf(Error)
+        expect(thrownError.message).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
+        expect(result.current.isSignedIn).toBe(false)
+        expect(result.current.error).toBe('Unable to reach the Google Drive sync service at https://worker.example. Check VITE_SYNC_WORKER_URL and any local DNS or hosts overrides, then try again.')
+        expect(getStoredSession).toHaveBeenCalledTimes(1)
+        expect(fetch).toHaveBeenCalledTimes(3)
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'auth.sign_in_failed',
+            context: expect.objectContaining({
+                step: 'auth-init',
+                workerOrigin: 'https://worker.example',
+            }),
+        }))
+    })
+
     it('surfaces worker callback details when the auth exchange fails', async () => {
         getStoredSession.mockResolvedValue(null)
 
@@ -596,6 +655,188 @@ describe('useGoogleAuth', () => {
 
         expect(result.current.isSignedIn).toBe(true)
         expect(closedReadCount).toBe(1)
+    })
+
+    it('releases the connect loading state when the auth popup is closed after Google navigation', async () => {
+        getStoredSession.mockResolvedValue(null)
+
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                state: 'oauth-state',
+            }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        vi.useFakeTimers()
+
+        let thrownError
+        let signInPromise
+
+        act(() => {
+            signInPromise = result.current.signIn().catch(error => {
+                thrownError = error
+            })
+        })
+
+        await act(async () => {
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+
+        popup.closed = true
+
+        act(() => {
+            window.dispatchEvent(new Event('focus'))
+        })
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(250)
+            await signInPromise
+        })
+
+        expect(thrownError).toBeInstanceOf(Error)
+        expect(thrownError.message).toBe('Authentication popup was closed before sign-in completed.')
+        expect(result.current.isLoading).toBe(false)
+        expect(result.current.error).toBe('Authentication popup was closed before sign-in completed.')
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'auth.sign_in_failed',
+        }))
+    })
+
+    it('shows a friendly retry message when the auth callback state does not match', async () => {
+        getStoredSession.mockResolvedValue(null)
+
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                state: 'oauth-state',
+            }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let thrownError
+
+        act(() => {
+            void result.current.signIn().catch(error => {
+                thrownError = error
+            })
+        })
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'auth-code',
+                    state: 'old-oauth-state',
+                },
+            }))
+        })
+
+        await waitFor(() => {
+            expect(thrownError).toBeInstanceOf(Error)
+        })
+
+        expect(thrownError.message).toBe('Google sign-in could not be completed because the session no longer matched. Please try connecting again.')
+        expect(result.current.error).toBe('Google sign-in could not be completed because the session no longer matched. Please try connecting again.')
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'auth.sign_in_failed',
+        }))
+    })
+
+    it('does not surface a stale callback state error when another auth flow already stored a valid session', async () => {
+        getStoredSession
+            .mockResolvedValueOnce(null)
+            .mockResolvedValue({
+                sessionId: 'session-existing',
+                userId: 'user-existing',
+                email: 'existing@example.com',
+                createdAt: new Date().toISOString(),
+            })
+
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+
+        fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                    state: 'oauth-state',
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ authenticated: true }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let thrownError
+        let signInPromise
+
+        act(() => {
+            signInPromise = result.current.signIn().catch(error => {
+                thrownError = error
+            })
+        })
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'auth-code',
+                    state: 'old-oauth-state',
+                },
+            }))
+        })
+
+        await act(async () => {
+            await signInPromise
+        })
+
+        expect(thrownError).toBeUndefined()
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.sessionId).toBe('session-existing')
+        expect(result.current.user?.email).toBe('existing@example.com')
+        expect(result.current.error).toBeNull()
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'auth.sign_in_failed',
+        }))
     })
 
     it('does not capture a DebugBundle incident when the auth popup is blocked', async () => {

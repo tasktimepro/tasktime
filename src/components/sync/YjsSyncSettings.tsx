@@ -12,7 +12,7 @@ import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { usePreferences } from '@/hooks/usePreferences';
 import { useToast } from '@/hooks/useToast';
-import { ArrowPathIcon, CheckIcon, CloudIcon, CloudOffIcon, CloudSyncIcon, CloudDownloadIcon, CloudUploadIcon, ExclamationTriangleIcon, MoreHorizontalIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowPathIcon, CheckIcon, CloudBackupIcon, CloudIcon, CloudOffIcon, ExclamationTriangleIcon, MoreHorizontalIcon, TrashIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card as CardPrimitive, CardContent as CardContentPrimitive, CardHeader as CardHeaderPrimitive, CardTitle as CardTitlePrimitive } from '@/components/ui/card';
 import { Checkbox as CheckboxPrimitive } from '@/components/ui/checkbox';
@@ -202,7 +202,7 @@ export default function YjsSyncSettings() {
             return {
                 text: 'Changes waiting for manual sync',
                 tone: 'status-warning-text-strong',
-                icon: CloudUploadIcon,
+                icon: CloudBackupIcon,
             };
         }
 
@@ -230,6 +230,10 @@ export default function YjsSyncSettings() {
         try {
             await signIn();
         } catch (error) {
+            if (store.isDriveConnected()) {
+                return;
+            }
+
             console.error('[YjsSyncSettings] Connect failed:', error);
             showError(error instanceof Error ? error.message : 'Google Drive action failed.');
         }

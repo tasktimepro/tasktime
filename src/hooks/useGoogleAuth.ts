@@ -34,9 +34,13 @@ interface AuthState {
 type ValidateWorkerSession = (session: StoredSession) => Promise<boolean>;
 type SignOutFromWorker = (options?: { revoke?: boolean }) => Promise<void>;
 const SIGN_IN_CAPACITY_EXCEEDED_ERROR = 'Google Drive sign-in is temporarily unavailable because the sync service reached its daily sign-in limit. Please try again tomorrow.';
+const AUTH_POPUP_CLOSED_ERROR = 'Authentication popup was closed before sign-in completed.';
+const AUTH_STATE_MISMATCH_ERROR = 'Google sign-in could not be completed because the session no longer matched. Please try connecting again.';
+const AUTH_TIMED_OUT_ERROR = 'Authentication timed out. Please try again.';
 const AUTH_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
 const AUTH_CONFIG_INCIDENT_THROTTLE_MS = 60 * 60 * 1000;
 const AUTH_INIT_RETRY_DELAYS_MS = [500, 1500];
+const AUTH_POPUP_CLOSE_CHECK_DELAY_MS = 250;
 
 const HAD_PREVIOUS_SESSION_KEY = 'google-auth-had-previous-session';
 
@@ -166,9 +170,17 @@ function shouldCaptureSignInIncident(error: Error): boolean {
     return !(
         message === 'Failed to open auth popup. Check popup blocker settings.' ||
         message === 'Authentication popup was closed before Google sign-in could start.' ||
-        message === 'Authentication popup was closed before sign-in completed.' ||
-        message === 'Authentication timed out. Please try again.'
+        message === AUTH_POPUP_CLOSED_ERROR ||
+        message === AUTH_STATE_MISMATCH_ERROR ||
+        message === AUTH_TIMED_OUT_ERROR
     );
+}
+
+function shouldSilentlyRestoreExistingSessionAfterAuthError(error: Error): boolean {
+
+    return error.message === AUTH_STATE_MISMATCH_ERROR ||
+        error.message === AUTH_POPUP_CLOSED_ERROR ||
+        error.message === AUTH_TIMED_OUT_ERROR;
 }
 
 function isRetryableAuthInitError(error: unknown): boolean {
@@ -449,13 +461,41 @@ export const useGoogleAuth = () => {
 
             forceReconnectState = false;
             writeHadPreviousSessionFlag(true);
+            clearPendingAuthState();
 
             notifyAuthSubscribers();
 
         } catch (error) {
             closeAuthPopup(popup);
+            clearPendingAuthState();
 
             const authError = toAuthError(error, SYNC_WORKER_CONFIG.endpoints.authInit);
+
+            if (shouldSilentlyRestoreExistingSessionAfterAuthError(authError)) {
+                const existingSession = await getStoredSession();
+
+                if (existingSession) {
+                    const isValidExistingSession = await validateWorkerSession(existingSession);
+
+                    if (isValidExistingSession) {
+                        setState({
+                            isSignedIn: true,
+                            isLoading: false,
+                            user: { id: existingSession.userId, email: existingSession.email },
+                            accessToken: null,
+                            sessionId: existingSession.sessionId,
+                            error: null,
+                            hadPreviousSession: true,
+                        });
+
+                        forceReconnectState = false;
+                        writeHadPreviousSessionFlag(true);
+
+                        notifyAuthSubscribers();
+                        return;
+                    }
+                }
+            }
 
             setState(prev => ({
                 ...prev,
@@ -724,6 +764,8 @@ function renderPendingAuthPopup(popup: Window): void {
         const viewport = popupDocument.createElement('meta');
         const title = popupDocument.createElement('title');
         const style = popupDocument.createElement('style');
+        const container = popupDocument.createElement('main');
+        const spinner = popupDocument.createElement('div');
         const message = popupDocument.createElement('p');
 
         popupDocument.documentElement.lang = 'en';
@@ -734,6 +776,10 @@ function renderPendingAuthPopup(popup: Window): void {
         title.textContent = 'Connecting Google Drive...';
 
         style.textContent = `
+            :root {
+                color-scheme: ${popupTheme.colorScheme};
+            }
+
             body {
                 margin: 0;
                 min-height: 100vh;
@@ -745,17 +791,45 @@ function renderPendingAuthPopup(popup: Window): void {
                 color: ${popupTheme.foreground};
             }
 
-            p {
-                margin: 0;
+            main {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
                 padding: 24px;
                 text-align: center;
             }
+
+            .spinner {
+                width: 32px;
+                height: 32px;
+                margin-bottom: 16px;
+                border: 3px solid ${popupTheme.spinnerTrack};
+                border-top-color: currentColor;
+                border-radius: 9999px;
+                animation: spin 0.8s linear infinite;
+            }
+
+            p {
+                margin: 0;
+                font-size: 14px;
+                color: ${popupTheme.mutedForeground};
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
         `;
 
-        message.textContent = 'Opening Google sign-in...';
+        spinner.className = 'spinner';
+        message.dataset.authMessage = 'true';
+        message.textContent = 'Connecting to Google...';
+        container.replaceChildren(spinner, message);
 
         popupDocument.head.replaceChildren(viewport, title, style);
-        popupDocument.body.replaceChildren(message);
+        popupDocument.body.replaceChildren(container);
     } catch {
         // Ignore cross-browser document access failures for blank popups.
     }
@@ -768,7 +842,7 @@ function updatePendingAuthPopupMessage(popup: Window | null, text: string): void
     }
 
     try {
-        const message = popup.document.body.querySelector('p');
+        const message = popup.document.body.querySelector('[data-auth-message="true"]');
         if (message) {
             message.textContent = text;
         }
@@ -777,28 +851,51 @@ function updatePendingAuthPopupMessage(popup: Window | null, text: string): void
     }
 }
 
-function resolvePendingAuthPopupTheme(): { background: string; foreground: string } {
+function clearPendingAuthState(): void {
+
+    try {
+        sessionStorage.removeItem('google_auth_state');
+    } catch {
+        // Ignore storage failures.
+    }
+}
+
+function resolvePendingAuthPopupTheme(): { background: string; foreground: string; mutedForeground: string; spinnerTrack: string; colorScheme: 'light' | 'dark' } {
 
     const darkModeActive = document.documentElement.classList.contains('dark');
     const sourceElement = document.body ?? document.documentElement;
     const sourceStyles = window.getComputedStyle(sourceElement);
     const background = sourceStyles.backgroundColor;
     const foreground = sourceStyles.color;
+    const mutedForeground = darkModeActive ? 'rgb(163, 163, 163)' : 'rgb(82, 82, 82)';
+    const spinnerTrack = darkModeActive ? 'rgba(250, 250, 250, 0.24)' : 'rgba(10, 10, 10, 0.18)';
 
     if (background && foreground) {
-        return { background, foreground };
+        return {
+            background,
+            foreground,
+            mutedForeground,
+            spinnerTrack,
+            colorScheme: darkModeActive ? 'dark' : 'light',
+        };
     }
 
     if (darkModeActive) {
         return {
             background: 'rgb(10, 10, 10)',
             foreground: 'rgb(250, 250, 250)',
+            mutedForeground,
+            spinnerTrack,
+            colorScheme: 'dark',
         };
     }
 
     return {
         background: 'rgb(254, 254, 254)',
         foreground: 'rgb(10, 10, 10)',
+        mutedForeground,
+        spinnerTrack,
+        colorScheme: 'light',
     };
 }
 
@@ -818,14 +915,17 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
 
         let settled = false;
         let broadcastChannel: BroadcastChannel | null = null;
-
-        // Do not poll popup.closed once the window has navigated to Google.
-        // COOP can sever or warn on that reference, and the callback page
-        // already communicates completion via postMessage/BroadcastChannel.
+        let closeCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
         const cleanup = () => {
             window.removeEventListener('message', handleMessage);
+            window.removeEventListener('focus', schedulePopupClosedCheck);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             clearTimeout(timeoutId);
+            if (closeCheckTimeoutId) {
+                clearTimeout(closeCheckTimeoutId);
+                closeCheckTimeoutId = null;
+            }
             if (broadcastChannel) {
                 try { broadcastChannel.close(); } catch { /* ignore */ }
                 broadcastChannel = null;
@@ -836,7 +936,7 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
             cleanup();
             if (!settled) {
                 settled = true;
-                reject(new Error('Authentication timed out. Please try again.'));
+                reject(new Error(AUTH_TIMED_OUT_ERROR));
             }
         }, 120000);
 
@@ -855,13 +955,49 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
 
             if (state !== expectedState) {
                 settled = true;
-                reject(new Error('Invalid auth state - possible CSRF attack'));
+                reject(new Error(AUTH_STATE_MISMATCH_ERROR));
                 return;
             }
 
             settled = true;
             resolve(code as string);
         };
+
+        const checkPopupClosed = () => {
+            closeCheckTimeoutId = null;
+
+            if (settled) {
+                return;
+            }
+
+            try {
+                if (!popup.closed) {
+                    return;
+                }
+            } catch {
+                // COOP can make popup.closed unreliable after Google navigation.
+                // If the browser blocks the check, keep waiting for the callback.
+                return;
+            }
+
+            cleanup();
+            settled = true;
+            reject(new Error(AUTH_POPUP_CLOSED_ERROR));
+        };
+
+        function schedulePopupClosedCheck() {
+            if (settled || closeCheckTimeoutId) {
+                return;
+            }
+
+            closeCheckTimeoutId = setTimeout(checkPopupClosed, AUTH_POPUP_CLOSE_CHECK_DELAY_MS);
+        }
+
+        function handleVisibilityChange() {
+            if (document.visibilityState === 'visible') {
+                schedulePopupClosedCheck();
+            }
+        }
 
         const handleMessage = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
@@ -870,6 +1006,8 @@ function waitForAuthCallback(popup: Window, expectedState: string): Promise<stri
         };
 
         window.addEventListener('message', handleMessage);
+        window.addEventListener('focus', schedulePopupClosedCheck);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         // BroadcastChannel fallback: on mobile browsers, window.opener can be
         // lost after cross-origin Google OAuth redirects, so postMessage never
