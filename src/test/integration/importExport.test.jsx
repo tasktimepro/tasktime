@@ -255,14 +255,58 @@ describe('Import/Export integration', () => {
         })
         await user.click(screen.getByRole('button', { name: 'Import Data' }))
 
-        expect(onImport).toHaveBeenCalledWith({
-            projects: payload.projects,
+        await waitFor(() => {
+            expect(onImport).toHaveBeenCalledWith({
+                projects: payload.projects,
+                tasks: [],
+                timeEntries: [],
+                invoices: [],
+                paymentMethods: [],
+                expenseCategories: payload.expenseCategories,
+                taxReturnPeriods: payload.taxReturnPeriods,
+                businessInfos: [],
+                businessBrandAssets: [],
+                clients: [],
+                invoiceTemplates: [],
+                emailTemplates: [],
+                expenses: [],
+                expenseRecurrences: [],
+                dailyGoals: [],
+                plannerAttachments: [],
+                preferences: payload.preferences
+            })
+        })
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog', { name: 'Import Data' })).not.toBeInTheDocument()
+        })
+    })
+
+    it('keeps the import dialog busy until async restore finishes', async () => {
+
+        const user = userEvent.setup()
+        let resolveImport
+        const onImport = vi.fn(() => new Promise((resolve) => {
+            resolveImport = resolve
+        }))
+
+        render(
+            <ExportImport
+                {...baseProps}
+                onImport={onImport}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Import' }))
+
+        const payload = {
+            version: BACKUP_VERSION,
+            projects: baseProps.projects,
             tasks: [],
             timeEntries: [],
             invoices: [],
             paymentMethods: [],
-            expenseCategories: payload.expenseCategories,
-            taxReturnPeriods: payload.taxReturnPeriods,
+            expenseCategories: [],
+            taxReturnPeriods: [],
             businessInfos: [],
             businessBrandAssets: [],
             clients: [],
@@ -272,9 +316,24 @@ describe('Import/Export integration', () => {
             expenseRecurrences: [],
             dailyGoals: [],
             plannerAttachments: [],
-            preferences: payload.preferences
+            preferences: {}
+        }
+
+        fireEvent.change(screen.getByLabelText('Or paste JSON data'), {
+            target: { value: JSON.stringify(payload) }
         })
-        expect(screen.queryByRole('dialog', { name: 'Import Data' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Import Data' }))
+
+        expect(screen.getByRole('dialog', { name: 'Import Data' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Importing...' })).toBeDisabled()
+
+        await act(async () => {
+            resolveImport()
+        })
+
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog', { name: 'Import Data' })).not.toBeInTheDocument()
+        })
     })
 
     it('shows error for invalid JSON', async () => {

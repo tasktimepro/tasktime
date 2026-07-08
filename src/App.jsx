@@ -492,7 +492,6 @@ function AppContent() {
     const [activeModal, setActiveModal] = useState(null);
     const [editingItem, setEditingItem] = useState(null);
     const [modalOptions, setModalOptions] = useState(null);
-    const [pendingImport, setPendingImport] = useState(null);
     const [taskViewState, setTaskViewState] = useState({
         isOpen: false,
         task: null,
@@ -1139,26 +1138,8 @@ function AppContent() {
     // === Import Handler ===
     const handleImport = async (importData) => {
         await clearAllData();
-        setPendingImport(importData);
+        await store.importBackupData(importData);
     };
-
-    useEffect(() => {
-        if (!pendingImport || !isReady) return;
-
-        (async () => {
-            try {
-                await store.importBackupData(pendingImport);
-                setPendingImport(null);
-            } catch (error) {
-                toast?.showError(error instanceof Error ? error.message : 'Import failed.');
-            }
-        })();
-    }, [
-        pendingImport,
-        isReady,
-        store,
-        toast,
-    ]);
 
     const [isMobileLayout, setIsMobileLayout] = useState(() => {
         if (typeof window === 'undefined' || !window.matchMedia) {

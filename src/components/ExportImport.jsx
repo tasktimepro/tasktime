@@ -55,6 +55,7 @@ function ExportImport({
     const [isExporting, setIsExporting] = useState(false);
     const [showExportTimerWarning, setShowExportTimerWarning] = useState(false);
     const [selectedImportFileName, setSelectedImportFileName] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef(null);
 
     const resetImportState = () => {
@@ -137,18 +138,20 @@ function ExportImport({
     /**
      * Parse and validate import data
      */
-    const handleImport = () => {
+    const handleImport = async () => {
         setImportError('');
         
         try {
             const { version: _version, exportDate: _exportDate, backupType: _backupType, ...backupImportData } = parseBackupImportJson(importData);
 
-            onImport(backupImportData);
-            setShowImportModal(false);
-            setImportData('');
+            setIsImporting(true);
+            await onImport(backupImportData);
+            resetImportState();
             
         } catch (error) {
-            setImportError(error.message);
+            setImportError(error instanceof Error ? error.message : 'Import failed.');
+        } finally {
+            setIsImporting(false);
         }
     };
 
@@ -174,6 +177,7 @@ function ExportImport({
             <Button
                 variant="secondary"
                 onClick={resetImportState}
+                disabled={isImporting}
             >
                 Cancel
             </Button>
@@ -181,6 +185,8 @@ function ExportImport({
             <Button
                 onClick={handleImport}
                 disabled={!importData.trim()}
+                loading={isImporting}
+                loadingText="Importing..."
             >
                 Import Data
             </Button>
@@ -249,7 +255,7 @@ function ExportImport({
             {/* Import Modal */}
             <Modal 
                 isOpen={showImportModal}
-                onClose={resetImportState}
+                onClose={isImporting ? () => {} : resetImportState}
                 title="Import Data"
                 size="2xl"
                 footer={importModalFooter}
@@ -271,6 +277,7 @@ function ExportImport({
                                 variant="outline"
                                 leadingIcon={FileBracesIcon}
                                 onClick={() => fileInputRef.current?.click()}
+                                disabled={isImporting}
                             >
                                 Choose File
                             </Button>
@@ -289,6 +296,7 @@ function ExportImport({
                             onChange={(e) => setImportData(e.target.value)}
                             placeholder="Paste JSON data here..."
                             className="h-40 font-mono text-sm"
+                            disabled={isImporting}
                         />
                     </div>
 

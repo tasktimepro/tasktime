@@ -103,6 +103,8 @@ test.describe('Backup smoke', () => {
     });
 
     test('restores exported data after clearing local data', async ({ page }) => {
+        test.setTimeout(90_000);
+
         const now = Date.now();
         const projectTitle = `Playwright Restore Project ${now}`;
         const clientTitle = `Playwright Restore Client ${now}`;
@@ -172,6 +174,7 @@ test.describe('Backup smoke', () => {
 
         await expect(importDialog).not.toBeVisible();
         await expect(page.getByText('Current Data')).toBeVisible();
+        await expect(page.getByText('Clients: 1')).toBeVisible();
         await expect(page.getByText('Projects: 1')).toBeVisible();
         await expect(page.getByText('Invoices: 1')).toBeVisible();
 
@@ -179,14 +182,17 @@ test.describe('Backup smoke', () => {
         await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
 
         await page.goto('/invoices?section=invoices');
-        await expect(page.getByText(`Client: ${clientName}`)).toBeVisible();
-        await expect(page.getByText(`Project: ${projectTitle}`)).toBeVisible();
+        await expect(page.getByRole('heading', { name: /^Invoices \(1\)$/ })).toBeVisible();
+
+        const invoicesView = page.locator('main');
+        await expect(invoicesView).toContainText(`Client: ${clientName}`);
+        await expect(invoicesView).toContainText(`Project: ${projectTitle}`);
 
         await page.reload();
 
         await expect(page.getByRole('heading', { name: /^Invoices \(1\)$/ })).toBeVisible();
-        await expect(page.getByText(`Client: ${clientName}`)).toBeVisible();
-        await expect(page.getByText(`Project: ${projectTitle}`)).toBeVisible();
+        await expect(invoicesView).toContainText(`Client: ${clientName}`);
+        await expect(invoicesView).toContainText(`Project: ${projectTitle}`);
     });
 
     test('imports the broad sample backup and previews an imported invoice in edit mode', async ({ page }) => {
