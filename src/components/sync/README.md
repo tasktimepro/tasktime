@@ -93,6 +93,7 @@ Manual export:
 - If Drive is connected, refresh from cloud first.
 - If cloud refresh fails, do not create the export.
 - Include active data, archived docs, historical `entries-{year}` docs, preferences, planner data, templates, expenses, invoices, and business data.
+- Active timer sessions are live stopwatch state, not durable backup records. Warn users to stop timers before export if they need that time saved.
 
 Import:
 

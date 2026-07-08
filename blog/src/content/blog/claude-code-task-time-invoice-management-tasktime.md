@@ -1,7 +1,7 @@
 ---
 title: "Claude Code for Freelancers: Tasks, Time Tracking, Expenses, and Invoices"
 description: "Use the TaskTime Pro Claude Code plugin to manage projects, timers, expenses, invoice drafts, reports, and app navigation through a local MCP bridge."
-publishedAt: "2026-07-08"
+publishedAt: "2026-07-06"
 excerpt: "Claude Code can now work with TaskTime Pro through a local plugin and MCP bridge, giving freelancers agent help for project admin without bypassing the app."
 category: "workflow"
 tags: ["Claude Code", "AI agents", "MCP", "invoicing"]

@@ -1,7 +1,7 @@
 ---
 title: "AI Agent Task Management for Freelancers: TaskTime Pro Agent Bridge"
 description: "Use TaskTime Pro with AI agents through a local MCP bridge for private task management, time tracking, expenses, reports, and invoicing."
-publishedAt: "2026-07-08"
+publishedAt: "2026-07-05"
 excerpt: "TaskTime Pro now gives same-device AI agents a local MCP bridge for planning work, tracking time, finding unbilled hours, preparing invoices, and keeping the user in control."
 category: "workflow"
 tags: ["AI agents", "MCP", "workflow", "freelancers"]

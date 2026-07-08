@@ -281,6 +281,61 @@ img {
     max-width: var(--content-width);
 }
 
+.pagination {
+    align-items: center;
+    display: flex;
+    gap: 0.85rem;
+    justify-content: space-between;
+    margin: 1.5rem auto 0;
+    max-width: var(--content-width);
+}
+
+.pagination-pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    justify-content: center;
+}
+
+.pagination-link {
+    align-items: center;
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--foreground);
+    display: inline-flex;
+    font-size: 0.92rem;
+    font-weight: 600;
+    justify-content: center;
+    min-width: 2.6rem;
+    padding: 0.65rem 0.9rem;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.pagination-link:hover {
+    background: var(--muted);
+    border-color: var(--foreground);
+    box-shadow: var(--shadow-soft);
+    transform: translateY(-1px);
+}
+
+.pagination-link.is-current {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-foreground);
+}
+
+.pagination-link.is-disabled {
+    color: var(--muted-foreground);
+    cursor: default;
+    opacity: 0.7;
+}
+
+.pagination-link--edge {
+    min-width: 5.7rem;
+}
+
 .post-card {
     padding: 1.4rem;
     border: 1px solid var(--border);
@@ -370,6 +425,29 @@ img {
     border-radius: var(--radius-sm);
     background: var(--muted);
     font-size: 0.92em;
+}
+
+.article-content pre {
+    margin: 1.35rem 0;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius-lg) + 0.1rem);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--muted) 86%, var(--card)) 0%, var(--card) 100%);
+    box-shadow: var(--shadow-soft);
+    overflow-x: auto;
+}
+
+.article-content pre code {
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--foreground);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    white-space: pre;
 }
 
 .tag-list {
@@ -842,6 +920,19 @@ img {
 
     .post-card {
         padding: 1.1rem;
+    }
+
+    .pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .pagination-pages {
+        width: 100%;
+    }
+
+    .pagination-link--edge {
+        width: 100%;
     }
 
     .public-page-grid {

@@ -1,11 +1,9 @@
 import rss from '@astrojs/rss';
-import { getCollection } from 'astro:content';
 import { SITE_URL } from '../../config/site.js';
+import { getPublishedBlogPosts } from '../../lib/blog.js';
 
 export async function GET() {
-    const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
-        (left, right) => right.data.publishedAt.valueOf() - left.data.publishedAt.valueOf()
-    );
+    const posts = await getPublishedBlogPosts();
 
     return rss({
         title: 'TaskTime Pro Blog',

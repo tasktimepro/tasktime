@@ -13,14 +13,24 @@
     [x] Publish everything under the new github org /tasktimepro in clawhub
         [x] Should the skill be @tasktimepro/tasktime-pro or just @tasktimepro/tasktime? - YES
     [ ] Actually validate the skill/MCP with our own OpenClaw
+        - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
+        - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
+
+[ ] Publish in more places:
+    [ ] PulseMCP - VERIFY AUTO LISTING
+    [ ] Smithery
+        [ ] Skill
+        [ ] MCP
+    [ ] Glama
+    [ ] MCP.so
+
+[ ] Merge Agents Kit so that we have a proper agent setup/scaffold
 
 ---
 
 ## Blog Posts
 
 - Always keep in mind trending words and most likely searched for words for better SEO reachability
-[ ] Create a blog post that mentions openclaw skill and how you can use tasktime pro with openclaw / agents
-[ ] I think it's also important to teach how tasktime multi-timer support can actually allow you to have multiple agents works for different clients at the same time - to start timing before they start working on a task and stop the timer when then finish - to creating the invoice and so on - and e2e flow for agents
 
 ---
 

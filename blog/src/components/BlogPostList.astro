@@ -1,0 +1,60 @@
+---
+import { BLOG_CATEGORY_LABELS } from '../config/site.js';
+import { formatBlogDate, getBlogPageHref } from '../lib/blog.js';
+
+const {
+    posts = [],
+    currentPage = 1,
+    totalPages = 1,
+} = Astro.props;
+
+const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+const previousPageHref = currentPage > 1 ? getBlogPageHref(currentPage - 1) : null;
+const nextPageHref = currentPage < totalPages ? getBlogPageHref(currentPage + 1) : null;
+---
+
+<section class="post-list" aria-label="Blog posts">
+    {posts.map((post) => (
+        <article class="post-card">
+            <p class="post-meta">
+                <span class="category-pill">{BLOG_CATEGORY_LABELS[post.data.category]}</span>
+                <time datetime={post.data.publishedAt.toISOString()}>{formatBlogDate(post.data.publishedAt)}</time>
+            </p>
+            <h2>
+                <a href={`/blog/${post.slug}/`}>{post.data.title}</a>
+            </h2>
+            <p>{post.data.excerpt}</p>
+            <ul class="tag-list" aria-label={`Tags for ${post.data.title}`}>
+                {post.data.tags.map((tag) => (
+                    <li>{tag}</li>
+                ))}
+            </ul>
+        </article>
+    ))}
+</section>
+
+{totalPages > 1 && (
+    <nav class="pagination" aria-label="Blog pagination">
+        {previousPageHref ? (
+            <a class="pagination-link pagination-link--edge" href={previousPageHref} rel="prev">Previous</a>
+        ) : (
+            <span class="pagination-link pagination-link--edge is-disabled" aria-disabled="true">Previous</span>
+        )}
+
+        <div class="pagination-pages" aria-label={`Page ${currentPage} of ${totalPages}`}>
+            {pageNumbers.map((pageNumber) => (
+                pageNumber === currentPage ? (
+                    <span class="pagination-link is-current" aria-current="page">{pageNumber}</span>
+                ) : (
+                    <a class="pagination-link" href={getBlogPageHref(pageNumber)}>{pageNumber}</a>
+                )
+            ))}
+        </div>
+
+        {nextPageHref ? (
+            <a class="pagination-link pagination-link--edge" href={nextPageHref} rel="next">Next</a>
+        ) : (
+            <span class="pagination-link pagination-link--edge is-disabled" aria-disabled="true">Next</span>
+        )}
+    </nav>
+)}

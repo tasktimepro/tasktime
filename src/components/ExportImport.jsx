@@ -27,8 +27,9 @@ import { parseBackupImportJson } from '../utils/backupData.ts';
  * - Projects, tasks, time entries, and invoices
  * - Payment methods, business info, clients, invoice templates, and email templates
  * - Expense categories, tax return periods, planner data, and user preferences
- * 
- * Note: Timer state is intentionally excluded from export/import
+ *
+ * Active timers are live stopwatch sessions, so they are intentionally excluded
+ * from JSON backups. Users should stop timers first to save them as time entries.
  */
 function ExportImport({ 
     projects, 
@@ -52,6 +53,7 @@ function ExportImport({
     const [importData, setImportData] = useState('');
     const [importError, setImportError] = useState('');
     const [isExporting, setIsExporting] = useState(false);
+    const [showExportTimerWarning, setShowExportTimerWarning] = useState(false);
     const [selectedImportFileName, setSelectedImportFileName] = useState('');
     const fileInputRef = useRef(null);
 
@@ -91,7 +93,7 @@ function ExportImport({
     /**
      * Export all project data as JSON file
      */
-    const handleExport = async () => {
+    const runExport = async () => {
         setIsExporting(true);
 
         try {
@@ -116,6 +118,20 @@ function ExportImport({
         } finally {
             setIsExporting(false);
         }
+    };
+
+    const handleExport = () => {
+        if (isTimerActive) {
+            setShowExportTimerWarning(true);
+            return;
+        }
+
+        void runExport();
+    };
+
+    const handleConfirmExportWithActiveTimer = () => {
+        setShowExportTimerWarning(false);
+        void runExport();
     };
 
     /**
@@ -292,7 +308,7 @@ function ExportImport({
                             title="Active Timer Detected!"
                         >
                             <p>
-                                You have an active timer running. Importing data will <strong>stop and discard</strong> any unsaved timer progress. Please stop your timer first to save the time entry, or proceed knowing the current timer session will be lost.
+                                You have an active timer running. Importing data will <strong>discard</strong> any unsaved timer progress. Please stop your timer first to save the time entry, or proceed knowing the current timer session will be lost.
                             </p>
                         </Notice>
                     )}
@@ -314,6 +330,45 @@ function ExportImport({
                         />
                     )}
                 </div>
+            </Modal>
+
+            <Modal
+                isOpen={showExportTimerWarning}
+                onClose={() => {
+                    if (!isExporting) {
+                        setShowExportTimerWarning(false);
+                    }
+                }}
+                title="Active Timer Not Included"
+                footer={(
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setShowExportTimerWarning(false)}
+                            disabled={isExporting}
+                        >
+                            Cancel
+                        </Button>
+
+                        <Button
+                            onClick={handleConfirmExportWithActiveTimer}
+                            loading={isExporting}
+                            loadingText="Exporting..."
+                        >
+                            Export Anyway
+                        </Button>
+                    </div>
+                )}
+            >
+                <Notice
+                    variant="warning"
+                    icon={ExclamationTriangleIcon}
+                    title="Stop Timer First To Save It"
+                >
+                    <p>
+                        Active timers are not included in JSON backups. Stop your timer first to save it as a time entry, or export anyway knowing the current timer session will not be saved.
+                    </p>
+                </Notice>
             </Modal>
             </CardContent>
         </Card>

@@ -1,5 +1,11 @@
-import { getCollection } from 'astro:content';
 import { SITE_URL, toCanonicalUrl } from '../config/site.js';
+import {
+    BLOG_PAGE_SIZE,
+    getBlogPageCount,
+    getBlogPageHref,
+    getBlogPostsForPage,
+    getPublishedBlogPosts,
+} from '../lib/blog.js';
 
 const STATIC_ENTRIES = [
     {
@@ -89,14 +95,29 @@ function formatSitemapEntry({ loc, lastmod, changefreq, priority }) {
 }
 
 export async function GET() {
-    const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
-        (left, right) => right.data.publishedAt.valueOf() - left.data.publishedAt.valueOf()
-    );
+    const posts = await getPublishedBlogPosts();
+    const totalPages = getBlogPageCount(posts, BLOG_PAGE_SIZE);
     const latestPostDate = posts.reduce((latest, post) => {
         const postDate = post.data.updatedAt ?? post.data.publishedAt;
 
         return postDate > latest ? postDate : latest;
     }, new Date('2026-04-05'));
+    const paginatedBlogEntries = Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => {
+        const currentPage = index + 2;
+        const currentPosts = getBlogPostsForPage(posts, currentPage, BLOG_PAGE_SIZE);
+        const pageLastModified = currentPosts.reduce((latest, post) => {
+            const postDate = post.data.updatedAt ?? post.data.publishedAt;
+
+            return postDate > latest ? postDate : latest;
+        }, currentPosts[0]?.data.updatedAt ?? currentPosts[0]?.data.publishedAt ?? latestPostDate);
+
+        return {
+            loc: toCanonicalUrl(getBlogPageHref(currentPage), SITE_URL),
+            lastmod: pageLastModified,
+            changefreq: 'weekly',
+            priority: '0.7',
+        };
+    });
     const sitemapEntries = [
         ...STATIC_ENTRIES.map((entry) => ({
             loc: toCanonicalUrl(entry.pathname, SITE_URL),
@@ -110,6 +131,7 @@ export async function GET() {
             changefreq: 'weekly',
             priority: '0.8',
         },
+        ...paginatedBlogEntries,
         ...posts.map((post) => ({
             loc: toCanonicalUrl(`/blog/${post.slug}/`, SITE_URL),
             lastmod: post.data.updatedAt ?? post.data.publishedAt,

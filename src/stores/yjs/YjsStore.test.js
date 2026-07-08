@@ -704,6 +704,7 @@ describe('YjsStore timer reconciliation', () => {
         coreDoc.getMap('expenseRecurrences').set('recurrence-1', objectToYMap({ id: 'recurrence-1', title: 'Recurring Expense', currency: 'EUR', amount: 10, amountType: 'fixed', paymentMode: 'manual', repeat: 'monthly', monthlyType: 'specific', monthlyDay: 1, startDate: '2026-01-01', isPersonal: true, billable: false, active: true }))
         coreDoc.getMap('plannerAttachments').set('attachment-1', objectToYMap({ id: 'attachment-1', type: 'project', referenceId: 'project-1', mode: 'weekday', weekday: 1, sortOrder: 1 }))
         coreDoc.getMap('dailyGoals').set('goal-1', objectToYMap({ id: 'goal-1', weekday: 1, targetHours: 4 }))
+        coreDoc.getMap('timers').set('project-1', objectToYMap({ projectId: 'project-1', taskId: 'task-active', timerInstanceId: 'timer-1', startTime: Date.UTC(2026, 3, 1), paused: true, pausedElapsedTime: 60000, note: 'Paused work', lastActive: Date.UTC(2026, 3, 1, 1) }))
         coreDoc.getMap('invoices').set('invoice-active', objectToYMap({ id: 'invoice-active', projectId: 'project-1', clientId: 'client-1', date: '2026-04-01', dueDate: '2026-04-15', status: 'draft', subtotal: 10, tax: 0, total: 10, currency: 'EUR', items: [] }))
         coreDoc.getMap('preferences').set('currency', 'EUR')
 
@@ -748,6 +749,7 @@ describe('YjsStore timer reconciliation', () => {
             expect.objectContaining({ id: 'entry-active' }),
             expect.objectContaining({ id: 'entry-2024' }),
         ]))
+        expect(payload).not.toHaveProperty('timers')
         expect(payload.backupType).toBe('manual')
 
         store.destroy()
@@ -803,6 +805,7 @@ describe('YjsStore timer reconciliation', () => {
             expenseRecurrences: [],
             dailyGoals: [],
             plannerAttachments: [],
+            timers: [{ projectId: 'project-1', taskId: 'task-active', timerInstanceId: 'timer-imported', startTime: Date.UTC(2026, 3, 1), paused: true, pausedElapsedTime: 120000, note: 'Imported timer', lastActive: Date.UTC(2026, 3, 1, 2) }],
             preferences: { currency: 'EUR' },
         })
 
@@ -835,6 +838,7 @@ describe('YjsStore timer reconciliation', () => {
         expect((await store.loadArchivedInvoices()).has('invoice-archived')).toBe(true)
         expect(store.expenses.has('expense-active')).toBe(true)
         expect((await store.loadArchivedExpenses()).has('expense-archived')).toBe(true)
+        expect(store.timers.has('project-1')).toBe(false)
 
         store.destroy()
     })

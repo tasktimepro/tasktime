@@ -1,7 +1,8 @@
 # TaskTime Pro Makefile
 # Shorthand commands for common Docker operations
 
-APP_RUN = docker compose run --rm app
+APP_RUN_ENV ?=
+APP_RUN = docker compose run --rm $(APP_RUN_ENV) app
 
 .PHONY: help dev dev-push-local preview-push-local preview-push-cloud stop build preview preview-build install lint clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
 
@@ -157,10 +158,10 @@ test-e2e-pwa-smoke:
 # Release gate checks (coverage + browser smoke + build)
 release-gate:
 	$(MAKE) lint
-	docker compose run --rm app npm run test:coverage
-	docker compose run --rm app npm run test:e2e:smoke
-	docker compose run --rm app npm run test:e2e:pwa:smoke
-	docker compose run --rm app npm run build
+	$(APP_RUN) npm run test:coverage
+	$(APP_RUN) npm run test:e2e:smoke
+	$(APP_RUN) npm run test:e2e:pwa:smoke
+	$(APP_RUN) npm run build
 
 # View logs
 logs:

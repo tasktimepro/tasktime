@@ -1,19 +1,16 @@
 ---
-import { getCollection } from 'astro:content';
-import { BLOG_CATEGORY_LABELS } from '../../config/site.js';
+import BlogPostList from '../../components/BlogPostList.astro';
 import BlogLayout from '../../layouts/BlogLayout.astro';
+import {
+    BLOG_PAGE_SIZE,
+    getBlogPageCount,
+    getBlogPostsForPage,
+    getPublishedBlogPosts,
+} from '../../lib/blog.js';
 
-const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
-    (left, right) => right.data.publishedAt.valueOf() - left.data.publishedAt.valueOf()
-);
-
-function formatDate(value) {
-    return new Intl.DateTimeFormat('en', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    }).format(value);
-}
+const posts = await getPublishedBlogPosts();
+const totalPages = getBlogPageCount(posts, BLOG_PAGE_SIZE);
+const pagePosts = getBlogPostsForPage(posts, 1, BLOG_PAGE_SIZE);
 ---
 
 <BlogLayout
@@ -30,23 +27,5 @@ function formatDate(value) {
         </p>
     </section>
 
-    <section class="post-list" aria-label="Blog posts">
-        {posts.map((post) => (
-            <article class="post-card">
-                <p class="post-meta">
-                    <span class="category-pill">{BLOG_CATEGORY_LABELS[post.data.category]}</span>
-                    <time datetime={post.data.publishedAt.toISOString()}>{formatDate(post.data.publishedAt)}</time>
-                </p>
-                <h2>
-                    <a href={`/blog/${post.slug}/`}>{post.data.title}</a>
-                </h2>
-                <p>{post.data.excerpt}</p>
-                <ul class="tag-list" aria-label={`Tags for ${post.data.title}`}>
-                    {post.data.tags.map((tag) => (
-                        <li>{tag}</li>
-                    ))}
-                </ul>
-            </article>
-        ))}
-    </section>
+    <BlogPostList posts={pagePosts} currentPage={1} totalPages={totalPages} />
 </BlogLayout>

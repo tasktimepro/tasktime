@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExportImport from '../../components/ExportImport'
 import { BACKUP_VERSION } from '../../utils/backupData'
@@ -57,6 +57,7 @@ describe('Import/Export integration', () => {
         mockExpenses.length = 0
         mockExpenseCategories.length = 0
         mockTaxReturnPeriods.length = 0
+        mockExportBackupData.mockReset()
         mockExportBackupData.mockResolvedValue({
             version: BACKUP_VERSION,
             exportDate: '2026-04-22T12:14:07.792Z',
@@ -213,6 +214,7 @@ describe('Import/Export integration', () => {
         expect(parsed.clients).toEqual(baseProps.clients)
         expect(parsed.invoiceTemplates).toEqual(baseProps.invoiceTemplates)
         expect(parsed.emailTemplates).toEqual(baseProps.emailTemplates)
+        expect(parsed).not.toHaveProperty('timers')
         expect(parsed.preferences).toEqual(baseProps.preferences)
 
         blobSpy.mockRestore()
@@ -337,6 +339,37 @@ describe('Import/Export integration', () => {
         expect(screen.getByText('Active Timer Detected!')).toBeInTheDocument()
         
         // Reset for other tests
+        mockTimers.length = 0
+    })
+
+    it('warns before exporting while an active timer is running', async () => {
+
+        const user = userEvent.setup()
+        setupExportMocks()
+        mockTimers.push({ projectId: 'project-1', taskId: 'task-1' })
+
+        render(
+            <ExportImport
+                {...baseProps}
+                onImport={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Export' }))
+
+        expect(mockExportBackupData).not.toHaveBeenCalled()
+        expect(screen.getByRole('dialog', { name: 'Active Timer Not Included' })).toBeInTheDocument()
+        expect(screen.getByText('Stop Timer First To Save It')).toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Export Anyway' }))
+
+        await waitFor(() => {
+            expect(mockExportBackupData).toHaveBeenCalledWith({
+                backupType: 'manual',
+                refreshFromCloud: true,
+            })
+        })
+
         mockTimers.length = 0
     })
 

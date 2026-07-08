@@ -1,5 +1,7 @@
 # TaskTime Pro
 
+[![CI](https://github.com/tasktimepro/tasktime/actions/workflows/ci.yml/badge.svg)](https://github.com/tasktimepro/tasktime/actions/workflows/ci.yml)
+
 TaskTime Pro is a local-first task management, time tracking, expenses, and invoicing app for freelancers and solo professionals.
 
 The app runs in the browser, stores user work data locally with Yjs and IndexedDB, supports optional Google Drive sync, and exposes an optional same-device MCP bridge for AI agents after explicit pairing.

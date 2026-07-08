@@ -1,7 +1,7 @@
 ---
 title: "Use Codex with TaskTime Pro Through MCP for Local Freelancer Workflows"
 description: "Connect Codex to TaskTime Pro's local MCP agent bridge for private task planning, time tracking, invoice preparation, reports, and review workflows."
-publishedAt: "2026-07-08"
+publishedAt: "2026-07-07"
 excerpt: "Codex can work with MCP servers, which makes TaskTime Pro's local agent bridge a useful way to bring project, timer, expense, invoice, and report context into an agent workflow."
 category: "workflow"
 tags: ["Codex", "MCP", "AI agents", "workflow"]

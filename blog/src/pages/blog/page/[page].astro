@@ -1,0 +1,50 @@
+---
+import BlogPostList from '../../../components/BlogPostList.astro';
+import BlogLayout from '../../../layouts/BlogLayout.astro';
+import {
+    BLOG_PAGE_SIZE,
+    getBlogPageCount,
+    getBlogPostsForPage,
+    getPublishedBlogPosts,
+} from '../../../lib/blog.js';
+
+export async function getStaticPaths() {
+    const posts = await getPublishedBlogPosts();
+    const totalPages = getBlogPageCount(posts, BLOG_PAGE_SIZE);
+
+    return Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => {
+        const currentPage = index + 2;
+
+        return {
+            params: { page: String(currentPage) },
+            props: {
+                currentPage,
+                totalPages,
+                posts: getBlogPostsForPage(posts, currentPage, BLOG_PAGE_SIZE),
+            },
+        };
+    });
+}
+
+const { currentPage, totalPages, posts } = Astro.props;
+const title = `TaskTime Pro Blog - Page ${currentPage}`;
+const description = `Page ${currentPage} of the TaskTime Pro Blog: privacy-first freelancing guides for time tracking, expenses, invoicing, and local-first workflows.`;
+---
+
+<BlogLayout
+    title={title}
+    description={description}
+    canonicalPath={Astro.url.pathname}
+    pageType="website"
+>
+    <section class="hero">
+        <p class="eyebrow">The TaskTime Pro Blog</p>
+        <h1>Our Blog</h1>
+        <p class="hero-copy">
+            Page {currentPage} of {totalPages}. Browse guides for freelancers who want to track time, manage expenses,
+            send invoices, and keep their data private.
+        </p>
+    </section>
+
+    <BlogPostList posts={posts} currentPage={currentPage} totalPages={totalPages} />
+</BlogLayout>

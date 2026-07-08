@@ -84,6 +84,7 @@ test.describe('Backup smoke', () => {
 
         expect(exportedJson.version).toBe('1.4');
         expect(typeof exportedJson.exportDate).toBe('string');
+        expect(exportedJson).not.toHaveProperty('timers');
         expect(exportedJson.projects).toEqual(expect.arrayContaining([
             expect.objectContaining({ title: projectTitle }),
         ]));
