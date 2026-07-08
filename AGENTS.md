@@ -292,6 +292,7 @@ docker compose run --rm app npm run <script>
 |----------|---------|
 | Private project overview | Full technical documentation, available only in the private infra/docs checkout |
 | Private Yjs sync plan | Yjs sync architecture notes, available only in the private infra/docs checkout |
+| `docs/agent-release-runbook.md` | Local MCP bridge, ClawHub skill, OpenClaw bundle, and Claude plugin publishing workflow |
 | `_implan.md` | Original project plan and preferences |
 | `README.md` | User-facing documentation |
 
