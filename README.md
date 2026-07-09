@@ -1,6 +1,9 @@
 # TaskTime Pro
 
 [![CI](https://github.com/tasktimepro/tasktime/actions/workflows/ci.yml/badge.svg)](https://github.com/tasktimepro/tasktime/actions/workflows/ci.yml)
+[![Agent Bridge](https://img.shields.io/npm/v/%40tasktimepro%2Fagent-bridge?label=agent%20bridge)](https://www.npmjs.com/package/@tasktimepro/agent-bridge)
+[![MCP](https://img.shields.io/badge/mcp-pro.tasktime%2Fagent--bridge-0a7cff)](https://tasktime.pro/.well-known/tasktime-agent.json)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](./LICENSE)
 
 TaskTime Pro is a local-first task management, time tracking, expenses, and invoicing app for freelancers and solo professionals.
 
