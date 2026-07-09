@@ -98,6 +98,13 @@ describe('ProjectNotesEditor', () => {
         expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('md:min-h-[18rem]');
     });
 
+    it('uses the neutral app accent for note checklist checkboxes', () => {
+        render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
+
+        expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('[&_.task-item>label>input]:accent-primary');
+        expect(hookMocks.useEditorOptions.editorProps.attributes.class).toContain('[&_[data-type="taskItem"]>label>input]:accent-primary');
+    });
+
     it('configures note links to open on click in a new tab', () => {
         render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
 
