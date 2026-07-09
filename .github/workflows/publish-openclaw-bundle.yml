@@ -33,12 +33,15 @@ jobs:
         run: npm run smoke:agent-bundles
 
       - name: Check package version
-        if: ${{ inputs.dry_run == false }}
+        id: package_version
         run: |
           VERSION="$(node -p "require('./integrations/openclaw/tasktime/package.json').version")"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           if npm view "@tasktimepro/openclaw@${VERSION}" version >/dev/null 2>&1; then
             echo "@tasktimepro/openclaw@${VERSION} is already published."
-            exit 1
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Verify npm package contents
@@ -53,8 +56,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish package
-        if: ${{ inputs.dry_run == false }}
+        if: ${{ inputs.dry_run == false && steps.package_version.outputs.exists == 'false' }}
         working-directory: integrations/openclaw/tasktime
         run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Ensure public package access
+        if: ${{ inputs.dry_run == false }}
+        run: npm access public @tasktimepro/openclaw
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
