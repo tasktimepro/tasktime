@@ -2,9 +2,6 @@
 
 ## Priority
 
-[ ] Fix time entries not showing issue - see screenshots
-[ ] Should we include Code of conduct and Privacy md files at the root of the public repo as well?
-
 [ ] Check about indexing blog issues - ONGOING
 
 [x] docs/todo/local-agent-bridge-proposal.md

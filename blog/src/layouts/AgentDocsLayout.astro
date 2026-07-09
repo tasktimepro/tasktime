@@ -167,30 +167,38 @@ const structuredData = {
     <body>
         <div class="page-shell">
             <header class="site-header">
-                <a class="brand" href="/agents/">
-                    <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
-                    <span class="brand-label">TaskTime Pro Agent Docs</span>
-                </a>
+                <div class="site-header-top">
+                    <a class="brand" href="/agents/">
+                        <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
+                        <span class="brand-label">TaskTime Pro Agent Docs</span>
+                    </a>
+                    <div class="site-header-controls">
+                        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
+                            <span class="sr-only">Toggle color theme</span>
+                            <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"></path>
+                            </svg>
+                            <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                                <circle cx="12" cy="12" r="4"></circle>
+                                <path d="M12 2v2"></path>
+                                <path d="M12 20v2"></path>
+                                <path d="m4.93 4.93 1.41 1.41"></path>
+                                <path d="m17.66 17.66 1.41 1.41"></path>
+                                <path d="M2 12h2"></path>
+                                <path d="M20 12h2"></path>
+                                <path d="m6.34 17.66-1.41 1.41"></path>
+                                <path d="m19.07 4.93-1.41 1.41"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
                 <nav class="site-nav" aria-label="Primary">
-                    <a href="/blog/">Blog</a>
-                    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
-                        <span class="sr-only">Toggle color theme</span>
-                        <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"></path>
-                        </svg>
-                        <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                            <circle cx="12" cy="12" r="4"></circle>
-                            <path d="M12 2v2"></path>
-                            <path d="M12 20v2"></path>
-                            <path d="m4.93 4.93 1.41 1.41"></path>
-                            <path d="m17.66 17.66 1.41 1.41"></path>
-                            <path d="M2 12h2"></path>
-                            <path d="M20 12h2"></path>
-                            <path d="m6.34 17.66-1.41 1.41"></path>
-                            <path d="m19.07 4.93-1.41 1.41"></path>
-                        </svg>
-                    </button>
-                    <a href="/" class="cta-button">Open TaskTime Pro</a>
+                    <div class="site-nav-links">
+                        <a href="/blog/">Blog</a>
+                    </div>
+                    <div class="site-nav-actions">
+                        <a href="/" class="cta-button">Open App</a>
+                    </div>
                 </nav>
             </header>
 
@@ -263,11 +271,12 @@ const structuredData = {
                     <a class="footer-icon-link" href="https://x.com/tasktimepro" target="_blank" rel="noreferrer noopener" aria-label="TaskTime Pro on X">
                         <img src="/x.svg" alt="" aria-hidden="true" width="16" height="16" loading="lazy" />
                     </a>
-                    <a href="/agents/">Agents</a>
+                    <a href="/agents/">Agent Docs</a>
                     <a href="/blog/">Blog</a>
                     <a href="/contact/">Contact</a>
                     <a href="/privacy/">Privacy</a>
                     <a href="/terms/">Terms</a>
+                    <a href="/blog/rss.xml">RSS</a>
                 </div>
             </footer>
         </div>

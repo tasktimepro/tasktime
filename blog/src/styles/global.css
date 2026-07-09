@@ -58,8 +58,11 @@ img {
 }
 
 .site-header {
+    align-items: center;
+    flex-direction: row;
+    gap: 1rem;
+    justify-content: flex-start;
     margin-bottom: 3rem;
-    padding: 1rem 0;
 }
 
 .site-footer {
@@ -82,12 +85,26 @@ img {
 
 .brand {
     display: inline-flex;
+    flex: 1 1 auto;
     align-items: center;
     gap: 0.7rem;
+    min-width: 0;
     font-size: 1rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     text-decoration: none;
+}
+
+.site-header-controls {
+    order: 3;
+}
+
+.site-nav-links {
+    order: 2;
+}
+
+.site-nav-actions {
+    order: 4;
 }
 
 .brand-mark {
@@ -102,14 +119,43 @@ img {
     white-space: nowrap;
 }
 
+.site-header-top,
 .site-nav,
 .footer-links {
     display: flex;
     gap: 1rem;
 }
 
-.site-nav {
+.site-header-controls,
+.site-nav-links,
+.site-nav-actions {
     align-items: center;
+}
+
+.site-header-top,
+.site-nav {
+    display: contents;
+}
+
+.site-header-controls,
+.site-nav-links,
+.site-nav-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.site-header-controls,
+.site-nav-actions {
+    flex: 0 0 auto;
+}
+
+.site-header-controls {
+    justify-content: flex-end;
+}
+
+.site-nav-links {
+    margin-left: auto;
+    flex-wrap: wrap;
 }
 
 .site-nav a,
@@ -132,7 +178,7 @@ img {
 
 .site-nav a:hover,
 .footer-links a:hover,
-.post-card h2 a:hover,
+.post-card:hover h2,
 .article-content a:hover {
     color: var(--foreground);
 }
@@ -244,12 +290,8 @@ img {
     max-width: var(--content-width);
 }
 
-.hero {
-    margin-bottom: 2.5rem;
-}
-
 .eyebrow {
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.5rem !important;
     color: var(--muted-foreground);
     font-size: 0.82rem;
     font-weight: 700;
@@ -337,21 +379,38 @@ img {
 }
 
 .post-card {
+    color: inherit;
+    display: block;
     padding: 1.4rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--card) 92%, transparent);
     box-shadow: var(--shadow-soft);
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.post-card:hover,
+.post-card:focus-visible {
+    background: var(--muted);
+    border-color: var(--foreground);
+    box-shadow: var(--shadow-soft);
+    transform: translateY(-1px);
+}
+
+.post-card:focus-visible,
+.article-back-link:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
 }
 
 .post-card h2 {
     margin: 0.25rem 0 0.5rem;
     font-size: clamp(1.35rem, 3vw, 1.75rem);
     line-height: 1.2;
-}
-
-.post-card h2 a {
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.12em;
 }
 
 .post-card p,
@@ -390,6 +449,22 @@ img {
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
+}
+
+.article-back-link {
+    align-items: center;
+    color: var(--muted-foreground);
+    display: inline-flex;
+    gap: 0.45rem;
+    margin-bottom: 1.25rem;
+    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.12em;
+}
+
+.article-back-link:hover {
+    color: var(--foreground);
 }
 
 .article-header {
@@ -908,14 +983,98 @@ img {
         padding: 1rem;
     }
 
-    .site-header,
-    .site-footer {
-        align-items: flex-start;
+    .site-header {
+        align-items: stretch;
         flex-direction: column;
+        gap: 0.85rem;
+        justify-content: space-between;
+        margin-bottom: 2rem;
     }
 
-    .site-header {
-        margin-bottom: 2rem;
+    .brand {
+        gap: 0.75rem;
+    }
+
+    .brand-mark {
+        height: 2.35rem;
+        width: 2.35rem;
+    }
+
+    .brand-label {
+        font-size: 1.05rem;
+        white-space: normal;
+    }
+
+    .site-header-top,
+    .site-nav {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: space-between;
+    }
+
+    .site-nav {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        width: 100%;
+    }
+
+    .site-nav-links {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-end;
+        margin-left: 0;
+        min-width: 0;
+    }
+
+    .site-nav-actions {
+        gap: 0;
+        justify-content: flex-end;
+    }
+
+    .site-nav a {
+        text-align: left;
+    }
+
+    .site-nav-links a {
+        align-items: center;
+        background: color-mix(in srgb, var(--card) 92%, transparent);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        display: inline-flex;
+        min-height: 2.9rem;
+        padding: 0.45rem 0.85rem;
+    }
+
+    .site-nav-links a:hover {
+        background: var(--muted);
+        border-color: var(--foreground);
+        box-shadow: var(--shadow-soft);
+    }
+
+    .theme-toggle {
+        height: 2.9rem;
+    }
+
+    .site-nav a.cta-button {
+        min-height: 2.9rem;
+    }
+
+    .site-footer {
+        align-items: center;
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .footer-copyright {
+        justify-content: center;
+    }
+
+    .footer-links {
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: center;
+        row-gap: 0.7rem;
     }
 
     .post-card {
@@ -965,5 +1124,30 @@ img {
 
     .public-page-card {
         padding: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .site-nav {
+        gap: 0.5rem;
+    }
+
+    .site-nav-links,
+    .site-nav-actions {
+        flex: 1 1 0;
+    }
+
+    .site-nav-links:has(a + a) {
+        flex: 2 1 0;
+    }
+
+    .site-nav-links a,
+    .site-nav a.cta-button {
+        flex: 1 1 0;
+        font-size: 0.84rem;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        width: 100%;
     }
 }

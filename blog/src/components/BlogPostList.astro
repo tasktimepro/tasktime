@@ -15,20 +15,20 @@ const nextPageHref = currentPage < totalPages ? getBlogPageHref(currentPage + 1)
 
 <section class="post-list" aria-label="Blog posts">
     {posts.map((post) => (
-        <article class="post-card">
-            <p class="post-meta">
-                <span class="category-pill">{BLOG_CATEGORY_LABELS[post.data.category]}</span>
-                <time datetime={post.data.publishedAt.toISOString()}>{formatBlogDate(post.data.publishedAt)}</time>
-            </p>
-            <h2>
-                <a href={`/blog/${post.slug}/`}>{post.data.title}</a>
-            </h2>
-            <p>{post.data.excerpt}</p>
-            <ul class="tag-list" aria-label={`Tags for ${post.data.title}`}>
-                {post.data.tags.map((tag) => (
-                    <li>{tag}</li>
-                ))}
-            </ul>
+        <article>
+            <a class="post-card" href={`/blog/${post.slug}/`}>
+                <p class="post-meta">
+                    <span class="category-pill">{BLOG_CATEGORY_LABELS[post.data.category]}</span>
+                    <time datetime={post.data.publishedAt.toISOString()}>{formatBlogDate(post.data.publishedAt)}</time>
+                </p>
+                <h2>{post.data.title}</h2>
+                <p>{post.data.excerpt}</p>
+                <ul class="tag-list" aria-label={`Tags for ${post.data.title}`}>
+                    {post.data.tags.map((tag) => (
+                        <li>{tag}</li>
+                    ))}
+                </ul>
+            </a>
         </article>
     ))}
 </section>
