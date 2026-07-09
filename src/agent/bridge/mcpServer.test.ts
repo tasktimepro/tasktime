@@ -219,6 +219,8 @@ describe('MCP bridge tool definitions', () => {
         const emailTools = listMcpToolDefinitions(new Set(['read', 'write', 'email']));
 
         expect(readTools.map((tool) => tool.name)).toEqual([...readTools.map((tool) => tool.name)].sort());
+        expect(readTools.map((tool) => tool.name)).toContain('get_pairing_status');
+        expect(readTools.map((tool) => tool.name)).toContain('refresh_pairing');
         expect(readTools.map((tool) => tool.name)).toContain('get_dashboard_summary');
         expect(readTools.map((tool) => tool.name)).toContain('list_invoices');
         expect(readTools.map((tool) => tool.name)).toContain('list_business_brand_assets');
@@ -696,6 +698,8 @@ describe('McpBridgeJsonRpcServer', () => {
                                 action: 'launch_tasktime',
                                 reason: 'authoritative_app_session_required',
                                 message: 'Open TaskTime Pro and connect the local agent bridge, then retry the tool call.',
+                                statusTool: 'get_pairing_status',
+                                refreshTool: 'refresh_pairing',
                             },
                         },
                     }),
@@ -704,6 +708,75 @@ describe('McpBridgeJsonRpcServer', () => {
         } finally {
             await bridge.stop();
         }
+    });
+
+    it('serves bridge-local pairing setup tools before an app session is connected', async () => {
+        let refreshCount = 0;
+        const server = new McpBridgeJsonRpcServer({
+            bridge: {
+                sendCommand: async () => {
+                    throw new Error('sendCommand should not be called for bridge-local tools.');
+                },
+                getPairingStatus: () => ({
+                    endpoint: 'ws://127.0.0.1:39123/tasktime-agent',
+                    launchUrl: 'https://tasktime.pro/account?section=agent',
+                    session: {
+                        paired: false,
+                    },
+                }),
+                refreshPairing: () => {
+                    refreshCount += 1;
+                    return {
+                        pairing: {
+                            id: `pairing-${refreshCount}`,
+                        },
+                    };
+                },
+            },
+            scopes: [],
+        });
+
+        const statusResponse = await server.handleMessage({
+            jsonrpc: '2.0',
+            id: 'pairing-status',
+            method: 'tools/call',
+            params: {
+                name: 'get_pairing_status',
+                arguments: {},
+            },
+        });
+        const refreshResponse = await server.handleMessage({
+            jsonrpc: '2.0',
+            id: 'refresh-pairing',
+            method: 'tools/call',
+            params: {
+                name: 'refresh_pairing',
+                arguments: {},
+            },
+        });
+
+        expect(statusResponse?.result).toEqual(expect.objectContaining({
+            isError: false,
+            structuredContent: {
+                ok: true,
+                command: 'get_pairing_status',
+                data: expect.objectContaining({
+                    endpoint: 'ws://127.0.0.1:39123/tasktime-agent',
+                }),
+            },
+        }));
+        expect(refreshResponse?.result).toEqual(expect.objectContaining({
+            isError: false,
+            structuredContent: {
+                ok: true,
+                command: 'refresh_pairing',
+                data: {
+                    pairing: {
+                        id: 'pairing-1',
+                    },
+                },
+            },
+        }));
     });
 
     it('ignores notifications and rejects unsupported JSON-RPC methods', async () => {

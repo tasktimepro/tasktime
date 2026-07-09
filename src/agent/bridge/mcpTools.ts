@@ -1,6 +1,10 @@
 import type { AgentCommandName } from '@/agent/commands/registry';
 import type { AgentPermissionScope } from '@/agent/types';
 
+export type BridgeSetupToolName =
+    | 'get_pairing_status'
+    | 'refresh_pairing';
+
 export type JsonSchema = {
     type: 'object';
     properties?: Record<string, unknown>;
@@ -9,10 +13,11 @@ export type JsonSchema = {
 };
 
 export interface McpToolDefinition {
-    name: AgentCommandName;
+    name: AgentCommandName | BridgeSetupToolName;
     description: string;
     scopes: AgentPermissionScope[];
     inputSchema: JsonSchema;
+    bridgeLocal?: boolean;
 }
 
 const optionalString = { type: 'string' };
@@ -69,6 +74,23 @@ const emptySchema: JsonSchema = {
     properties: {},
     additionalProperties: false,
 };
+
+const MCP_BRIDGE_SETUP_TOOL_DEFINITIONS: McpToolDefinition[] = [
+    {
+        name: 'get_pairing_status',
+        description: 'Return the active local TaskTime Pro bridge endpoint, launch URL, pairing expiry, stable agent identity, and app-session status. This tool works before the browser app is paired.',
+        scopes: [],
+        inputSchema: emptySchema,
+        bridgeLocal: true,
+    },
+    {
+        name: 'refresh_pairing',
+        description: 'Create a fresh local TaskTime Pro pairing challenge and launch URL for the same bridge process when the previous pairing code expired or was consumed. This tool works before the browser app is paired.',
+        scopes: [],
+        inputSchema: emptySchema,
+        bridgeLocal: true,
+    },
+];
 
 export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     {
@@ -2269,11 +2291,19 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
 ];
 
 export function listMcpToolDefinitions(scopes: Set<AgentPermissionScope>): McpToolDefinition[] {
-    return MCP_TOOL_DEFINITIONS
-        .filter((tool) => tool.scopes.every((scope) => scopes.has(scope)))
+    return [
+        ...MCP_BRIDGE_SETUP_TOOL_DEFINITIONS,
+        ...MCP_TOOL_DEFINITIONS.filter((tool) => tool.scopes.every((scope) => scopes.has(scope))),
+    ]
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function getMcpToolDefinition(name: string): McpToolDefinition | null {
-    return MCP_TOOL_DEFINITIONS.find((tool) => tool.name === name) ?? null;
+    return MCP_BRIDGE_SETUP_TOOL_DEFINITIONS.find((tool) => tool.name === name)
+        ?? MCP_TOOL_DEFINITIONS.find((tool) => tool.name === name)
+        ?? null;
+}
+
+export function isBridgeSetupToolName(name: string): name is BridgeSetupToolName {
+    return MCP_BRIDGE_SETUP_TOOL_DEFINITIONS.some((tool) => tool.name === name);
 }

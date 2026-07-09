@@ -3,6 +3,7 @@ import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
 
 const highlights = [
     'Use MCP recovery hints before retrying blindly.',
+    'Use get_pairing_status and refresh_pairing before manual bridge commands.',
     'Run bridge smoke tests after changing the agent surface.',
     'Use DebugBundle for production/runtime incidents, not deterministic local code checks.',
     'Do not ask users to reset local data or Drive state as a first response.',
@@ -29,11 +30,15 @@ const highlights = [
                 <tbody>
                     <tr>
                         <td><code>UNAVAILABLE</code> with <code>launch_tasktime</code></td>
-                        <td>Open TaskTime Pro, pair Account &gt; Agent Access, then retry the tool call.</td>
+                        <td>Call <code>get_pairing_status</code>, open the active bridge <code>launchUrl</code>, pair Account &gt; Agent Access, then retry the tool call.</td>
+                    </tr>
+                    <tr>
+                        <td>Expired or used pairing code</td>
+                        <td>Call <code>refresh_pairing</code> on the active MCP bridge and use the returned launch URL. Do not start a second terminal bridge for a managed install.</td>
                     </tr>
                     <tr>
                         <td>Missing scope</td>
-                        <td>Explain the required scope and ask the user whether to relaunch or reconnect with that scope.</td>
+                        <td>Explain the required scope and ask the user whether to relaunch or reconnect with that scope. Do not tell users to select scopes in the app unless a scope picker is visible.</td>
                     </tr>
                     <tr>
                         <td>Approval gated</td>
@@ -41,7 +46,7 @@ const highlights = [
                     </tr>
                     <tr>
                         <td>Pairing failure</td>
-                        <td>Check endpoint host, port, path, pairing code expiry, browser CSP, and local-network policy.</td>
+                        <td>Check that the endpoint is from the active bridge, the dynamic port is listening, the path matches, the code is fresh, and browser local-network policy allows loopback WebSockets.</td>
                     </tr>
                 </tbody>
             </table>

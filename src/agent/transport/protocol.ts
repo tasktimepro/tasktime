@@ -27,6 +27,8 @@ export type AgentAppSessionPairingMessage = {
     sessionToken: string;
     scopes: AgentPermissionScope[];
     expiresAt: number;
+    agentId?: string;
+    agentLabel?: string;
 };
 
 export type AgentAppSessionControlMessage = {
@@ -113,7 +115,9 @@ export function isAgentAppSessionPairingMessage(value: unknown): value is AgentA
         && Array.isArray(candidate.scopes)
         && candidate.scopes.every((scope) => typeof scope === 'string')
         && typeof candidate.expiresAt === 'number'
-        && Number.isFinite(candidate.expiresAt);
+        && Number.isFinite(candidate.expiresAt)
+        && (candidate.agentId === undefined || typeof candidate.agentId === 'string')
+        && (candidate.agentLabel === undefined || typeof candidate.agentLabel === 'string');
 }
 
 export function isAgentAppSessionControlMessage(value: unknown): value is AgentAppSessionControlMessage {
@@ -184,6 +188,8 @@ export function createAgentBridgeSessionFromPairingMessage(
         scopes: new Set(message.scopes),
         createdAt,
         expiresAt: message.expiresAt,
+        agentId: message.agentId,
+        agentLabel: message.agentLabel,
     };
 }
 

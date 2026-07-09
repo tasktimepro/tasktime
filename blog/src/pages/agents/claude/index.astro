@@ -5,6 +5,7 @@ const highlights = [
     'Install from the TaskTime Pro GitHub marketplace.',
     'Claude Code starts the bundled MCP server when the plugin is enabled.',
     'The browser app still requires explicit Account > Agent Access pairing.',
+    'Use pairing status tools for recovery instead of a second terminal bridge.',
     'Submit to the Claude Code plugin directory after local validation.',
 ];
 const mcpOnlyConfig = JSON.stringify({
@@ -61,6 +62,8 @@ const mcpOnlyConfig = JSON.stringify({
             <li>MCP server config: <code>integrations/claude/tasktime/.mcp.json</code>.</li>
             <li>Bundled bridge launcher: <code>scripts/run-tasktime-agent-bridge.mjs</code>.</li>
             <li>Bundled bridge binary: <code>vendor/tasktime-agent-bridge.mjs</code>.</li>
+            <li>Stable agent identity: <code>tasktime.agent.claude-code</code>, label <code>Claude Code on this device</code>.</li>
+            <li>Bridge status file: <code>tasktime-agent-bridge.status.json</code> beside the plugin launcher.</li>
         </ul>
     </section>
 
@@ -75,6 +78,11 @@ const mcpOnlyConfig = JSON.stringify({
             Plugin-bundled MCP tools use Claude's scoped tool-name form:
         </p>
         <pre><code>mcp__plugin_tasktime_tasktime__list_projects</code></pre>
+        <p>
+            For pairing recovery, use the plugin bridge's <code>get_pairing_status</code> tool to get the active
+            launch URL. If the pairing code expired or was consumed, call <code>refresh_pairing</code>. Do not pair
+            TaskTime Pro to a separately launched terminal bridge when the plugin already owns the MCP server.
+        </p>
     </section>
 
     <section>

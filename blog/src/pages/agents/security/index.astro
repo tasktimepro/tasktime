@@ -5,6 +5,7 @@ const highlights = [
     'Same-device only in v1.',
     'The browser app validates and executes every command.',
     'Scopes control tool visibility and execution.',
+    'Pairing codes are short-lived, while trusted local agent identity is stable.',
     'Sensitive actions remain explicit and auditable.',
 ];
 ---
@@ -38,7 +39,10 @@ const highlights = [
         <h2>Pairing And Revocation</h2>
         <ul class="agent-check-list">
             <li>Pairing requires a bridge endpoint, pairing ID, and pairing code shown by the local bridge.</li>
-            <li>The pairing code is time-limited and should be treated as a local secret.</li>
+            <li>The pairing code is time-limited, single-use, and should be treated as a local secret.</li>
+            <li>Managed bridges should provide a stable agent identity, such as <code>tasktime.agent.openclaw</code>, so trust is not tied to a random localhost port.</li>
+            <li>App sessions default to normal work-session length; pairing codes remain short so copied setup URLs are not useful long-term.</li>
+            <li>Trusted chat approvals default to until revoked for stable same-device agents, with shorter choices available for users who prefer them.</li>
             <li>Account &gt; Agent Access shows paired status, scopes, current activity, and local activity history.</li>
             <li>The user can disconnect or revoke local agent access without clearing TaskTime Pro data.</li>
         </ul>
@@ -95,6 +99,7 @@ const highlights = [
             Destructive, billing, restore, email, export-adjacent, sync, and account-data commands can require explicit
             confirmation plus TaskTime Pro approval. A trusted local approval token can satisfy that gate only when a trusted
             local grant exists, the token matches the exact command input hash, and the browser app verifies it.
+            Stable same-device grants can remain trusted until revoked; users can revoke grants from Account &gt; Agent Access.
             Otherwise, TaskTime Pro shows the visible browser approval prompt.
         </p>
         <p>

@@ -3,9 +3,9 @@ import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
 
 const highlights = [
     'Install or launch the packaged bridge binary.',
-    'Open TaskTime Pro with the bridge pairing URL or Account > Agent Access.',
+    'Use the active bridge launch URL or pairing status tool.',
     'Use MCP tools only after the browser app is paired.',
-    'Retry with the launch recovery hint when no app session is available.',
+    'Refresh the pairing challenge instead of starting a second bridge.',
 ];
 const listToolsExample = [
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}',
@@ -52,6 +52,9 @@ const callToolExample = JSON.stringify({
             For local development, point <code>--app-url</code> at the local app origin, usually
             <code>http://localhost:3101</code>. The bridge prints a launch URL for
             <code>/account?section=agent</code> with the endpoint, pairing ID, and pairing code already filled in.
+            Managed bundles should also pass a stable <code>--agent-id</code>, a user-facing
+            <code>--agent-label</code>, and a <code>--status-file</code> path so the host can recover setup state
+            without scraping stderr.
         </p>
     </section>
 
@@ -64,6 +67,8 @@ const callToolExample = JSON.stringify({
         <ul class="agent-check-list">
             <li>The app-session WebSocket target must be loopback, such as <code>ws://127.0.0.1:39123/tasktime-agent</code>.</li>
             <li>The pairing ID and pairing code are time-limited and single-use.</li>
+            <li>The WebSocket port is dynamic; pair to the active bridge process, not an example or stale terminal bridge.</li>
+            <li>Stable agent identity comes from <code>--agent-id</code>, not from the localhost port.</li>
             <li>The paired browser app becomes the authoritative app session for command execution.</li>
         </ul>
     </section>
@@ -74,7 +79,8 @@ const callToolExample = JSON.stringify({
             After the bridge starts, an MCP host can initialize and list scoped tools. The public reference at
             <a href="/agents/tools/">/agents/tools/</a> and machine-readable catalog at
             <a href="/agents/mcp-tools.json">/agents/mcp-tools.json</a> come from the same MCP tool definitions used by
-            the bridge.
+            the bridge. Setup tools such as <code>get_pairing_status</code> and <code>refresh_pairing</code> are
+            intentionally available before the browser app is paired.
         </p>
         <pre><code>{listToolsExample}</code></pre>
     </section>
@@ -94,7 +100,8 @@ const callToolExample = JSON.stringify({
             If a tool call fails because no authoritative TaskTime Pro app session is paired, the MCP error includes a
             recovery hint with <code>action: "launch_tasktime"</code> and
             <code>reason: "authoritative_app_session_required"</code>. Agent hosts should guide the user to launch and
-            pair TaskTime Pro, then retry the tool call.
+            pair TaskTime Pro, then retry the tool call. First call <code>get_pairing_status</code>; if its pairing has
+            expired or was used by a stale attempt, call <code>refresh_pairing</code> and open the returned launch URL.
         </p>
     </section>
 </AgentDocsLayout>

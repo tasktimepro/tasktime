@@ -12,6 +12,8 @@ export interface BridgePairingChallenge {
     scopes: AgentPermissionScope[];
     createdAt: number;
     expiresAt: number;
+    agentId?: string;
+    agentLabel?: string;
 }
 
 export interface CreateBridgePairingChallengeOptions {
@@ -22,6 +24,8 @@ export interface CreateBridgePairingChallengeOptions {
     codeLength?: number;
     idFactory?: () => string;
     codeFactory?: (length: number) => string;
+    agentId?: string;
+    agentLabel?: string;
 }
 
 function createPairingCode(length: number): string {
@@ -46,6 +50,8 @@ export function createBridgePairingChallenge(options: CreateBridgePairingChallen
         scopes: [...options.scopes],
         createdAt: now,
         expiresAt: now + ttlMs,
+        agentId: options.agentId,
+        agentLabel: options.agentLabel,
     };
 }
 

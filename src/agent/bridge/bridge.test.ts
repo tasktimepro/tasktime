@@ -444,10 +444,7 @@ describe('agent bridge websocket helpers', () => {
     });
 
     it('exchanges a short-lived session token after successful pairing', async () => {
-        let connectedClientResolve: (client: BridgeWebSocketClient) => void;
-        const connectedClient = new Promise<BridgeWebSocketClient>((resolve) => {
-            connectedClientResolve = resolve;
-        });
+        const connectedClients: BridgeWebSocketClient[] = [];
         const pairingStore = new BridgePairingStore();
         const server = new BridgeAppSessionServer({
             host: '127.0.0.1',
@@ -460,9 +457,12 @@ describe('agent bridge websocket helpers', () => {
                 tokenBytes: 8,
                 tokenFactory: () => 'paired-session-token',
             },
-            onClientConnected: (client) => connectedClientResolve(client),
+            onClientConnected: (client) => {
+                connectedClients.push(client);
+            },
         });
         let connection: TestWebSocketConnection | null = null;
+        let resumedConnection: TestWebSocketConnection | null = null;
 
         pairingStore.create({
             endpoint: 'ws://127.0.0.1:0/tasktime-agent',
@@ -471,6 +471,8 @@ describe('agent bridge websocket helpers', () => {
             ttlMs: 5000,
             idFactory: () => 'pairing-success',
             codeFactory: () => '654321',
+            agentId: 'tasktime.agent.openclaw',
+            agentLabel: 'OpenClaw on this device',
         });
 
         try {
@@ -480,16 +482,20 @@ describe('agent bridge websocket helpers', () => {
                 address.port,
                 '/tasktime-agent?pairingId=pairing-success&pairingCode=654321'
             );
-            const client = await connectedClient;
+            await waitForCondition(() => connectedClients.length === 1);
+            const client = connectedClients[0];
 
             expect(client.session?.sessionToken).toBe('paired-session-token');
             expect(client.session?.scopes).toEqual(new Set(['read', 'write']));
+            expect(client.session?.agentId).toBe('tasktime.agent.openclaw');
             await expect(connection.nextMessage()).resolves.toEqual({
                 type: 'agent_bridge_session',
                 protocolVersion: 1,
                 sessionToken: 'paired-session-token',
                 scopes: ['read', 'write'],
                 expiresAt: 12_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
             });
             expect(server.createSessionRequest(client, 'paired-request', 'create_task', {
                 title: 'Paired task',
@@ -509,7 +515,41 @@ describe('agent bridge websocket helpers', () => {
                 'http://localhost:3101',
                 '/tasktime-agent?pairingId=pairing-success&pairingCode=654321'
             )).resolves.toContain('HTTP/1.1 403 Forbidden');
+
+            await connection.close();
+            connection = null;
+            await waitForCondition(() => server.getClientCount() === 0);
+
+            resumedConnection = await connectTestWebSocket(
+                address.port,
+                '/tasktime-agent?sessionToken=paired-session-token'
+            );
+            await waitForCondition(() => connectedClients.length === 2);
+            const resumedClient = connectedClients[1];
+
+            expect(resumedClient.session?.sessionToken).toBe('paired-session-token');
+            await expect(resumedConnection.nextMessage()).resolves.toEqual({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'paired-session-token',
+                scopes: ['read', 'write'],
+                expiresAt: 12_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
+            });
+            expect(server.getAuditEvents().filter((event) => event.action === 'pairing_succeeded')).toHaveLength(1);
+            expect(server.getAuditEvents()).toEqual(expect.arrayContaining([
+                expect.objectContaining({
+                    action: 'session_connected',
+                    clientId: resumedClient.id,
+                    details: expect.objectContaining({
+                        paired: false,
+                        resumed: true,
+                    }),
+                }),
+            ]));
         } finally {
+            await resumedConnection?.close();
             await connection?.close();
             await server.stop();
         }

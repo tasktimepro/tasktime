@@ -65,8 +65,24 @@ try {
 
   const toolsResponse = JSON.parse(await readStdoutLine())
   assert(toolsResponse.result?.tools?.some((tool) => tool.name === 'get_dashboard_summary'), 'tools/list did not include get_dashboard_summary')
+  assert(toolsResponse.result?.tools?.some((tool) => tool.name === 'get_pairing_status'), 'tools/list did not include get_pairing_status')
+  assert(toolsResponse.result?.tools?.some((tool) => tool.name === 'refresh_pairing'), 'tools/list did not include refresh_pairing')
   assert(!toolsResponse.result?.tools?.some((tool) => tool.name === 'finalize_invoice'), 'default bridge scopes must not expose finalize_invoice')
   assert(!toolsResponse.result?.tools?.some((tool) => tool.name === 'mark_invoice_paid'), 'default bridge scopes must not expose mark_invoice_paid')
+
+  child.stdin.write(`${JSON.stringify({
+    jsonrpc: '2.0',
+    id: 'pairing-status',
+    method: 'tools/call',
+    params: {
+      name: 'get_pairing_status',
+      arguments: {},
+    },
+  })}\n`)
+
+  const statusResponse = JSON.parse(await readStdoutLine())
+  assert(statusResponse.result?.structuredContent?.data?.endpoint, 'get_pairing_status did not return an endpoint')
+  assert(statusResponse.result?.structuredContent?.data?.session?.paired === false, 'get_pairing_status should report no paired session before browser pairing')
 
   child.stdin.write(`${JSON.stringify({
     jsonrpc: '2.0',

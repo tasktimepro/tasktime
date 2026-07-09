@@ -5,7 +5,13 @@
       "args": [
         "./scripts/run-tasktime-agent-bridge.mjs",
         "--app-url",
-        "https://tasktime.pro"
+        "https://tasktime.pro",
+        "--agent-id",
+        "tasktime.agent.openclaw",
+        "--agent-label",
+        "OpenClaw on this device",
+        "--session-ttl-ms",
+        "86400000"
       ]
     }
   }

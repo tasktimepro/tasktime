@@ -5,7 +5,7 @@ import AgentDocsLayout from '../../layouts/AgentDocsLayout.astro';
 const highlights = [
     'MCP over stdio is the primary v1 agent interface.',
     'The paired browser app remains the only mutation owner.',
-    'TaskTime Pro must be open and explicitly paired before an agent can use local data.',
+    'Setup tools expose the active pairing URL before app data tools run.',
     'Sensitive actions require approval checks.',
 ];
 ---
@@ -39,16 +39,16 @@ const highlights = [
                 <h3>Local MCP bridge</h3>
                 <p>
                     Agent hosts launch <code>tasktime-agent-bridge</code> and speak line-delimited MCP JSON-RPC over
-                    stdio. The bridge provides <code>tools/list</code>, <code>tools/call</code>, and TaskTime Pro approval
-                    token support.
+                    stdio. The bridge provides <code>tools/list</code>, <code>tools/call</code>, pairing status and
+                    refresh tools, and TaskTime Pro approval token support.
                 </p>
             </article>
             <article class="agent-info-card">
                 <h3>Paired browser session</h3>
                 <p>
-                    TaskTime Pro connects to the local bridge from Account &gt; Agent Access after the user enters or opens
-                    pairing details. The browser app owns data validation, mutations, downloads, email sends, sync
-                    behavior, and navigation.
+                    TaskTime Pro connects to the local bridge from Account &gt; Agent Access after the user opens the
+                    active pairing URL. Pairing codes are short-lived and single-use, while managed integrations use a
+                    stable local agent identity instead of a random port.
                 </p>
             </article>
             <article class="agent-info-card">
@@ -87,8 +87,8 @@ const highlights = [
         <h2>Important Boundaries</h2>
         <p>
             TaskTime Pro agent access is not a remote API. It is designed for a local personal agent working on the same
-            device as the user. The user grants access, chooses scopes, can revoke access, and remains able to inspect
-            or continue the work in the visible browser app.
+            device as the user. The user grants access, sees the granted scopes after connection, can revoke access,
+            and remains able to inspect or continue the work in the visible browser app.
         </p>
         <p>
             For unsupported visual workflows, use UI automation only as a fallback or validation layer. The MCP bridge is

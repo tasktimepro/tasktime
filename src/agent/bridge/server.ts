@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
-import { createAgentBridgeSession, type AgentBridgeSession } from '@/agent/session';
+import { createAgentBridgeSession, isAgentBridgeSessionExpired, type AgentBridgeSession } from '@/agent/session';
 import {
     AGENT_APP_SESSION_PROTOCOL_VERSION,
     isAgentAppSessionApprovalGrantMessage,
@@ -64,8 +64,9 @@ export interface BridgeAppSessionPairingOptions {
     tokenFactory?: (byteLength?: number) => string;
 }
 
-interface PairingResult {
-    challenge: BridgePairingChallenge;
+interface SessionConnectionResult {
+    challenge?: BridgePairingChallenge;
+    resumed: boolean;
     session: AgentBridgeSession;
 }
 
@@ -203,6 +204,7 @@ export class BridgeAppSessionServer {
     private readonly auditLog: BridgeAuditLog;
     private readonly clients = new Set<BridgeWebSocketClient>();
     private readonly pendingResponses = new Map<string, PendingAppSessionResponse>();
+    private readonly sessions = new Map<string, AgentBridgeSession>();
     private server: Server | null = null;
     private nextClientId = 0;
     private authoritativeClientId: string | null = null;
@@ -241,6 +243,7 @@ export class BridgeAppSessionServer {
         }
 
         this.clients.clear();
+        this.sessions.clear();
         this.authoritativeClientId = null;
 
         if (!server) {
@@ -254,6 +257,10 @@ export class BridgeAppSessionServer {
 
     getClientCount(): number {
         return this.clients.size;
+    }
+
+    getSessionCount(): number {
+        return this.sessions.size;
     }
 
     getAuthoritativeClientId(): string | null {
@@ -291,6 +298,7 @@ export class BridgeAppSessionServer {
             clientId: revokedByClientId,
         });
         this.rejectPendingResponses(new AgentCommandError('PERMISSION_DENIED', 'TaskTime Pro agent bridge access was revoked.'));
+        this.sessions.clear();
 
         for (const client of this.clients) {
             client.close();
@@ -497,8 +505,27 @@ export class BridgeAppSessionServer {
         }
     }
 
-    private createPairingSession(requestUrl: URL): PairingResult | null {
+    private createSessionConnection(requestUrl: URL): SessionConnectionResult | null {
         const pairing = this.options.pairing;
+        const now = pairing?.now ? pairing.now() : Date.now();
+        const sessionToken = requestUrl.searchParams.get('sessionToken')?.trim();
+
+        if (sessionToken) {
+            const session = this.sessions.get(sessionToken);
+
+            if (!session || isAgentBridgeSessionExpired(session, now)) {
+                if (session) {
+                    this.sessions.delete(sessionToken);
+                }
+
+                throw new AgentCommandError('PERMISSION_DENIED', 'Agent bridge session expired or not found.');
+            }
+
+            return {
+                resumed: true,
+                session,
+            };
+        }
 
         if (!pairing) {
             return null;
@@ -515,7 +542,6 @@ export class BridgeAppSessionServer {
             throw new AgentCommandError('PERMISSION_DENIED', 'Pairing credentials are required for the TaskTime Pro agent bridge.');
         }
 
-        const now = pairing.now ? pairing.now() : Date.now();
         const challenge = pairing.store.consume(pairingId, pairingCode, now);
         const session = createAgentBridgeSession({
             scopes: challenge.scopes,
@@ -523,19 +549,32 @@ export class BridgeAppSessionServer {
             ttlMs: pairing.sessionTtlMs,
             tokenBytes: pairing.tokenBytes,
             tokenFactory: pairing.tokenFactory,
+            agentId: challenge.agentId,
+            agentLabel: challenge.agentLabel,
         });
+        this.sessions.set(session.sessionToken, session);
 
-        return { challenge, session };
+        return { challenge, resumed: false, session };
     }
 
     private createPairingMessage(session: AgentBridgeSession): AgentAppSessionPairingMessage {
-        return {
+        const message: AgentAppSessionPairingMessage = {
             type: 'agent_bridge_session',
             protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
             sessionToken: session.sessionToken,
             scopes: Array.from(session.scopes),
             expiresAt: session.expiresAt,
         };
+
+        if (session.agentId) {
+            message.agentId = session.agentId;
+        }
+
+        if (session.agentLabel) {
+            message.agentLabel = session.agentLabel;
+        }
+
+        return message;
     }
 
     private audit(input: Parameters<BridgeAuditLog['append']>[0]): void {
@@ -558,7 +597,7 @@ export class BridgeAppSessionServer {
                 throw new Error('Missing WebSocket key.');
             }
 
-            const pairingResult = this.createPairingSession(requestUrl);
+            const sessionResult = this.createSessionConnection(requestUrl);
 
             socket.write([
                 'HTTP/1.1 101 Switching Protocols',
@@ -569,7 +608,7 @@ export class BridgeAppSessionServer {
                 '',
             ].join('\r\n'));
 
-            const client = new BridgeWebSocketClient(socket, `client-${this.nextClientId++}`, pairingResult?.session ?? null);
+            const client = new BridgeWebSocketClient(socket, `client-${this.nextClientId++}`, sessionResult?.session ?? null);
             this.clients.add(client);
 
             if (!this.authoritativeClientId) {
@@ -580,23 +619,27 @@ export class BridgeAppSessionServer {
                 action: 'session_connected',
                 clientId: client.id,
                 details: {
-                    paired: !!pairingResult,
+                    paired: Boolean(sessionResult?.challenge),
+                    resumed: Boolean(sessionResult?.resumed),
                     authoritative: this.authoritativeClientId === client.id,
                 },
             });
 
-            if (pairingResult) {
-                client.sendJson(this.createPairingMessage(pairingResult.session));
-                this.audit({
-                    action: 'pairing_succeeded',
-                    clientId: client.id,
-                    details: {
-                        pairingId: pairingResult.challenge.id,
-                        scopes: pairingResult.challenge.scopes,
-                        expiresAt: pairingResult.session.expiresAt,
-                    },
-                });
-                this.options.onSessionCreated?.(pairingResult.session, client, pairingResult.challenge);
+            if (sessionResult) {
+                client.sendJson(this.createPairingMessage(sessionResult.session));
+
+                if (sessionResult.challenge) {
+                    this.audit({
+                        action: 'pairing_succeeded',
+                        clientId: client.id,
+                        details: {
+                            pairingId: sessionResult.challenge.id,
+                            scopes: sessionResult.challenge.scopes,
+                            expiresAt: sessionResult.session.expiresAt,
+                        },
+                    });
+                    this.options.onSessionCreated?.(sessionResult.session, client, sessionResult.challenge);
+                }
             }
 
             this.options.onClientConnected?.(client);

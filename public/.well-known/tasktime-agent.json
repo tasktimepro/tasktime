@@ -34,7 +34,23 @@
       "protocol": "websocket",
       "defaultPath": "/tasktime-agent",
       "allowedHosts": ["127.0.0.1", "localhost", "::1"],
-      "pairingRequired": true
+      "pairingRequired": true,
+      "defaultSessionTtlMs": 86400000,
+      "resume": {
+        "queryParam": "sessionToken",
+        "memoryOnly": true,
+        "until": ["session_expiry", "access_revocation", "bridge_process_exit"]
+      }
+    },
+    "statusFile": {
+      "argument": "--status-file",
+      "environment": "TASKTIME_AGENT_BRIDGE_STATUS_FILE",
+      "schemaVersion": 1
+    },
+    "identity": {
+      "argument": "--agent-id",
+      "labelArgument": "--agent-label",
+      "defaultAgentId": "tasktime.agent.local-bridge"
     },
     "defaultScopes": ["read", "write", "navigation"],
     "optionalScopes": ["billing", "export", "email"],
@@ -45,6 +61,8 @@
     "approvalTokens": {
       "format": "tasktime-hmac-sha256-v1",
       "requiresTrustedGrant": true,
+      "trustedGrantDurations": ["until_revoked", "today", "30_days"],
+      "defaultTrustedGrantDuration": "until_revoked",
       "maxTtlMs": 300000,
       "singleUse": true
     },
@@ -57,12 +75,15 @@
       "pairingParams": {
         "endpoint": "agentBridgeEndpoint",
         "pairingId": "agentBridgePairingId",
-        "pairingCode": "agentBridgePairingCode"
+        "pairingCode": "agentBridgePairingCode",
+        "agentId": "agentBridgeAgentId",
+        "agentLabel": "agentBridgeAgentLabel"
       }
     },
     "recovery": {
       "unavailableAction": "launch_tasktime",
-      "reason": "authoritative_app_session_required"
+      "reason": "authoritative_app_session_required",
+      "setupTools": ["get_pairing_status", "refresh_pairing"]
     }
   }
 }

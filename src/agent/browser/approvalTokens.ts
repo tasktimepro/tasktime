@@ -346,6 +346,30 @@ export async function revokeAgentBridgeApprovalGrant(grantId: string, revokedAt:
     }, grantId);
 }
 
+export async function deleteAgentBridgeApprovalGrant(grantId: string): Promise<void> {
+    const db = await getDB();
+    await db.delete(GRANTS_STORE, grantId);
+}
+
+export async function deleteRevokedAgentBridgeApprovalGrants(): Promise<number> {
+    const db = await getDB();
+    const tx = db.transaction(GRANTS_STORE, 'readwrite');
+    const keys = await tx.store.getAllKeys();
+    let deleted = 0;
+
+    for (const key of keys) {
+        const grant = await tx.store.get(key) as AgentBridgeApprovalGrant | undefined;
+
+        if (grant?.revokedAt != null) {
+            await tx.store.delete(key);
+            deleted += 1;
+        }
+    }
+
+    await tx.done;
+    return deleted;
+}
+
 export async function verifyAgentBridgeApprovalToken(
     request: AgentAppSessionApprovalVerificationRequest,
     options: VerifyAgentBridgeApprovalTokenOptions = {}

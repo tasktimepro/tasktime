@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { buildAgentBridgePairingUrl } from '@/agent/browser/bridgeEndpoint';
 import {
     createAgentBridgeApprovalGrant,
+    deleteRevokedAgentBridgeApprovalGrants,
     listAgentBridgeApprovalGrants,
     revokeAgentBridgeApprovalGrant as revokeStoredAgentBridgeApprovalGrant,
     saveAgentBridgeApprovalGrant,
@@ -138,6 +139,41 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         }
     }, []);
 
+    const deliverStoredApprovalGrants = useCallback(async (nextSession) => {
+        try {
+            const grants = await listAgentBridgeApprovalGrants();
+            const now = Date.now();
+            const clientId = nextSession.agentId || 'tasktime.agent.local-bridge';
+            let matchingActiveGrantCount = 0;
+            let deliveredGrantCount = 0;
+
+            setApprovalGrants(grants);
+            setApprovalGrantError('');
+
+            for (const grant of grants) {
+                if (
+                    grant.clientId !== clientId
+                    || grant.revokedAt != null
+                    || (grant.expiresAt != null && grant.expiresAt <= now)
+                ) {
+                    continue;
+                }
+
+                matchingActiveGrantCount += 1;
+
+                if (clientRef.current?.sendApprovalGrant(grant) === true) {
+                    deliveredGrantCount += 1;
+                }
+            }
+
+            if (matchingActiveGrantCount > 0 && deliveredGrantCount === 0) {
+                setApprovalGrantError('Unable to deliver the trusted approval grant to the local bridge.');
+            }
+        } catch {
+            setApprovalGrantError('Trusted approval grants are unavailable in this browser session.');
+        }
+    }, []);
+
     const connect = useCallback(({ endpoint, pairingId, pairingCode }) => {
         if (!agentAccessEnabled) {
             setError('Agent access is disabled for this page session.');
@@ -179,7 +215,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
 
                 if (nextStatus === 'error') {
                     resolvePendingApproval(false);
-                    setError('Unable to connect to the local agent bridge. Check that tasktime-agent-bridge is still running, the endpoint and path match the bridge output, the pairing code has not expired or already been used, and your browser/CSP/local-network settings allow this localhost WebSocket.');
+                    setError('Unable to connect to the active local agent bridge. Check that the MCP-owned bridge is still running and the endpoint matches its current status. If this pairing code expired or was already used, refresh pairing from the same bridge and open the new launch URL.');
                 }
 
                 if (nextStatus === 'closed') {
@@ -188,6 +224,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
             },
             onSessionChange: (nextSession) => {
                 setSession(nextSession);
+                void deliverStoredApprovalGrants(nextSession);
             },
             onCommandApprovalRequest: (request) => {
                 resolvePendingApproval(false);
@@ -275,7 +312,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
             setError(connectError instanceof Error ? connectError.message : 'Unable to connect to the bridge.');
             return false;
         }
-    }, [agentAccessEnabled, closeClient, resolvePendingApproval, verifyApprovalToken]);
+    }, [agentAccessEnabled, closeClient, deliverStoredApprovalGrants, resolvePendingApproval, verifyApprovalToken]);
 
     const disconnect = useCallback(() => {
         resolvePendingApproval(false);
@@ -294,7 +331,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         setStatus('closed');
     }, [resolvePendingApproval]);
 
-    const createApprovalGrant = useCallback(async ({ clientId, label }) => {
+    const createApprovalGrant = useCallback(async ({ clientId, label, expiresAt }) => {
         if (!session) {
             setApprovalGrantError('Pair the local bridge before trusting it for chat approvals.');
             return null;
@@ -304,6 +341,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
             clientId,
             label,
             scopes: Array.from(session.scopes),
+            expiresAt,
         });
 
         try {
@@ -333,6 +371,15 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
             await refreshApprovalGrants();
         } catch {
             setApprovalGrantError('Unable to revoke the trusted approval grant.');
+        }
+    }, [refreshApprovalGrants]);
+
+    const clearRevokedApprovalGrants = useCallback(async () => {
+        try {
+            await deleteRevokedAgentBridgeApprovalGrants();
+            await refreshApprovalGrants();
+        } catch {
+            setApprovalGrantError('Unable to clear revoked trusted approval grants.');
         }
     }, [refreshApprovalGrants]);
 
@@ -381,6 +428,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         revoke,
         createApprovalGrant,
         revokeApprovalGrant,
+        clearRevokedApprovalGrants,
         setAgentAccessState,
         resolvePendingApproval,
     }), [
@@ -400,6 +448,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         revoke,
         createApprovalGrant,
         revokeApprovalGrant,
+        clearRevokedApprovalGrants,
         setAgentAccessState,
         resolvePendingApproval,
     ]);

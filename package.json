@@ -14,6 +14,7 @@
     "build:app": "vite build",
     "build:agent-bridge": "vite build --config vite.agent-bridge.config.js && node ./scripts/fix-agent-bridge-bin.mjs",
     "smoke:agent-bridge": "node ./scripts/smoke-agent-bridge.mjs",
+    "smoke:agent-bundles": "node ./scripts/smoke-agent-bundles.mjs",
     "smoke:agent-live": "node ./scripts/smoke-agent-live.mjs",
     "build:blog": "npm --prefix blog run build",
     "lint": "sh ./scripts/run-eslint.sh",
@@ -26,7 +27,7 @@
     "test:e2e:smoke": "playwright test --workers=2 e2e/*.smoke.spec.js",
     "test:e2e:pwa:smoke": "npm run build && playwright test -c playwright.pwa.config.js",
     "release": "npm run lint && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run build",
-    "release:agent": "npm run build:agent-bridge && npm run smoke:agent-bridge && npm run smoke:agent-live"
+    "release:agent": "npm run build:agent-bridge && npm run smoke:agent-bridge && npm run smoke:agent-bundles && npm run smoke:agent-live"
   },
   "dependencies": {
     "@debugbundle/sdk-browser": "^1.4.0",

@@ -1,6 +1,7 @@
 import type { AgentCommandContext, AgentCommandErrorCode } from '@/agent/types';
 import type { AgentBridgeSession } from '@/agent/session';
 import { isAgentBridgeSessionExpired } from '@/agent/session';
+import { buildAgentBridgeSessionUrl } from '@/agent/browser/bridgeEndpoint';
 import {
     AGENT_APP_SESSION_PROTOCOL_VERSION,
     createAgentBridgeSessionFromPairingMessage,
@@ -138,7 +139,7 @@ export class AgentAppSessionWebSocketClient {
         this.clearReconnectTimer();
         const WebSocketCtor = getWebSocketCtor(this.options.WebSocketCtor);
         this.setStatus('connecting');
-        this.socket = new WebSocketCtor(this.options.url);
+        this.socket = new WebSocketCtor(this.createConnectionUrl());
         this.socket.onopen = () => {
             this.reconnectAttempts = 0;
             this.setStatus('open');
@@ -256,6 +257,17 @@ export class AgentAppSessionWebSocketClient {
 
             this.connect();
         }, this.options.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS);
+    }
+
+    private createConnectionUrl(): string {
+        if (!this.session || isAgentBridgeSessionExpired(this.session)) {
+            return this.options.url;
+        }
+
+        return buildAgentBridgeSessionUrl({
+            endpoint: this.options.url,
+            sessionToken: this.session.sessionToken,
+        });
     }
 
     private async handleMessage(data: unknown): Promise<void> {

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Readable, Writable } from 'node:stream';
 import { AgentCommandError, type AgentPermissionScope } from '@/agent/types';
 import type { AgentAppSessionApprovalToken, AgentAppSessionResponse } from '@/agent/transport/protocol';
-import { getMcpToolDefinition, listMcpToolDefinitions } from './mcpTools';
+import { getMcpToolDefinition, isBridgeSetupToolName, listMcpToolDefinitions, type BridgeSetupToolName } from './mcpTools';
 
 const MCP_PROTOCOL_VERSION = '2025-11-25';
 const JSON_RPC_VERSION = '2.0';
@@ -18,6 +18,8 @@ export interface McpBridgeCommandSender {
         timeoutMs?: number,
         approval?: AgentAppSessionApprovalToken
     ) => Promise<AgentAppSessionResponse>;
+    getPairingStatus?: () => unknown;
+    refreshPairing?: () => unknown;
     createApprovalToken?: (options: {
         grantId?: string;
         command: string;
@@ -172,6 +174,10 @@ export class McpBridgeJsonRpcServer {
             return createToolError('INVALID_INPUT', `Unsupported TaskTime Pro tool: ${callParams.name}`);
         }
 
+        if (isBridgeSetupToolName(tool.name)) {
+            return this.callBridgeSetupTool(tool.name);
+        }
+
         const missingScope = tool.scopes.find((scope) => !this.scopes.has(scope));
 
         if (missingScope) {
@@ -220,6 +226,22 @@ export class McpBridgeJsonRpcServer {
         };
     }
 
+    private callBridgeSetupTool(name: BridgeSetupToolName): unknown {
+        if (name === 'get_pairing_status') {
+            if (!this.bridge.getPairingStatus) {
+                return createToolError('UNAVAILABLE', 'TaskTime Pro bridge pairing status is unavailable.');
+            }
+
+            return createToolSuccess(name, this.bridge.getPairingStatus());
+        }
+
+        if (!this.bridge.refreshPairing) {
+            return createToolError('UNAVAILABLE', 'TaskTime Pro bridge pairing refresh is unavailable.');
+        }
+
+        return createToolSuccess(name, this.bridge.refreshPairing());
+    }
+
     private async createApprovalToken(params: unknown): Promise<unknown> {
         if (!this.bridge.createApprovalToken) {
             return createToolError('UNAVAILABLE', 'TaskTime Pro approval-token signing is unavailable.');
@@ -235,6 +257,10 @@ export class McpBridgeJsonRpcServer {
 
         if (!tool) {
             return createToolError('INVALID_INPUT', `Unsupported TaskTime Pro tool: ${tokenParams.command}`);
+        }
+
+        if (isBridgeSetupToolName(tool.name)) {
+            return createToolError('INVALID_INPUT', `TaskTime Pro setup tool does not require approval tokens: ${tokenParams.command}`);
         }
 
         const scopes = parseApprovalScopes(tokenParams.scopes, tool.scopes);
@@ -417,7 +443,28 @@ function getUnavailableAppSessionRecoveryDetails(): Record<string, unknown> {
             action: 'launch_tasktime',
             reason: 'authoritative_app_session_required',
             message: 'Open TaskTime Pro and connect the local agent bridge, then retry the tool call.',
+            statusTool: 'get_pairing_status',
+            refreshTool: 'refresh_pairing',
         },
+    };
+}
+
+export function createToolSuccess(command: string, data: unknown): unknown {
+    const response = {
+        ok: true,
+        command,
+        data,
+    };
+
+    return {
+        content: [
+            {
+                type: 'text',
+                text: JSON.stringify(response),
+            },
+        ],
+        structuredContent: response,
+        isError: false,
     };
 }
 

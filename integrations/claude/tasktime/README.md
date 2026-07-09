@@ -32,6 +32,10 @@ Reload plugins if Claude Code asks for it:
 
 Open TaskTime Pro, go to Account > Agent Access, and approve the local pairing request before using tools.
 
+For plugin-managed installs, pair TaskTime Pro to the active Claude-owned MCP bridge, not to a separately launched terminal bridge. Use the bridge-local `get_pairing_status` tool to find the exact dynamic localhost endpoint and TaskTime Pro launch URL. If the code expired or was already consumed, call `refresh_pairing` and use the new launch URL.
+
+This plugin identifies itself as `tasktime.agent.claude-code` / `Claude Code on this device`, writes `tasktime-agent-bridge.status.json` beside the launcher, and uses a 24-hour app-session TTL for normal work sessions. Pairing codes remain short-lived and single-use.
+
 Claude clients that support MCP but not Claude Code plugins can use the standalone bridge package instead:
 
 ```json

@@ -18,6 +18,11 @@ export interface AgentBridgePairingFields {
     pairingCode: string;
 }
 
+export interface AgentBridgeSessionFields {
+    endpoint: string;
+    sessionToken: string;
+}
+
 export function buildAgentBridgePairingUrl(fields: AgentBridgePairingFields): string {
     const endpoint = fields.endpoint.trim();
     const pairingId = fields.pairingId.trim();
@@ -51,6 +56,35 @@ export function buildAgentBridgePairingUrl(fields: AgentBridgePairingFields): st
     return url.toString();
 }
 
+export function buildAgentBridgeSessionUrl(fields: AgentBridgeSessionFields): string {
+    const endpoint = fields.endpoint.trim();
+    const sessionToken = fields.sessionToken.trim();
+
+    if (!endpoint) {
+        throw new Error('Bridge endpoint is required.');
+    }
+
+    if (!sessionToken) {
+        throw new Error('Session token is required.');
+    }
+
+    const url = new URL(endpoint);
+
+    if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+        throw new Error('Bridge endpoint must use ws:// or wss://.');
+    }
+
+    if (!LOOPBACK_HOSTS.has(url.hostname)) {
+        throw new Error('Bridge endpoint must use a loopback host.');
+    }
+
+    url.searchParams.delete('pairingId');
+    url.searchParams.delete('pairingCode');
+    url.searchParams.set('sessionToken', sessionToken);
+
+    return url.toString();
+}
+
 export function getAgentBridgeConnectionDiagnostics(
     endpoint: string,
     pageProtocol: string = typeof window === 'undefined' ? '' : window.location.protocol
@@ -69,7 +103,7 @@ export function getAgentBridgeConnectionDiagnostics(
         return [{
             severity: 'error',
             title: 'Endpoint is not a valid URL',
-            message: 'Use the WebSocket endpoint printed by tasktime-agent-bridge, for example ws://127.0.0.1:12345/tasktime-agent.',
+            message: 'Use the exact WebSocket endpoint printed by the active bridge or returned by the pairing status tool, for example ws://127.0.0.1:<dynamic-port>/tasktime-agent.',
         }];
     }
 
@@ -109,9 +143,9 @@ export function getAgentBridgeConnectionDiagnostics(
 
     if (pageProtocol === 'https:' && url.protocol === 'ws:') {
         diagnostics.push({
-            severity: 'warning',
-            title: 'Browser may block ws:// from this page',
-            message: 'If the browser blocks the local WebSocket, use a WSS bridge endpoint, a local development origin, or a future desktop wrapper.',
+            severity: 'info',
+            title: 'Local ws:// bridge',
+            message: 'If this browser blocks the local WebSocket, use a WSS bridge endpoint, local development origin, or desktop wrapper.',
         });
     }
 

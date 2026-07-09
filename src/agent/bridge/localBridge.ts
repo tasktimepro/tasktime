@@ -25,6 +25,8 @@ export interface CreateLocalAgentPairingOptions {
     codeLength?: number;
     idFactory?: () => string;
     codeFactory?: (length: number) => string;
+    agentId?: string;
+    agentLabel?: string;
 }
 
 export interface CreateLocalAgentApprovalTokenOptions {
@@ -91,6 +93,8 @@ export class LocalAgentBridge {
             codeLength: options.codeLength,
             idFactory: options.idFactory,
             codeFactory: options.codeFactory,
+            agentId: options.agentId,
+            agentLabel: options.agentLabel,
         });
     }
 
@@ -124,6 +128,14 @@ export class LocalAgentBridge {
         return Array.from(this.approvalGrants.values());
     }
 
+    getClientCount(): number {
+        return this.server.getClientCount();
+    }
+
+    getAuthoritativeClientId(): string | null {
+        return this.server.getAuthoritativeClientId();
+    }
+
     createApprovalToken(options: CreateLocalAgentApprovalTokenOptions): AgentAppSessionApprovalToken {
         const requestedScopes = dedupeScopes(options.scopes);
         const now = this.options.now ? this.options.now() : Date.now();
@@ -155,7 +167,7 @@ export class LocalAgentBridge {
         });
     }
 
-    private getEndpoint(): string {
+    getEndpoint(): string {
         const address = this.server.getAddress();
 
         if (!address || typeof address === 'string') {

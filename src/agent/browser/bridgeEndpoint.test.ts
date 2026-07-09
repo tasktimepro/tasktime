@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAgentBridgePairingUrl, getAgentBridgeConnectionDiagnostics } from './bridgeEndpoint';
+import { buildAgentBridgePairingUrl, buildAgentBridgeSessionUrl, getAgentBridgeConnectionDiagnostics } from './bridgeEndpoint';
 
 describe('buildAgentBridgePairingUrl', () => {
     it('adds pairing credentials to an explicit loopback websocket endpoint', () => {
@@ -50,6 +50,13 @@ describe('buildAgentBridgePairingUrl', () => {
         })).toThrow('Pairing ID is required.');
     });
 
+    it('builds resume URLs from a session token and removes stale pairing credentials', () => {
+        expect(buildAgentBridgeSessionUrl({
+            endpoint: 'ws://127.0.0.1:39123/tasktime-agent?pairingId=old&pairingCode=used&debug=1',
+            sessionToken: 'session-token',
+        })).toBe('ws://127.0.0.1:39123/tasktime-agent?debug=1&sessionToken=session-token');
+    });
+
     it('returns no diagnostics for an empty endpoint', () => {
         expect(getAgentBridgeConnectionDiagnostics('')).toEqual([]);
     });
@@ -80,8 +87,8 @@ describe('buildAgentBridgePairingUrl', () => {
                 title: 'Endpoint has no explicit port',
             }),
             expect.objectContaining({
-                severity: 'warning',
-                title: 'Browser may block ws:// from this page',
+                severity: 'info',
+                title: 'Local ws:// bridge',
             }),
         ]));
         expect(getAgentBridgeConnectionDiagnostics('ws://127.0.0.1:39123/custom-path')).toEqual(expect.arrayContaining([

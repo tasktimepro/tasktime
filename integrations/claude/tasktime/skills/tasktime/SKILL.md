@@ -31,7 +31,13 @@ Install from the TaskTime Pro Claude marketplace:
 
 When the plugin is enabled, Claude Code starts the bundled `tasktime` MCP server automatically. In Claude Code, the server appears as `plugin:tasktime:tasktime`. Plugin-bundled MCP tools use the full name form `mcp__plugin_tasktime_tasktime__<tool-name>`, for example `mcp__plugin_tasktime_tasktime__list_projects`.
 
-The user grants first-use access in TaskTime Pro under Account > Agent Access. Require a running, paired browser session before reading or mutating data. After pairing, check available tools because they depend on the granted scopes. Default scopes are `read`, `write`, and `navigation`; optional scopes are `billing`, `export`, and `email`.
+The user grants first-use access in TaskTime Pro under Account > Agent Access. Require a running, paired browser session before reading or mutating data. After pairing, check available tools because they depend on the granted scopes. Default scopes are `read`, `write`, and `navigation`; optional scopes are `billing`, `export`, and `email`. Current TaskTime Pro app builds show scopes after connection; do not tell the user to select scopes in the app unless a future scope picker is visible.
+
+For Claude-plugin-managed installs, do not ask the user to run `tasktime-agent-bridge` manually in Terminal. Pair TaskTime Pro to the active Claude-owned MCP bridge only. The bridge exposes `get_pairing_status` and `refresh_pairing`; use those setup tools to get the exact endpoint, launch URL, stable agent identity, current pairing expiry, and session state. If a pairing code expired or was already used, call `refresh_pairing` and open the returned launch URL.
+
+The Claude plugin uses the stable agent identity `tasktime.agent.claude-code` with the label `Claude Code on this device`. The WebSocket port is dynamic and must not be treated as identity. App sessions are intended to last through normal work sessions, while pairing codes stay short-lived and single-use. Within a running bridge process, browser reconnects resume with a memory-only app-session token; ask the user to re-pair only when status shows no paired session, the session expired, access was revoked, or the bridge process restarted.
+
+Trusted chat approvals default to until revoked for stable same-device managed agents. Shorter trust durations may be available, but do not tell the user they must re-trust every 30 days unless they chose a 30-day grant.
 
 ## Operating Workflow
 
@@ -45,6 +51,7 @@ The user grants first-use access in TaskTime Pro under Account > Agent Access. R
 ## Useful First Tools
 
 - `list_projects`, `list_clients`, and `list_tasks` to understand the current workspace.
+- `get_pairing_status` and `refresh_pairing` for setup/recovery before app data tools are available.
 - `get_active_timers`, `start_timer`, `pause_timer`, `resume_timer`, and `stop_timer` for time tracking.
 - `create_project`, `create_client`, and `create_task` for normal setup and planning.
 - `list_expenses` and expense category tools for expense review and entry.
@@ -56,7 +63,11 @@ The user grants first-use access in TaskTime Pro under Account > Agent Access. R
 
 If a tool call returns an unavailable app-session error with `launch_tasktime`, open or guide the user to TaskTime Pro, pair Account > Agent Access, then retry. Do not treat this as a generic MCP failure.
 
+If `get_pairing_status` is available, inspect it before suggesting manual commands. If the status shows no paired app session, use its `launchUrl`; if the pairing is expired or consumed, call `refresh_pairing` and use the new `launchUrl`. Never pair the app to a separately launched terminal bridge when the MCP server is already plugin-managed.
+
 If tool availability does not match the task, inspect the MCP server status and granted scopes. Ask the user to adjust TaskTime Pro Agent Access only when the missing scope is actually needed.
+
+For task-and-time-management workflows, prefer this sequence: inspect projects/tasks, create or choose the task, start the timer, let the user work, later check active timers and stop the matching timer. A timer can reasonably run for hours; do not assume the session should expire after a short chat turn.
 
 ## Safety
 

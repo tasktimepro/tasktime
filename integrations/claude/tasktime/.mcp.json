@@ -5,7 +5,13 @@
       "args": [
         "${CLAUDE_PLUGIN_ROOT}/scripts/run-tasktime-agent-bridge.mjs",
         "--app-url",
-        "https://tasktime.pro"
+        "https://tasktime.pro",
+        "--agent-id",
+        "tasktime.agent.claude-code",
+        "--agent-label",
+        "Claude Code on this device",
+        "--session-ttl-ms",
+        "86400000"
       ]
     }
   }

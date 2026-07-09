@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AgentBridgeSettings from './AgentBridgeSettings';
@@ -66,7 +66,7 @@ const approvalTokenMocks = vi.hoisted(() => {
             scopes: [...options.scopes],
             secretKeyBase64Url: 'secret-key',
             createdAt: 1_700_000_000_000,
-            expiresAt: null,
+            expiresAt: options.expiresAt ?? null,
             revokedAt: null,
         })),
         saveAgentBridgeApprovalGrant: vi.fn(async (grant) => {
@@ -82,6 +82,11 @@ const approvalTokenMocks = vi.hoisted(() => {
                     ? { ...grant, revokedAt: 1_700_000_010_000 }
                     : grant
             ));
+        }),
+        deleteRevokedAgentBridgeApprovalGrants: vi.fn(async () => {
+            const beforeCount = state.grants.length;
+            state.grants = state.grants.filter((grant) => !grant.revokedAt);
+            return beforeCount - state.grants.length;
         }),
     };
 });
@@ -99,6 +104,7 @@ vi.mock('@/agent/browser/approvalTokens', () => ({
     saveAgentBridgeApprovalGrant: approvalTokenMocks.saveAgentBridgeApprovalGrant,
     listAgentBridgeApprovalGrants: approvalTokenMocks.listAgentBridgeApprovalGrants,
     revokeAgentBridgeApprovalGrant: approvalTokenMocks.revokeAgentBridgeApprovalGrant,
+    deleteRevokedAgentBridgeApprovalGrants: approvalTokenMocks.deleteRevokedAgentBridgeApprovalGrants,
 }));
 
 function renderAgentBridgeSettings(ui = <AgentBridgeSettings />) {
@@ -120,6 +126,7 @@ describe('AgentBridgeSettings', () => {
         approvalTokenMocks.saveAgentBridgeApprovalGrant.mockClear();
         approvalTokenMocks.listAgentBridgeApprovalGrants.mockClear();
         approvalTokenMocks.revokeAgentBridgeApprovalGrant.mockClear();
+        approvalTokenMocks.deleteRevokedAgentBridgeApprovalGrants.mockClear();
         window.history.pushState({}, '', '/account?section=agent');
     });
 
@@ -157,6 +164,7 @@ describe('AgentBridgeSettings', () => {
         expect(screen.getByLabelText('Bridge endpoint')).toHaveValue('ws://127.0.0.1:39123/tasktime-agent');
         expect(screen.getByLabelText('Pairing ID')).toHaveValue('pairing-1');
         expect(screen.getByLabelText('Pairing code')).toHaveValue('123456');
+        expect(screen.getByText('Local agent request')).toBeInTheDocument();
 
         await waitFor(() => {
             const params = new URLSearchParams(window.location.search);
@@ -167,7 +175,7 @@ describe('AgentBridgeSettings', () => {
             expect(params.has('agentBridgePairingCode')).toBe(false);
         });
 
-        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+        await userEvent.click(screen.getByRole('button', { name: 'Approve & Connect' }));
 
         expect(FakeWebSocket.instances).toHaveLength(1);
         expect(FakeWebSocket.instances[0].url).toBe('ws://127.0.0.1:39123/tasktime-agent?pairingId=pairing-1&pairingCode=123456');
@@ -217,7 +225,7 @@ describe('AgentBridgeSettings', () => {
         expect(screen.getAllByText('Disconnected').length).toBeGreaterThan(0);
     });
 
-    it('creates and revokes a trusted approval grant for the paired local agent', async () => {
+    it('creates and revokes an until-revoked trusted approval grant for the paired local agent by default', async () => {
         renderAgentBridgeSettings();
 
         await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
@@ -234,6 +242,8 @@ describe('AgentBridgeSettings', () => {
                 sessionToken: 'paired-token',
                 scopes: ['read', 'write', 'billing'],
                 expiresAt: Date.now() + 60_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
             }));
         });
 
@@ -241,7 +251,8 @@ describe('AgentBridgeSettings', () => {
             expect(screen.getAllByText('Paired').length).toBeGreaterThan(0);
         });
 
-        await userEvent.click(screen.getByRole('button', { name: 'Trust Current Agent' }));
+        expect(screen.getByRole('combobox', { name: 'Trust duration' })).toHaveTextContent('Until revoked');
+        await userEvent.click(screen.getByRole('button', { name: 'Trust Until Revoked' }));
 
         await waitFor(() => {
             expect(approvalTokenMocks.saveAgentBridgeApprovalGrant).toHaveBeenCalledTimes(1);
@@ -249,9 +260,10 @@ describe('AgentBridgeSettings', () => {
         });
 
         expect(approvalTokenMocks.createAgentBridgeApprovalGrant).toHaveBeenCalledWith({
-            clientId: 'ws://127.0.0.1:39123/tasktime-agent',
-            label: 'Local agent bridge',
+            clientId: 'tasktime.agent.openclaw',
+            label: 'OpenClaw on this device',
             scopes: ['read', 'write', 'billing'],
+            expiresAt: null,
         });
         expect(JSON.parse(socket.sent[0])).toEqual({
             type: 'agent_bridge_approval_grant',
@@ -259,19 +271,21 @@ describe('AgentBridgeSettings', () => {
             sessionToken: 'paired-token',
             grant: expect.objectContaining({
                 id: 'grant-1',
-                clientId: 'ws://127.0.0.1:39123/tasktime-agent',
-                label: 'Local agent bridge',
+                clientId: 'tasktime.agent.openclaw',
+                label: 'OpenClaw on this device',
                 scopes: ['read', 'write', 'billing'],
                 secretKeyBase64Url: 'secret-key',
+                expiresAt: null,
             }),
         });
-        expect(screen.getByRole('button', { name: 'Trust Current Agent' })).toBeDisabled();
+        expect(screen.getByText('Expires: Never')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Trust Until Revoked' })).toBeDisabled();
 
         await userEvent.click(screen.getByRole('button', { name: 'Revoke Grant' }));
 
         await waitFor(() => {
             expect(approvalTokenMocks.revokeAgentBridgeApprovalGrant).toHaveBeenCalledWith('grant-1', expect.any(Number));
-            expect(screen.getByText('Revoked')).toBeInTheDocument();
+            expect(screen.getByText('Clear Revoked')).toBeInTheDocument();
         });
         expect(JSON.parse(socket.sent[1])).toEqual({
             type: 'agent_bridge_approval_grant_revoke',
@@ -279,6 +293,94 @@ describe('AgentBridgeSettings', () => {
             sessionToken: 'paired-token',
             grantId: 'grant-1',
             revokedAt: expect.any(Number),
+        });
+    });
+
+    it('redelivers an existing trusted approval grant to a newly paired stable agent', async () => {
+        approvalTokenMocks.state.grants = [{
+            id: 'grant-existing',
+            clientId: 'tasktime.agent.openclaw',
+            label: 'OpenClaw on this device',
+            scopes: ['read', 'write'],
+            secretKeyBase64Url: 'secret-key',
+            createdAt: 1_700_000_000_000,
+            expiresAt: null,
+            revokedAt: null,
+        }];
+
+        renderAgentBridgeSettings();
+
+        await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
+        await userEvent.type(screen.getByLabelText('Pairing ID'), 'pairing-1');
+        await userEvent.type(screen.getByLabelText('Pairing code'), '123456');
+        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'paired-token',
+                scopes: ['read', 'write'],
+                expiresAt: Date.now() + 60_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
+            }));
+        });
+
+        await waitFor(() => {
+            expect(socket.sent.some((message) => {
+                const parsed = JSON.parse(message);
+
+                return parsed.type === 'agent_bridge_approval_grant'
+                    && parsed.grant.id === 'grant-existing'
+                    && parsed.grant.clientId === 'tasktime.agent.openclaw';
+            })).toBe(true);
+        });
+
+        expect(screen.getByRole('button', { name: 'Trust Until Revoked' })).toBeDisabled();
+        expect(screen.getByText('Trusted')).toBeInTheDocument();
+        expect(approvalTokenMocks.saveAgentBridgeApprovalGrant).not.toHaveBeenCalled();
+    });
+
+    it('can create a time-limited trusted approval grant when selected', async () => {
+        renderAgentBridgeSettings();
+
+        await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
+        await userEvent.type(screen.getByLabelText('Pairing ID'), 'pairing-1');
+        await userEvent.type(screen.getByLabelText('Pairing code'), '123456');
+        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+        act(() => {
+            FakeWebSocket.instances[0].open();
+            FakeWebSocket.instances[0].message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'paired-token',
+                scopes: ['read', 'write'],
+                expiresAt: Date.now() + 60_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
+            }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('Paired').length).toBeGreaterThan(0);
+        });
+
+        fireEvent.click(screen.getByRole('combobox', { name: 'Trust duration' }));
+        fireEvent.click(screen.getByRole('option', { name: '30 days' }));
+        expect(screen.getByRole('combobox', { name: 'Trust duration' })).toHaveTextContent('30 days');
+        await userEvent.click(screen.getByRole('button', { name: 'Trust for 30 Days' }));
+
+        await waitFor(() => {
+            expect(approvalTokenMocks.createAgentBridgeApprovalGrant).toHaveBeenCalledWith({
+                clientId: 'tasktime.agent.openclaw',
+                label: 'OpenClaw on this device',
+                scopes: ['read', 'write'],
+                expiresAt: expect.any(Number),
+            });
         });
     });
 

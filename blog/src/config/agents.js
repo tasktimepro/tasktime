@@ -1,4 +1,4 @@
-export const AGENT_DOCS_LAST_UPDATED = '2026-07-07';
+export const AGENT_DOCS_LAST_UPDATED = '2026-07-10';
 
 export const AGENT_DOCS_DESCRIPTION = 'Use TaskTime Pro with same-device AI agents through the local MCP agent bridge for private task management, time tracking, expenses, invoicing, reports, and app navigation.';
 

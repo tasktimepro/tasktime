@@ -15,6 +15,24 @@ This file is the local source of truth for publishing TaskTime Pro agent-facing 
 
 The old ClawHub slug `@tasktimepro/tasktime-pro` was merged into `@tasktimepro/tasktime` on July 8, 2026. Treat `@tasktimepro/tasktime` as canonical.
 
+## Agent Bridge UX Contract
+
+TaskTime Pro pairing must be smooth for managed agent platforms:
+
+- Pairing codes stay short-lived and single-use. Do not lengthen pairing codes to days or months.
+- App sessions default to normal work-session length: 24 hours unless a host explicitly overrides `--session-ttl-ms`.
+- After successful pairing, browser reconnects must use the in-memory app-session token, not the consumed pairing code. The bridge should accept `?sessionToken=...` until the session expires, access is revoked, or the bridge process exits.
+- App-session tokens are memory-only. Do not write them to status files, logs, launch URLs, docs, or MCP recovery payloads.
+- Stable trust identity comes from `--agent-id` and `--agent-label`, not the dynamic WebSocket port.
+- Trusted chat approval grants default to "until revoked" for stable same-device managed agents. The UI may also offer shorter grants such as "today" or "30 days", but the smooth path should not force recurring monthly re-trust.
+- OpenClaw uses `tasktime.agent.openclaw` / `OpenClaw on this device`.
+- Claude Code uses `tasktime.agent.claude-code` / `Claude Code on this device`.
+- Managed bundles should pass `--status-file` so agents can discover the active endpoint and launch URL without scraping stderr.
+- Agents should use `get_pairing_status` before giving setup instructions, and `refresh_pairing` when a pairing code expired or was consumed.
+- Agents must not ask users to run a separate `tasktime-agent-bridge` terminal process when the installed MCP server already owns a bridge.
+- Current TaskTime Pro app builds show scopes after connection; do not document user-selectable scopes unless the app gains a visible scope picker.
+- Task-and-time-management validation must include the long-running flow: inspect/create task, start timer, let the user work, later stop the same timer and verify the created time entry.
+
 ## Credentials
 
 ClawHub CLI auth is stored locally at:
@@ -54,9 +72,11 @@ For bridge-only changes, the minimum useful local check is:
 ```bash
 make npm CMD="run build:agent-bridge"
 make npm CMD="run smoke:agent-bridge"
+make npm CMD="run smoke:agent-bundles"
 ```
 
 Use `smoke:agent-live` before publishing bridge behavior changes that affect browser pairing, command routing, or MCP tool calls.
+For managed integration changes, also validate the OpenClaw/Claude launcher path: the bundle starts one bridge, writes a status file, exposes `get_pairing_status`/`refresh_pairing`, pairs the browser app to that same bridge, and successfully calls `list_projects`.
 
 ## MCP Bridge Release
 
@@ -79,6 +99,7 @@ cp agent-bridge/dist/tasktime-agent-bridge.mjs integrations/claude/tasktime/vend
 
 ```bash
 make npm CMD="run smoke:agent-bridge"
+make npm CMD="run smoke:agent-bundles"
 make npm CMD="run smoke:agent-live"
 ```
 
@@ -203,6 +224,8 @@ Important files:
 - `scripts/run-tasktime-agent-bridge.mjs`
 - `vendor/tasktime-agent-bridge.mjs`
 
+The OpenClaw `.mcp.json` must pass `--agent-id tasktime.agent.openclaw`, `--agent-label "OpenClaw on this device"`, and a work-session-length `--session-ttl-ms`. The launcher writes `tasktime-agent-bridge.status.json` next to the bundle by default.
+
 When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`. If the bundle package itself is published to npm, bump `integrations/openclaw/tasktime/package.json` and publish from that directory with `npm publish --access public` using the TaskTime Pro npm credentials.
 
 ## Claude Code Plugin Bundle
@@ -228,6 +251,8 @@ The marketplace install path is repository-backed:
 /plugin install tasktime@tasktimepro
 ```
 
+The Claude `.mcp.json` must pass `--agent-id tasktime.agent.claude-code`, `--agent-label "Claude Code on this device"`, and a work-session-length `--session-ttl-ms`. The launcher writes `tasktime-agent-bridge.status.json` next to the plugin by default.
+
 When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`. Bump `.claude-plugin/plugin.json` when the plugin bundle changes in a way users should receive as a new plugin version.
 
 ## Final Sanity Checks
@@ -241,3 +266,4 @@ Before tagging or announcing an agent release:
 - `@tasktimepro/tasktime-pro` redirects to `@tasktimepro/tasktime` if inspected.
 - Public docs point to `@tasktimepro/tasktime`, `@tasktimepro/agent-bridge`, and `pro.tasktime/agent-bridge`.
 - Vendored bridge files match `agent-bridge/dist/tasktime-agent-bridge.mjs` when a bundle includes the bridge.
+- Managed bundle tests verify `get_pairing_status`, `refresh_pairing`, stable agent identity, status-file output, and the create/start/stop timer workflow.

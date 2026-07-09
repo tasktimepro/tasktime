@@ -125,7 +125,7 @@ describe('AgentAppSessionWebSocketClient', () => {
         FakeWebSocket.instances = [];
     });
 
-    it('connects only to the explicitly configured URL and reports status', () => {
+    it('connects with a paired session token when one is already available', () => {
         const statuses: string[] = [];
         const client = new AgentAppSessionWebSocketClient({
             url: 'ws://127.0.0.1:39876/tasktime-agent',
@@ -138,7 +138,7 @@ describe('AgentAppSessionWebSocketClient', () => {
         client.connect();
 
         expect(FakeWebSocket.instances).toHaveLength(1);
-        expect(FakeWebSocket.instances[0].url).toBe('ws://127.0.0.1:39876/tasktime-agent');
+        expect(FakeWebSocket.instances[0].url).toBe('ws://127.0.0.1:39876/tasktime-agent?sessionToken=session-token');
         expect(statuses).toEqual(['connecting']);
 
         FakeWebSocket.instances[0].open();
@@ -603,7 +603,7 @@ describe('AgentAppSessionWebSocketClient', () => {
         expect(context.tasks.size).toBe(0);
     });
 
-    it('reconnects to the same explicit URL after an unexpected close when enabled', () => {
+    it('reconnects with the existing session token after an unexpected close when enabled', () => {
         vi.useFakeTimers();
         const statuses: string[] = [];
         const client = new AgentAppSessionWebSocketClient({
@@ -630,8 +630,39 @@ describe('AgentAppSessionWebSocketClient', () => {
 
         vi.advanceTimersByTime(1);
         expect(FakeWebSocket.instances).toHaveLength(2);
-        expect(FakeWebSocket.instances[1].url).toBe('ws://127.0.0.1:39876/tasktime-agent');
+        expect(FakeWebSocket.instances[1].url).toBe('ws://127.0.0.1:39876/tasktime-agent?sessionToken=session-token');
         expect(statuses).toEqual(['connecting', 'open', 'closed', 'connecting']);
+    });
+
+    it('uses the initial pairing URL first, then session-token resume URLs after pairing', () => {
+        vi.useFakeTimers();
+        const client = new AgentAppSessionWebSocketClient({
+            url: 'ws://127.0.0.1:39876/tasktime-agent?pairingId=pairing-1&pairingCode=123456',
+            context: createContext(),
+            WebSocketCtor: FakeWebSocket,
+            autoReconnect: true,
+            reconnectDelayMs: 250,
+        });
+
+        client.connect();
+        const firstSocket = FakeWebSocket.instances[0];
+        firstSocket.open();
+
+        expect(firstSocket.url).toBe('ws://127.0.0.1:39876/tasktime-agent?pairingId=pairing-1&pairingCode=123456');
+
+        firstSocket.message(JSON.stringify({
+            type: 'agent_bridge_session',
+            protocolVersion: 1,
+            sessionToken: 'paired-token',
+            scopes: ['read', 'write'],
+            expiresAt: Date.now() + 60_000,
+        }));
+
+        firstSocket.close();
+        vi.advanceTimersByTime(250);
+
+        expect(FakeWebSocket.instances).toHaveLength(2);
+        expect(FakeWebSocket.instances[1].url).toBe('ws://127.0.0.1:39876/tasktime-agent?sessionToken=paired-token');
     });
 
     it('does not reconnect after an explicit client close', () => {

@@ -1,6 +1,6 @@
 import type { AgentPermissionScope } from '@/agent/types';
 
-const DEFAULT_SESSION_TTL_MS = 30 * 60 * 1000;
+const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_TOKEN_BYTES = 32;
 
 export interface AgentBridgeSession {
@@ -8,6 +8,8 @@ export interface AgentBridgeSession {
     scopes: Set<AgentPermissionScope>;
     createdAt: number;
     expiresAt: number;
+    agentId?: string;
+    agentLabel?: string;
 }
 
 export interface CreateAgentBridgeSessionOptions {
@@ -16,6 +18,8 @@ export interface CreateAgentBridgeSessionOptions {
     ttlMs?: number;
     tokenBytes?: number;
     tokenFactory?: (byteLength?: number) => string;
+    agentId?: string;
+    agentLabel?: string;
 }
 
 function getCrypto(): Crypto {
@@ -44,6 +48,8 @@ export function createAgentBridgeSession(options: CreateAgentBridgeSessionOption
         scopes: new Set(options.scopes),
         createdAt: now,
         expiresAt: now + ttlMs,
+        agentId: options.agentId,
+        agentLabel: options.agentLabel,
     };
 }
 

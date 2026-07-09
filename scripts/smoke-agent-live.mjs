@@ -432,7 +432,7 @@ async function pairBrowserSession(page, challenge) {
     await checkbox.check()
   }
 
-  await page.getByRole('button', { name: 'Connect', exact: true }).click()
+  await page.getByRole('button', { name: /^(Approve & Connect|Connect)$/ }).click()
 }
 
 async function waitForPairedBridge(lines, bridge) {
