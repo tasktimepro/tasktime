@@ -226,7 +226,15 @@ Important files:
 
 The OpenClaw `.mcp.json` must pass `--agent-id tasktime.agent.openclaw`, `--agent-label "OpenClaw on this device"`, and a work-session-length `--session-ttl-ms`. The launcher writes `tasktime-agent-bridge.status.json` next to the bundle by default.
 
-When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`. If the bundle package itself is published to npm, bump `integrations/openclaw/tasktime/package.json` and publish from that directory with `npm publish --access public` using the TaskTime Pro npm credentials.
+When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`.
+
+If the OpenClaw bundle package is published to npm, bump `integrations/openclaw/tasktime/package.json` and use the repo workflow:
+
+```bash
+gh workflow run publish-openclaw-bundle.yml --ref main -f dry_run=true
+gh workflow run publish-openclaw-bundle.yml --ref main -f dry_run=false
+docker compose run --rm app npm view @tasktimepro/openclaw version
+```
 
 ## Claude Code Plugin Bundle
 

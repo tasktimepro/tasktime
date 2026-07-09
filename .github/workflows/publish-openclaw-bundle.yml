@@ -1,0 +1,60 @@
+name: Publish OpenClaw Bundle to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run npm publish with --dry-run instead of publishing"
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Smoke test OpenClaw bundle
+        run: npm run smoke:agent-bundles
+
+      - name: Check package version
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          VERSION="$(node -p "require('./integrations/openclaw/tasktime/package.json').version")"
+          if npm view "@tasktimepro/openclaw@${VERSION}" version >/dev/null 2>&1; then
+            echo "@tasktimepro/openclaw@${VERSION} is already published."
+            exit 1
+          fi
+
+      - name: Verify npm package contents
+        working-directory: integrations/openclaw/tasktime
+        run: npm pack --dry-run
+
+      - name: Dry-run publish
+        if: ${{ inputs.dry_run == true }}
+        working-directory: integrations/openclaw/tasktime
+        run: npm publish --access public --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish package
+        if: ${{ inputs.dry_run == false }}
+        working-directory: integrations/openclaw/tasktime
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
