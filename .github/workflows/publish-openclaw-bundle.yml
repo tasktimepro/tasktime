@@ -64,6 +64,6 @@ jobs:
 
       - name: Ensure public package access
         if: ${{ inputs.dry_run == false }}
-        run: npm access public @tasktimepro/openclaw
+        run: npm access set status=public @tasktimepro/openclaw
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
