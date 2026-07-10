@@ -6,7 +6,7 @@ description: >-
   agents organize projects, find unbilled work, prepare drafts, review business
   data, manage multiple timers, set tasks, and open the right app screens while
   keeping sensitive actions visible and approval-gated.
-version: 1.0.6
+version: 1.0.7
 metadata:
   openclaw:
     requires:

@@ -9,11 +9,14 @@ This file is the local source of truth for publishing TaskTime Pro agent-facing 
 - Bridge binary: `tasktime-agent-bridge`
 - Public bridge manifest: `public/.well-known/tasktime-agent.json`
 - Public MCP tool catalog: `https://tasktime.pro/agents/mcp-tools.json`
-- OpenClaw/ClawHub skill slug: `@tasktimepro/tasktime`
+- OpenClaw/ClawHub skill slug: `@tasktimepro/tasktime-agent`
 - OpenClaw bundle path: `integrations/openclaw/tasktime/`
 - Claude Code plugin path: `integrations/claude/tasktime/`
 
-The old ClawHub slug `@tasktimepro/tasktime-pro` was merged into `@tasktimepro/tasktime` on July 8, 2026. Treat `@tasktimepro/tasktime` as canonical.
+The canonical ClawHub skill is `@tasktimepro/tasktime-agent`. The legacy slugs
+`@tasktimepro/tasktime` and `@tasktimepro/tasktime-pro` redirect to it. Keep
+the internal OpenClaw skill key as `tasktime` so managed installs retain their
+existing local skill identity.
 
 ## Agent Bridge UX Contract
 
@@ -177,10 +180,14 @@ The ClawHub skill source is:
 integrations/openclaw/tasktime/skills/tasktime/SKILL.md
 ```
 
-Keep the frontmatter `name: tasktime`. Bump the skill `version` when the instructions materially change. The canonical install command is:
+Keep the frontmatter `name: tasktime` and `metadata.openclaw.skillKey: tasktime`.
+They are the installed OpenClaw identity, not the public ClawHub URL. Bump the
+skill `version` when the instructions or published metadata materially change.
+Always publish the explicit canonical ClawHub slug and display name. The
+canonical install command is:
 
 ```bash
-openclaw skills install @tasktimepro/tasktime
+openclaw skills install @tasktimepro/tasktime-agent
 ```
 
 Use the standalone ClawHub CLI with Node 24:
@@ -202,7 +209,7 @@ docker run --rm \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --dry-run'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --dry-run'
 ```
 
 Publish:
@@ -213,7 +220,7 @@ docker run --rm \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro"'
 ```
 
 Verify:
@@ -222,7 +229,7 @@ Verify:
 docker run --rm \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 inspect @tasktimepro/tasktime'
+  sh -lc 'npx -y clawhub@0.23.1 inspect @tasktimepro/tasktime-agent'
 ```
 
 If a duplicate owned slug appears again, merge the duplicate into the canonical slug instead of deleting it:
@@ -231,7 +238,7 @@ If a duplicate owned slug appears again, merge the duplicate into the canonical 
 docker run --rm \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill merge @tasktimepro/<duplicate-slug> @tasktimepro/tasktime --yes'
+  sh -lc 'npx -y clawhub@0.23.1 skill merge @tasktimepro/<duplicate-slug> @tasktimepro/tasktime-agent --yes'
 ```
 
 ## OpenClaw Bundle
@@ -297,8 +304,8 @@ Before tagging or announcing an agent release:
 - `make release-gate` passes.
 - `make npm CMD="run release:agent"` passes or the skipped part is explicitly documented.
 - `@tasktimepro/agent-bridge` npm version matches the intended bridge release.
-- `@tasktimepro/tasktime` is the only TaskTime Pro ClawHub search result under owner `tasktimepro`.
-- `@tasktimepro/tasktime-pro` redirects to `@tasktimepro/tasktime` if inspected.
-- Public docs point to `@tasktimepro/tasktime`, `@tasktimepro/agent-bridge`, and `pro.tasktime/agent-bridge`.
+- `@tasktimepro/tasktime-agent` is the only canonical TaskTime Pro ClawHub skill under owner `tasktimepro`.
+- `@tasktimepro/tasktime` and `@tasktimepro/tasktime-pro` redirect to `@tasktimepro/tasktime-agent` if inspected.
+- Public docs point to `@tasktimepro/tasktime-agent`, `@tasktimepro/agent-bridge`, and `pro.tasktime/agent-bridge`.
 - Vendored bridge files match `agent-bridge/dist/tasktime-agent-bridge.mjs` when a bundle includes the bridge.
 - Managed bundle tests verify `get_pairing_status`, `refresh_pairing`, stable agent identity, status-file output, and the create/start/stop timer workflow.

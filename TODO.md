@@ -9,7 +9,7 @@
     [x] Add public Astro agent docs at `/agents/` with `llms.txt`, generated MCP tool JSON, and Skill/OpenClaw pointers
     [x] Prepare final MCP/OpenClaw skill and plugin for publishing package metadata and so on
     [x] Publish everything under the new github org /tasktimepro in clawhub
-        [x] Should the skill be @tasktimepro/tasktime-pro or just @tasktimepro/tasktime? - YES
+        [x] Canonical ClawHub skill: @tasktimepro/tasktime-agent (legacy @tasktimepro/tasktime and @tasktimepro/tasktime-pro redirect here)
     [ ] Actually validate the skill/MCP with our own OpenClaw
         - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
         - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
