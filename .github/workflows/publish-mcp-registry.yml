@@ -1,0 +1,32 @@
+name: Publish MCP Registry
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install mcp-publisher
+        run: brew install mcp-publisher
+
+      - name: Validate server manifest
+        run: mcp-publisher validate agent-bridge/server.json
+
+      - name: Login with TaskTime domain proof
+        run: |
+          mcp-publisher login http \
+            --domain tasktime.pro \
+            --algorithm ecdsap384 \
+            --private-key "$MCP_REGISTRY_PRIVATE_KEY"
+        env:
+          MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+
+      - name: Publish server manifest
+        run: mcp-publisher publish agent-bridge/server.json

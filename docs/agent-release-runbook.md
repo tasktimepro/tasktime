@@ -58,6 +58,21 @@ npm publishing uses GitHub Actions and the `NPM_TOKEN` repository secret:
 .github/workflows/publish-agent-bridge.yml
 ```
 
+MCP Registry publishing uses the domain proof at `https://tasktime.pro/.well-known/mcp-registry-auth`.
+The matching private key is stored on the release machine at:
+
+```text
+~/.ssh/tasktime-mcp-registry-p384.pem
+```
+
+The GitHub Actions workflow uses the same key as raw ECDSA P-384 private-key hex in the `MCP_REGISTRY_PRIVATE_KEY` repository secret:
+
+```text
+.github/workflows/publish-mcp-registry.yml
+```
+
+Do not commit the private key, PEM contents, or derived private-key hex. If the key is rotated, update `public/.well-known/mcp-registry-auth`, deploy production so the new public proof is live, then update `MCP_REGISTRY_PRIVATE_KEY`.
+
 ## Pre-Release Checks
 
 Run Node/npm commands through Docker for this app:
@@ -113,6 +128,18 @@ make npm CMD="run smoke:agent-live"
 ```bash
 docker compose run --rm app npm view @tasktimepro/agent-bridge version
 docker compose run --rm app npx -y @tasktimepro/agent-bridge --manifest
+```
+
+8. Publish the official MCP Registry metadata after the npm package is live and the production `.well-known/mcp-registry-auth` proof matches the active key:
+
+```bash
+gh workflow run publish-mcp-registry.yml --ref main
+```
+
+9. Verify the official MCP Registry latest version:
+
+```bash
+curl 'https://registry.modelcontextprotocol.io/v0/servers?search=pro.tasktime%2Fagent-bridge'
 ```
 
 ## Public Agent Docs
