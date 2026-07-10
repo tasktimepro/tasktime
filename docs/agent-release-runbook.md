@@ -229,8 +229,35 @@ Verify:
 docker run --rm \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 inspect @tasktimepro/tasktime-agent'
+  sh -lc 'npx -y clawhub@0.23.1 skill verify @tasktimepro/tasktime-agent'
 ```
+
+This command must return `"ok": true` and `card.available: true`. The
+generated card is part of ClawHub's verification contract, even when every
+security scanner is clean. Confirm the card itself is available with:
+
+```bash
+docker run --rm \
+  -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
+  node:24-alpine \
+  sh -lc 'npx -y clawhub@0.23.1 skill verify @tasktimepro/tasktime-agent --card'
+```
+
+Also test unqualified resolution, because it is the natural verification path
+after an OpenClaw search. It must resolve to the same `TaskTime Pro` publisher
+and canonical `tasktime-agent` slug:
+
+```bash
+clawhub skill verify tasktime-agent
+openclaw skills verify tasktime-agent
+```
+
+ClawHub generates `skill-card.md` server-side after publish or scan completion;
+there is no publisher CLI command to generate it manually. If verification is
+clean except for `card.missing`, request one ClawHub rescan and wait for the
+card job. If the card is still missing, contact ClawHub support with the slug,
+version, verification JSON, and artifact fingerprint. Do not republish only to
+retry card generation.
 
 If a duplicate owned slug appears again, merge the duplicate into the canonical slug instead of deleting it:
 
@@ -306,6 +333,8 @@ Before tagging or announcing an agent release:
 - `@tasktimepro/agent-bridge` npm version matches the intended bridge release.
 - `@tasktimepro/tasktime-agent` is the only canonical TaskTime Pro ClawHub skill under owner `tasktimepro`.
 - `@tasktimepro/tasktime` and `@tasktimepro/tasktime-pro` redirect to `@tasktimepro/tasktime-agent` if inspected.
+- `clawhub skill verify @tasktimepro/tasktime-agent` returns `"ok": true` and a generated Skill Card.
+- Unqualified `clawhub skill verify tasktime-agent` and `openclaw skills verify tasktime-agent` resolve to TaskTime Pro.
 - Public docs point to `@tasktimepro/tasktime-agent`, `@tasktimepro/agent-bridge`, and `pro.tasktime/agent-bridge`.
 - Vendored bridge files match `agent-bridge/dist/tasktime-agent-bridge.mjs` when a bundle includes the bridge.
 - Managed bundle tests verify `get_pairing_status`, `refresh_pairing`, stable agent identity, status-file output, and the create/start/stop timer workflow.

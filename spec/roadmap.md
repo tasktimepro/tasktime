@@ -1,0 +1,44 @@
+# Implementation Roadmap
+
+This roadmap describes the current production project rather than pretending it is greenfield.
+
+## Phase 0 — Production foundation (completed)
+
+- React/Vite PWA, Yjs/IndexedDB storage, Docker development, CI, core CRUD, tests
+- Success evidence: production app, repository history, current unit/integration/browser suites
+
+## Phase 1 — Core work, finance, sync, and public surfaces (completed)
+
+- Projects/clients/tasks/planner/timers, expenses/tax, invoices/quotes/payments/reports, Drive sync, public Astro site
+- Success evidence: implemented modules, generated artifacts, tests, and production use
+
+## Phase 2 — Agent access and publishing (implemented; validation follow-through active)
+
+- Browser command layer, local bridge, MCP tools, scopes/approvals, bundles, public docs, registry artifacts
+- Remaining success evidence: real installed OpenClaw long-running task/timer flow and remaining directory validation/publication
+
+## Phase 3 — Agent-kit foundation reconciliation (current)
+
+- Add normalized specs, contracts, rules, architecture maps, environment examples, status, reusable skills, and prompts
+- Cross-check these documents against code/tests and resolve recorded drift
+- Success: all required foundation files exist, links/metadata validate, and no production source-of-truth was overwritten
+
+## Phase 4 — Critical-path assurance (next)
+
+Thin review/remediation slices:
+
+1. Stored-data and backup compatibility
+2. Drive sync loss/conflict/reconnect behavior
+3. Timer duration, stop idempotency, and time-entry exactness
+4. Invoice calculations, currency, finalization, payment, and undo
+5. Report/export total consistency
+6. Import preview/restore safety
+
+Each slice requires reconstructed contracts, representative historical fixtures, focused red/green regression coverage for findings, relevant Docker gates, and doc/status reconciliation.
+
+## Phase 5 — Maintainability evolution
+
+- Gradual TypeScript migration
+- Test infrastructure improvements
+- Approved product backlog such as task templates and invoice cancellation after ambiguities are resolved
+- Continued public-site indexing/SEO and agent distribution maintenance

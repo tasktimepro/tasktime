@@ -1,7 +1,7 @@
 # Agent Instructions for TaskTime Pro
 
 > **Purpose:** Guidelines and context for AI agents working on this codebase  
-> **Last Updated:** May 20, 2026
+> **Last Updated:** July 10, 2026
 
 ---
 
@@ -18,6 +18,28 @@
 5. **No automatic destructive sync actions** — Resets, claim states, archive moves, and billing mutations must be explicit and reversible where practical
 6. **Legacy code can be removed only after migration** — Delete old implementations after the replacement safely handles existing data
 7. **Per-file test coverage ≥ 70%** — For `src/hooks/**` and `src/utils/**`, each file must meet at least 75% coverage
+
+---
+
+## Agent Workflow
+
+Before changing code, read the sources that govern the area being changed:
+
+1. This file, then `status/_status.md` and the relevant layer status file
+2. `SYSTEM_OVERVIEW.md` and `ARCHITECTURE_MAP.md`
+3. `spec/requirements.md`, `spec/acceptance.md`, and the relevant feature/design specifications
+4. Relevant files under `contracts/` and `rules/`, especially `rules/domain-invariants.md`
+5. Relevant sections of `README.md`, `CONTRIBUTING.md`, and operational documentation under `docs/`
+6. Existing tests and behavior comments beside the code being changed
+7. A matching workflow under `.agents/skills/` when one applies
+
+`AGENTS.md` and the project-specific rules are authoritative. The reusable skills and prompts support those rules; they do not override TaskTime Pro's production compatibility requirements.
+
+For behavior changes, use red/green discipline: first add or update a test that demonstrates the required behavior, verify that it fails for the intended reason, implement the smallest compatible change, then run the focused test and the relevant broader Docker-backed gate. Update docs and comments when a contract, workflow, or non-obvious invariant changes.
+
+Ongoing agent workflows are available in `.github/prompts/`. `status/` is the execution work register; `TODO.md` is the broader backlog and ideas list. Update the relevant status file when a tracked slice materially changes state.
+
+**Authority rule:** `spec/`, `contracts/`, and `rules/` are project source of truth. `SYSTEM_OVERVIEW.md` and `ARCHITECTURE_MAP.md` compress that context and must be reconciled when architecture or workflows change. If source, tests, and specifications disagree, investigate and reconcile the drift rather than silently choosing the most convenient version.
 
 ---
 
@@ -295,6 +317,13 @@ docker compose run --rm app npm run <script>
 | `docs/agent-release-runbook.md` | Local MCP bridge, ClawHub skill, OpenClaw bundle, and Claude plugin publishing workflow |
 | `_implan.md` | Original project plan and preferences |
 | `README.md` | User-facing documentation |
+| `rules/` | Detailed engineering, testing, design, Docker, hardening, and domain constraints |
+| `.agents/skills/` | Reusable workflows for planning, implementation, review, and handoff |
+| `SYSTEM_OVERVIEW.md` | Compressed runtime, data, workflow, reliability, and security model |
+| `ARCHITECTURE_MAP.md` | Module boundaries, dependency direction, and change hotspots |
+| `spec/` | Product intent, requirements, acceptance, architecture, UX, features, roadmap, and ambiguities |
+| `contracts/` | Durable public interfaces and persisted data schemas |
+| `status/` | Current cross-layer execution state and handoff detail |
 
 ---
 
@@ -307,6 +336,7 @@ docker compose run --rm app npm run <script>
 5. **Use Yjs hooks directly** — `useProjects()`, `useTasks()`, etc. from `src/hooks/`
 6. **Review the private Yjs sync plan when it exists locally** — Understand the CRDT-based sync system
 7. **Subtasks cannot be recurring** — The project UI disallows recurring subtasks; avoid adding recurring-specific logic to subtask components.
+8. **Keep the context layer current** — Update specifications, contracts, overview/map, and status when their governed behavior changes.
 
 ---
 

@@ -22,7 +22,17 @@
     [ ] Glama
     [ ] MCP.so
 
-[ ] Merge Agents Kit so that we have a proper agent setup/scaffold
+[x] Merge Agents Kit so that we have a proper agent setup/scaffold
+    [ ] Run deep validations on the core parts of the product like:
+        - Cloud sync gaps / should not let data be unsynced or lost
+        - Storage and stored data 
+        - Invoicing generation (calculations, currency related conversions, all tasks + timings properly calculated, billed hours, undo last invoice properly undoes everything well, etc.)
+        - Reporting totals conditions & calculations
+        - Export / Import
+    [ ] Set these as part of the rules/spec that we must always be very careful here about the most crucial parts of the app - there should be rules that we cannot ever break - for example, the worker sync should always be efficient, we must keep as low requests as possible. | Important data should always be sent to the cloud, backups, and export/import, so new features that will include user data must obey these rules | Agent bridge and commands should always be kept in parity with things the user can do from within the UI.
+        - and we can try to determine if there are other similarly important things that could break the app that is critical
+    [ ] Run any suggested improvements in general throughout the app. Is everything implemented as expected, did we leave any potential critical gaps behind? Are all timings accurate by the second? Determine all the critical paths of this app and make sure everything works as expected.
+    [ ] Are agents able to handle bulk commands, like bulk mark as completed, delete, etc? Or for now doing things individually is ok for this kind of project?
 
 
 ---

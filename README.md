@@ -115,6 +115,14 @@ When changing persisted data:
 
 This repository contains the public app, public site, tests, agent bridge, and OpenClaw bundle. Private Cloudflare Worker source, deployment workflows, provider account IDs, production KV/D1 identifiers, secrets, and internal operational runbooks are intentionally managed outside this public source tree.
 
+## Agent Development Workflow
+
+Agent instructions live in `AGENTS.md`. Product intent and acceptance live in `spec/`, durable boundaries in `contracts/`, detailed constraints in `rules/`, and current execution state in `status/`. `SYSTEM_OVERVIEW.md` and `ARCHITECTURE_MAP.md` provide a fast architecture read; `TODO.md` remains the broader backlog and ideas list.
+
+Reusable workflows live in `.agents/skills/`, with editor-invocable ongoing-project prompts in `.github/prompts/`. These files were derived from the established production repository rather than from blank first-intake scaffolding.
+
+The installed agent-kit version is recorded in `KIT_VERSION`, and `KIT_MANIFEST.md` records local ownership. The generic kit source is only update material and does not override TaskTime Pro's production compatibility, architecture, or public/private repository boundaries.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development expectations, compatibility rules, and pull request guidance.
