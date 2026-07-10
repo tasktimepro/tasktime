@@ -11,6 +11,12 @@ For OpenClaw-managed installs, pair TaskTime Pro to the active MCP-owned bridge,
 
 This bundle identifies itself as `tasktime.agent.openclaw` / `OpenClaw on this device`, writes `tasktime-agent-bridge.status.json` beside the launcher, and uses a 24-hour app-session TTL for normal work sessions. Pairing codes remain short-lived and single-use.
 
+For the standalone ClawHub skill, always use the owner-qualified TaskTime Pro reference:
+
+```bash
+openclaw skills install @tasktimepro/tasktime-agent
+```
+
 If you install only the standalone skill, install `@tasktimepro/agent-bridge` separately and expose it to your MCP client as `tasktime-agent-bridge --app-url https://tasktime.pro`.
 
 Useful references:
