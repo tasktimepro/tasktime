@@ -1,29 +1,29 @@
 #!/usr/bin/env node
-import { realpathSync as dt, mkdirSync as tr, writeFileSync as nr } from "node:fs";
-import { resolve as rr, dirname as or } from "node:path";
-import { fileURLToPath as ir, pathToFileURL as ar } from "node:url";
-import { randomUUID as Me, randomBytes as sr, createHmac as cr, randomInt as lr, createHash as en } from "node:crypto";
+import { realpathSync as mt, mkdirSync as rr, writeFileSync as or } from "node:fs";
+import { resolve as ir, dirname as ar } from "node:path";
+import { fileURLToPath as sr, pathToFileURL as cr } from "node:url";
+import { randomUUID as Me, randomBytes as lr, createHmac as pr, randomInt as ur, createHash as nn } from "node:crypto";
 import { Buffer as X } from "node:buffer";
-import { createServer as pr } from "node:http";
-class O extends Error {
+import { createServer as dr } from "node:http";
+class z extends Error {
   constructor(t, n, r) {
     super(n), this.name = "AgentCommandError", this.code = t, this.details = r;
   }
 }
-const ur = 500;
-function dr(e) {
+const mr = 500;
+function fr(e) {
   return e.startsWith("export_") || e === "create_drive_backup" || e === "download_drive_backup_json" ? "export" : e.startsWith("open_") || e.startsWith("focus_") ? "navigation" : e.includes("invoice") || e.includes("billed") || e.includes("billing") ? e.includes("email") ? "email" : "billing" : e.startsWith("list_") || e.startsWith("get_") || e.startsWith("find_") || e.startsWith("preview_") ? "read" : e.startsWith("create_") || e.startsWith("update_") || e.startsWith("complete_") || e.startsWith("archive_") || e.startsWith("unarchive_") || e.startsWith("start_") || e.startsWith("pause_") || e.startsWith("stop_") || e.startsWith("add_") || e.startsWith("mark_") || e.startsWith("finalize_") || e.startsWith("restore_") || e.startsWith("delete_") ? "write" : "unknown";
 }
-class tn {
+class rn {
   constructor(t = {}) {
-    this.events = [], this.nextId = 0, this.maxEvents = t.maxEvents ?? ur, this.now = t.now ?? Date.now, this.idFactory = t.idFactory ?? (() => `bridge-audit-${this.nextId++}`);
+    this.events = [], this.nextId = 0, this.maxEvents = t.maxEvents ?? mr, this.now = t.now ?? Date.now, this.idFactory = t.idFactory ?? (() => `bridge-audit-${this.nextId++}`);
   }
   append(t) {
     const n = {
       id: this.idFactory(),
       timestamp: this.now(),
       action: t.action
-    }, r = t.commandCategory ?? (t.command ? dr(t.command) : void 0);
+    }, r = t.commandCategory ?? (t.command ? fr(t.command) : void 0);
     for (t.clientId && (n.clientId = t.clientId), t.requestId && (n.requestId = t.requestId), t.command && (n.command = t.command), r && (n.commandCategory = r), typeof t.ok == "boolean" && (n.ok = t.ok), t.errorCode && (n.errorCode = t.errorCode), t.details && (n.details = t.details), this.events.push(n); this.events.length > this.maxEvents; )
       this.events.shift();
     return n;
@@ -38,8 +38,8 @@ class tn {
     this.events.length = 0;
   }
 }
-const mr = "tasktime-hmac-sha256-v1", fr = 6e4;
-function nn(e) {
+const hr = "tasktime-hmac-sha256-v1", gr = 6e4;
+function on(e) {
   return [...new Set(e)].sort();
 }
 function Ze(e) {
@@ -47,27 +47,27 @@ function Ze(e) {
     Object.entries(e).filter(([, t]) => t !== void 0 && typeof t != "function" && typeof t != "symbol").sort(([t], [n]) => t.localeCompare(n)).map(([t, n]) => [t, Ze(n)])
   ) : null;
 }
-function hr(e) {
+function yr(e) {
   return JSON.stringify(Ze({
     ...e,
-    scopes: nn(e.scopes)
+    scopes: on(e.scopes)
   }));
 }
-function gr(e) {
+function br(e) {
   const t = e.replace(/-/g, "+").replace(/_/g, "/"), n = t.padEnd(Math.ceil(t.length / 4) * 4, "=");
   return Buffer.from(n, "base64");
 }
-function yr(e, t) {
-  return cr("sha256", gr(t)).update(hr(e)).digest("base64url");
+function _r(e, t) {
+  return pr("sha256", br(t)).update(yr(e)).digest("base64url");
 }
-function _r(e) {
-  const t = e.now ? e.now() : Date.now(), n = t + (e.ttlMs ?? fr), r = e.nonce ?? (typeof Me == "function" ? Me() : sr(16).toString("base64url")), o = {
-    format: mr,
+function vr(e) {
+  const t = e.now ? e.now() : Date.now(), n = t + (e.ttlMs ?? gr), r = e.nonce ?? (typeof Me == "function" ? Me() : lr(16).toString("base64url")), o = {
+    format: hr,
     grantId: e.grant.id,
     command: e.command,
     inputHash: e.inputHash,
     category: e.category,
-    scopes: nn(e.scopes),
+    scopes: on(e.scopes),
     nonce: r,
     issuedAt: t,
     expiresAt: n
@@ -75,7 +75,7 @@ function _r(e) {
   return {
     format: o.format,
     grantId: o.grantId,
-    token: yr(o, e.grant.secretKeyBase64Url),
+    token: _r(o, e.grant.secretKeyBase64Url),
     issuedAt: o.issuedAt,
     expiresAt: o.expiresAt,
     nonce: o.nonce,
@@ -85,18 +85,18 @@ function _r(e) {
     category: o.category
   };
 }
-const br = 300 * 1e3, vr = 6;
-function wr(e) {
+const Ir = 300 * 1e3, wr = 6;
+function kr(e) {
   let t = "";
   for (let n = 0; n < e; n += 1)
-    t += String(lr(0, 10));
+    t += String(ur(0, 10));
   return t;
 }
-function Ir(e) {
-  const t = e.now ? e.now() : Date.now(), n = e.ttlMs ?? br, r = e.codeLength ?? vr;
+function Tr(e) {
+  const t = e.now ? e.now() : Date.now(), n = e.ttlMs ?? Ir, r = e.codeLength ?? wr;
   return {
     id: e.idFactory ? e.idFactory() : Me(),
-    code: e.codeFactory ? e.codeFactory(r) : wr(r),
+    code: e.codeFactory ? e.codeFactory(r) : kr(r),
     endpoint: e.endpoint,
     scopes: [...e.scopes],
     createdAt: t,
@@ -105,15 +105,15 @@ function Ir(e) {
     agentLabel: e.agentLabel
   };
 }
-function kr(e, t = Date.now()) {
+function Sr(e, t = Date.now()) {
   return t >= e.expiresAt;
 }
-class Tr {
+class Pr {
   constructor() {
     this.challenges = /* @__PURE__ */ new Map();
   }
   create(t) {
-    const n = Ir(t);
+    const n = Tr(t);
     return this.challenges.set(n.id, n), n;
   }
   get(t) {
@@ -122,31 +122,31 @@ class Tr {
   consume(t, n, r = Date.now()) {
     const o = this.challenges.get(t);
     if (!o)
-      throw new O("NOT_FOUND", "Pairing challenge not found.", { id: t });
-    if (kr(o, r))
-      throw this.challenges.delete(t), new O("PERMISSION_DENIED", "Pairing challenge expired.", { id: t });
+      throw new z("NOT_FOUND", "Pairing challenge not found.", { id: t });
+    if (Sr(o, r))
+      throw this.challenges.delete(t), new z("PERMISSION_DENIED", "Pairing challenge expired.", { id: t });
     if (o.code !== n)
-      throw new O("PERMISSION_DENIED", "Pairing code is invalid.", { id: t });
+      throw new z("PERMISSION_DENIED", "Pairing code is invalid.", { id: t });
     return this.challenges.delete(t), o;
   }
   delete(t) {
     this.challenges.delete(t);
   }
 }
-const Sr = 1440 * 60 * 1e3, Pr = 32;
-function Ar() {
+const Ar = 1440 * 60 * 1e3, xr = 32;
+function Er() {
   if (!globalThis.crypto?.getRandomValues)
     throw new Error("Secure random token generation is unavailable.");
   return globalThis.crypto;
 }
-function xr(e = Pr) {
+function jr(e = xr) {
   const t = new Uint8Array(e);
-  return Ar().getRandomValues(t), Array.from(t).map((n) => n.toString(16).padStart(2, "0")).join("");
+  return Er().getRandomValues(t), Array.from(t).map((n) => n.toString(16).padStart(2, "0")).join("");
 }
-function Er(e) {
-  const t = e.now ? e.now() : Date.now(), n = e.ttlMs ?? Sr;
+function zr(e) {
+  const t = e.now ? e.now() : Date.now(), n = e.ttlMs ?? Ar;
   return {
-    sessionToken: e.tokenFactory ? e.tokenFactory(e.tokenBytes) : xr(e.tokenBytes),
+    sessionToken: e.tokenFactory ? e.tokenFactory(e.tokenBytes) : jr(e.tokenBytes),
     scopes: new Set(e.scopes),
     createdAt: t,
     expiresAt: t + n,
@@ -154,27 +154,25 @@ function Er(e) {
     agentLabel: e.agentLabel
   };
 }
-function jr(e, t = Date.now()) {
+function Or(e, t = Date.now()) {
   return t >= e.expiresAt;
 }
-const zr = "1.4";
-Array.from(/* @__PURE__ */ new Set(["1.0", "1.1", "1.3", zr]));
 function u(e, t, n) {
-  function r(c, l) {
+  function r(c, p) {
     if (c._zod || Object.defineProperty(c, "_zod", {
       value: {
-        def: l,
+        def: p,
         constr: i,
         traits: /* @__PURE__ */ new Set()
       },
       enumerable: !1
     }), c._zod.traits.has(e))
       return;
-    c._zod.traits.add(e), t(c, l);
-    const p = i.prototype, f = Object.keys(p);
-    for (let y = 0; y < f.length; y++) {
-      const v = f[y];
-      v in c || (c[v] = p[v].bind(c));
+    c._zod.traits.add(e), t(c, p);
+    const l = i.prototype, h = Object.keys(l);
+    for (let y = 0; y < h.length; y++) {
+      const v = h[y];
+      v in c || (c[v] = l[v].bind(c));
     }
   }
   const o = n?.Parent ?? Object;
@@ -182,12 +180,12 @@ function u(e, t, n) {
   }
   Object.defineProperty(a, "name", { value: e });
   function i(c) {
-    var l;
-    const p = n?.Parent ? new a() : this;
-    r(p, c), (l = p._zod).deferred ?? (l.deferred = []);
-    for (const f of p._zod.deferred)
-      f();
-    return p;
+    var p;
+    const l = n?.Parent ? new a() : this;
+    r(l, c), (p = l._zod).deferred ?? (p.deferred = []);
+    for (const h of l._zod.deferred)
+      h();
+    return l;
   }
   return Object.defineProperty(i, "init", { value: r }), Object.defineProperty(i, Symbol.hasInstance, {
     value: (c) => n?.Parent && c instanceof n.Parent ? !0 : c?._zod?.traits?.has(e)
@@ -198,7 +196,7 @@ class se extends Error {
     super("Encountered Promise during synchronous parse. Use .parseAsync() instead.");
   }
 }
-class rn extends Error {
+class an extends Error {
   constructor(t) {
     super(`Encountered unidirectional transform during encode: ${t}`), this.name = "ZodEncodeError";
   }
@@ -207,14 +205,14 @@ const Ue = {};
 function H(e) {
   return e && Object.assign(Ue, e), Ue;
 }
-function on(e) {
+function sn(e) {
   const t = Object.values(e).filter((r) => typeof r == "number");
   return Object.entries(e).filter(([r, o]) => t.indexOf(+r) === -1).map(([r, o]) => o);
 }
 function qe(e, t) {
   return typeof t == "bigint" ? t.toString() : t;
 }
-function nt(e) {
+function rt(e) {
   return {
     get value() {
       {
@@ -224,30 +222,30 @@ function nt(e) {
     }
   };
 }
-function rt(e) {
+function ot(e) {
   return e == null;
 }
-function ot(e) {
+function it(e) {
   const t = e.startsWith("^") ? 1 : 0, n = e.endsWith("$") ? e.length - 1 : e.length;
   return e.slice(t, n);
 }
-function Or(e, t) {
+function Dr(e, t) {
   const n = (e.toString().split(".")[1] || "").length, r = t.toString();
   let o = (r.split(".")[1] || "").length;
   if (o === 0 && /\d?e-\d?/.test(r)) {
-    const l = r.match(/\d?e-(\d?)/);
-    l?.[1] && (o = Number.parseInt(l[1]));
+    const p = r.match(/\d?e-(\d?)/);
+    p?.[1] && (o = Number.parseInt(p[1]));
   }
   const a = n > o ? n : o, i = Number.parseInt(e.toFixed(a).replace(".", "")), c = Number.parseInt(t.toFixed(a).replace(".", ""));
   return i % c / 10 ** a;
 }
-const mt = /* @__PURE__ */ Symbol("evaluating");
-function T(e, t, n) {
+const ft = /* @__PURE__ */ Symbol("evaluating");
+function S(e, t, n) {
   let r;
   Object.defineProperty(e, t, {
     get() {
-      if (r !== mt)
-        return r === void 0 && (r = mt, r = n()), r;
+      if (r !== ft)
+        return r === void 0 && (r = ft, r = n()), r;
     },
     set(o) {
       Object.defineProperty(e, t, {
@@ -274,18 +272,18 @@ function te(...e) {
   }
   return Object.defineProperties({}, t);
 }
-function ft(e) {
+function ht(e) {
   return JSON.stringify(e);
 }
-function Dr(e) {
+function Nr(e) {
   return e.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
 }
-const an = "captureStackTrace" in Error ? Error.captureStackTrace : (...e) => {
+const cn = "captureStackTrace" in Error ? Error.captureStackTrace : (...e) => {
 };
-function be(e) {
+function ve(e) {
   return typeof e == "object" && e !== null && !Array.isArray(e);
 }
-const Nr = nt(() => {
+const $r = rt(() => {
   if (typeof navigator < "u" && navigator?.userAgent?.includes("Cloudflare"))
     return !1;
   try {
@@ -296,15 +294,15 @@ const Nr = nt(() => {
   }
 });
 function le(e) {
-  if (be(e) === !1)
+  if (ve(e) === !1)
     return !1;
   const t = e.constructor;
   if (t === void 0 || typeof t != "function")
     return !0;
   const n = t.prototype;
-  return !(be(n) === !1 || Object.prototype.hasOwnProperty.call(n, "isPrototypeOf") === !1);
+  return !(ve(n) === !1 || Object.prototype.hasOwnProperty.call(n, "isPrototypeOf") === !1);
 }
-function sn(e) {
+function ln(e) {
   return le(e) ? { ...e } : Array.isArray(e) ? [...e] : e;
 }
 const Cr = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
@@ -328,17 +326,17 @@ function _(e) {
   }
   return delete t.message, typeof t.error == "string" ? { ...t, error: () => t.error } : t;
 }
-function $r(e) {
+function Rr(e) {
   return Object.keys(e).filter((t) => e[t]._zod.optin === "optional" && e[t]._zod.optout === "optional");
 }
-const Rr = {
+const Lr = {
   safeint: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
   int32: [-2147483648, 2147483647],
   uint32: [0, 4294967295],
   float32: [-34028234663852886e22, 34028234663852886e22],
   float64: [-Number.MAX_VALUE, Number.MAX_VALUE]
 };
-function Lr(e, t) {
+function Mr(e, t) {
   const n = e._zod.def, r = n.checks;
   if (r && r.length > 0)
     throw new Error(".pick() cannot be used on object schemas containing refinements");
@@ -356,7 +354,7 @@ function Lr(e, t) {
   });
   return ne(e, a);
 }
-function Mr(e, t) {
+function Zr(e, t) {
   const n = e._zod.def, r = n.checks;
   if (r && r.length > 0)
     throw new Error(".omit() cannot be used on object schemas containing refinements");
@@ -374,7 +372,7 @@ function Mr(e, t) {
   });
   return ne(e, a);
 }
-function Zr(e, t) {
+function Ur(e, t) {
   if (!le(t))
     throw new Error("Invalid input to extend: expected a plain object");
   const n = e._zod.def.checks;
@@ -392,7 +390,7 @@ function Zr(e, t) {
   });
   return ne(e, o);
 }
-function Ur(e, t) {
+function qr(e, t) {
   if (!le(t))
     throw new Error("Invalid input to safeExtend: expected a plain object");
   const n = te(e._zod.def, {
@@ -403,7 +401,7 @@ function Ur(e, t) {
   });
   return ne(e, n);
 }
-function qr(e, t) {
+function Br(e, t) {
   const n = te(e._zod.def, {
     get shape() {
       const r = { ...e._zod.def.shape, ...t._zod.def.shape };
@@ -417,35 +415,35 @@ function qr(e, t) {
   });
   return ne(e, n);
 }
-function Br(e, t, n) {
+function Fr(e, t, n) {
   const o = t._zod.def.checks;
   if (o && o.length > 0)
     throw new Error(".partial() cannot be used on object schemas containing refinements");
   const i = te(t._zod.def, {
     get shape() {
-      const c = t._zod.def.shape, l = { ...c };
+      const c = t._zod.def.shape, p = { ...c };
       if (n)
-        for (const p in n) {
-          if (!(p in c))
-            throw new Error(`Unrecognized key: "${p}"`);
-          n[p] && (l[p] = e ? new e({
+        for (const l in n) {
+          if (!(l in c))
+            throw new Error(`Unrecognized key: "${l}"`);
+          n[l] && (p[l] = e ? new e({
             type: "optional",
-            innerType: c[p]
-          }) : c[p]);
+            innerType: c[l]
+          }) : c[l]);
         }
       else
-        for (const p in c)
-          l[p] = e ? new e({
+        for (const l in c)
+          p[l] = e ? new e({
             type: "optional",
-            innerType: c[p]
-          }) : c[p];
-      return re(this, "shape", l), l;
+            innerType: c[l]
+          }) : c[l];
+      return re(this, "shape", p), p;
     },
     checks: []
   });
   return ne(t, i);
 }
-function Fr(e, t, n) {
+function Gr(e, t, n) {
   const r = te(t._zod.def, {
     get shape() {
       const o = t._zod.def.shape, a = { ...o };
@@ -483,18 +481,18 @@ function ae(e, t) {
     return (r = n).path ?? (r.path = []), n.path.unshift(e), n;
   });
 }
-function ge(e) {
+function ye(e) {
   return typeof e == "string" ? e : e?.message;
 }
 function Y(e, t, n) {
   const r = { ...e, path: e.path ?? [] };
   if (!e.message) {
-    const o = ge(e.inst?._zod.def?.error?.(e)) ?? ge(t?.error?.(e)) ?? ge(n.customError?.(e)) ?? ge(n.localeError?.(e)) ?? "Invalid input";
+    const o = ye(e.inst?._zod.def?.error?.(e)) ?? ye(t?.error?.(e)) ?? ye(n.customError?.(e)) ?? ye(n.localeError?.(e)) ?? "Invalid input";
     r.message = o;
   }
   return delete r.inst, delete r.continue, t?.reportInput || delete r.input, r;
 }
-function it(e) {
+function at(e) {
   return Array.isArray(e) ? "array" : typeof e == "string" ? "string" : "unknown";
 }
 function he(...e) {
@@ -506,7 +504,7 @@ function he(...e) {
     inst: r
   } : { ...t };
 }
-const cn = (e, t) => {
+const pn = (e, t) => {
   e.name = "$ZodError", Object.defineProperty(e, "_zod", {
     value: e._zod,
     enumerable: !1
@@ -517,14 +515,14 @@ const cn = (e, t) => {
     value: () => e.message,
     enumerable: !1
   });
-}, ln = u("$ZodError", cn), pn = u("$ZodError", cn, { Parent: Error });
-function Gr(e, t = (n) => n.message) {
+}, un = u("$ZodError", pn), dn = u("$ZodError", pn, { Parent: Error });
+function Jr(e, t = (n) => n.message) {
   const n = {}, r = [];
   for (const o of e.issues)
     o.path.length > 0 ? (n[o.path[0]] = n[o.path[0]] || [], n[o.path[0]].push(t(o))) : r.push(t(o));
   return { formErrors: r, fieldErrors: n };
 }
-function Jr(e, t = (n) => n.message) {
+function Vr(e, t = (n) => n.message) {
   const n = { _errors: [] }, r = (o) => {
     for (const a of o.issues)
       if (a.code === "invalid_union" && a.errors.length)
@@ -538,28 +536,28 @@ function Jr(e, t = (n) => n.message) {
       else {
         let i = n, c = 0;
         for (; c < a.path.length; ) {
-          const l = a.path[c];
-          c === a.path.length - 1 ? (i[l] = i[l] || { _errors: [] }, i[l]._errors.push(t(a))) : i[l] = i[l] || { _errors: [] }, i = i[l], c++;
+          const p = a.path[c];
+          c === a.path.length - 1 ? (i[p] = i[p] || { _errors: [] }, i[p]._errors.push(t(a))) : i[p] = i[p] || { _errors: [] }, i = i[p], c++;
         }
       }
   };
   return r(e), n;
 }
-const at = (e) => (t, n, r, o) => {
+const st = (e) => (t, n, r, o) => {
   const a = r ? Object.assign(r, { async: !1 }) : { async: !1 }, i = t._zod.run({ value: n, issues: [] }, a);
   if (i instanceof Promise)
     throw new se();
   if (i.issues.length) {
-    const c = new (o?.Err ?? e)(i.issues.map((l) => Y(l, a, H())));
-    throw an(c, o?.callee), c;
+    const c = new (o?.Err ?? e)(i.issues.map((p) => Y(p, a, H())));
+    throw cn(c, o?.callee), c;
   }
   return i.value;
-}, st = (e) => async (t, n, r, o) => {
+}, ct = (e) => async (t, n, r, o) => {
   const a = r ? Object.assign(r, { async: !0 }) : { async: !0 };
   let i = t._zod.run({ value: n, issues: [] }, a);
   if (i instanceof Promise && (i = await i), i.issues.length) {
-    const c = new (o?.Err ?? e)(i.issues.map((l) => Y(l, a, H())));
-    throw an(c, o?.callee), c;
+    const c = new (o?.Err ?? e)(i.issues.map((p) => Y(p, a, H())));
+    throw cn(c, o?.callee), c;
   }
   return i.value;
 }, je = (e) => (t, n, r) => {
@@ -568,58 +566,58 @@ const at = (e) => (t, n, r, o) => {
     throw new se();
   return a.issues.length ? {
     success: !1,
-    error: new (e ?? ln)(a.issues.map((i) => Y(i, o, H())))
+    error: new (e ?? un)(a.issues.map((i) => Y(i, o, H())))
   } : { success: !0, data: a.value };
-}, Vr = /* @__PURE__ */ je(pn), ze = (e) => async (t, n, r) => {
+}, Kr = /* @__PURE__ */ je(dn), ze = (e) => async (t, n, r) => {
   const o = r ? Object.assign(r, { async: !0 }) : { async: !0 };
   let a = t._zod.run({ value: n, issues: [] }, o);
   return a instanceof Promise && (a = await a), a.issues.length ? {
     success: !1,
     error: new e(a.issues.map((i) => Y(i, o, H())))
   } : { success: !0, data: a.value };
-}, Kr = /* @__PURE__ */ ze(pn), Wr = (e) => (t, n, r) => {
-  const o = r ? Object.assign(r, { direction: "backward" }) : { direction: "backward" };
-  return at(e)(t, n, o);
-}, Hr = (e) => (t, n, r) => at(e)(t, n, r), Xr = (e) => async (t, n, r) => {
+}, Wr = /* @__PURE__ */ ze(dn), Hr = (e) => (t, n, r) => {
   const o = r ? Object.assign(r, { direction: "backward" }) : { direction: "backward" };
   return st(e)(t, n, o);
-}, Yr = (e) => async (t, n, r) => st(e)(t, n, r), Qr = (e) => (t, n, r) => {
+}, Xr = (e) => (t, n, r) => st(e)(t, n, r), Yr = (e) => async (t, n, r) => {
+  const o = r ? Object.assign(r, { direction: "backward" }) : { direction: "backward" };
+  return ct(e)(t, n, o);
+}, Qr = (e) => async (t, n, r) => ct(e)(t, n, r), eo = (e) => (t, n, r) => {
   const o = r ? Object.assign(r, { direction: "backward" }) : { direction: "backward" };
   return je(e)(t, n, o);
-}, eo = (e) => (t, n, r) => je(e)(t, n, r), to = (e) => async (t, n, r) => {
+}, to = (e) => (t, n, r) => je(e)(t, n, r), no = (e) => async (t, n, r) => {
   const o = r ? Object.assign(r, { direction: "backward" }) : { direction: "backward" };
   return ze(e)(t, n, o);
-}, no = (e) => async (t, n, r) => ze(e)(t, n, r), ro = /^[cC][^\s-]{8,}$/, oo = /^[0-9a-z]+$/, io = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/, ao = /^[0-9a-vA-V]{20}$/, so = /^[A-Za-z0-9]{27}$/, co = /^[a-zA-Z0-9_-]{21}$/, lo = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/, po = /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/, ht = (e) => e ? new RegExp(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-${e}[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$`) : /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/, uo = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/, mo = "^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$";
-function fo() {
-  return new RegExp(mo, "u");
+}, ro = (e) => async (t, n, r) => ze(e)(t, n, r), oo = /^[cC][^\s-]{8,}$/, io = /^[0-9a-z]+$/, ao = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/, so = /^[0-9a-vA-V]{20}$/, co = /^[A-Za-z0-9]{27}$/, lo = /^[a-zA-Z0-9_-]{21}$/, po = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/, uo = /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/, gt = (e) => e ? new RegExp(`^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-${e}[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$`) : /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/, mo = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/, fo = "^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$";
+function ho() {
+  return new RegExp(fo, "u");
 }
-const ho = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/, go = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/, yo = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/([0-9]|[1-2][0-9]|3[0-2])$/, _o = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:?){0,6})\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$/, bo = /^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$/, un = /^[A-Za-z0-9_-]*$/, vo = /^\+[1-9]\d{6,14}$/, dn = "(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))", wo = /* @__PURE__ */ new RegExp(`^${dn}$`);
-function mn(e) {
+const go = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/, yo = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/, bo = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/([0-9]|[1-2][0-9]|3[0-2])$/, _o = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::|([0-9a-fA-F]{1,4})?::([0-9a-fA-F]{1,4}:?){0,6})\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$/, vo = /^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$/, mn = /^[A-Za-z0-9_-]*$/, Io = /^\+[1-9]\d{6,14}$/, fn = "(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))", wo = /* @__PURE__ */ new RegExp(`^${fn}$`);
+function hn(e) {
   const t = "(?:[01]\\d|2[0-3]):[0-5]\\d";
   return typeof e.precision == "number" ? e.precision === -1 ? `${t}` : e.precision === 0 ? `${t}:[0-5]\\d` : `${t}:[0-5]\\d\\.\\d{${e.precision}}` : `${t}(?::[0-5]\\d(?:\\.\\d+)?)?`;
 }
-function Io(e) {
-  return new RegExp(`^${mn(e)}$`);
-}
 function ko(e) {
-  const t = mn({ precision: e.precision }), n = ["Z"];
+  return new RegExp(`^${hn(e)}$`);
+}
+function To(e) {
+  const t = hn({ precision: e.precision }), n = ["Z"];
   e.local && n.push(""), e.offset && n.push("([+-](?:[01]\\d|2[0-3]):[0-5]\\d)");
   const r = `${t}(?:${n.join("|")})`;
-  return new RegExp(`^${dn}T(?:${r})$`);
+  return new RegExp(`^${fn}T(?:${r})$`);
 }
-const To = (e) => {
+const So = (e) => {
   const t = e ? `[\\s\\S]{${e?.minimum ?? 0},${e?.maximum ?? ""}}` : "[\\s\\S]*";
   return new RegExp(`^${t}$`);
-}, So = /^-?\d+$/, fn = /^-?\d+(?:\.\d+)?$/, Po = /^(?:true|false)$/i, Ao = /^null$/i, xo = /^[^A-Z]*$/, Eo = /^[^a-z]*$/, F = /* @__PURE__ */ u("$ZodCheck", (e, t) => {
+}, Po = /^-?\d+$/, gn = /^-?\d+(?:\.\d+)?$/, Ao = /^(?:true|false)$/i, xo = /^null$/i, Eo = /^[^A-Z]*$/, jo = /^[^a-z]*$/, F = /* @__PURE__ */ u("$ZodCheck", (e, t) => {
   var n;
   e._zod ?? (e._zod = {}), e._zod.def = t, (n = e._zod).onattach ?? (n.onattach = []);
-}), hn = {
+}), yn = {
   number: "number",
   bigint: "bigint",
   object: "date"
-}, gn = /* @__PURE__ */ u("$ZodCheckLessThan", (e, t) => {
+}, bn = /* @__PURE__ */ u("$ZodCheckLessThan", (e, t) => {
   F.init(e, t);
-  const n = hn[typeof t.value];
+  const n = yn[typeof t.value];
   e._zod.onattach.push((r) => {
     const o = r._zod.bag, a = (t.inclusive ? o.maximum : o.exclusiveMaximum) ?? Number.POSITIVE_INFINITY;
     t.value < a && (t.inclusive ? o.maximum = t.value : o.exclusiveMaximum = t.value);
@@ -634,9 +632,9 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), yn = /* @__PURE__ */ u("$ZodCheckGreaterThan", (e, t) => {
+}), _n = /* @__PURE__ */ u("$ZodCheckGreaterThan", (e, t) => {
   F.init(e, t);
-  const n = hn[typeof t.value];
+  const n = yn[typeof t.value];
   e._zod.onattach.push((r) => {
     const o = r._zod.bag, a = (t.inclusive ? o.minimum : o.exclusiveMinimum) ?? Number.NEGATIVE_INFINITY;
     t.value > a && (t.inclusive ? o.minimum = t.value : o.exclusiveMinimum = t.value);
@@ -651,14 +649,14 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), jo = /* @__PURE__ */ u("$ZodCheckMultipleOf", (e, t) => {
+}), zo = /* @__PURE__ */ u("$ZodCheckMultipleOf", (e, t) => {
   F.init(e, t), e._zod.onattach.push((n) => {
     var r;
     (r = n._zod.bag).multipleOf ?? (r.multipleOf = t.value);
   }), e._zod.check = (n) => {
     if (typeof n.value != typeof t.value)
       throw new Error("Cannot mix number and bigint in multiple_of check.");
-    (typeof n.value == "bigint" ? n.value % t.value === BigInt(0) : Or(n.value, t.value) === 0) || n.issues.push({
+    (typeof n.value == "bigint" ? n.value % t.value === BigInt(0) : Dr(n.value, t.value) === 0) || n.issues.push({
       origin: typeof n.value,
       code: "not_multiple_of",
       divisor: t.value,
@@ -667,12 +665,12 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), zo = /* @__PURE__ */ u("$ZodCheckNumberFormat", (e, t) => {
+}), Oo = /* @__PURE__ */ u("$ZodCheckNumberFormat", (e, t) => {
   F.init(e, t), t.format = t.format || "float64";
-  const n = t.format?.includes("int"), r = n ? "int" : "number", [o, a] = Rr[t.format];
+  const n = t.format?.includes("int"), r = n ? "int" : "number", [o, a] = Lr[t.format];
   e._zod.onattach.push((i) => {
     const c = i._zod.bag;
-    c.format = t.format, c.minimum = o, c.maximum = a, n && (c.pattern = So);
+    c.format = t.format, c.minimum = o, c.maximum = a, n && (c.pattern = Po);
   }), e._zod.check = (i) => {
     const c = i.value;
     if (n) {
@@ -728,11 +726,11 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), Oo = /* @__PURE__ */ u("$ZodCheckMaxLength", (e, t) => {
+}), Do = /* @__PURE__ */ u("$ZodCheckMaxLength", (e, t) => {
   var n;
   F.init(e, t), (n = e._zod.def).when ?? (n.when = (r) => {
     const o = r.value;
-    return !rt(o) && o.length !== void 0;
+    return !ot(o) && o.length !== void 0;
   }), e._zod.onattach.push((r) => {
     const o = r._zod.bag.maximum ?? Number.POSITIVE_INFINITY;
     t.maximum < o && (r._zod.bag.maximum = t.maximum);
@@ -740,7 +738,7 @@ const To = (e) => {
     const o = r.value;
     if (o.length <= t.maximum)
       return;
-    const i = it(o);
+    const i = at(o);
     r.issues.push({
       origin: i,
       code: "too_big",
@@ -751,11 +749,11 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), Do = /* @__PURE__ */ u("$ZodCheckMinLength", (e, t) => {
+}), No = /* @__PURE__ */ u("$ZodCheckMinLength", (e, t) => {
   var n;
   F.init(e, t), (n = e._zod.def).when ?? (n.when = (r) => {
     const o = r.value;
-    return !rt(o) && o.length !== void 0;
+    return !ot(o) && o.length !== void 0;
   }), e._zod.onattach.push((r) => {
     const o = r._zod.bag.minimum ?? Number.NEGATIVE_INFINITY;
     t.minimum > o && (r._zod.bag.minimum = t.minimum);
@@ -763,7 +761,7 @@ const To = (e) => {
     const o = r.value;
     if (o.length >= t.minimum)
       return;
-    const i = it(o);
+    const i = at(o);
     r.issues.push({
       origin: i,
       code: "too_small",
@@ -774,11 +772,11 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), No = /* @__PURE__ */ u("$ZodCheckLengthEquals", (e, t) => {
+}), $o = /* @__PURE__ */ u("$ZodCheckLengthEquals", (e, t) => {
   var n;
   F.init(e, t), (n = e._zod.def).when ?? (n.when = (r) => {
     const o = r.value;
-    return !rt(o) && o.length !== void 0;
+    return !ot(o) && o.length !== void 0;
   }), e._zod.onattach.push((r) => {
     const o = r._zod.bag;
     o.minimum = t.length, o.maximum = t.length, o.length = t.length;
@@ -786,7 +784,7 @@ const To = (e) => {
     const o = r.value, a = o.length;
     if (a === t.length)
       return;
-    const i = it(o), c = a > t.length;
+    const i = at(o), c = a > t.length;
     r.issues.push({
       origin: i,
       ...c ? { code: "too_big", maximum: t.length } : { code: "too_small", minimum: t.length },
@@ -826,11 +824,11 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), $o = /* @__PURE__ */ u("$ZodCheckLowerCase", (e, t) => {
-  t.pattern ?? (t.pattern = xo), Oe.init(e, t);
-}), Ro = /* @__PURE__ */ u("$ZodCheckUpperCase", (e, t) => {
+}), Ro = /* @__PURE__ */ u("$ZodCheckLowerCase", (e, t) => {
   t.pattern ?? (t.pattern = Eo), Oe.init(e, t);
-}), Lo = /* @__PURE__ */ u("$ZodCheckIncludes", (e, t) => {
+}), Lo = /* @__PURE__ */ u("$ZodCheckUpperCase", (e, t) => {
+  t.pattern ?? (t.pattern = jo), Oe.init(e, t);
+}), Mo = /* @__PURE__ */ u("$ZodCheckIncludes", (e, t) => {
   F.init(e, t);
   const n = pe(t.includes), r = new RegExp(typeof t.position == "number" ? `^.{${t.position}}${n}` : n);
   t.pattern = r, e._zod.onattach.push((o) => {
@@ -847,7 +845,7 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), Mo = /* @__PURE__ */ u("$ZodCheckStartsWith", (e, t) => {
+}), Zo = /* @__PURE__ */ u("$ZodCheckStartsWith", (e, t) => {
   F.init(e, t);
   const n = new RegExp(`^${pe(t.prefix)}.*`);
   t.pattern ?? (t.pattern = n), e._zod.onattach.push((r) => {
@@ -864,7 +862,7 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), Zo = /* @__PURE__ */ u("$ZodCheckEndsWith", (e, t) => {
+}), Uo = /* @__PURE__ */ u("$ZodCheckEndsWith", (e, t) => {
   F.init(e, t);
   const n = new RegExp(`.*${pe(t.suffix)}$`);
   t.pattern ?? (t.pattern = n), e._zod.onattach.push((r) => {
@@ -881,12 +879,12 @@ const To = (e) => {
       continue: !t.abort
     });
   };
-}), Uo = /* @__PURE__ */ u("$ZodCheckOverwrite", (e, t) => {
+}), qo = /* @__PURE__ */ u("$ZodCheckOverwrite", (e, t) => {
   F.init(e, t), e._zod.check = (n) => {
     n.value = t.tx(n.value);
   };
 });
-class qo {
+class Bo {
   constructor(t = []) {
     this.content = [], this.indent = 0, this && (this.args = t);
   }
@@ -909,13 +907,13 @@ class qo {
 `));
   }
 }
-const Bo = {
+const Fo = {
   major: 4,
   minor: 3,
   patch: 6
 }, A = /* @__PURE__ */ u("$ZodType", (e, t) => {
   var n;
-  e ?? (e = {}), e._zod.def = t, e._zod.bag = e._zod.bag || {}, e._zod.version = Bo;
+  e ?? (e = {}), e._zod.def = t, e._zod.bag = e._zod.bag || {}, e._zod.version = Fo;
   const r = [...e._zod.def.checks ?? []];
   e._zod.traits.has("$ZodCheck") && r.unshift(e);
   for (const o of r)
@@ -926,69 +924,69 @@ const Bo = {
       e._zod.run = e._zod.parse;
     });
   else {
-    const o = (i, c, l) => {
-      let p = ie(i), f;
+    const o = (i, c, p) => {
+      let l = ie(i), h;
       for (const y of c) {
         if (y._zod.def.when) {
           if (!y._zod.def.when(i))
             continue;
-        } else if (p)
+        } else if (l)
           continue;
-        const v = i.issues.length, w = y._zod.check(i);
-        if (w instanceof Promise && l?.async === !1)
+        const v = i.issues.length, I = y._zod.check(i);
+        if (I instanceof Promise && p?.async === !1)
           throw new se();
-        if (f || w instanceof Promise)
-          f = (f ?? Promise.resolve()).then(async () => {
-            await w, i.issues.length !== v && (p || (p = ie(i, v)));
+        if (h || I instanceof Promise)
+          h = (h ?? Promise.resolve()).then(async () => {
+            await I, i.issues.length !== v && (l || (l = ie(i, v)));
           });
         else {
           if (i.issues.length === v)
             continue;
-          p || (p = ie(i, v));
+          l || (l = ie(i, v));
         }
       }
-      return f ? f.then(() => i) : i;
-    }, a = (i, c, l) => {
+      return h ? h.then(() => i) : i;
+    }, a = (i, c, p) => {
       if (ie(i))
         return i.aborted = !0, i;
-      const p = o(c, r, l);
-      if (p instanceof Promise) {
-        if (l.async === !1)
+      const l = o(c, r, p);
+      if (l instanceof Promise) {
+        if (p.async === !1)
           throw new se();
-        return p.then((f) => e._zod.parse(f, l));
+        return l.then((h) => e._zod.parse(h, p));
       }
-      return e._zod.parse(p, l);
+      return e._zod.parse(l, p);
     };
     e._zod.run = (i, c) => {
       if (c.skipChecks)
         return e._zod.parse(i, c);
       if (c.direction === "backward") {
-        const p = e._zod.parse({ value: i.value, issues: [] }, { ...c, skipChecks: !0 });
-        return p instanceof Promise ? p.then((f) => a(f, i, c)) : a(p, i, c);
+        const l = e._zod.parse({ value: i.value, issues: [] }, { ...c, skipChecks: !0 });
+        return l instanceof Promise ? l.then((h) => a(h, i, c)) : a(l, i, c);
       }
-      const l = e._zod.parse(i, c);
-      if (l instanceof Promise) {
+      const p = e._zod.parse(i, c);
+      if (p instanceof Promise) {
         if (c.async === !1)
           throw new se();
-        return l.then((p) => o(p, r, c));
+        return p.then((l) => o(l, r, c));
       }
-      return o(l, r, c);
+      return o(p, r, c);
     };
   }
-  T(e, "~standard", () => ({
+  S(e, "~standard", () => ({
     validate: (o) => {
       try {
-        const a = Vr(e, o);
+        const a = Kr(e, o);
         return a.success ? { value: a.data } : { issues: a.error?.issues };
       } catch {
-        return Kr(e, o).then((i) => i.success ? { value: i.data } : { issues: i.error?.issues });
+        return Wr(e, o).then((i) => i.success ? { value: i.data } : { issues: i.error?.issues });
       }
     },
     vendor: "zod",
     version: 1
   }));
-}), ct = /* @__PURE__ */ u("$ZodString", (e, t) => {
-  A.init(e, t), e._zod.pattern = [...e?._zod.bag?.patterns ?? []].pop() ?? To(e._zod.bag), e._zod.parse = (n, r) => {
+}), lt = /* @__PURE__ */ u("$ZodString", (e, t) => {
+  A.init(e, t), e._zod.pattern = [...e?._zod.bag?.patterns ?? []].pop() ?? So(e._zod.bag), e._zod.parse = (n, r) => {
     if (t.coerce)
       try {
         n.value = String(n.value);
@@ -1002,10 +1000,10 @@ const Bo = {
     }), n;
   };
 }), E = /* @__PURE__ */ u("$ZodStringFormat", (e, t) => {
-  Oe.init(e, t), ct.init(e, t);
-}), Fo = /* @__PURE__ */ u("$ZodGUID", (e, t) => {
-  t.pattern ?? (t.pattern = po), E.init(e, t);
-}), Go = /* @__PURE__ */ u("$ZodUUID", (e, t) => {
+  Oe.init(e, t), lt.init(e, t);
+}), Go = /* @__PURE__ */ u("$ZodGUID", (e, t) => {
+  t.pattern ?? (t.pattern = uo), E.init(e, t);
+}), Jo = /* @__PURE__ */ u("$ZodUUID", (e, t) => {
   if (t.version) {
     const r = {
       v1: 1,
@@ -1019,13 +1017,13 @@ const Bo = {
     }[t.version];
     if (r === void 0)
       throw new Error(`Invalid UUID version: "${t.version}"`);
-    t.pattern ?? (t.pattern = ht(r));
+    t.pattern ?? (t.pattern = gt(r));
   } else
-    t.pattern ?? (t.pattern = ht());
+    t.pattern ?? (t.pattern = gt());
   E.init(e, t);
-}), Jo = /* @__PURE__ */ u("$ZodEmail", (e, t) => {
-  t.pattern ?? (t.pattern = uo), E.init(e, t);
-}), Vo = /* @__PURE__ */ u("$ZodURL", (e, t) => {
+}), Vo = /* @__PURE__ */ u("$ZodEmail", (e, t) => {
+  t.pattern ?? (t.pattern = mo), E.init(e, t);
+}), Ko = /* @__PURE__ */ u("$ZodURL", (e, t) => {
   E.init(e, t), e._zod.check = (n) => {
     try {
       const r = n.value.trim(), o = new URL(r);
@@ -1057,32 +1055,32 @@ const Bo = {
       });
     }
   };
-}), Ko = /* @__PURE__ */ u("$ZodEmoji", (e, t) => {
-  t.pattern ?? (t.pattern = fo()), E.init(e, t);
-}), Wo = /* @__PURE__ */ u("$ZodNanoID", (e, t) => {
-  t.pattern ?? (t.pattern = co), E.init(e, t);
-}), Ho = /* @__PURE__ */ u("$ZodCUID", (e, t) => {
-  t.pattern ?? (t.pattern = ro), E.init(e, t);
-}), Xo = /* @__PURE__ */ u("$ZodCUID2", (e, t) => {
-  t.pattern ?? (t.pattern = oo), E.init(e, t);
-}), Yo = /* @__PURE__ */ u("$ZodULID", (e, t) => {
-  t.pattern ?? (t.pattern = io), E.init(e, t);
-}), Qo = /* @__PURE__ */ u("$ZodXID", (e, t) => {
-  t.pattern ?? (t.pattern = ao), E.init(e, t);
-}), ei = /* @__PURE__ */ u("$ZodKSUID", (e, t) => {
-  t.pattern ?? (t.pattern = so), E.init(e, t);
-}), ti = /* @__PURE__ */ u("$ZodISODateTime", (e, t) => {
-  t.pattern ?? (t.pattern = ko(t)), E.init(e, t);
-}), ni = /* @__PURE__ */ u("$ZodISODate", (e, t) => {
-  t.pattern ?? (t.pattern = wo), E.init(e, t);
-}), ri = /* @__PURE__ */ u("$ZodISOTime", (e, t) => {
-  t.pattern ?? (t.pattern = Io(t)), E.init(e, t);
-}), oi = /* @__PURE__ */ u("$ZodISODuration", (e, t) => {
+}), Wo = /* @__PURE__ */ u("$ZodEmoji", (e, t) => {
+  t.pattern ?? (t.pattern = ho()), E.init(e, t);
+}), Ho = /* @__PURE__ */ u("$ZodNanoID", (e, t) => {
   t.pattern ?? (t.pattern = lo), E.init(e, t);
-}), ii = /* @__PURE__ */ u("$ZodIPv4", (e, t) => {
-  t.pattern ?? (t.pattern = ho), E.init(e, t), e._zod.bag.format = "ipv4";
-}), ai = /* @__PURE__ */ u("$ZodIPv6", (e, t) => {
-  t.pattern ?? (t.pattern = go), E.init(e, t), e._zod.bag.format = "ipv6", e._zod.check = (n) => {
+}), Xo = /* @__PURE__ */ u("$ZodCUID", (e, t) => {
+  t.pattern ?? (t.pattern = oo), E.init(e, t);
+}), Yo = /* @__PURE__ */ u("$ZodCUID2", (e, t) => {
+  t.pattern ?? (t.pattern = io), E.init(e, t);
+}), Qo = /* @__PURE__ */ u("$ZodULID", (e, t) => {
+  t.pattern ?? (t.pattern = ao), E.init(e, t);
+}), ei = /* @__PURE__ */ u("$ZodXID", (e, t) => {
+  t.pattern ?? (t.pattern = so), E.init(e, t);
+}), ti = /* @__PURE__ */ u("$ZodKSUID", (e, t) => {
+  t.pattern ?? (t.pattern = co), E.init(e, t);
+}), ni = /* @__PURE__ */ u("$ZodISODateTime", (e, t) => {
+  t.pattern ?? (t.pattern = To(t)), E.init(e, t);
+}), ri = /* @__PURE__ */ u("$ZodISODate", (e, t) => {
+  t.pattern ?? (t.pattern = wo), E.init(e, t);
+}), oi = /* @__PURE__ */ u("$ZodISOTime", (e, t) => {
+  t.pattern ?? (t.pattern = ko(t)), E.init(e, t);
+}), ii = /* @__PURE__ */ u("$ZodISODuration", (e, t) => {
+  t.pattern ?? (t.pattern = po), E.init(e, t);
+}), ai = /* @__PURE__ */ u("$ZodIPv4", (e, t) => {
+  t.pattern ?? (t.pattern = go), E.init(e, t), e._zod.bag.format = "ipv4";
+}), si = /* @__PURE__ */ u("$ZodIPv6", (e, t) => {
+  t.pattern ?? (t.pattern = yo), E.init(e, t), e._zod.bag.format = "ipv6", e._zod.check = (n) => {
     try {
       new URL(`http://[${n.value}]`);
     } catch {
@@ -1095,9 +1093,9 @@ const Bo = {
       });
     }
   };
-}), si = /* @__PURE__ */ u("$ZodCIDRv4", (e, t) => {
-  t.pattern ?? (t.pattern = yo), E.init(e, t);
-}), ci = /* @__PURE__ */ u("$ZodCIDRv6", (e, t) => {
+}), ci = /* @__PURE__ */ u("$ZodCIDRv4", (e, t) => {
+  t.pattern ?? (t.pattern = bo), E.init(e, t);
+}), li = /* @__PURE__ */ u("$ZodCIDRv6", (e, t) => {
   t.pattern ?? (t.pattern = _o), E.init(e, t), e._zod.check = (n) => {
     const r = n.value.split("/");
     try {
@@ -1123,7 +1121,7 @@ const Bo = {
     }
   };
 });
-function _n(e) {
+function vn(e) {
   if (e === "")
     return !0;
   if (e.length % 4 !== 0)
@@ -1134,9 +1132,9 @@ function _n(e) {
     return !1;
   }
 }
-const li = /* @__PURE__ */ u("$ZodBase64", (e, t) => {
-  t.pattern ?? (t.pattern = bo), E.init(e, t), e._zod.bag.contentEncoding = "base64", e._zod.check = (n) => {
-    _n(n.value) || n.issues.push({
+const pi = /* @__PURE__ */ u("$ZodBase64", (e, t) => {
+  t.pattern ?? (t.pattern = vo), E.init(e, t), e._zod.bag.contentEncoding = "base64", e._zod.check = (n) => {
+    vn(n.value) || n.issues.push({
       code: "invalid_format",
       format: "base64",
       input: n.value,
@@ -1145,15 +1143,15 @@ const li = /* @__PURE__ */ u("$ZodBase64", (e, t) => {
     });
   };
 });
-function pi(e) {
-  if (!un.test(e))
+function ui(e) {
+  if (!mn.test(e))
     return !1;
   const t = e.replace(/[-_]/g, (r) => r === "-" ? "+" : "/"), n = t.padEnd(Math.ceil(t.length / 4) * 4, "=");
-  return _n(n);
+  return vn(n);
 }
-const ui = /* @__PURE__ */ u("$ZodBase64URL", (e, t) => {
-  t.pattern ?? (t.pattern = un), E.init(e, t), e._zod.bag.contentEncoding = "base64url", e._zod.check = (n) => {
-    pi(n.value) || n.issues.push({
+const di = /* @__PURE__ */ u("$ZodBase64URL", (e, t) => {
+  t.pattern ?? (t.pattern = mn), E.init(e, t), e._zod.bag.contentEncoding = "base64url", e._zod.check = (n) => {
+    ui(n.value) || n.issues.push({
       code: "invalid_format",
       format: "base64url",
       input: n.value,
@@ -1161,10 +1159,10 @@ const ui = /* @__PURE__ */ u("$ZodBase64URL", (e, t) => {
       continue: !t.abort
     });
   };
-}), di = /* @__PURE__ */ u("$ZodE164", (e, t) => {
-  t.pattern ?? (t.pattern = vo), E.init(e, t);
+}), mi = /* @__PURE__ */ u("$ZodE164", (e, t) => {
+  t.pattern ?? (t.pattern = Io), E.init(e, t);
 });
-function mi(e, t = null) {
+function fi(e, t = null) {
   try {
     const n = e.split(".");
     if (n.length !== 3)
@@ -1178,9 +1176,9 @@ function mi(e, t = null) {
     return !1;
   }
 }
-const fi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
+const hi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
   E.init(e, t), e._zod.check = (n) => {
-    mi(n.value, t.alg) || n.issues.push({
+    fi(n.value, t.alg) || n.issues.push({
       code: "invalid_format",
       format: "jwt",
       input: n.value,
@@ -1188,8 +1186,8 @@ const fi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
       continue: !t.abort
     });
   };
-}), bn = /* @__PURE__ */ u("$ZodNumber", (e, t) => {
-  A.init(e, t), e._zod.pattern = e._zod.bag.pattern ?? fn, e._zod.parse = (n, r) => {
+}), In = /* @__PURE__ */ u("$ZodNumber", (e, t) => {
+  A.init(e, t), e._zod.pattern = e._zod.bag.pattern ?? gn, e._zod.parse = (n, r) => {
     if (t.coerce)
       try {
         n.value = Number(n.value);
@@ -1207,10 +1205,10 @@ const fi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
       ...a ? { received: a } : {}
     }), n;
   };
-}), hi = /* @__PURE__ */ u("$ZodNumberFormat", (e, t) => {
-  zo.init(e, t), bn.init(e, t);
-}), gi = /* @__PURE__ */ u("$ZodBoolean", (e, t) => {
-  A.init(e, t), e._zod.pattern = Po, e._zod.parse = (n, r) => {
+}), gi = /* @__PURE__ */ u("$ZodNumberFormat", (e, t) => {
+  Oo.init(e, t), In.init(e, t);
+}), yi = /* @__PURE__ */ u("$ZodBoolean", (e, t) => {
+  A.init(e, t), e._zod.pattern = Ao, e._zod.parse = (n, r) => {
     if (t.coerce)
       try {
         n.value = !!n.value;
@@ -1224,8 +1222,8 @@ const fi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
       inst: e
     }), n;
   };
-}), yi = /* @__PURE__ */ u("$ZodNull", (e, t) => {
-  A.init(e, t), e._zod.pattern = Ao, e._zod.values = /* @__PURE__ */ new Set([null]), e._zod.parse = (n, r) => {
+}), bi = /* @__PURE__ */ u("$ZodNull", (e, t) => {
+  A.init(e, t), e._zod.pattern = xo, e._zod.values = /* @__PURE__ */ new Set([null]), e._zod.parse = (n, r) => {
     const o = n.value;
     return o === null || n.issues.push({
       expected: "null",
@@ -1236,7 +1234,7 @@ const fi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
   };
 }), _i = /* @__PURE__ */ u("$ZodUnknown", (e, t) => {
   A.init(e, t), e._zod.parse = (n) => n;
-}), bi = /* @__PURE__ */ u("$ZodNever", (e, t) => {
+}), vi = /* @__PURE__ */ u("$ZodNever", (e, t) => {
   A.init(e, t), e._zod.parse = (n, r) => (n.issues.push({
     expected: "never",
     code: "invalid_type",
@@ -1244,10 +1242,10 @@ const fi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
     inst: e
   }), n);
 });
-function gt(e, t, n) {
+function yt(e, t, n) {
   e.issues.length && t.issues.push(...ae(n, e.issues)), t.value[n] = e.value;
 }
-const vi = /* @__PURE__ */ u("$ZodArray", (e, t) => {
+const Ii = /* @__PURE__ */ u("$ZodArray", (e, t) => {
   A.init(e, t), e._zod.parse = (n, r) => {
     const o = n.value;
     if (!Array.isArray(o))
@@ -1260,16 +1258,16 @@ const vi = /* @__PURE__ */ u("$ZodArray", (e, t) => {
     n.value = Array(o.length);
     const a = [];
     for (let i = 0; i < o.length; i++) {
-      const c = o[i], l = t.element._zod.run({
+      const c = o[i], p = t.element._zod.run({
         value: c,
         issues: []
       }, r);
-      l instanceof Promise ? a.push(l.then((p) => gt(p, n, i))) : gt(l, n, i);
+      p instanceof Promise ? a.push(p.then((l) => yt(l, n, i))) : yt(p, n, i);
     }
     return a.length ? Promise.all(a).then(() => n) : n;
   };
 });
-function ve(e, t, n, r, o) {
+function Ie(e, t, n, r, o) {
   if (e.issues.length) {
     if (o && !(n in r))
       return;
@@ -1277,12 +1275,12 @@ function ve(e, t, n, r, o) {
   }
   e.value === void 0 ? n in r && (t.value[n] = void 0) : t.value[n] = e.value;
 }
-function vn(e) {
+function wn(e) {
   const t = Object.keys(e.shape);
   for (const r of t)
     if (!e.shape?.[r]?._zod?.traits?.has("$ZodType"))
       throw new Error(`Invalid element at key "${r}": expected a Zod schema`);
-  const n = $r(e.shape);
+  const n = Rr(e.shape);
   return {
     ...e,
     keys: t,
@@ -1291,17 +1289,17 @@ function vn(e) {
     optionalKeys: new Set(n)
   };
 }
-function wn(e, t, n, r, o, a) {
-  const i = [], c = o.keySet, l = o.catchall._zod, p = l.def.type, f = l.optout === "optional";
+function kn(e, t, n, r, o, a) {
+  const i = [], c = o.keySet, p = o.catchall._zod, l = p.def.type, h = p.optout === "optional";
   for (const y in t) {
     if (c.has(y))
       continue;
-    if (p === "never") {
+    if (l === "never") {
       i.push(y);
       continue;
     }
-    const v = l.run({ value: t[y], issues: [] }, r);
-    v instanceof Promise ? e.push(v.then((w) => ve(w, n, y, t, f))) : ve(v, n, y, t, f);
+    const v = p.run({ value: t[y], issues: [] }, r);
+    v instanceof Promise ? e.push(v.then((I) => Ie(I, n, y, t, h))) : Ie(v, n, y, t, h);
   }
   return i.length && n.issues.push({
     code: "unrecognized_keys",
@@ -1315,62 +1313,62 @@ const wi = /* @__PURE__ */ u("$ZodObject", (e, t) => {
     const c = t.shape;
     Object.defineProperty(t, "shape", {
       get: () => {
-        const l = { ...c };
+        const p = { ...c };
         return Object.defineProperty(t, "shape", {
-          value: l
-        }), l;
+          value: p
+        }), p;
       }
     });
   }
-  const r = nt(() => vn(t));
-  T(e._zod, "propValues", () => {
-    const c = t.shape, l = {};
-    for (const p in c) {
-      const f = c[p]._zod;
-      if (f.values) {
-        l[p] ?? (l[p] = /* @__PURE__ */ new Set());
-        for (const y of f.values)
-          l[p].add(y);
+  const r = rt(() => wn(t));
+  S(e._zod, "propValues", () => {
+    const c = t.shape, p = {};
+    for (const l in c) {
+      const h = c[l]._zod;
+      if (h.values) {
+        p[l] ?? (p[l] = /* @__PURE__ */ new Set());
+        for (const y of h.values)
+          p[l].add(y);
       }
     }
-    return l;
+    return p;
   });
-  const o = be, a = t.catchall;
+  const o = ve, a = t.catchall;
   let i;
-  e._zod.parse = (c, l) => {
+  e._zod.parse = (c, p) => {
     i ?? (i = r.value);
-    const p = c.value;
-    if (!o(p))
+    const l = c.value;
+    if (!o(l))
       return c.issues.push({
         expected: "object",
         code: "invalid_type",
-        input: p,
+        input: l,
         inst: e
       }), c;
     c.value = {};
-    const f = [], y = i.shape;
+    const h = [], y = i.shape;
     for (const v of i.keys) {
-      const w = y[v], $ = w._zod.optout === "optional", C = w._zod.run({ value: p[v], issues: [] }, l);
-      C instanceof Promise ? f.push(C.then((L) => ve(L, c, v, p, $))) : ve(C, c, v, p, $);
+      const I = y[v], L = I._zod.optout === "optional", $ = I._zod.run({ value: l[v], issues: [] }, p);
+      $ instanceof Promise ? h.push($.then((M) => Ie(M, c, v, l, L))) : Ie($, c, v, l, L);
     }
-    return a ? wn(f, p, c, l, r.value, e) : f.length ? Promise.all(f).then(() => c) : c;
+    return a ? kn(h, l, c, p, r.value, e) : h.length ? Promise.all(h).then(() => c) : c;
   };
-}), Ii = /* @__PURE__ */ u("$ZodObjectJIT", (e, t) => {
+}), ki = /* @__PURE__ */ u("$ZodObjectJIT", (e, t) => {
   wi.init(e, t);
-  const n = e._zod.parse, r = nt(() => vn(t)), o = (v) => {
-    const w = new qo(["shape", "payload", "ctx"]), $ = r.value, C = (W) => {
-      const B = ft(W);
+  const n = e._zod.parse, r = rt(() => wn(t)), o = (v) => {
+    const I = new Bo(["shape", "payload", "ctx"]), L = r.value, $ = (W) => {
+      const B = ht(W);
       return `shape[${B}]._zod.run({ value: input[${B}], issues: [] }, ctx)`;
     };
-    w.write("const input = payload.value;");
-    const L = /* @__PURE__ */ Object.create(null);
-    let Yn = 0;
-    for (const W of $.keys)
-      L[W] = `key_${Yn++}`;
-    w.write("const newResult = {};");
-    for (const W of $.keys) {
-      const B = L[W], V = ft(W), er = v[W]?._zod?.optout === "optional";
-      w.write(`const ${B} = ${C(W)};`), er ? w.write(`
+    I.write("const input = payload.value;");
+    const M = /* @__PURE__ */ Object.create(null);
+    let er = 0;
+    for (const W of L.keys)
+      M[W] = `key_${er++}`;
+    I.write("const newResult = {};");
+    for (const W of L.keys) {
+      const B = M[W], V = ht(W), nr = v[W]?._zod?.optout === "optional";
+      I.write(`const ${B} = ${$(W)};`), nr ? I.write(`
         if (${B}.issues.length) {
           if (${V} in input) {
             payload.issues = payload.issues.concat(${B}.issues.map(iss => ({
@@ -1388,7 +1386,7 @@ const wi = /* @__PURE__ */ u("$ZodObject", (e, t) => {
           newResult[${V}] = ${B}.value;
         }
 
-      `) : w.write(`
+      `) : I.write(`
         if (${B}.issues.length) {
           payload.issues = payload.issues.concat(${B}.issues.map(iss => ({
             ...iss,
@@ -1406,25 +1404,25 @@ const wi = /* @__PURE__ */ u("$ZodObject", (e, t) => {
 
       `);
     }
-    w.write("payload.value = newResult;"), w.write("return payload;");
-    const Qn = w.compile();
-    return (W, B) => Qn(v, W, B);
+    I.write("payload.value = newResult;"), I.write("return payload;");
+    const tr = I.compile();
+    return (W, B) => tr(v, W, B);
   };
   let a;
-  const i = be, c = !Ue.jitless, p = c && Nr.value, f = t.catchall;
+  const i = ve, c = !Ue.jitless, l = c && $r.value, h = t.catchall;
   let y;
-  e._zod.parse = (v, w) => {
+  e._zod.parse = (v, I) => {
     y ?? (y = r.value);
-    const $ = v.value;
-    return i($) ? c && p && w?.async === !1 && w.jitless !== !0 ? (a || (a = o(t.shape)), v = a(v, w), f ? wn([], $, v, w, y, e) : v) : n(v, w) : (v.issues.push({
+    const L = v.value;
+    return i(L) ? c && l && I?.async === !1 && I.jitless !== !0 ? (a || (a = o(t.shape)), v = a(v, I), h ? kn([], L, v, I, y, e) : v) : n(v, I) : (v.issues.push({
       expected: "object",
       code: "invalid_type",
-      input: $,
+      input: L,
       inst: e
     }), v);
   };
 });
-function yt(e, t, n, r) {
+function bt(e, t, n, r) {
   for (const a of e)
     if (a.issues.length === 0)
       return t.value = a.value, t;
@@ -1436,14 +1434,14 @@ function yt(e, t, n, r) {
     errors: e.map((a) => a.issues.map((i) => Y(i, r, H())))
   }), t);
 }
-const ki = /* @__PURE__ */ u("$ZodUnion", (e, t) => {
-  A.init(e, t), T(e._zod, "optin", () => t.options.some((o) => o._zod.optin === "optional") ? "optional" : void 0), T(e._zod, "optout", () => t.options.some((o) => o._zod.optout === "optional") ? "optional" : void 0), T(e._zod, "values", () => {
+const Ti = /* @__PURE__ */ u("$ZodUnion", (e, t) => {
+  A.init(e, t), S(e._zod, "optin", () => t.options.some((o) => o._zod.optin === "optional") ? "optional" : void 0), S(e._zod, "optout", () => t.options.some((o) => o._zod.optout === "optional") ? "optional" : void 0), S(e._zod, "values", () => {
     if (t.options.every((o) => o._zod.values))
       return new Set(t.options.flatMap((o) => Array.from(o._zod.values)));
-  }), T(e._zod, "pattern", () => {
+  }), S(e._zod, "pattern", () => {
     if (t.options.every((o) => o._zod.pattern)) {
       const o = t.options.map((a) => a._zod.pattern);
-      return new RegExp(`^(${o.map((a) => ot(a.source)).join("|")})$`);
+      return new RegExp(`^(${o.map((a) => it(a.source)).join("|")})$`);
     }
   });
   const n = t.options.length === 1, r = t.options[0]._zod.run;
@@ -1452,25 +1450,25 @@ const ki = /* @__PURE__ */ u("$ZodUnion", (e, t) => {
       return r(o, a);
     let i = !1;
     const c = [];
-    for (const l of t.options) {
-      const p = l._zod.run({
+    for (const p of t.options) {
+      const l = p._zod.run({
         value: o.value,
         issues: []
       }, a);
-      if (p instanceof Promise)
-        c.push(p), i = !0;
+      if (l instanceof Promise)
+        c.push(l), i = !0;
       else {
-        if (p.issues.length === 0)
-          return p;
-        c.push(p);
+        if (l.issues.length === 0)
+          return l;
+        c.push(l);
       }
     }
-    return i ? Promise.all(c).then((l) => yt(l, o, e, a)) : yt(c, o, e, a);
+    return i ? Promise.all(c).then((p) => bt(p, o, e, a)) : bt(c, o, e, a);
   };
-}), Ti = /* @__PURE__ */ u("$ZodIntersection", (e, t) => {
+}), Si = /* @__PURE__ */ u("$ZodIntersection", (e, t) => {
   A.init(e, t), e._zod.parse = (n, r) => {
     const o = n.value, a = t.left._zod.run({ value: o, issues: [] }, r), i = t.right._zod.run({ value: o, issues: [] }, r);
-    return a instanceof Promise || i instanceof Promise ? Promise.all([a, i]).then(([l, p]) => _t(n, l, p)) : _t(n, a, i);
+    return a instanceof Promise || i instanceof Promise ? Promise.all([a, i]).then(([p, l]) => _t(n, p, l)) : _t(n, a, i);
   };
 });
 function Be(e, t) {
@@ -1514,14 +1512,14 @@ function _t(e, t, n) {
   for (const c of t.issues)
     if (c.code === "unrecognized_keys") {
       o ?? (o = c);
-      for (const l of c.keys)
-        r.has(l) || r.set(l, {}), r.get(l).l = !0;
+      for (const p of c.keys)
+        r.has(p) || r.set(p, {}), r.get(p).l = !0;
     } else
       e.issues.push(c);
   for (const c of n.issues)
     if (c.code === "unrecognized_keys")
-      for (const l of c.keys)
-        r.has(l) || r.set(l, {}), r.get(l).r = !0;
+      for (const p of c.keys)
+        r.has(p) || r.set(p, {}), r.get(p).r = !0;
     else
       e.issues.push(c);
   const a = [...r].filter(([, c]) => c.l && c.r).map(([c]) => c);
@@ -1532,7 +1530,7 @@ function _t(e, t, n) {
     throw new Error(`Unmergable intersection. Error path: ${JSON.stringify(i.mergeErrorPath)}`);
   return e.value = i.data, e;
 }
-const Si = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
+const Pi = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
   A.init(e, t), e._zod.parse = (n, r) => {
     const o = n.value;
     if (!le(o))
@@ -1546,59 +1544,59 @@ const Si = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
     if (i) {
       n.value = {};
       const c = /* @__PURE__ */ new Set();
-      for (const p of i)
-        if (typeof p == "string" || typeof p == "number" || typeof p == "symbol") {
-          c.add(typeof p == "number" ? p.toString() : p);
-          const f = t.valueType._zod.run({ value: o[p], issues: [] }, r);
-          f instanceof Promise ? a.push(f.then((y) => {
-            y.issues.length && n.issues.push(...ae(p, y.issues)), n.value[p] = y.value;
-          })) : (f.issues.length && n.issues.push(...ae(p, f.issues)), n.value[p] = f.value);
+      for (const l of i)
+        if (typeof l == "string" || typeof l == "number" || typeof l == "symbol") {
+          c.add(typeof l == "number" ? l.toString() : l);
+          const h = t.valueType._zod.run({ value: o[l], issues: [] }, r);
+          h instanceof Promise ? a.push(h.then((y) => {
+            y.issues.length && n.issues.push(...ae(l, y.issues)), n.value[l] = y.value;
+          })) : (h.issues.length && n.issues.push(...ae(l, h.issues)), n.value[l] = h.value);
         }
-      let l;
-      for (const p in o)
-        c.has(p) || (l = l ?? [], l.push(p));
-      l && l.length > 0 && n.issues.push({
+      let p;
+      for (const l in o)
+        c.has(l) || (p = p ?? [], p.push(l));
+      p && p.length > 0 && n.issues.push({
         code: "unrecognized_keys",
         input: o,
         inst: e,
-        keys: l
+        keys: p
       });
     } else {
       n.value = {};
       for (const c of Reflect.ownKeys(o)) {
         if (c === "__proto__")
           continue;
-        let l = t.keyType._zod.run({ value: c, issues: [] }, r);
-        if (l instanceof Promise)
+        let p = t.keyType._zod.run({ value: c, issues: [] }, r);
+        if (p instanceof Promise)
           throw new Error("Async schemas not supported in object keys currently");
-        if (typeof c == "string" && fn.test(c) && l.issues.length) {
+        if (typeof c == "string" && gn.test(c) && p.issues.length) {
           const y = t.keyType._zod.run({ value: Number(c), issues: [] }, r);
           if (y instanceof Promise)
             throw new Error("Async schemas not supported in object keys currently");
-          y.issues.length === 0 && (l = y);
+          y.issues.length === 0 && (p = y);
         }
-        if (l.issues.length) {
+        if (p.issues.length) {
           t.mode === "loose" ? n.value[c] = o[c] : n.issues.push({
             code: "invalid_key",
             origin: "record",
-            issues: l.issues.map((y) => Y(y, r, H())),
+            issues: p.issues.map((y) => Y(y, r, H())),
             input: c,
             path: [c],
             inst: e
           });
           continue;
         }
-        const f = t.valueType._zod.run({ value: o[c], issues: [] }, r);
-        f instanceof Promise ? a.push(f.then((y) => {
-          y.issues.length && n.issues.push(...ae(c, y.issues)), n.value[l.value] = y.value;
-        })) : (f.issues.length && n.issues.push(...ae(c, f.issues)), n.value[l.value] = f.value);
+        const h = t.valueType._zod.run({ value: o[c], issues: [] }, r);
+        h instanceof Promise ? a.push(h.then((y) => {
+          y.issues.length && n.issues.push(...ae(c, y.issues)), n.value[p.value] = y.value;
+        })) : (h.issues.length && n.issues.push(...ae(c, h.issues)), n.value[p.value] = h.value);
       }
     }
     return a.length ? Promise.all(a).then(() => n) : n;
   };
-}), Pi = /* @__PURE__ */ u("$ZodEnum", (e, t) => {
+}), Ai = /* @__PURE__ */ u("$ZodEnum", (e, t) => {
   A.init(e, t);
-  const n = on(t.entries), r = new Set(n);
+  const n = sn(t.entries), r = new Set(n);
   e._zod.values = r, e._zod.pattern = new RegExp(`^(${n.filter((o) => Cr.has(typeof o)).map((o) => typeof o == "string" ? pe(o) : o.toString()).join("|")})$`), e._zod.parse = (o, a) => {
     const i = o.value;
     return r.has(i) || o.issues.push({
@@ -1608,7 +1606,7 @@ const Si = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
       inst: e
     }), o;
   };
-}), Ai = /* @__PURE__ */ u("$ZodLiteral", (e, t) => {
+}), xi = /* @__PURE__ */ u("$ZodLiteral", (e, t) => {
   if (A.init(e, t), t.values.length === 0)
     throw new Error("Cannot create literal schema with no valid values");
   const n = new Set(t.values);
@@ -1621,10 +1619,10 @@ const Si = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
       inst: e
     }), r;
   };
-}), xi = /* @__PURE__ */ u("$ZodTransform", (e, t) => {
+}), Ei = /* @__PURE__ */ u("$ZodTransform", (e, t) => {
   A.init(e, t), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
-      throw new rn(e.constructor.name);
+      throw new an(e.constructor.name);
     const o = t.transform(n.value, n);
     if (r.async)
       return (o instanceof Promise ? o : Promise.resolve(o)).then((i) => (n.value = i, n));
@@ -1633,44 +1631,44 @@ const Si = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
     return n.value = o, n;
   };
 });
-function bt(e, t) {
+function vt(e, t) {
   return e.issues.length && t === void 0 ? { issues: [], value: void 0 } : e;
 }
-const In = /* @__PURE__ */ u("$ZodOptional", (e, t) => {
-  A.init(e, t), e._zod.optin = "optional", e._zod.optout = "optional", T(e._zod, "values", () => t.innerType._zod.values ? /* @__PURE__ */ new Set([...t.innerType._zod.values, void 0]) : void 0), T(e._zod, "pattern", () => {
+const Tn = /* @__PURE__ */ u("$ZodOptional", (e, t) => {
+  A.init(e, t), e._zod.optin = "optional", e._zod.optout = "optional", S(e._zod, "values", () => t.innerType._zod.values ? /* @__PURE__ */ new Set([...t.innerType._zod.values, void 0]) : void 0), S(e._zod, "pattern", () => {
     const n = t.innerType._zod.pattern;
-    return n ? new RegExp(`^(${ot(n.source)})?$`) : void 0;
+    return n ? new RegExp(`^(${it(n.source)})?$`) : void 0;
   }), e._zod.parse = (n, r) => {
     if (t.innerType._zod.optin === "optional") {
       const o = t.innerType._zod.run(n, r);
-      return o instanceof Promise ? o.then((a) => bt(a, n.value)) : bt(o, n.value);
+      return o instanceof Promise ? o.then((a) => vt(a, n.value)) : vt(o, n.value);
     }
     return n.value === void 0 ? n : t.innerType._zod.run(n, r);
   };
-}), Ei = /* @__PURE__ */ u("$ZodExactOptional", (e, t) => {
-  In.init(e, t), T(e._zod, "values", () => t.innerType._zod.values), T(e._zod, "pattern", () => t.innerType._zod.pattern), e._zod.parse = (n, r) => t.innerType._zod.run(n, r);
-}), ji = /* @__PURE__ */ u("$ZodNullable", (e, t) => {
-  A.init(e, t), T(e._zod, "optin", () => t.innerType._zod.optin), T(e._zod, "optout", () => t.innerType._zod.optout), T(e._zod, "pattern", () => {
+}), ji = /* @__PURE__ */ u("$ZodExactOptional", (e, t) => {
+  Tn.init(e, t), S(e._zod, "values", () => t.innerType._zod.values), S(e._zod, "pattern", () => t.innerType._zod.pattern), e._zod.parse = (n, r) => t.innerType._zod.run(n, r);
+}), zi = /* @__PURE__ */ u("$ZodNullable", (e, t) => {
+  A.init(e, t), S(e._zod, "optin", () => t.innerType._zod.optin), S(e._zod, "optout", () => t.innerType._zod.optout), S(e._zod, "pattern", () => {
     const n = t.innerType._zod.pattern;
-    return n ? new RegExp(`^(${ot(n.source)}|null)$`) : void 0;
-  }), T(e._zod, "values", () => t.innerType._zod.values ? /* @__PURE__ */ new Set([...t.innerType._zod.values, null]) : void 0), e._zod.parse = (n, r) => n.value === null ? n : t.innerType._zod.run(n, r);
-}), zi = /* @__PURE__ */ u("$ZodDefault", (e, t) => {
-  A.init(e, t), e._zod.optin = "optional", T(e._zod, "values", () => t.innerType._zod.values), e._zod.parse = (n, r) => {
+    return n ? new RegExp(`^(${it(n.source)}|null)$`) : void 0;
+  }), S(e._zod, "values", () => t.innerType._zod.values ? /* @__PURE__ */ new Set([...t.innerType._zod.values, null]) : void 0), e._zod.parse = (n, r) => n.value === null ? n : t.innerType._zod.run(n, r);
+}), Oi = /* @__PURE__ */ u("$ZodDefault", (e, t) => {
+  A.init(e, t), e._zod.optin = "optional", S(e._zod, "values", () => t.innerType._zod.values), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
       return t.innerType._zod.run(n, r);
     if (n.value === void 0)
       return n.value = t.defaultValue, n;
     const o = t.innerType._zod.run(n, r);
-    return o instanceof Promise ? o.then((a) => vt(a, t)) : vt(o, t);
+    return o instanceof Promise ? o.then((a) => It(a, t)) : It(o, t);
   };
 });
-function vt(e, t) {
+function It(e, t) {
   return e.value === void 0 && (e.value = t.defaultValue), e;
 }
-const Oi = /* @__PURE__ */ u("$ZodPrefault", (e, t) => {
-  A.init(e, t), e._zod.optin = "optional", T(e._zod, "values", () => t.innerType._zod.values), e._zod.parse = (n, r) => (r.direction === "backward" || n.value === void 0 && (n.value = t.defaultValue), t.innerType._zod.run(n, r));
-}), Di = /* @__PURE__ */ u("$ZodNonOptional", (e, t) => {
-  A.init(e, t), T(e._zod, "values", () => {
+const Di = /* @__PURE__ */ u("$ZodPrefault", (e, t) => {
+  A.init(e, t), e._zod.optin = "optional", S(e._zod, "values", () => t.innerType._zod.values), e._zod.parse = (n, r) => (r.direction === "backward" || n.value === void 0 && (n.value = t.defaultValue), t.innerType._zod.run(n, r));
+}), Ni = /* @__PURE__ */ u("$ZodNonOptional", (e, t) => {
+  A.init(e, t), S(e._zod, "values", () => {
     const n = t.innerType._zod.values;
     return n ? new Set([...n].filter((r) => r !== void 0)) : void 0;
   }), e._zod.parse = (n, r) => {
@@ -1686,8 +1684,8 @@ function wt(e, t) {
     inst: t
   }), e;
 }
-const Ni = /* @__PURE__ */ u("$ZodCatch", (e, t) => {
-  A.init(e, t), T(e._zod, "optin", () => t.innerType._zod.optin), T(e._zod, "optout", () => t.innerType._zod.optout), T(e._zod, "values", () => t.innerType._zod.values), e._zod.parse = (n, r) => {
+const $i = /* @__PURE__ */ u("$ZodCatch", (e, t) => {
+  A.init(e, t), S(e._zod, "optin", () => t.innerType._zod.optin), S(e._zod, "optout", () => t.innerType._zod.optout), S(e._zod, "values", () => t.innerType._zod.values), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
       return t.innerType._zod.run(n, r);
     const o = t.innerType._zod.run(n, r);
@@ -1706,40 +1704,40 @@ const Ni = /* @__PURE__ */ u("$ZodCatch", (e, t) => {
     }), n.issues = []), n);
   };
 }), Ci = /* @__PURE__ */ u("$ZodPipe", (e, t) => {
-  A.init(e, t), T(e._zod, "values", () => t.in._zod.values), T(e._zod, "optin", () => t.in._zod.optin), T(e._zod, "optout", () => t.out._zod.optout), T(e._zod, "propValues", () => t.in._zod.propValues), e._zod.parse = (n, r) => {
+  A.init(e, t), S(e._zod, "values", () => t.in._zod.values), S(e._zod, "optin", () => t.in._zod.optin), S(e._zod, "optout", () => t.out._zod.optout), S(e._zod, "propValues", () => t.in._zod.propValues), e._zod.parse = (n, r) => {
     if (r.direction === "backward") {
       const a = t.out._zod.run(n, r);
-      return a instanceof Promise ? a.then((i) => ye(i, t.in, r)) : ye(a, t.in, r);
+      return a instanceof Promise ? a.then((i) => be(i, t.in, r)) : be(a, t.in, r);
     }
     const o = t.in._zod.run(n, r);
-    return o instanceof Promise ? o.then((a) => ye(a, t.out, r)) : ye(o, t.out, r);
+    return o instanceof Promise ? o.then((a) => be(a, t.out, r)) : be(o, t.out, r);
   };
 });
-function ye(e, t, n) {
+function be(e, t, n) {
   return e.issues.length ? (e.aborted = !0, e) : t._zod.run({ value: e.value, issues: e.issues }, n);
 }
-const $i = /* @__PURE__ */ u("$ZodReadonly", (e, t) => {
-  A.init(e, t), T(e._zod, "propValues", () => t.innerType._zod.propValues), T(e._zod, "values", () => t.innerType._zod.values), T(e._zod, "optin", () => t.innerType?._zod?.optin), T(e._zod, "optout", () => t.innerType?._zod?.optout), e._zod.parse = (n, r) => {
+const Ri = /* @__PURE__ */ u("$ZodReadonly", (e, t) => {
+  A.init(e, t), S(e._zod, "propValues", () => t.innerType._zod.propValues), S(e._zod, "values", () => t.innerType._zod.values), S(e._zod, "optin", () => t.innerType?._zod?.optin), S(e._zod, "optout", () => t.innerType?._zod?.optout), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
       return t.innerType._zod.run(n, r);
     const o = t.innerType._zod.run(n, r);
-    return o instanceof Promise ? o.then(It) : It(o);
+    return o instanceof Promise ? o.then(kt) : kt(o);
   };
 });
-function It(e) {
+function kt(e) {
   return e.value = Object.freeze(e.value), e;
 }
-const Ri = /* @__PURE__ */ u("$ZodLazy", (e, t) => {
-  A.init(e, t), T(e._zod, "innerType", () => t.getter()), T(e._zod, "pattern", () => e._zod.innerType?._zod?.pattern), T(e._zod, "propValues", () => e._zod.innerType?._zod?.propValues), T(e._zod, "optin", () => e._zod.innerType?._zod?.optin ?? void 0), T(e._zod, "optout", () => e._zod.innerType?._zod?.optout ?? void 0), e._zod.parse = (n, r) => e._zod.innerType._zod.run(n, r);
-}), Li = /* @__PURE__ */ u("$ZodCustom", (e, t) => {
+const Li = /* @__PURE__ */ u("$ZodLazy", (e, t) => {
+  A.init(e, t), S(e._zod, "innerType", () => t.getter()), S(e._zod, "pattern", () => e._zod.innerType?._zod?.pattern), S(e._zod, "propValues", () => e._zod.innerType?._zod?.propValues), S(e._zod, "optin", () => e._zod.innerType?._zod?.optin ?? void 0), S(e._zod, "optout", () => e._zod.innerType?._zod?.optout ?? void 0), e._zod.parse = (n, r) => e._zod.innerType._zod.run(n, r);
+}), Mi = /* @__PURE__ */ u("$ZodCustom", (e, t) => {
   F.init(e, t), A.init(e, t), e._zod.parse = (n, r) => n, e._zod.check = (n) => {
     const r = n.value, o = t.fn(r);
     if (o instanceof Promise)
-      return o.then((a) => kt(a, n, r, e));
-    kt(o, n, r, e);
+      return o.then((a) => Tt(a, n, r, e));
+    Tt(o, n, r, e);
   };
 });
-function kt(e, t, n, r) {
+function Tt(e, t, n, r) {
   if (!e) {
     const o = {
       code: "custom",
@@ -1754,8 +1752,8 @@ function kt(e, t, n, r) {
     r._zod.def.params && (o.params = r._zod.def.params), t.issues.push(he(o));
   }
 }
-var Tt;
-class Mi {
+var St;
+class Zi {
   constructor() {
     this._map = /* @__PURE__ */ new WeakMap(), this._idmap = /* @__PURE__ */ new Map();
   }
@@ -1784,20 +1782,20 @@ class Mi {
     return this._map.has(t);
   }
 }
-function Zi() {
-  return new Mi();
+function Ui() {
+  return new Zi();
 }
-(Tt = globalThis).__zod_globalRegistry ?? (Tt.__zod_globalRegistry = Zi());
+(St = globalThis).__zod_globalRegistry ?? (St.__zod_globalRegistry = Ui());
 const fe = globalThis.__zod_globalRegistry;
 // @__NO_SIDE_EFFECTS__
-function Ui(e, t) {
+function qi(e, t) {
   return new e({
     type: "string",
     ..._(t)
   });
 }
 // @__NO_SIDE_EFFECTS__
-function qi(e, t) {
+function Bi(e, t) {
   return new e({
     type: "string",
     format: "email",
@@ -1807,20 +1805,10 @@ function qi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function St(e, t) {
+function Pt(e, t) {
   return new e({
     type: "string",
     format: "guid",
-    check: "string_format",
-    abort: !1,
-    ..._(t)
-  });
-}
-// @__NO_SIDE_EFFECTS__
-function Bi(e, t) {
-  return new e({
-    type: "string",
-    format: "uuid",
     check: "string_format",
     abort: !1,
     ..._(t)
@@ -1833,7 +1821,6 @@ function Fi(e, t) {
     format: "uuid",
     check: "string_format",
     abort: !1,
-    version: "v4",
     ..._(t)
   });
 }
@@ -1844,7 +1831,7 @@ function Gi(e, t) {
     format: "uuid",
     check: "string_format",
     abort: !1,
-    version: "v6",
+    version: "v4",
     ..._(t)
   });
 }
@@ -1855,12 +1842,23 @@ function Ji(e, t) {
     format: "uuid",
     check: "string_format",
     abort: !1,
-    version: "v7",
+    version: "v6",
     ..._(t)
   });
 }
 // @__NO_SIDE_EFFECTS__
 function Vi(e, t) {
+  return new e({
+    type: "string",
+    format: "uuid",
+    check: "string_format",
+    abort: !1,
+    version: "v7",
+    ..._(t)
+  });
+}
+// @__NO_SIDE_EFFECTS__
+function Ki(e, t) {
   return new e({
     type: "string",
     format: "url",
@@ -1870,7 +1868,7 @@ function Vi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Ki(e, t) {
+function Wi(e, t) {
   return new e({
     type: "string",
     format: "emoji",
@@ -1880,7 +1878,7 @@ function Ki(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Wi(e, t) {
+function Hi(e, t) {
   return new e({
     type: "string",
     format: "nanoid",
@@ -1890,7 +1888,7 @@ function Wi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Hi(e, t) {
+function Xi(e, t) {
   return new e({
     type: "string",
     format: "cuid",
@@ -1900,7 +1898,7 @@ function Hi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Xi(e, t) {
+function Yi(e, t) {
   return new e({
     type: "string",
     format: "cuid2",
@@ -1910,7 +1908,7 @@ function Xi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Yi(e, t) {
+function Qi(e, t) {
   return new e({
     type: "string",
     format: "ulid",
@@ -1920,7 +1918,7 @@ function Yi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Qi(e, t) {
+function ea(e, t) {
   return new e({
     type: "string",
     format: "xid",
@@ -1930,7 +1928,7 @@ function Qi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ea(e, t) {
+function ta(e, t) {
   return new e({
     type: "string",
     format: "ksuid",
@@ -1940,7 +1938,7 @@ function ea(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ta(e, t) {
+function na(e, t) {
   return new e({
     type: "string",
     format: "ipv4",
@@ -1950,7 +1948,7 @@ function ta(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function na(e, t) {
+function ra(e, t) {
   return new e({
     type: "string",
     format: "ipv6",
@@ -1960,7 +1958,7 @@ function na(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ra(e, t) {
+function oa(e, t) {
   return new e({
     type: "string",
     format: "cidrv4",
@@ -1970,7 +1968,7 @@ function ra(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function oa(e, t) {
+function ia(e, t) {
   return new e({
     type: "string",
     format: "cidrv6",
@@ -1980,7 +1978,7 @@ function oa(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ia(e, t) {
+function aa(e, t) {
   return new e({
     type: "string",
     format: "base64",
@@ -1990,7 +1988,7 @@ function ia(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function aa(e, t) {
+function sa(e, t) {
   return new e({
     type: "string",
     format: "base64url",
@@ -2000,7 +1998,7 @@ function aa(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function sa(e, t) {
+function ca(e, t) {
   return new e({
     type: "string",
     format: "e164",
@@ -2010,7 +2008,7 @@ function sa(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ca(e, t) {
+function la(e, t) {
   return new e({
     type: "string",
     format: "jwt",
@@ -2020,7 +2018,7 @@ function ca(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function la(e, t) {
+function pa(e, t) {
   return new e({
     type: "string",
     format: "datetime",
@@ -2032,7 +2030,7 @@ function la(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function pa(e, t) {
+function ua(e, t) {
   return new e({
     type: "string",
     format: "date",
@@ -2041,7 +2039,7 @@ function pa(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ua(e, t) {
+function da(e, t) {
   return new e({
     type: "string",
     format: "time",
@@ -2051,7 +2049,7 @@ function ua(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function da(e, t) {
+function ma(e, t) {
   return new e({
     type: "string",
     format: "duration",
@@ -2060,7 +2058,7 @@ function da(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ma(e, t) {
+function fa(e, t) {
   return new e({
     type: "number",
     checks: [],
@@ -2068,7 +2066,7 @@ function ma(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function fa(e, t) {
+function ha(e, t) {
   return new e({
     type: "number",
     check: "number_format",
@@ -2078,21 +2076,21 @@ function fa(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ha(e, t) {
+function ga(e, t) {
   return new e({
     type: "boolean",
     ..._(t)
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ga(e, t) {
+function ya(e, t) {
   return new e({
     type: "null",
     ..._(t)
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ya(e) {
+function ba(e) {
   return new e({
     type: "unknown"
   });
@@ -2105,8 +2103,8 @@ function _a(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Pt(e, t) {
-  return new gn({
+function At(e, t) {
+  return new bn({
     check: "less_than",
     ..._(t),
     value: e,
@@ -2115,7 +2113,7 @@ function Pt(e, t) {
 }
 // @__NO_SIDE_EFFECTS__
 function Ne(e, t) {
-  return new gn({
+  return new bn({
     check: "less_than",
     ..._(t),
     value: e,
@@ -2123,8 +2121,8 @@ function Ne(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function At(e, t) {
-  return new yn({
+function xt(e, t) {
+  return new _n({
     check: "greater_than",
     ..._(t),
     value: e,
@@ -2132,8 +2130,8 @@ function At(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Ce(e, t) {
-  return new yn({
+function $e(e, t) {
+  return new _n({
     check: "greater_than",
     ..._(t),
     value: e,
@@ -2141,16 +2139,16 @@ function Ce(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function xt(e, t) {
-  return new jo({
+function Et(e, t) {
+  return new zo({
     check: "multiple_of",
     ..._(t),
     value: e
   });
 }
 // @__NO_SIDE_EFFECTS__
-function kn(e, t) {
-  return new Oo({
+function Sn(e, t) {
+  return new Do({
     check: "max_length",
     ..._(t),
     maximum: e
@@ -2158,22 +2156,22 @@ function kn(e, t) {
 }
 // @__NO_SIDE_EFFECTS__
 function we(e, t) {
-  return new Do({
+  return new No({
     check: "min_length",
     ..._(t),
     minimum: e
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Tn(e, t) {
-  return new No({
+function Pn(e, t) {
+  return new $o({
     check: "length_equals",
     ..._(t),
     length: e
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ba(e, t) {
+function va(e, t) {
   return new Co({
     check: "string_format",
     format: "regex",
@@ -2182,8 +2180,8 @@ function ba(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function va(e) {
-  return new $o({
+function Ia(e) {
+  return new Ro({
     check: "string_format",
     format: "lowercase",
     ..._(e)
@@ -2191,15 +2189,15 @@ function va(e) {
 }
 // @__NO_SIDE_EFFECTS__
 function wa(e) {
-  return new Ro({
+  return new Lo({
     check: "string_format",
     format: "uppercase",
     ..._(e)
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Ia(e, t) {
-  return new Lo({
+function ka(e, t) {
+  return new Mo({
     check: "string_format",
     format: "includes",
     ..._(t),
@@ -2207,8 +2205,8 @@ function Ia(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function ka(e, t) {
-  return new Mo({
+function Ta(e, t) {
+  return new Zo({
     check: "string_format",
     format: "starts_with",
     ..._(t),
@@ -2216,8 +2214,8 @@ function ka(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Ta(e, t) {
-  return new Zo({
+function Sa(e, t) {
+  return new Uo({
     check: "string_format",
     format: "ends_with",
     ..._(t),
@@ -2226,33 +2224,33 @@ function Ta(e, t) {
 }
 // @__NO_SIDE_EFFECTS__
 function me(e) {
-  return new Uo({
+  return new qo({
     check: "overwrite",
     tx: e
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Sa(e) {
+function Pa(e) {
   return /* @__PURE__ */ me((t) => t.normalize(e));
 }
 // @__NO_SIDE_EFFECTS__
-function Pa() {
+function Aa() {
   return /* @__PURE__ */ me((e) => e.trim());
 }
 // @__NO_SIDE_EFFECTS__
-function Aa() {
+function xa() {
   return /* @__PURE__ */ me((e) => e.toLowerCase());
 }
 // @__NO_SIDE_EFFECTS__
-function xa() {
+function Ea() {
   return /* @__PURE__ */ me((e) => e.toUpperCase());
 }
 // @__NO_SIDE_EFFECTS__
-function Ea() {
-  return /* @__PURE__ */ me((e) => Dr(e));
+function ja() {
+  return /* @__PURE__ */ me((e) => Nr(e));
 }
 // @__NO_SIDE_EFFECTS__
-function ja(e, t, n) {
+function za(e, t, n) {
   return new e({
     type: "array",
     element: t,
@@ -2263,7 +2261,7 @@ function ja(e, t, n) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function za(e, t, n) {
+function Oa(e, t, n) {
   return new e({
     type: "custom",
     check: "custom",
@@ -2272,8 +2270,8 @@ function za(e, t, n) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Oa(e) {
-  const t = /* @__PURE__ */ Da((n) => (n.addIssue = (r) => {
+function Da(e) {
+  const t = /* @__PURE__ */ Na((n) => (n.addIssue = (r) => {
     if (typeof r == "string")
       n.issues.push(he(r, n.value, t._zod.def));
     else {
@@ -2284,14 +2282,14 @@ function Oa(e) {
   return t;
 }
 // @__NO_SIDE_EFFECTS__
-function Da(e, t) {
+function Na(e, t) {
   const n = new F({
     check: "custom",
     ..._(t)
   });
   return n._zod.check = e, n;
 }
-function Sn(e) {
+function An(e) {
   let t = e?.target ?? "draft-2020-12";
   return t === "draft-4" && (t = "draft-04"), t === "draft-7" && (t = "draft-07"), {
     processors: e.processors ?? {},
@@ -2319,26 +2317,26 @@ function D(e, t, n = { path: [], schemaPath: [] }) {
   if (c)
     i.schema = c;
   else {
-    const f = {
+    const h = {
       ...n,
       schemaPath: [...n.schemaPath, e],
       path: n.path
     };
     if (e._zod.processJSONSchema)
-      e._zod.processJSONSchema(t, i.schema, f);
+      e._zod.processJSONSchema(t, i.schema, h);
     else {
-      const v = i.schema, w = t.processors[o.type];
-      if (!w)
+      const v = i.schema, I = t.processors[o.type];
+      if (!I)
         throw new Error(`[toJSONSchema]: Non-representable type encountered: ${o.type}`);
-      w(e, t, v, f);
+      I(e, t, v, h);
     }
     const y = e._zod.parent;
-    y && (i.ref || (i.ref = y), D(y, t, f), t.seen.get(y).isParent = !0);
+    y && (i.ref || (i.ref = y), D(y, t, h), t.seen.get(y).isParent = !0);
   }
-  const l = t.metadataRegistry.get(e);
-  return l && Object.assign(i.schema, l), t.io === "input" && Z(e) && (delete i.schema.examples, delete i.schema.default), t.io === "input" && i.schema._prefault && ((r = i.schema).default ?? (r.default = i.schema._prefault)), delete i.schema._prefault, t.seen.get(e).schema;
+  const p = t.metadataRegistry.get(e);
+  return p && Object.assign(i.schema, p), t.io === "input" && U(e) && (delete i.schema.examples, delete i.schema.default), t.io === "input" && i.schema._prefault && ((r = i.schema).default ?? (r.default = i.schema._prefault)), delete i.schema._prefault, t.seen.get(e).schema;
 }
-function Pn(e, t) {
+function xn(e, t) {
   const n = e.seen.get(t);
   if (!n)
     throw new Error("Unprocessed schema. This is a bug in Zod.");
@@ -2346,8 +2344,8 @@ function Pn(e, t) {
   for (const i of e.seen.entries()) {
     const c = e.metadataRegistry.get(i[0])?.id;
     if (c) {
-      const l = r.get(c);
-      if (l && l !== i[0])
+      const p = r.get(c);
+      if (p && p !== i[0])
         throw new Error(`Duplicate schema id "${c}" detected during JSON Schema conversion. Two different schemas cannot share the same id when converted together.`);
       r.set(c, i[0]);
     }
@@ -2355,25 +2353,25 @@ function Pn(e, t) {
   const o = (i) => {
     const c = e.target === "draft-2020-12" ? "$defs" : "definitions";
     if (e.external) {
-      const y = e.external.registry.get(i[0])?.id, v = e.external.uri ?? (($) => $);
+      const y = e.external.registry.get(i[0])?.id, v = e.external.uri ?? ((L) => L);
       if (y)
         return { ref: v(y) };
-      const w = i[1].defId ?? i[1].schema.id ?? `schema${e.counter++}`;
-      return i[1].defId = w, { defId: w, ref: `${v("__shared")}#/${c}/${w}` };
+      const I = i[1].defId ?? i[1].schema.id ?? `schema${e.counter++}`;
+      return i[1].defId = I, { defId: I, ref: `${v("__shared")}#/${c}/${I}` };
     }
     if (i[1] === n)
       return { ref: "#" };
-    const p = `#/${c}/`, f = i[1].schema.id ?? `__schema${e.counter++}`;
-    return { defId: f, ref: p + f };
+    const l = `#/${c}/`, h = i[1].schema.id ?? `__schema${e.counter++}`;
+    return { defId: h, ref: l + h };
   }, a = (i) => {
     if (i[1].schema.$ref)
       return;
-    const c = i[1], { ref: l, defId: p } = o(i);
-    c.def = { ...c.schema }, p && (c.defId = p);
-    const f = c.schema;
-    for (const y in f)
-      delete f[y];
-    f.$ref = l;
+    const c = i[1], { ref: p, defId: l } = o(i);
+    c.def = { ...c.schema }, l && (c.defId = l);
+    const h = c.schema;
+    for (const y in h)
+      delete h[y];
+    h.$ref = p;
   };
   if (e.cycles === "throw")
     for (const i of e.seen.entries()) {
@@ -2390,8 +2388,8 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
       continue;
     }
     if (e.external) {
-      const p = e.external.registry.get(i[0])?.id;
-      if (t !== i[0] && p) {
+      const l = e.external.registry.get(i[0])?.id;
+      if (t !== i[0] && l) {
         a(i);
         continue;
       }
@@ -2410,7 +2408,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
     }
   }
 }
-function An(e, t) {
+function En(e, t) {
   const n = e.seen.get(t);
   if (!n)
     throw new Error("Unprocessed schema. This is a bug in Zod.");
@@ -2418,28 +2416,28 @@ function An(e, t) {
     const c = e.seen.get(i);
     if (c.ref === null)
       return;
-    const l = c.def ?? c.schema, p = { ...l }, f = c.ref;
-    if (c.ref = null, f) {
-      r(f);
-      const v = e.seen.get(f), w = v.schema;
-      if (w.$ref && (e.target === "draft-07" || e.target === "draft-04" || e.target === "openapi-3.0") ? (l.allOf = l.allOf ?? [], l.allOf.push(w)) : Object.assign(l, w), Object.assign(l, p), i._zod.parent === f)
-        for (const C in l)
-          C === "$ref" || C === "allOf" || C in p || delete l[C];
-      if (w.$ref && v.def)
-        for (const C in l)
-          C === "$ref" || C === "allOf" || C in v.def && JSON.stringify(l[C]) === JSON.stringify(v.def[C]) && delete l[C];
+    const p = c.def ?? c.schema, l = { ...p }, h = c.ref;
+    if (c.ref = null, h) {
+      r(h);
+      const v = e.seen.get(h), I = v.schema;
+      if (I.$ref && (e.target === "draft-07" || e.target === "draft-04" || e.target === "openapi-3.0") ? (p.allOf = p.allOf ?? [], p.allOf.push(I)) : Object.assign(p, I), Object.assign(p, l), i._zod.parent === h)
+        for (const $ in p)
+          $ === "$ref" || $ === "allOf" || $ in l || delete p[$];
+      if (I.$ref && v.def)
+        for (const $ in p)
+          $ === "$ref" || $ === "allOf" || $ in v.def && JSON.stringify(p[$]) === JSON.stringify(v.def[$]) && delete p[$];
     }
     const y = i._zod.parent;
-    if (y && y !== f) {
+    if (y && y !== h) {
       r(y);
       const v = e.seen.get(y);
-      if (v?.schema.$ref && (l.$ref = v.schema.$ref, v.def))
-        for (const w in l)
-          w === "$ref" || w === "allOf" || w in v.def && JSON.stringify(l[w]) === JSON.stringify(v.def[w]) && delete l[w];
+      if (v?.schema.$ref && (p.$ref = v.schema.$ref, v.def))
+        for (const I in p)
+          I === "$ref" || I === "allOf" || I in v.def && JSON.stringify(p[I]) === JSON.stringify(v.def[I]) && delete p[I];
     }
     e.override({
       zodSchema: i,
-      jsonSchema: l,
+      jsonSchema: p,
       path: c.path ?? []
     });
   };
@@ -2465,8 +2463,8 @@ function An(e, t) {
       value: {
         ...t["~standard"],
         jsonSchema: {
-          input: Ie(t, "input", e.processors),
-          output: Ie(t, "output", e.processors)
+          input: ke(t, "input", e.processors),
+          output: ke(t, "output", e.processors)
         }
       },
       enumerable: !1,
@@ -2476,7 +2474,7 @@ function An(e, t) {
     throw new Error("Error converting schema to JSON.");
   }
 }
-function Z(e, t) {
+function U(e, t) {
   const n = t ?? { seen: /* @__PURE__ */ new Set() };
   if (n.seen.has(e))
     return !1;
@@ -2485,45 +2483,45 @@ function Z(e, t) {
   if (r.type === "transform")
     return !0;
   if (r.type === "array")
-    return Z(r.element, n);
+    return U(r.element, n);
   if (r.type === "set")
-    return Z(r.valueType, n);
+    return U(r.valueType, n);
   if (r.type === "lazy")
-    return Z(r.getter(), n);
+    return U(r.getter(), n);
   if (r.type === "promise" || r.type === "optional" || r.type === "nonoptional" || r.type === "nullable" || r.type === "readonly" || r.type === "default" || r.type === "prefault")
-    return Z(r.innerType, n);
+    return U(r.innerType, n);
   if (r.type === "intersection")
-    return Z(r.left, n) || Z(r.right, n);
+    return U(r.left, n) || U(r.right, n);
   if (r.type === "record" || r.type === "map")
-    return Z(r.keyType, n) || Z(r.valueType, n);
+    return U(r.keyType, n) || U(r.valueType, n);
   if (r.type === "pipe")
-    return Z(r.in, n) || Z(r.out, n);
+    return U(r.in, n) || U(r.out, n);
   if (r.type === "object") {
     for (const o in r.shape)
-      if (Z(r.shape[o], n))
+      if (U(r.shape[o], n))
         return !0;
     return !1;
   }
   if (r.type === "union") {
     for (const o of r.options)
-      if (Z(o, n))
+      if (U(o, n))
         return !0;
     return !1;
   }
   if (r.type === "tuple") {
     for (const o of r.items)
-      if (Z(o, n))
+      if (U(o, n))
         return !0;
-    return !!(r.rest && Z(r.rest, n));
+    return !!(r.rest && U(r.rest, n));
   }
   return !1;
 }
-const Na = (e, t = {}) => (n) => {
-  const r = Sn({ ...n, processors: t });
-  return D(e, r), Pn(r, e), An(r, e);
-}, Ie = (e, t, n = {}) => (r) => {
-  const { libraryOptions: o, target: a } = r ?? {}, i = Sn({ ...o ?? {}, target: a, io: t, processors: n });
-  return D(e, i), Pn(i, e), An(i, e);
+const $a = (e, t = {}) => (n) => {
+  const r = An({ ...n, processors: t });
+  return D(e, r), xn(r, e), En(r, e);
+}, ke = (e, t, n = {}) => (r) => {
+  const { libraryOptions: o, target: a } = r ?? {}, i = An({ ...o ?? {}, target: a, io: t, processors: n });
+  return D(e, i), xn(i, e), En(i, e);
 }, Ca = {
   guid: "uuid",
   url: "uri",
@@ -2531,33 +2529,33 @@ const Na = (e, t = {}) => (n) => {
   json_string: "json-string",
   regex: ""
   // do not set
-}, $a = (e, t, n, r) => {
+}, Ra = (e, t, n, r) => {
   const o = n;
   o.type = "string";
-  const { minimum: a, maximum: i, format: c, patterns: l, contentEncoding: p } = e._zod.bag;
-  if (typeof a == "number" && (o.minLength = a), typeof i == "number" && (o.maxLength = i), c && (o.format = Ca[c] ?? c, o.format === "" && delete o.format, c === "time" && delete o.format), p && (o.contentEncoding = p), l && l.size > 0) {
-    const f = [...l];
-    f.length === 1 ? o.pattern = f[0].source : f.length > 1 && (o.allOf = [
-      ...f.map((y) => ({
+  const { minimum: a, maximum: i, format: c, patterns: p, contentEncoding: l } = e._zod.bag;
+  if (typeof a == "number" && (o.minLength = a), typeof i == "number" && (o.maxLength = i), c && (o.format = Ca[c] ?? c, o.format === "" && delete o.format, c === "time" && delete o.format), l && (o.contentEncoding = l), p && p.size > 0) {
+    const h = [...p];
+    h.length === 1 ? o.pattern = h[0].source : h.length > 1 && (o.allOf = [
+      ...h.map((y) => ({
         ...t.target === "draft-07" || t.target === "draft-04" || t.target === "openapi-3.0" ? { type: "string" } : {},
         pattern: y.source
       }))
     ]);
   }
-}, Ra = (e, t, n, r) => {
-  const o = n, { minimum: a, maximum: i, format: c, multipleOf: l, exclusiveMaximum: p, exclusiveMinimum: f } = e._zod.bag;
-  typeof c == "string" && c.includes("int") ? o.type = "integer" : o.type = "number", typeof f == "number" && (t.target === "draft-04" || t.target === "openapi-3.0" ? (o.minimum = f, o.exclusiveMinimum = !0) : o.exclusiveMinimum = f), typeof a == "number" && (o.minimum = a, typeof f == "number" && t.target !== "draft-04" && (f >= a ? delete o.minimum : delete o.exclusiveMinimum)), typeof p == "number" && (t.target === "draft-04" || t.target === "openapi-3.0" ? (o.maximum = p, o.exclusiveMaximum = !0) : o.exclusiveMaximum = p), typeof i == "number" && (o.maximum = i, typeof p == "number" && t.target !== "draft-04" && (p <= i ? delete o.maximum : delete o.exclusiveMaximum)), typeof l == "number" && (o.multipleOf = l);
 }, La = (e, t, n, r) => {
-  n.type = "boolean";
+  const o = n, { minimum: a, maximum: i, format: c, multipleOf: p, exclusiveMaximum: l, exclusiveMinimum: h } = e._zod.bag;
+  typeof c == "string" && c.includes("int") ? o.type = "integer" : o.type = "number", typeof h == "number" && (t.target === "draft-04" || t.target === "openapi-3.0" ? (o.minimum = h, o.exclusiveMinimum = !0) : o.exclusiveMinimum = h), typeof a == "number" && (o.minimum = a, typeof h == "number" && t.target !== "draft-04" && (h >= a ? delete o.minimum : delete o.exclusiveMinimum)), typeof l == "number" && (t.target === "draft-04" || t.target === "openapi-3.0" ? (o.maximum = l, o.exclusiveMaximum = !0) : o.exclusiveMaximum = l), typeof i == "number" && (o.maximum = i, typeof l == "number" && t.target !== "draft-04" && (l <= i ? delete o.maximum : delete o.exclusiveMaximum)), typeof p == "number" && (o.multipleOf = p);
 }, Ma = (e, t, n, r) => {
-  t.target === "openapi-3.0" ? (n.type = "string", n.nullable = !0, n.enum = [null]) : n.type = "null";
+  n.type = "boolean";
 }, Za = (e, t, n, r) => {
-  n.not = {};
+  t.target === "openapi-3.0" ? (n.type = "string", n.nullable = !0, n.enum = [null]) : n.type = "null";
 }, Ua = (e, t, n, r) => {
+  n.not = {};
 }, qa = (e, t, n, r) => {
-  const o = e._zod.def, a = on(o.entries);
-  a.every((i) => typeof i == "number") && (n.type = "number"), a.every((i) => typeof i == "string") && (n.type = "string"), n.enum = a;
 }, Ba = (e, t, n, r) => {
+  const o = e._zod.def, a = sn(o.entries);
+  a.every((i) => typeof i == "number") && (n.type = "number"), a.every((i) => typeof i == "string") && (n.type = "string"), n.enum = a;
+}, Fa = (e, t, n, r) => {
   const o = e._zod.def, a = [];
   for (const i of o.values)
     if (i === void 0) {
@@ -2574,62 +2572,62 @@ const Na = (e, t = {}) => (n) => {
     n.type = i === null ? "null" : typeof i, t.target === "draft-04" || t.target === "openapi-3.0" ? n.enum = [i] : n.const = i;
   } else
     a.every((i) => typeof i == "number") && (n.type = "number"), a.every((i) => typeof i == "string") && (n.type = "string"), a.every((i) => typeof i == "boolean") && (n.type = "boolean"), a.every((i) => i === null) && (n.type = "null"), n.enum = a;
-}, Fa = (e, t, n, r) => {
-  if (t.unrepresentable === "throw")
-    throw new Error("Custom types cannot be represented in JSON Schema");
 }, Ga = (e, t, n, r) => {
   if (t.unrepresentable === "throw")
-    throw new Error("Transforms cannot be represented in JSON Schema");
+    throw new Error("Custom types cannot be represented in JSON Schema");
 }, Ja = (e, t, n, r) => {
+  if (t.unrepresentable === "throw")
+    throw new Error("Transforms cannot be represented in JSON Schema");
+}, Va = (e, t, n, r) => {
   const o = n, a = e._zod.def, { minimum: i, maximum: c } = e._zod.bag;
   typeof i == "number" && (o.minItems = i), typeof c == "number" && (o.maxItems = c), o.type = "array", o.items = D(a.element, t, { ...r, path: [...r.path, "items"] });
-}, Va = (e, t, n, r) => {
+}, Ka = (e, t, n, r) => {
   const o = n, a = e._zod.def;
   o.type = "object", o.properties = {};
   const i = a.shape;
-  for (const p in i)
-    o.properties[p] = D(i[p], t, {
+  for (const l in i)
+    o.properties[l] = D(i[l], t, {
       ...r,
-      path: [...r.path, "properties", p]
+      path: [...r.path, "properties", l]
     });
-  const c = new Set(Object.keys(i)), l = new Set([...c].filter((p) => {
-    const f = a.shape[p]._zod;
-    return t.io === "input" ? f.optin === void 0 : f.optout === void 0;
+  const c = new Set(Object.keys(i)), p = new Set([...c].filter((l) => {
+    const h = a.shape[l]._zod;
+    return t.io === "input" ? h.optin === void 0 : h.optout === void 0;
   }));
-  l.size > 0 && (o.required = Array.from(l)), a.catchall?._zod.def.type === "never" ? o.additionalProperties = !1 : a.catchall ? a.catchall && (o.additionalProperties = D(a.catchall, t, {
+  p.size > 0 && (o.required = Array.from(p)), a.catchall?._zod.def.type === "never" ? o.additionalProperties = !1 : a.catchall ? a.catchall && (o.additionalProperties = D(a.catchall, t, {
     ...r,
     path: [...r.path, "additionalProperties"]
   })) : t.io === "output" && (o.additionalProperties = !1);
-}, Ka = (e, t, n, r) => {
-  const o = e._zod.def, a = o.inclusive === !1, i = o.options.map((c, l) => D(c, t, {
+}, Wa = (e, t, n, r) => {
+  const o = e._zod.def, a = o.inclusive === !1, i = o.options.map((c, p) => D(c, t, {
     ...r,
-    path: [...r.path, a ? "oneOf" : "anyOf", l]
+    path: [...r.path, a ? "oneOf" : "anyOf", p]
   }));
   a ? n.oneOf = i : n.anyOf = i;
-}, Wa = (e, t, n, r) => {
+}, Ha = (e, t, n, r) => {
   const o = e._zod.def, a = D(o.left, t, {
     ...r,
     path: [...r.path, "allOf", 0]
   }), i = D(o.right, t, {
     ...r,
     path: [...r.path, "allOf", 1]
-  }), c = (p) => "allOf" in p && Object.keys(p).length === 1, l = [
+  }), c = (l) => "allOf" in l && Object.keys(l).length === 1, p = [
     ...c(a) ? a.allOf : [a],
     ...c(i) ? i.allOf : [i]
   ];
-  n.allOf = l;
-}, Ha = (e, t, n, r) => {
+  n.allOf = p;
+}, Xa = (e, t, n, r) => {
   const o = n, a = e._zod.def;
   o.type = "object";
-  const i = a.keyType, l = i._zod.bag?.patterns;
-  if (a.mode === "loose" && l && l.size > 0) {
-    const f = D(a.valueType, t, {
+  const i = a.keyType, p = i._zod.bag?.patterns;
+  if (a.mode === "loose" && p && p.size > 0) {
+    const h = D(a.valueType, t, {
       ...r,
       path: [...r.path, "patternProperties", "*"]
     });
     o.patternProperties = {};
-    for (const y of l)
-      o.patternProperties[y.source] = f;
+    for (const y of p)
+      o.patternProperties[y.source] = h;
   } else
     (t.target === "draft-07" || t.target === "draft-2020-12") && (o.propertyNames = D(a.keyType, t, {
       ...r,
@@ -2638,30 +2636,30 @@ const Na = (e, t = {}) => (n) => {
       ...r,
       path: [...r.path, "additionalProperties"]
     });
-  const p = i._zod.values;
-  if (p) {
-    const f = [...p].filter((y) => typeof y == "string" || typeof y == "number");
-    f.length > 0 && (o.required = f);
+  const l = i._zod.values;
+  if (l) {
+    const h = [...l].filter((y) => typeof y == "string" || typeof y == "number");
+    h.length > 0 && (o.required = h);
   }
-}, Xa = (e, t, n, r) => {
+}, Ya = (e, t, n, r) => {
   const o = e._zod.def, a = D(o.innerType, t, r), i = t.seen.get(e);
   t.target === "openapi-3.0" ? (i.ref = o.innerType, n.nullable = !0) : n.anyOf = [a, { type: "null" }];
-}, Ya = (e, t, n, r) => {
-  const o = e._zod.def;
-  D(o.innerType, t, r);
-  const a = t.seen.get(e);
-  a.ref = o.innerType;
 }, Qa = (e, t, n, r) => {
   const o = e._zod.def;
   D(o.innerType, t, r);
   const a = t.seen.get(e);
-  a.ref = o.innerType, n.default = JSON.parse(JSON.stringify(o.defaultValue));
+  a.ref = o.innerType;
 }, es = (e, t, n, r) => {
   const o = e._zod.def;
   D(o.innerType, t, r);
   const a = t.seen.get(e);
-  a.ref = o.innerType, t.io === "input" && (n._prefault = JSON.parse(JSON.stringify(o.defaultValue)));
+  a.ref = o.innerType, n.default = JSON.parse(JSON.stringify(o.defaultValue));
 }, ts = (e, t, n, r) => {
+  const o = e._zod.def;
+  D(o.innerType, t, r);
+  const a = t.seen.get(e);
+  a.ref = o.innerType, t.io === "input" && (n._prefault = JSON.parse(JSON.stringify(o.defaultValue)));
+}, ns = (e, t, n, r) => {
   const o = e._zod.def;
   D(o.innerType, t, r);
   const a = t.seen.get(e);
@@ -2673,58 +2671,58 @@ const Na = (e, t = {}) => (n) => {
     throw new Error("Dynamic catch values are not supported in JSON Schema");
   }
   n.default = i;
-}, ns = (e, t, n, r) => {
+}, rs = (e, t, n, r) => {
   const o = e._zod.def, a = t.io === "input" ? o.in._zod.def.type === "transform" ? o.out : o.in : o.out;
   D(a, t, r);
   const i = t.seen.get(e);
   i.ref = a;
-}, rs = (e, t, n, r) => {
+}, os = (e, t, n, r) => {
   const o = e._zod.def;
   D(o.innerType, t, r);
   const a = t.seen.get(e);
   a.ref = o.innerType, n.readOnly = !0;
-}, xn = (e, t, n, r) => {
+}, jn = (e, t, n, r) => {
   const o = e._zod.def;
   D(o.innerType, t, r);
   const a = t.seen.get(e);
   a.ref = o.innerType;
-}, os = (e, t, n, r) => {
+}, is = (e, t, n, r) => {
   const o = e._zod.innerType;
   D(o, t, r);
   const a = t.seen.get(e);
   a.ref = o;
-}, is = /* @__PURE__ */ u("ZodISODateTime", (e, t) => {
-  ti.init(e, t), j.init(e, t);
-});
-function as(e) {
-  return /* @__PURE__ */ la(is, e);
-}
-const ss = /* @__PURE__ */ u("ZodISODate", (e, t) => {
+}, as = /* @__PURE__ */ u("ZodISODateTime", (e, t) => {
   ni.init(e, t), j.init(e, t);
 });
-function cs(e) {
-  return /* @__PURE__ */ pa(ss, e);
+function ss(e) {
+  return /* @__PURE__ */ pa(as, e);
 }
-const ls = /* @__PURE__ */ u("ZodISOTime", (e, t) => {
+const cs = /* @__PURE__ */ u("ZodISODate", (e, t) => {
   ri.init(e, t), j.init(e, t);
 });
-function ps(e) {
-  return /* @__PURE__ */ ua(ls, e);
+function ls(e) {
+  return /* @__PURE__ */ ua(cs, e);
 }
-const us = /* @__PURE__ */ u("ZodISODuration", (e, t) => {
+const ps = /* @__PURE__ */ u("ZodISOTime", (e, t) => {
   oi.init(e, t), j.init(e, t);
 });
-function ds(e) {
-  return /* @__PURE__ */ da(us, e);
+function us(e) {
+  return /* @__PURE__ */ da(ps, e);
 }
-const ms = (e, t) => {
-  ln.init(e, t), e.name = "ZodError", Object.defineProperties(e, {
+const ds = /* @__PURE__ */ u("ZodISODuration", (e, t) => {
+  ii.init(e, t), j.init(e, t);
+});
+function ms(e) {
+  return /* @__PURE__ */ ma(ds, e);
+}
+const fs = (e, t) => {
+  un.init(e, t), e.name = "ZodError", Object.defineProperties(e, {
     format: {
-      value: (n) => Jr(e, n)
+      value: (n) => Vr(e, n)
       // enumerable: false,
     },
     flatten: {
-      value: (n) => Gr(e, n)
+      value: (n) => Jr(e, n)
       // enumerable: false,
     },
     addIssue: {
@@ -2746,21 +2744,21 @@ const ms = (e, t) => {
       // enumerable: false,
     }
   });
-}, J = u("ZodError", ms, {
+}, J = u("ZodError", fs, {
   Parent: Error
-}), fs = /* @__PURE__ */ at(J), hs = /* @__PURE__ */ st(J), gs = /* @__PURE__ */ je(J), ys = /* @__PURE__ */ ze(J), _s = /* @__PURE__ */ Wr(J), bs = /* @__PURE__ */ Hr(J), vs = /* @__PURE__ */ Xr(J), ws = /* @__PURE__ */ Yr(J), Is = /* @__PURE__ */ Qr(J), ks = /* @__PURE__ */ eo(J), Ts = /* @__PURE__ */ to(J), Ss = /* @__PURE__ */ no(J), x = /* @__PURE__ */ u("ZodType", (e, t) => (A.init(e, t), Object.assign(e["~standard"], {
+}), hs = /* @__PURE__ */ st(J), gs = /* @__PURE__ */ ct(J), ys = /* @__PURE__ */ je(J), bs = /* @__PURE__ */ ze(J), _s = /* @__PURE__ */ Hr(J), vs = /* @__PURE__ */ Xr(J), Is = /* @__PURE__ */ Yr(J), ws = /* @__PURE__ */ Qr(J), ks = /* @__PURE__ */ eo(J), Ts = /* @__PURE__ */ to(J), Ss = /* @__PURE__ */ no(J), Ps = /* @__PURE__ */ ro(J), x = /* @__PURE__ */ u("ZodType", (e, t) => (A.init(e, t), Object.assign(e["~standard"], {
   jsonSchema: {
-    input: Ie(e, "input"),
-    output: Ie(e, "output")
+    input: ke(e, "input"),
+    output: ke(e, "output")
   }
-}), e.toJSONSchema = Na(e, {}), e.def = t, e.type = t.type, Object.defineProperty(e, "_def", { value: t }), e.check = (...n) => e.clone(te(t, {
+}), e.toJSONSchema = $a(e, {}), e.def = t, e.type = t.type, Object.defineProperty(e, "_def", { value: t }), e.check = (...n) => e.clone(te(t, {
   checks: [
     ...t.checks ?? [],
     ...n.map((r) => typeof r == "function" ? { _zod: { check: r, def: { check: "custom" }, onattach: [] } } : r)
   ]
 }), {
   parent: !0
-}), e.with = e.check, e.clone = (n, r) => ne(e, n, r), e.brand = () => e, e.register = ((n, r) => (n.add(e, r), e)), e.parse = (n, r) => fs(e, n, r, { callee: e.parse }), e.safeParse = (n, r) => gs(e, n, r), e.parseAsync = async (n, r) => hs(e, n, r, { callee: e.parseAsync }), e.safeParseAsync = async (n, r) => ys(e, n, r), e.spa = e.safeParseAsync, e.encode = (n, r) => _s(e, n, r), e.decode = (n, r) => bs(e, n, r), e.encodeAsync = async (n, r) => vs(e, n, r), e.decodeAsync = async (n, r) => ws(e, n, r), e.safeEncode = (n, r) => Is(e, n, r), e.safeDecode = (n, r) => ks(e, n, r), e.safeEncodeAsync = async (n, r) => Ts(e, n, r), e.safeDecodeAsync = async (n, r) => Ss(e, n, r), e.refine = (n, r) => e.check(vc(n, r)), e.superRefine = (n) => e.check(wc(n)), e.overwrite = (n) => e.check(/* @__PURE__ */ me(n)), e.optional = () => zt(e), e.exactOptional = () => ac(e), e.nullable = () => Ot(e), e.nullish = () => zt(Ot(e)), e.nonoptional = (n) => dc(e, n), e.array = () => q(e), e.or = (n) => zn([e, n]), e.and = (n) => tc(e, n), e.transform = (n) => Ge(e, On(n)), e.default = (n) => lc(e, n), e.prefault = (n) => uc(e, n), e.catch = (n) => fc(e, n), e.pipe = (n) => Ge(e, n), e.readonly = () => yc(e), e.describe = (n) => {
+}), e.with = e.check, e.clone = (n, r) => ne(e, n, r), e.brand = () => e, e.register = ((n, r) => (n.add(e, r), e)), e.parse = (n, r) => hs(e, n, r, { callee: e.parse }), e.safeParse = (n, r) => ys(e, n, r), e.parseAsync = async (n, r) => gs(e, n, r, { callee: e.parseAsync }), e.safeParseAsync = async (n, r) => bs(e, n, r), e.spa = e.safeParseAsync, e.encode = (n, r) => _s(e, n, r), e.decode = (n, r) => vs(e, n, r), e.encodeAsync = async (n, r) => Is(e, n, r), e.decodeAsync = async (n, r) => ws(e, n, r), e.safeEncode = (n, r) => ks(e, n, r), e.safeDecode = (n, r) => Ts(e, n, r), e.safeEncodeAsync = async (n, r) => Ss(e, n, r), e.safeDecodeAsync = async (n, r) => Ps(e, n, r), e.refine = (n, r) => e.check(Ic(n, r)), e.superRefine = (n) => e.check(wc(n)), e.overwrite = (n) => e.check(/* @__PURE__ */ me(n)), e.optional = () => Ot(e), e.exactOptional = () => sc(e), e.nullable = () => Dt(e), e.nullish = () => Ot(Dt(e)), e.nonoptional = (n) => mc(e, n), e.array = () => R(e), e.or = (n) => Dn([e, n]), e.and = (n) => nc(e, n), e.transform = (n) => Ge(e, Nn(n)), e.default = (n) => pc(e, n), e.prefault = (n) => dc(e, n), e.catch = (n) => hc(e, n), e.pipe = (n) => Ge(e, n), e.readonly = () => bc(e), e.describe = (n) => {
   const r = e.clone();
   return fe.add(r, { description: n }), r;
 }, Object.defineProperty(e, "description", {
@@ -2773,136 +2771,136 @@ const ms = (e, t) => {
     return fe.get(e);
   const r = e.clone();
   return fe.add(r, n[0]), r;
-}, e.isOptional = () => e.safeParse(void 0).success, e.isNullable = () => e.safeParse(null).success, e.apply = (n) => n(e), e)), En = /* @__PURE__ */ u("_ZodString", (e, t) => {
-  ct.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => $a(e, r, o);
+}, e.isOptional = () => e.safeParse(void 0).success, e.isNullable = () => e.safeParse(null).success, e.apply = (n) => n(e), e)), zn = /* @__PURE__ */ u("_ZodString", (e, t) => {
+  lt.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => Ra(e, r, o);
   const n = e._zod.bag;
-  e.format = n.format ?? null, e.minLength = n.minimum ?? null, e.maxLength = n.maximum ?? null, e.regex = (...r) => e.check(/* @__PURE__ */ ba(...r)), e.includes = (...r) => e.check(/* @__PURE__ */ Ia(...r)), e.startsWith = (...r) => e.check(/* @__PURE__ */ ka(...r)), e.endsWith = (...r) => e.check(/* @__PURE__ */ Ta(...r)), e.min = (...r) => e.check(/* @__PURE__ */ we(...r)), e.max = (...r) => e.check(/* @__PURE__ */ kn(...r)), e.length = (...r) => e.check(/* @__PURE__ */ Tn(...r)), e.nonempty = (...r) => e.check(/* @__PURE__ */ we(1, ...r)), e.lowercase = (r) => e.check(/* @__PURE__ */ va(r)), e.uppercase = (r) => e.check(/* @__PURE__ */ wa(r)), e.trim = () => e.check(/* @__PURE__ */ Pa()), e.normalize = (...r) => e.check(/* @__PURE__ */ Sa(...r)), e.toLowerCase = () => e.check(/* @__PURE__ */ Aa()), e.toUpperCase = () => e.check(/* @__PURE__ */ xa()), e.slugify = () => e.check(/* @__PURE__ */ Ea());
-}), Ps = /* @__PURE__ */ u("ZodString", (e, t) => {
-  ct.init(e, t), En.init(e, t), e.email = (n) => e.check(/* @__PURE__ */ qi(As, n)), e.url = (n) => e.check(/* @__PURE__ */ Vi(xs, n)), e.jwt = (n) => e.check(/* @__PURE__ */ ca(Bs, n)), e.emoji = (n) => e.check(/* @__PURE__ */ Ki(Es, n)), e.guid = (n) => e.check(/* @__PURE__ */ St(Et, n)), e.uuid = (n) => e.check(/* @__PURE__ */ Bi(_e, n)), e.uuidv4 = (n) => e.check(/* @__PURE__ */ Fi(_e, n)), e.uuidv6 = (n) => e.check(/* @__PURE__ */ Gi(_e, n)), e.uuidv7 = (n) => e.check(/* @__PURE__ */ Ji(_e, n)), e.nanoid = (n) => e.check(/* @__PURE__ */ Wi(js, n)), e.guid = (n) => e.check(/* @__PURE__ */ St(Et, n)), e.cuid = (n) => e.check(/* @__PURE__ */ Hi(zs, n)), e.cuid2 = (n) => e.check(/* @__PURE__ */ Xi(Os, n)), e.ulid = (n) => e.check(/* @__PURE__ */ Yi(Ds, n)), e.base64 = (n) => e.check(/* @__PURE__ */ ia(Zs, n)), e.base64url = (n) => e.check(/* @__PURE__ */ aa(Us, n)), e.xid = (n) => e.check(/* @__PURE__ */ Qi(Ns, n)), e.ksuid = (n) => e.check(/* @__PURE__ */ ea(Cs, n)), e.ipv4 = (n) => e.check(/* @__PURE__ */ ta($s, n)), e.ipv6 = (n) => e.check(/* @__PURE__ */ na(Rs, n)), e.cidrv4 = (n) => e.check(/* @__PURE__ */ ra(Ls, n)), e.cidrv6 = (n) => e.check(/* @__PURE__ */ oa(Ms, n)), e.e164 = (n) => e.check(/* @__PURE__ */ sa(qs, n)), e.datetime = (n) => e.check(as(n)), e.date = (n) => e.check(cs(n)), e.time = (n) => e.check(ps(n)), e.duration = (n) => e.check(ds(n));
+  e.format = n.format ?? null, e.minLength = n.minimum ?? null, e.maxLength = n.maximum ?? null, e.regex = (...r) => e.check(/* @__PURE__ */ va(...r)), e.includes = (...r) => e.check(/* @__PURE__ */ ka(...r)), e.startsWith = (...r) => e.check(/* @__PURE__ */ Ta(...r)), e.endsWith = (...r) => e.check(/* @__PURE__ */ Sa(...r)), e.min = (...r) => e.check(/* @__PURE__ */ we(...r)), e.max = (...r) => e.check(/* @__PURE__ */ Sn(...r)), e.length = (...r) => e.check(/* @__PURE__ */ Pn(...r)), e.nonempty = (...r) => e.check(/* @__PURE__ */ we(1, ...r)), e.lowercase = (r) => e.check(/* @__PURE__ */ Ia(r)), e.uppercase = (r) => e.check(/* @__PURE__ */ wa(r)), e.trim = () => e.check(/* @__PURE__ */ Aa()), e.normalize = (...r) => e.check(/* @__PURE__ */ Pa(...r)), e.toLowerCase = () => e.check(/* @__PURE__ */ xa()), e.toUpperCase = () => e.check(/* @__PURE__ */ Ea()), e.slugify = () => e.check(/* @__PURE__ */ ja());
+}), As = /* @__PURE__ */ u("ZodString", (e, t) => {
+  lt.init(e, t), zn.init(e, t), e.email = (n) => e.check(/* @__PURE__ */ Bi(xs, n)), e.url = (n) => e.check(/* @__PURE__ */ Ki(Es, n)), e.jwt = (n) => e.check(/* @__PURE__ */ la(Fs, n)), e.emoji = (n) => e.check(/* @__PURE__ */ Wi(js, n)), e.guid = (n) => e.check(/* @__PURE__ */ Pt(jt, n)), e.uuid = (n) => e.check(/* @__PURE__ */ Fi(_e, n)), e.uuidv4 = (n) => e.check(/* @__PURE__ */ Gi(_e, n)), e.uuidv6 = (n) => e.check(/* @__PURE__ */ Ji(_e, n)), e.uuidv7 = (n) => e.check(/* @__PURE__ */ Vi(_e, n)), e.nanoid = (n) => e.check(/* @__PURE__ */ Hi(zs, n)), e.guid = (n) => e.check(/* @__PURE__ */ Pt(jt, n)), e.cuid = (n) => e.check(/* @__PURE__ */ Xi(Os, n)), e.cuid2 = (n) => e.check(/* @__PURE__ */ Yi(Ds, n)), e.ulid = (n) => e.check(/* @__PURE__ */ Qi(Ns, n)), e.base64 = (n) => e.check(/* @__PURE__ */ aa(Us, n)), e.base64url = (n) => e.check(/* @__PURE__ */ sa(qs, n)), e.xid = (n) => e.check(/* @__PURE__ */ ea($s, n)), e.ksuid = (n) => e.check(/* @__PURE__ */ ta(Cs, n)), e.ipv4 = (n) => e.check(/* @__PURE__ */ na(Rs, n)), e.ipv6 = (n) => e.check(/* @__PURE__ */ ra(Ls, n)), e.cidrv4 = (n) => e.check(/* @__PURE__ */ oa(Ms, n)), e.cidrv6 = (n) => e.check(/* @__PURE__ */ ia(Zs, n)), e.e164 = (n) => e.check(/* @__PURE__ */ ca(Bs, n)), e.datetime = (n) => e.check(ss(n)), e.date = (n) => e.check(ls(n)), e.time = (n) => e.check(us(n)), e.duration = (n) => e.check(ms(n));
 });
 function d(e) {
-  return /* @__PURE__ */ Ui(Ps, e);
+  return /* @__PURE__ */ qi(As, e);
 }
 const j = /* @__PURE__ */ u("ZodStringFormat", (e, t) => {
-  E.init(e, t), En.init(e, t);
-}), As = /* @__PURE__ */ u("ZodEmail", (e, t) => {
-  Jo.init(e, t), j.init(e, t);
-}), Et = /* @__PURE__ */ u("ZodGUID", (e, t) => {
-  Fo.init(e, t), j.init(e, t);
-}), _e = /* @__PURE__ */ u("ZodUUID", (e, t) => {
-  Go.init(e, t), j.init(e, t);
-}), xs = /* @__PURE__ */ u("ZodURL", (e, t) => {
+  E.init(e, t), zn.init(e, t);
+}), xs = /* @__PURE__ */ u("ZodEmail", (e, t) => {
   Vo.init(e, t), j.init(e, t);
-}), Es = /* @__PURE__ */ u("ZodEmoji", (e, t) => {
+}), jt = /* @__PURE__ */ u("ZodGUID", (e, t) => {
+  Go.init(e, t), j.init(e, t);
+}), _e = /* @__PURE__ */ u("ZodUUID", (e, t) => {
+  Jo.init(e, t), j.init(e, t);
+}), Es = /* @__PURE__ */ u("ZodURL", (e, t) => {
   Ko.init(e, t), j.init(e, t);
-}), js = /* @__PURE__ */ u("ZodNanoID", (e, t) => {
+}), js = /* @__PURE__ */ u("ZodEmoji", (e, t) => {
   Wo.init(e, t), j.init(e, t);
-}), zs = /* @__PURE__ */ u("ZodCUID", (e, t) => {
+}), zs = /* @__PURE__ */ u("ZodNanoID", (e, t) => {
   Ho.init(e, t), j.init(e, t);
-}), Os = /* @__PURE__ */ u("ZodCUID2", (e, t) => {
+}), Os = /* @__PURE__ */ u("ZodCUID", (e, t) => {
   Xo.init(e, t), j.init(e, t);
-}), Ds = /* @__PURE__ */ u("ZodULID", (e, t) => {
+}), Ds = /* @__PURE__ */ u("ZodCUID2", (e, t) => {
   Yo.init(e, t), j.init(e, t);
-}), Ns = /* @__PURE__ */ u("ZodXID", (e, t) => {
+}), Ns = /* @__PURE__ */ u("ZodULID", (e, t) => {
   Qo.init(e, t), j.init(e, t);
-}), Cs = /* @__PURE__ */ u("ZodKSUID", (e, t) => {
+}), $s = /* @__PURE__ */ u("ZodXID", (e, t) => {
   ei.init(e, t), j.init(e, t);
-}), $s = /* @__PURE__ */ u("ZodIPv4", (e, t) => {
-  ii.init(e, t), j.init(e, t);
-}), Rs = /* @__PURE__ */ u("ZodIPv6", (e, t) => {
+}), Cs = /* @__PURE__ */ u("ZodKSUID", (e, t) => {
+  ti.init(e, t), j.init(e, t);
+}), Rs = /* @__PURE__ */ u("ZodIPv4", (e, t) => {
   ai.init(e, t), j.init(e, t);
-}), Ls = /* @__PURE__ */ u("ZodCIDRv4", (e, t) => {
+}), Ls = /* @__PURE__ */ u("ZodIPv6", (e, t) => {
   si.init(e, t), j.init(e, t);
-}), Ms = /* @__PURE__ */ u("ZodCIDRv6", (e, t) => {
+}), Ms = /* @__PURE__ */ u("ZodCIDRv4", (e, t) => {
   ci.init(e, t), j.init(e, t);
-}), Zs = /* @__PURE__ */ u("ZodBase64", (e, t) => {
+}), Zs = /* @__PURE__ */ u("ZodCIDRv6", (e, t) => {
   li.init(e, t), j.init(e, t);
-}), Us = /* @__PURE__ */ u("ZodBase64URL", (e, t) => {
-  ui.init(e, t), j.init(e, t);
-}), qs = /* @__PURE__ */ u("ZodE164", (e, t) => {
+}), Us = /* @__PURE__ */ u("ZodBase64", (e, t) => {
+  pi.init(e, t), j.init(e, t);
+}), qs = /* @__PURE__ */ u("ZodBase64URL", (e, t) => {
   di.init(e, t), j.init(e, t);
-}), Bs = /* @__PURE__ */ u("ZodJWT", (e, t) => {
-  fi.init(e, t), j.init(e, t);
-}), jn = /* @__PURE__ */ u("ZodNumber", (e, t) => {
-  bn.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => Ra(e, r, o), e.gt = (r, o) => e.check(/* @__PURE__ */ At(r, o)), e.gte = (r, o) => e.check(/* @__PURE__ */ Ce(r, o)), e.min = (r, o) => e.check(/* @__PURE__ */ Ce(r, o)), e.lt = (r, o) => e.check(/* @__PURE__ */ Pt(r, o)), e.lte = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.max = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.int = (r) => e.check(jt(r)), e.safe = (r) => e.check(jt(r)), e.positive = (r) => e.check(/* @__PURE__ */ At(0, r)), e.nonnegative = (r) => e.check(/* @__PURE__ */ Ce(0, r)), e.negative = (r) => e.check(/* @__PURE__ */ Pt(0, r)), e.nonpositive = (r) => e.check(/* @__PURE__ */ Ne(0, r)), e.multipleOf = (r, o) => e.check(/* @__PURE__ */ xt(r, o)), e.step = (r, o) => e.check(/* @__PURE__ */ xt(r, o)), e.finite = () => e;
+}), Bs = /* @__PURE__ */ u("ZodE164", (e, t) => {
+  mi.init(e, t), j.init(e, t);
+}), Fs = /* @__PURE__ */ u("ZodJWT", (e, t) => {
+  hi.init(e, t), j.init(e, t);
+}), On = /* @__PURE__ */ u("ZodNumber", (e, t) => {
+  In.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => La(e, r, o), e.gt = (r, o) => e.check(/* @__PURE__ */ xt(r, o)), e.gte = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.min = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.lt = (r, o) => e.check(/* @__PURE__ */ At(r, o)), e.lte = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.max = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.int = (r) => e.check(zt(r)), e.safe = (r) => e.check(zt(r)), e.positive = (r) => e.check(/* @__PURE__ */ xt(0, r)), e.nonnegative = (r) => e.check(/* @__PURE__ */ $e(0, r)), e.negative = (r) => e.check(/* @__PURE__ */ At(0, r)), e.nonpositive = (r) => e.check(/* @__PURE__ */ Ne(0, r)), e.multipleOf = (r, o) => e.check(/* @__PURE__ */ Et(r, o)), e.step = (r, o) => e.check(/* @__PURE__ */ Et(r, o)), e.finite = () => e;
   const n = e._zod.bag;
   e.minValue = Math.max(n.minimum ?? Number.NEGATIVE_INFINITY, n.exclusiveMinimum ?? Number.NEGATIVE_INFINITY) ?? null, e.maxValue = Math.min(n.maximum ?? Number.POSITIVE_INFINITY, n.exclusiveMaximum ?? Number.POSITIVE_INFINITY) ?? null, e.isInt = (n.format ?? "").includes("int") || Number.isSafeInteger(n.multipleOf ?? 0.5), e.isFinite = !0, e.format = n.format ?? null;
 });
 function Q(e) {
-  return /* @__PURE__ */ ma(jn, e);
+  return /* @__PURE__ */ fa(On, e);
 }
-const Fs = /* @__PURE__ */ u("ZodNumberFormat", (e, t) => {
-  hi.init(e, t), jn.init(e, t);
+const Gs = /* @__PURE__ */ u("ZodNumberFormat", (e, t) => {
+  gi.init(e, t), On.init(e, t);
 });
-function jt(e) {
-  return /* @__PURE__ */ fa(Fs, e);
-}
-const Gs = /* @__PURE__ */ u("ZodBoolean", (e, t) => {
-  gi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => La(e, n, r);
-});
-function k(e) {
+function zt(e) {
   return /* @__PURE__ */ ha(Gs, e);
 }
-const Js = /* @__PURE__ */ u("ZodNull", (e, t) => {
+const Js = /* @__PURE__ */ u("ZodBoolean", (e, t) => {
   yi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ma(e, n, r);
 });
-function Vs(e) {
+function k(e) {
   return /* @__PURE__ */ ga(Js, e);
 }
-const Ks = /* @__PURE__ */ u("ZodUnknown", (e, t) => {
-  _i.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ua();
-});
-function ke() {
-  return /* @__PURE__ */ ya(Ks);
-}
-const Ws = /* @__PURE__ */ u("ZodNever", (e, t) => {
+const Vs = /* @__PURE__ */ u("ZodNull", (e, t) => {
   bi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Za(e, n, r);
 });
-function Hs(e) {
-  return /* @__PURE__ */ _a(Ws, e);
+function Ks(e) {
+  return /* @__PURE__ */ ya(Vs, e);
 }
-const Xs = /* @__PURE__ */ u("ZodArray", (e, t) => {
-  vi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ja(e, n, r, o), e.element = t.element, e.min = (n, r) => e.check(/* @__PURE__ */ we(n, r)), e.nonempty = (n) => e.check(/* @__PURE__ */ we(1, n)), e.max = (n, r) => e.check(/* @__PURE__ */ kn(n, r)), e.length = (n, r) => e.check(/* @__PURE__ */ Tn(n, r)), e.unwrap = () => e.element;
+const Ws = /* @__PURE__ */ u("ZodUnknown", (e, t) => {
+  _i.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => qa();
 });
-function q(e, t) {
-  return /* @__PURE__ */ ja(Xs, e, t);
+function Te() {
+  return /* @__PURE__ */ ba(Ws);
 }
-const Ys = /* @__PURE__ */ u("ZodObject", (e, t) => {
-  Ii.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Va(e, n, r, o), T(e, "shape", () => t.shape), e.keyof = () => P(Object.keys(e._zod.def.shape)), e.catchall = (n) => e.clone({ ...e._zod.def, catchall: n }), e.passthrough = () => e.clone({ ...e._zod.def, catchall: ke() }), e.loose = () => e.clone({ ...e._zod.def, catchall: ke() }), e.strict = () => e.clone({ ...e._zod.def, catchall: Hs() }), e.strip = () => e.clone({ ...e._zod.def, catchall: void 0 }), e.extend = (n) => Zr(e, n), e.safeExtend = (n) => Ur(e, n), e.merge = (n) => qr(e, n), e.pick = (n) => Lr(e, n), e.omit = (n) => Mr(e, n), e.partial = (...n) => Br(Dn, e, n[0]), e.required = (...n) => Fr(Nn, e, n[0]);
+const Hs = /* @__PURE__ */ u("ZodNever", (e, t) => {
+  vi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ua(e, n, r);
 });
-function S(e, t) {
+function Xs(e) {
+  return /* @__PURE__ */ _a(Hs, e);
+}
+const Ys = /* @__PURE__ */ u("ZodArray", (e, t) => {
+  Ii.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Va(e, n, r, o), e.element = t.element, e.min = (n, r) => e.check(/* @__PURE__ */ we(n, r)), e.nonempty = (n) => e.check(/* @__PURE__ */ we(1, n)), e.max = (n, r) => e.check(/* @__PURE__ */ Sn(n, r)), e.length = (n, r) => e.check(/* @__PURE__ */ Pn(n, r)), e.unwrap = () => e.element;
+});
+function R(e, t) {
+  return /* @__PURE__ */ za(Ys, e, t);
+}
+const Qs = /* @__PURE__ */ u("ZodObject", (e, t) => {
+  ki.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ka(e, n, r, o), S(e, "shape", () => t.shape), e.keyof = () => P(Object.keys(e._zod.def.shape)), e.catchall = (n) => e.clone({ ...e._zod.def, catchall: n }), e.passthrough = () => e.clone({ ...e._zod.def, catchall: Te() }), e.loose = () => e.clone({ ...e._zod.def, catchall: Te() }), e.strict = () => e.clone({ ...e._zod.def, catchall: Xs() }), e.strip = () => e.clone({ ...e._zod.def, catchall: void 0 }), e.extend = (n) => Ur(e, n), e.safeExtend = (n) => qr(e, n), e.merge = (n) => Br(e, n), e.pick = (n) => Mr(e, n), e.omit = (n) => Zr(e, n), e.partial = (...n) => Fr($n, e, n[0]), e.required = (...n) => Gr(Cn, e, n[0]);
+});
+function T(e, t) {
   const n = {
     type: "object",
     shape: e ?? {},
     ..._(t)
   };
-  return new Ys(n);
+  return new Qs(n);
 }
-const Qs = /* @__PURE__ */ u("ZodUnion", (e, t) => {
-  ki.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ka(e, n, r, o), e.options = t.options;
+const ec = /* @__PURE__ */ u("ZodUnion", (e, t) => {
+  Ti.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Wa(e, n, r, o), e.options = t.options;
 });
-function zn(e, t) {
-  return new Qs({
+function Dn(e, t) {
+  return new ec({
     type: "union",
     options: e,
     ..._(t)
   });
 }
-const ec = /* @__PURE__ */ u("ZodIntersection", (e, t) => {
-  Ti.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Wa(e, n, r, o);
+const tc = /* @__PURE__ */ u("ZodIntersection", (e, t) => {
+  Si.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ha(e, n, r, o);
 });
-function tc(e, t) {
-  return new ec({
+function nc(e, t) {
+  return new tc({
     type: "intersection",
     left: e,
     right: t
   });
 }
-const nc = /* @__PURE__ */ u("ZodRecord", (e, t) => {
-  Si.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ha(e, n, r, o), e.keyType = t.keyType, e.valueType = t.valueType;
+const rc = /* @__PURE__ */ u("ZodRecord", (e, t) => {
+  Pi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Xa(e, n, r, o), e.keyType = t.keyType, e.valueType = t.valueType;
 });
 function ee(e, t, n) {
-  return new nc({
+  return new rc({
     type: "record",
     keyType: e,
     valueType: t,
@@ -2910,7 +2908,7 @@ function ee(e, t, n) {
   });
 }
 const Fe = /* @__PURE__ */ u("ZodEnum", (e, t) => {
-  Pi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => qa(e, r, o), e.enum = t.entries, e.options = Object.values(t.entries);
+  Ai.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => Ba(e, r, o), e.enum = t.entries, e.options = Object.values(t.entries);
   const n = new Set(Object.keys(t.entries));
   e.extract = (r, o) => {
     const a = {};
@@ -2948,8 +2946,8 @@ function P(e, t) {
     ..._(t)
   });
 }
-const rc = /* @__PURE__ */ u("ZodLiteral", (e, t) => {
-  Ai.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ba(e, n, r), e.values = new Set(t.values), Object.defineProperty(e, "value", {
+const oc = /* @__PURE__ */ u("ZodLiteral", (e, t) => {
+  xi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Fa(e, n, r), e.values = new Set(t.values), Object.defineProperty(e, "value", {
     get() {
       if (t.values.length > 1)
         throw new Error("This schema contains multiple valid literal values. Use `.values` instead.");
@@ -2957,17 +2955,17 @@ const rc = /* @__PURE__ */ u("ZodLiteral", (e, t) => {
     }
   });
 });
-function Te(e, t) {
-  return new rc({
+function ge(e, t) {
+  return new oc({
     type: "literal",
     values: Array.isArray(e) ? e : [e],
     ..._(t)
   });
 }
-const oc = /* @__PURE__ */ u("ZodTransform", (e, t) => {
-  xi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ga(e, n), e._zod.parse = (n, r) => {
+const ic = /* @__PURE__ */ u("ZodTransform", (e, t) => {
+  Ei.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ja(e, n), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
-      throw new rn(e.constructor.name);
+      throw new an(e.constructor.name);
     n.addIssue = (a) => {
       if (typeof a == "string")
         n.issues.push(he(a, n.value, t));
@@ -2980,204 +2978,204 @@ const oc = /* @__PURE__ */ u("ZodTransform", (e, t) => {
     return o instanceof Promise ? o.then((a) => (n.value = a, n)) : (n.value = o, n);
   };
 });
-function On(e) {
-  return new oc({
+function Nn(e) {
+  return new ic({
     type: "transform",
     transform: e
   });
 }
-const Dn = /* @__PURE__ */ u("ZodOptional", (e, t) => {
-  In.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => xn(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
-});
-function zt(e) {
-  return new Dn({
-    type: "optional",
-    innerType: e
-  });
-}
-const ic = /* @__PURE__ */ u("ZodExactOptional", (e, t) => {
-  Ei.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => xn(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
-});
-function ac(e) {
-  return new ic({
-    type: "optional",
-    innerType: e
-  });
-}
-const sc = /* @__PURE__ */ u("ZodNullable", (e, t) => {
-  ji.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Xa(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
+const $n = /* @__PURE__ */ u("ZodOptional", (e, t) => {
+  Tn.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => jn(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
 });
 function Ot(e) {
-  return new sc({
+  return new $n({
+    type: "optional",
+    innerType: e
+  });
+}
+const ac = /* @__PURE__ */ u("ZodExactOptional", (e, t) => {
+  ji.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => jn(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
+});
+function sc(e) {
+  return new ac({
+    type: "optional",
+    innerType: e
+  });
+}
+const cc = /* @__PURE__ */ u("ZodNullable", (e, t) => {
+  zi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ya(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
+});
+function Dt(e) {
+  return new cc({
     type: "nullable",
     innerType: e
   });
 }
-const cc = /* @__PURE__ */ u("ZodDefault", (e, t) => {
-  zi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Qa(e, n, r, o), e.unwrap = () => e._zod.def.innerType, e.removeDefault = e.unwrap;
+const lc = /* @__PURE__ */ u("ZodDefault", (e, t) => {
+  Oi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => es(e, n, r, o), e.unwrap = () => e._zod.def.innerType, e.removeDefault = e.unwrap;
 });
-function lc(e, t) {
-  return new cc({
+function pc(e, t) {
+  return new lc({
     type: "default",
     innerType: e,
     get defaultValue() {
-      return typeof t == "function" ? t() : sn(t);
+      return typeof t == "function" ? t() : ln(t);
     }
   });
 }
-const pc = /* @__PURE__ */ u("ZodPrefault", (e, t) => {
-  Oi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => es(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
+const uc = /* @__PURE__ */ u("ZodPrefault", (e, t) => {
+  Di.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => ts(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
 });
-function uc(e, t) {
-  return new pc({
+function dc(e, t) {
+  return new uc({
     type: "prefault",
     innerType: e,
     get defaultValue() {
-      return typeof t == "function" ? t() : sn(t);
+      return typeof t == "function" ? t() : ln(t);
     }
   });
 }
-const Nn = /* @__PURE__ */ u("ZodNonOptional", (e, t) => {
-  Di.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ya(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
+const Cn = /* @__PURE__ */ u("ZodNonOptional", (e, t) => {
+  Ni.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Qa(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
 });
-function dc(e, t) {
-  return new Nn({
+function mc(e, t) {
+  return new Cn({
     type: "nonoptional",
     innerType: e,
     ..._(t)
   });
 }
-const mc = /* @__PURE__ */ u("ZodCatch", (e, t) => {
-  Ni.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => ts(e, n, r, o), e.unwrap = () => e._zod.def.innerType, e.removeCatch = e.unwrap;
+const fc = /* @__PURE__ */ u("ZodCatch", (e, t) => {
+  $i.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => ns(e, n, r, o), e.unwrap = () => e._zod.def.innerType, e.removeCatch = e.unwrap;
 });
-function fc(e, t) {
-  return new mc({
+function hc(e, t) {
+  return new fc({
     type: "catch",
     innerType: e,
     catchValue: typeof t == "function" ? t : () => t
   });
 }
-const hc = /* @__PURE__ */ u("ZodPipe", (e, t) => {
-  Ci.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => ns(e, n, r, o), e.in = t.in, e.out = t.out;
+const gc = /* @__PURE__ */ u("ZodPipe", (e, t) => {
+  Ci.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => rs(e, n, r, o), e.in = t.in, e.out = t.out;
 });
 function Ge(e, t) {
-  return new hc({
+  return new gc({
     type: "pipe",
     in: e,
     out: t
     // ...util.normalizeParams(params),
   });
 }
-const gc = /* @__PURE__ */ u("ZodReadonly", (e, t) => {
-  $i.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => rs(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
+const yc = /* @__PURE__ */ u("ZodReadonly", (e, t) => {
+  Ri.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => os(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
 });
-function yc(e) {
-  return new gc({
+function bc(e) {
+  return new yc({
     type: "readonly",
     innerType: e
   });
 }
 const _c = /* @__PURE__ */ u("ZodLazy", (e, t) => {
-  Ri.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => os(e, n, r, o), e.unwrap = () => e._zod.def.getter();
+  Li.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => is(e, n, r, o), e.unwrap = () => e._zod.def.getter();
 });
-function Cn(e) {
+function Rn(e) {
   return new _c({
     type: "lazy",
     getter: e
   });
 }
-const bc = /* @__PURE__ */ u("ZodCustom", (e, t) => {
-  Li.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Fa(e, n);
+const vc = /* @__PURE__ */ u("ZodCustom", (e, t) => {
+  Mi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ga(e, n);
 });
-function vc(e, t = {}) {
-  return /* @__PURE__ */ za(bc, e, t);
+function Ic(e, t = {}) {
+  return /* @__PURE__ */ Oa(vc, e, t);
 }
 function wc(e) {
-  return /* @__PURE__ */ Oa(e);
+  return /* @__PURE__ */ Da(e);
 }
-function lt(e, t) {
-  return Ge(On(e), t);
+function pt(e, t) {
+  return Ge(Nn(e), t);
 }
 const ue = {
   custom: "custom"
 };
 H({ jitless: !0 });
-const Ic = /^\d{4}-\d{2}-\d{2}$/, kc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, Tc = /^data:image\/(svg\+xml|png|jpeg|webp)(;charset=[^;,]+)?(;base64)?,/i, N = d().regex(Ic), Sc = lt(
+const kc = /^\d{4}-\d{2}-\d{2}$/, Tc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, Sc = /^data:image\/(svg\+xml|png|jpeg|webp)(;charset=[^;,]+)?(;base64)?,/i, N = d().regex(kc), Pc = pt(
   (e) => e === "" ? null : e,
   N.nullable().optional()
-), h = Q().finite(), G = Q().int(), ce = Q().finite().min(0), b = d().trim().min(1), Pc = d().trim().min(1).nullable(), z = d().trim().min(1).nullable().optional(), Ac = lt(
+), m = Q().finite(), G = Q().int(), ce = Q().finite().min(0), b = d().trim().min(1), Ac = d().trim().min(1).nullable(), O = d().trim().min(1).nullable().optional(), xc = pt(
   (e) => e === void 0 ? null : e,
-  Pc
-), $n = d().regex(kc), xc = d().regex(Tc), Rn = P(["image/svg+xml", "image/png", "image/jpeg", "image/webp"]), Ln = P([
+  Ac
+), Ln = d().regex(Tc), Ec = d().regex(Sc), Mn = P(["image/svg+xml", "image/png", "image/jpeg", "image/webp"]), Zn = P([
   "classic",
   "neutral"
-]), Mn = P([
+]), Un = P([
   "invoice-left-logo-right",
   "invoice-center-logo-center",
   "invoice-right-logo-left"
-]), Se = Cn(() => zn([
+]), Se = Rn(() => Dn([
   d(),
-  h,
+  m,
   k(),
-  Vs(),
-  q(Se),
+  Ks(),
+  R(Se),
   ee(d(), Se)
-])), Zn = Cn(() => S({
+])), qn = Rn(() => T({
   type: b,
   attrs: ee(d(), Se).nullable().optional(),
-  content: q(Zn).optional(),
-  marks: q(S({
+  content: R(qn).optional(),
+  marks: R(T({
     type: b,
     attrs: ee(d(), Se).nullable().optional()
   }).passthrough()).optional(),
   text: d().optional()
-}).passthrough()), Dt = S({
-  version: Te(1),
-  type: Te("tiptap-json"),
-  content: Zn,
+}).passthrough()), Nt = T({
+  version: ge(1),
+  type: ge("tiptap-json"),
+  content: qn,
   plainTextPreview: d().optional(),
-  updatedAt: h
-}).passthrough(), Ec = lt((e) => {
+  updatedAt: m
+}).passthrough(), jc = pt((e) => {
   if (e == null)
     return e;
-  const t = Dt.safeParse(e);
+  const t = Nt.safeParse(e);
   if (t.success)
     return t.data;
-}, Dt.nullable().optional()), jc = S({
+}, Nt.nullable().optional()), zc = T({
   type: P(["weekly", "monthly", "yearly"]),
-  weeklyDays: q(Q().int().min(0).max(6)).optional(),
+  weeklyDays: R(Q().int().min(0).max(6)).optional(),
   monthlyType: P(["first", "last", "specific"]).optional(),
   monthlyDay: Q().int().min(1).max(31).optional(),
   yearlyDate: N.optional()
 }).passthrough();
-S({
+T({
   id: b,
   title: b,
-  createdAt: h.optional(),
-  updatedAt: h.optional(),
+  createdAt: m.optional(),
+  updatedAt: m.optional(),
   description: d().optional(),
-  notes: Ec,
-  hourlyRate: h.nullable().optional(),
+  notes: jc,
+  hourlyRate: m.nullable().optional(),
   flatRate: k().optional(),
-  preferredClientId: z,
+  preferredClientId: O,
   isPersonal: k().optional(),
   archived: k().optional(),
   archivedOnDate: N.nullable().optional(),
-  lastBilledAt: h.nullable().optional(),
+  lastBilledAt: m.nullable().optional(),
   color: d().nullable().optional(),
-  invoiceIds: q(b).optional(),
+  invoiceIds: R(b).optional(),
   billableTimeIncrementMinutes: Q().int().positive().nullable().optional(),
   taskView: P(["list", "kanban"]).optional(),
   taskSort: P(["createdAt", "lastActive", "name", "manual"]).optional(),
   statusMode: P(["active", "quote"]).optional(),
   deadline: N.nullable().optional(),
-  deadlineResolvedAt: h.nullable().optional(),
+  deadlineResolvedAt: m.nullable().optional(),
   budgetAmount: ce.nullable().optional()
 }).passthrough();
-S({
+T({
   id: b,
-  projectId: z,
-  parentTaskId: z,
+  projectId: O,
+  parentTaskId: O,
   title: b,
   note: d().nullable().optional(),
   completed: k().optional(),
@@ -3185,38 +3183,38 @@ S({
   archivedOnDate: N.nullable().optional(),
   billable: k().optional(),
   billableSetByUser: k().optional(),
-  sortOrder: h.nullable().optional(),
-  sortOrderUpdatedAt: h.nullable().optional(),
-  lastActive: h.optional(),
-  createdAt: h.optional(),
-  lastBilledAt: h.nullable().optional(),
+  sortOrder: m.nullable().optional(),
+  sortOrderUpdatedAt: m.nullable().optional(),
+  lastActive: m.optional(),
+  createdAt: m.optional(),
+  lastBilledAt: m.nullable().optional(),
   startDate: N.nullable().optional(),
-  recurring: jc.nullable().optional(),
+  recurring: zc.nullable().optional(),
   promptTimeEntry: k().optional(),
   skipUntilNextRecurring: k().optional(),
   skippedOccurrenceDate: N.nullable().optional(),
-  completedDatesByYear: ee(d(), ee(d(), q(Q().int().min(1).max(31)))).optional(),
+  completedDatesByYear: ee(d(), ee(d(), R(Q().int().min(1).max(31)))).optional(),
   completedOnDate: N.nullable().optional(),
   estimatedHours: ce.nullable().optional(),
   estimatedFlatAmount: ce.nullable().optional(),
-  quotedAmountBilling: S({
+  quotedAmountBilling: T({
     invoiceId: b,
-    billedAt: h,
+    billedAt: m,
     total: ce
   }).nullable().optional()
 }).passthrough();
-S({
+T({
   id: b,
   taskId: b,
-  start: h,
-  end: h,
-  createdAt: h.optional(),
-  updatedAt: h.optional(),
+  start: m,
+  end: m,
+  createdAt: m.optional(),
+  updatedAt: m.optional(),
   note: d().optional(),
   source: d().optional(),
-  billedHourlyRate: h.nullable().optional(),
-  billedAt: h.nullable().optional(),
-  billedInvoiceId: z,
+  billedHourlyRate: m.nullable().optional(),
+  billedAt: m.nullable().optional(),
+  billedInvoiceId: O,
   billedDurationMs: ce.nullable().optional(),
   billingIncrementMinutes: Q().int().positive().nullable().optional(),
   _stoppedTimerKey: b.optional(),
@@ -3228,11 +3226,11 @@ S({
     message: "end must be greater than or equal to start"
   });
 }).passthrough();
-S({
+T({
   id: b,
   title: b,
-  createdAt: h.optional(),
-  updatedAt: h.optional(),
+  createdAt: m.optional(),
+  updatedAt: m.optional(),
   clientName: d().optional(),
   contactPerson: d().optional(),
   email: d().optional(),
@@ -3246,17 +3244,17 @@ S({
   vat: d().optional(),
   taxNumber: d().optional(),
   notes: d().optional(),
-  custom: q(S({ label: d(), value: d() })).optional(),
+  custom: R(T({ label: d(), value: d() })).optional(),
   disableTax: k().optional(),
-  defaultHourlyRate: h.nullable().optional(),
-  hourlyRate: h.nullable().optional(),
+  defaultHourlyRate: m.nullable().optional(),
+  hourlyRate: m.nullable().optional(),
   flatRate: k().optional(),
   defaultCurrency: d().optional(),
   archived: k().optional(),
   archivedOnDate: N.nullable().optional(),
   color: d().nullable().optional()
 }).passthrough();
-S({
+T({
   id: b,
   title: d().trim().min(1).optional(),
   name: d().trim().min(1).optional(),
@@ -3271,16 +3269,16 @@ S({
   registrationNumber: d().optional(),
   vat: d().optional(),
   taxNumber: d().optional(),
-  custom: q(S({ label: d(), value: d() })).optional(),
+  custom: R(T({ label: d(), value: d() })).optional(),
   taxId: d().optional(),
   logo: d().optional(),
   isDefault: k().optional(),
   taxEnabled: k().optional(),
   taxLabel: d().optional(),
-  taxRate: h.optional(),
-  branding: S({
-    primaryColor: $n.nullable().optional(),
-    logoAssetId: z
+  taxRate: m.optional(),
+  branding: T({
+    primaryColor: Ln.nullable().optional(),
+    logoAssetId: O
   }).passthrough().optional()
 }).superRefine((e, t) => {
   !e.title && !e.name && t.addIssue({
@@ -3293,101 +3291,136 @@ S({
     message: "businessName or name is required"
   });
 }).passthrough();
-S({
+T({
   id: b,
   businessInfoId: b,
-  kind: Te("logo"),
-  dataUrl: xc,
-  mimeType: Rn,
+  kind: ge("logo"),
+  dataUrl: Ec,
+  mimeType: Mn,
   fileName: d().nullable().optional(),
   width: G.positive(),
   height: G.positive(),
   byteSize: G.positive(),
   contentHash: b,
-  createdAt: h,
-  updatedAt: h.nullable().optional(),
-  archivedAt: h.nullable().optional()
+  createdAt: m,
+  updatedAt: m.nullable().optional(),
+  archivedAt: m.nullable().optional()
 }).passthrough();
-const zc = S({
+const Oc = T({
   description: d(),
-  quantity: h,
-  rate: h,
-  amount: h,
+  quantity: m,
+  rate: m,
+  amount: m,
   projectId: d().optional(),
   taskId: d().optional(),
   expenseId: d().optional(),
   supplierName: d().nullable().optional(),
-  originalAmount: h.optional(),
+  originalAmount: m.optional(),
   originalCurrency: d().optional(),
-  exchangeRate: h.optional(),
+  exchangeRate: m.optional(),
   lineType: P(["project", "project-subtotal", "task", "expense", "custom"]).optional(),
   rateLabel: d().optional(),
   quantityLabel: d().optional(),
   pricingMode: P(["hourly", "flat", "mixed"]).optional()
-}).passthrough(), Un = S({
-  capturedAt: h,
+}).passthrough(), Bn = T({
+  capturedAt: m,
   sourceCurrency: b,
-  sourceAmount: h,
+  sourceAmount: m,
   preferredCurrencyAtPayment: b,
-  preferredCurrencyAmount: h
-}).passthrough(), Oc = S({
+  preferredCurrencyAmount: m
+}).passthrough(), Dc = T({
   projectId: b,
   projectTitle: b,
   clientId: b,
   pricingMode: P(["hourly", "flat", "mixed"]),
-  tasks: q(ee(d(), ke())).optional(),
-  expenseItems: q(ee(d(), ke())).optional(),
-  totalHours: h,
-  subtotal: h,
-  allocatedDiscount: h.optional(),
-  allocatedShipping: h.optional(),
-  allocatedTax: h.optional(),
-  allocatedTotal: h.optional()
-}).passthrough(), Dc = S({
-  version: Te(1),
-  capturedAt: h,
-  taskLastBilledAt: ee(d(), h.nullable())
+  tasks: R(ee(d(), Te())).optional(),
+  expenseItems: R(ee(d(), Te())).optional(),
+  totalHours: m,
+  subtotal: m,
+  allocatedDiscount: m.optional(),
+  allocatedShipping: m.optional(),
+  allocatedTax: m.optional(),
+  allocatedTotal: m.optional()
+}).passthrough(), Nc = T({
+  version: ge(1),
+  capturedAt: m,
+  taskLastBilledAt: ee(d(), m.nullable())
+}).passthrough(), $c = T({
+  version: ge(1),
+  capturedAt: m,
+  invoiceCurrency: b,
+  entries: R(T({
+    entryId: b,
+    taskId: b,
+    start: m,
+    end: m,
+    actualDurationMs: m.nonnegative(),
+    billableDurationMs: m.nonnegative(),
+    billedHourlyRate: m.nullable()
+  }).refine((e) => e.end >= e.start, {
+    message: "end must be greater than or equal to start",
+    path: ["end"]
+  })),
+  tasks: R(T({
+    taskId: b,
+    title: b,
+    pricingMode: P(["hourly", "flat"]),
+    quantity: m.nonnegative(),
+    rate: m,
+    amount: m,
+    quotedAmount: m.nullable()
+  })),
+  expenses: R(T({
+    expenseId: b,
+    title: b,
+    sourceAmount: m,
+    sourceCurrency: b,
+    invoiceAmount: m,
+    invoiceCurrency: b,
+    exchangeRate: m.positive()
+  }))
 }).passthrough();
-S({
+T({
   id: b,
-  projectId: Ac,
-  projectIds: q(b).optional(),
-  projectBreakdowns: q(Oc).optional(),
+  projectId: xc,
+  projectIds: R(b).optional(),
+  projectBreakdowns: R(Dc).optional(),
   clientId: b,
-  createdAt: h.optional(),
-  updatedAt: h.optional(),
-  businessInfoId: z,
+  createdAt: m.optional(),
+  updatedAt: m.optional(),
+  businessInfoId: O,
   invoiceNumber: b,
   date: N,
   dueDate: N.nullable().optional(),
   status: P(["draft", "sent", "paid", "overdue"]),
-  items: q(zc),
-  subtotal: h,
-  tax: h.optional(),
-  taxRate: h.optional(),
-  total: h,
+  items: R(Oc),
+  subtotal: m,
+  tax: m.optional(),
+  taxRate: m.optional(),
+  total: m,
   notes: d().optional(),
-  paymentMethodId: z,
+  paymentMethodId: O,
   billingPeriodPreset: P(["last-month", "month", "all-time", "custom"]).optional(),
   billingPeriodStart: N.nullable().optional(),
   billingPeriodEnd: N.nullable().optional(),
   currency: d().optional(),
-  paidAt: h.nullable().optional(),
-  paymentCurrencySnapshot: Un.nullable().optional(),
-  sentAt: h.nullable().optional(),
+  paidAt: m.nullable().optional(),
+  paymentCurrencySnapshot: Bn.nullable().optional(),
+  sentAt: m.nullable().optional(),
   sentToEmail: d().nullable().optional(),
-  billingStateSnapshot: Dc.nullable().optional(),
-  brandingSnapshot: S({
-    businessInfoId: z,
-    templateId: z,
-    layoutStyle: Ln.optional(),
-    logoPlacement: Mn,
+  billingStateSnapshot: Nc.nullable().optional(),
+  billingSelectionSnapshot: $c.nullable().optional(),
+  brandingSnapshot: T({
+    businessInfoId: O,
+    templateId: O,
+    layoutStyle: Zn.optional(),
+    logoPlacement: Un,
     showBusinessLogo: k(),
     useBusinessPrimaryColor: k(),
-    primaryColor: $n.nullable().optional(),
-    logoAssetId: z,
-    logoAssetMeta: S({
-      mimeType: Rn,
+    primaryColor: Ln.nullable().optional(),
+    logoAssetId: O,
+    logoAssetMeta: T({
+      mimeType: Mn,
       width: G.positive(),
       height: G.positive(),
       byteSize: G.positive(),
@@ -3395,26 +3428,26 @@ S({
     }).nullable().optional()
   }).passthrough().nullable().optional()
 }).passthrough();
-S({
+T({
   id: b,
   name: b,
   prefix: d().optional(),
   useSequentialNumbers: k().optional(),
   currentSequentialNumber: G.optional(),
   defaultNotes: d().optional(),
-  defaultTaxRate: h.optional(),
+  defaultTaxRate: m.optional(),
   defaultDueDays: G.optional(),
   isDefault: k().optional(),
-  brandingOptions: S({
+  brandingOptions: T({
     showBusinessLogo: k().optional(),
     useBusinessPrimaryColor: k().optional()
   }).passthrough().optional(),
-  layoutStyle: Ln.optional(),
-  logoPlacement: Mn.optional(),
+  layoutStyle: Zn.optional(),
+  logoPlacement: Un.optional(),
   showBillingPeriod: k().optional(),
   showProjectTitle: k().optional()
 }).passthrough();
-S({
+T({
   id: b,
   name: b,
   type: P(["invoice", "quote"]),
@@ -3425,10 +3458,10 @@ S({
   reminderBody: d().max(5e3),
   attachmentTitle: d().max(200),
   isDefault: k().optional(),
-  createdAt: h.optional(),
-  updatedAt: h.optional()
+  createdAt: m.optional(),
+  updatedAt: m.optional()
 }).passthrough();
-S({
+T({
   id: b,
   title: b,
   fullName: d().optional(),
@@ -3437,14 +3470,14 @@ S({
   swift: d().optional(),
   bankAddress: d().optional(),
   paypal: d().optional(),
-  custom: q(S({ label: d(), value: d() })).default([]),
+  custom: R(T({ label: d(), value: d() })).default([]),
   instructions: d().optional(),
   isDefault: k().optional(),
-  createdAt: h.optional(),
-  updatedAt: h.optional(),
+  createdAt: m.optional(),
+  updatedAt: m.optional(),
   name: d().optional()
 }).passthrough();
-S({
+T({
   id: b,
   title: b,
   note: d().nullable().optional(),
@@ -3452,44 +3485,44 @@ S({
   supplierName: d().nullable().optional(),
   receiptNumber: d().nullable().optional(),
   currency: b,
-  amount: h,
-  paidOn: Sc,
+  amount: m,
+  paidOn: Pc,
   paidBy: d().nullable().optional(),
   paymentStatus: P(["unpaid", "paid"]),
   paymentMode: P(["manual", "auto"]).optional().default("manual"),
-  clientId: z,
-  projectId: z,
-  businessId: z,
-  categoryId: z,
+  clientId: O,
+  projectId: O,
+  businessId: O,
+  categoryId: O,
   isPersonal: k(),
   billable: k(),
   billingStatus: P(["unbilled", "billed"]).default("unbilled"),
-  invoiceId: z,
-  billedAt: h.nullable().optional(),
+  invoiceId: O,
+  billedAt: m.nullable().optional(),
   isRecurring: k().default(!1),
-  recurrenceId: z,
+  recurrenceId: O,
   amountType: P(["fixed", "variable"]).nullable().optional(),
   taxNumber: d().nullable().optional(),
   isTaxExempt: k().default(!1),
-  amountExcludingTax: h.nullable().optional(),
+  amountExcludingTax: m.nullable().optional(),
   taxLabel: d().nullable().optional(),
-  taxRate: h.nullable().optional(),
+  taxRate: m.nullable().optional(),
   taxClaimStatus: P(["unclaimed", "claimed", "excluded"]).nullable().optional(),
-  taxClaimPeriodId: z,
-  taxClaimedAt: h.nullable().optional(),
-  paymentCurrencySnapshot: Un.nullable().optional().catch(null),
+  taxClaimPeriodId: O,
+  taxClaimedAt: m.nullable().optional(),
+  paymentCurrencySnapshot: Bn.nullable().optional().catch(null),
   isPreview: k().optional(),
-  createdAt: h.optional(),
-  updatedAt: h.optional()
+  createdAt: m.optional(),
+  updatedAt: m.optional()
 }).passthrough();
-S({
+T({
   id: b,
   title: b,
   note: d().nullable().optional(),
   supplierName: d().nullable().optional(),
   paidBy: d().nullable().optional(),
   currency: b,
-  amount: h,
+  amount: m,
   amountType: P(["fixed", "variable"]),
   paymentMode: P(["manual", "auto"]).optional(),
   repeat: P(["monthly", "yearly"]),
@@ -3497,44 +3530,44 @@ S({
   monthlyDay: G.min(1).max(31).optional(),
   startDate: N,
   endDate: N.nullable().optional(),
-  clientId: z,
-  projectId: z,
-  businessId: z,
-  categoryId: z,
+  clientId: O,
+  projectId: O,
+  businessId: O,
+  categoryId: O,
   isPersonal: k(),
   billable: k(),
   taxNumber: d().nullable().optional(),
   isTaxExempt: k(),
-  amountExcludingTax: h.nullable().optional(),
+  amountExcludingTax: m.nullable().optional(),
   taxLabel: d().nullable().optional(),
-  taxRate: h.nullable().optional(),
+  taxRate: m.nullable().optional(),
   lastGeneratedDate: N.nullable().optional(),
   active: k(),
-  createdAt: h.optional(),
-  updatedAt: h.optional()
+  createdAt: m.optional(),
+  updatedAt: m.optional()
 }).passthrough();
-S({
+T({
   id: b,
   name: b,
   group: d().nullable().optional(),
   isDefault: k().default(!1),
   archived: k().default(!1),
-  createdAt: h.optional(),
-  updatedAt: h.optional()
+  createdAt: m.optional(),
+  updatedAt: m.optional()
 }).passthrough();
-S({
+T({
   id: b,
   title: b,
   type: P(["vat", "income-tax", "sales-tax", "other"]),
   startDate: N,
   endDate: N,
-  businessInfoId: z,
+  businessInfoId: O,
   status: P(["draft", "filed", "paid"]).default("draft"),
-  filedAt: h.nullable().optional(),
-  paidAt: h.nullable().optional(),
+  filedAt: m.nullable().optional(),
+  paidAt: m.nullable().optional(),
   notes: d().nullable().optional(),
-  createdAt: h.optional(),
-  updatedAt: h.optional()
+  createdAt: m.optional(),
+  updatedAt: m.optional()
 }).superRefine((e, t) => {
   e.endDate < e.startDate && t.addIssue({
     code: ue.custom,
@@ -3542,16 +3575,16 @@ S({
     message: "endDate must be greater than or equal to startDate"
   });
 }).passthrough();
-S({
+T({
   id: b,
   type: P(["client", "project", "task"]),
   referenceId: b,
   mode: P(["static", "date", "weekday"]),
   date: N.nullable().optional(),
   weekday: G.min(0).max(6).nullable().optional(),
-  sortOrder: h,
-  createdAt: h,
-  estimatedHours: h.nullable().optional()
+  sortOrder: m,
+  createdAt: m,
+  estimatedHours: m.nullable().optional()
 }).superRefine((e, t) => {
   e.mode === "date" && !e.date && t.addIssue({
     code: ue.custom,
@@ -3563,15 +3596,15 @@ S({
     message: "weekday is required when mode is weekday"
   });
 }).passthrough();
-S({
+T({
   id: b,
   weekday: G.min(0).max(6),
-  targetHours: h.nullable().optional(),
-  targetEarnings: h.nullable().optional(),
-  createdAt: h,
-  updatedAt: h.nullable().optional()
+  targetHours: m.nullable().optional(),
+  targetEarnings: m.nullable().optional(),
+  createdAt: m,
+  updatedAt: m.nullable().optional()
 }).passthrough();
-S({
+T({
   currency: d().optional(),
   dateFormat: d().optional(),
   timeFormat: d().optional(),
@@ -3585,27 +3618,29 @@ S({
   clientSort: P(["createdAt", "lastActive", "name"]).optional(),
   autoSyncEnabled: k().optional(),
   autoSyncMode: P(["backup", "sync"]).optional(),
-  weeklyGoalTargetHours: h.nullable().optional(),
-  weeklyGoalTargetEarnings: h.nullable().optional(),
+  weeklyGoalTargetHours: m.nullable().optional(),
+  weeklyGoalTargetEarnings: m.nullable().optional(),
   systemNotificationsEnabled: k().optional(),
   systemNotificationTime: d().regex(/^\d{2}:\d{2}$/).optional(),
   backupEnabled: k().optional(),
   backupFrequencyHours: G.min(1).optional()
 }).passthrough();
-S({
+T({
   projectId: b,
   taskId: b,
   timerInstanceId: b.optional(),
-  startTime: h,
+  startTime: m,
   paused: k().optional(),
   pausedElapsedTime: ce.optional(),
   note: d().optional(),
-  lastActive: h.optional()
+  lastActive: m.optional()
 }).passthrough();
+const Cc = "1.4";
+Array.from(/* @__PURE__ */ new Set(["1.0", "1.1", "1.3", Cc]));
 const Je = (e, t) => t.some((n) => e instanceof n);
-let Nt, Ct;
-function Nc() {
-  return Nt || (Nt = [
+let $t, Ct;
+function Rc() {
+  return $t || ($t = [
     IDBDatabase,
     IDBObjectStore,
     IDBIndex,
@@ -3613,15 +3648,15 @@ function Nc() {
     IDBTransaction
   ]);
 }
-function Cc() {
+function Lc() {
   return Ct || (Ct = [
     IDBCursor.prototype.advance,
     IDBCursor.prototype.continue,
     IDBCursor.prototype.continuePrimaryKey
   ]);
 }
-const Ve = /* @__PURE__ */ new WeakMap(), $e = /* @__PURE__ */ new WeakMap(), De = /* @__PURE__ */ new WeakMap();
-function $c(e) {
+const Ve = /* @__PURE__ */ new WeakMap(), Ce = /* @__PURE__ */ new WeakMap(), De = /* @__PURE__ */ new WeakMap();
+function Mc(e) {
   const t = new Promise((n, r) => {
     const o = () => {
       e.removeEventListener("success", a), e.removeEventListener("error", i);
@@ -3634,7 +3669,7 @@ function $c(e) {
   });
   return De.set(t, e), t;
 }
-function Rc(e) {
+function Zc(e) {
   if (Ve.has(e))
     return;
   const t = new Promise((n, r) => {
@@ -3666,96 +3701,96 @@ let Ke = {
     return e instanceof IDBTransaction && (t === "done" || t === "store") ? !0 : t in e;
   }
 };
-function qn(e) {
+function Fn(e) {
   Ke = e(Ke);
 }
-function Lc(e) {
-  return Cc().includes(e) ? function(...t) {
+function Uc(e) {
+  return Lc().includes(e) ? function(...t) {
     return e.apply(We(this), t), Pe(this.request);
   } : function(...t) {
     return Pe(e.apply(We(this), t));
   };
 }
-function Mc(e) {
-  return typeof e == "function" ? Lc(e) : (e instanceof IDBTransaction && Rc(e), Je(e, Nc()) ? new Proxy(e, Ke) : e);
+function qc(e) {
+  return typeof e == "function" ? Uc(e) : (e instanceof IDBTransaction && Zc(e), Je(e, Rc()) ? new Proxy(e, Ke) : e);
 }
 function Pe(e) {
   if (e instanceof IDBRequest)
-    return $c(e);
-  if ($e.has(e))
-    return $e.get(e);
-  const t = Mc(e);
-  return t !== e && ($e.set(e, t), De.set(t, e)), t;
+    return Mc(e);
+  if (Ce.has(e))
+    return Ce.get(e);
+  const t = qc(e);
+  return t !== e && (Ce.set(e, t), De.set(t, e)), t;
 }
-const We = (e) => De.get(e), Zc = ["get", "getKey", "getAll", "getAllKeys", "count"], Uc = ["put", "add", "delete", "clear"], Re = /* @__PURE__ */ new Map();
-function $t(e, t) {
+const We = (e) => De.get(e), Bc = ["get", "getKey", "getAll", "getAllKeys", "count"], Fc = ["put", "add", "delete", "clear"], Re = /* @__PURE__ */ new Map();
+function Rt(e, t) {
   if (!(e instanceof IDBDatabase && !(t in e) && typeof t == "string"))
     return;
   if (Re.get(t))
     return Re.get(t);
-  const n = t.replace(/FromIndex$/, ""), r = t !== n, o = Uc.includes(n);
+  const n = t.replace(/FromIndex$/, ""), r = t !== n, o = Fc.includes(n);
   if (
     // Bail if the target doesn't exist on the target. Eg, getAll isn't in Edge.
-    !(n in (r ? IDBIndex : IDBObjectStore).prototype) || !(o || Zc.includes(n))
+    !(n in (r ? IDBIndex : IDBObjectStore).prototype) || !(o || Bc.includes(n))
   )
     return;
   const a = async function(i, ...c) {
-    const l = this.transaction(i, o ? "readwrite" : "readonly");
-    let p = l.store;
-    return r && (p = p.index(c.shift())), (await Promise.all([
-      p[n](...c),
-      o && l.done
+    const p = this.transaction(i, o ? "readwrite" : "readonly");
+    let l = p.store;
+    return r && (l = l.index(c.shift())), (await Promise.all([
+      l[n](...c),
+      o && p.done
     ]))[0];
   };
   return Re.set(t, a), a;
 }
-qn((e) => ({
+Fn((e) => ({
   ...e,
-  get: (t, n, r) => $t(t, n) || e.get(t, n, r),
-  has: (t, n) => !!$t(t, n) || e.has(t, n)
+  get: (t, n, r) => Rt(t, n) || e.get(t, n, r),
+  has: (t, n) => !!Rt(t, n) || e.has(t, n)
 }));
-const qc = ["continue", "continuePrimaryKey", "advance"], Rt = {}, He = /* @__PURE__ */ new WeakMap(), Bn = /* @__PURE__ */ new WeakMap(), Bc = {
+const Gc = ["continue", "continuePrimaryKey", "advance"], Lt = {}, He = /* @__PURE__ */ new WeakMap(), Gn = /* @__PURE__ */ new WeakMap(), Jc = {
   get(e, t) {
-    if (!qc.includes(t))
+    if (!Gc.includes(t))
       return e[t];
-    let n = Rt[t];
-    return n || (n = Rt[t] = function(...r) {
-      He.set(this, Bn.get(this)[t](...r));
+    let n = Lt[t];
+    return n || (n = Lt[t] = function(...r) {
+      He.set(this, Gn.get(this)[t](...r));
     }), n;
   }
 };
-async function* Fc(...e) {
+async function* Vc(...e) {
   let t = this;
   if (t instanceof IDBCursor || (t = await t.openCursor(...e)), !t)
     return;
   t = t;
-  const n = new Proxy(t, Bc);
-  for (Bn.set(n, t), De.set(n, We(t)); t; )
+  const n = new Proxy(t, Jc);
+  for (Gn.set(n, t), De.set(n, We(t)); t; )
     yield n, t = await (He.get(n) || t.continue()), He.delete(n);
 }
-function Lt(e, t) {
+function Mt(e, t) {
   return t === Symbol.asyncIterator && Je(e, [IDBIndex, IDBObjectStore, IDBCursor]) || t === "iterate" && Je(e, [IDBIndex, IDBObjectStore]);
 }
-qn((e) => ({
+Fn((e) => ({
   ...e,
   get(t, n, r) {
-    return Lt(t, n) ? Fc : e.get(t, n, r);
+    return Mt(t, n) ? Vc : e.get(t, n, r);
   },
   has(t, n) {
-    return Lt(t, n) || e.has(t, n);
+    return Mt(t, n) || e.has(t, n);
   }
 }));
 Promise.resolve(void 0);
-const Gc = [
+const Kc = [
   { value: "last-month", label: "Last Month" },
   { value: "month", label: "This Month" },
   { value: "all-time", label: "All Time" },
   { value: "custom", label: "Custom Range" }
 ];
 new Set(
-  Gc.map((e) => e.value)
+  Kc.map((e) => e.value)
 );
-const Jc = [
+const Wc = [
   "Needs review",
   "Not due",
   "1-30 days",
@@ -3763,45 +3798,45 @@ const Jc = [
   "61-90 days",
   "90+ days"
 ];
-Jc.reduce((e, t, n) => (e.set(t, n), e), /* @__PURE__ */ new Map());
+Wc.reduce((e, t, n) => (e.set(t, n), e), /* @__PURE__ */ new Map());
 const de = 1;
-function Vc(e) {
+function Hc(e) {
   if (!e || typeof e != "object")
     return !1;
   const t = e;
   return t.type === "agent_bridge_control" && t.protocolVersion === de && typeof t.sessionToken == "string" && t.sessionToken.trim().length > 0 && t.action === "revoke";
 }
-function Kc(e) {
+function Xc(e) {
   if (!e || typeof e != "object")
     return !1;
   const t = e, n = t.grant;
   return t.type === "agent_bridge_approval_grant" && t.protocolVersion === de && typeof t.sessionToken == "string" && t.sessionToken.trim().length > 0 && !!n && typeof n == "object" && typeof n.id == "string" && n.id.trim().length > 0 && typeof n.clientId == "string" && n.clientId.trim().length > 0 && (n.label === void 0 || typeof n.label == "string") && Array.isArray(n.scopes) && n.scopes.every((r) => typeof r == "string") && typeof n.secretKeyBase64Url == "string" && n.secretKeyBase64Url.trim().length > 0 && typeof n.createdAt == "number" && Number.isFinite(n.createdAt) && (n.expiresAt === void 0 || n.expiresAt === null || typeof n.expiresAt == "number" && Number.isFinite(n.expiresAt));
 }
-function Wc(e) {
+function Yc(e) {
   if (!e || typeof e != "object")
     return !1;
   const t = e;
   return t.type === "agent_bridge_approval_grant_revoke" && t.protocolVersion === de && typeof t.sessionToken == "string" && t.sessionToken.trim().length > 0 && typeof t.grantId == "string" && t.grantId.trim().length > 0 && typeof t.revokedAt == "number" && Number.isFinite(t.revokedAt);
 }
-const Fn = [
+const Jn = [
   "https://tasktime.pro",
   "https://www.tasktime.pro",
   "http://localhost:3101",
   "http://127.0.0.1:3101",
   "http://localhost:5173",
   "http://127.0.0.1:5173"
-], Hc = /* @__PURE__ */ new Set([
+], Qc = /* @__PURE__ */ new Set([
   "localhost",
   "127.0.0.1",
   "::1",
   "[::1]"
 ]);
-function Xc(e) {
+function el(e) {
   return e.trim().toLowerCase();
 }
-function Yc(e) {
-  const t = Xc(e);
-  if (Hc.has(t))
+function tl(e) {
+  const t = el(e);
+  if (Qc.has(t))
     return !0;
   const n = t.split(".");
   return n.length !== 4 || n[0] !== "127" ? !1 : n.every((r) => {
@@ -3811,45 +3846,45 @@ function Yc(e) {
     return o >= 0 && o <= 255;
   });
 }
-function Qc(e) {
-  if (!Yc(e))
-    throw new O("INVALID_INPUT", "Agent bridge server must bind to a loopback host.", { host: e });
+function nl(e) {
+  if (!tl(e))
+    throw new z("INVALID_INPUT", "Agent bridge server must bind to a loopback host.", { host: e });
 }
-function Mt(e) {
+function Zt(e) {
   try {
     return new URL(e).origin;
   } catch {
     return null;
   }
 }
-function el(e, t = Fn) {
+function rl(e, t = Jn) {
   if (!e)
     return !1;
-  const n = Mt(e);
-  return n ? new Set(Array.from(t).map((r) => Mt(r)).filter(Boolean)).has(n) : !1;
+  const n = Zt(e);
+  return n ? new Set(Array.from(t).map((r) => Zt(r)).filter(Boolean)).has(n) : !1;
 }
-function tl(e, t) {
-  if (!el(e, t))
-    throw new O("PERMISSION_DENIED", "Origin is not allowed to connect to the TaskTime Pro agent bridge.", {
+function ol(e, t) {
+  if (!rl(e, t))
+    throw new z("PERMISSION_DENIED", "Origin is not allowed to connect to the TaskTime Pro agent bridge.", {
       origin: e || null
     });
 }
-const nl = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", rl = "/tasktime-agent", ol = 12e4;
-class il {
+const il = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", al = "/tasktime-agent", sl = 12e4;
+class cl {
   constructor(t, n, r = null) {
     this.id = n, this.session = r, this.socket = t;
   }
   sendJson(t) {
-    this.socket.destroyed || this.socket.write(sl(JSON.stringify(t)));
+    this.socket.destroyed || this.socket.write(pl(JSON.stringify(t)));
   }
   close() {
     this.socket.destroy();
   }
 }
-function al(e) {
-  return en("sha1").update(`${e}${nl}`).digest("base64");
+function ll(e) {
+  return nn("sha1").update(`${e}${il}`).digest("base64");
 }
-function sl(e) {
+function pl(e) {
   const t = X.from(e), n = t.length;
   if (n < 126)
     return X.concat([
@@ -3863,7 +3898,7 @@ function sl(e) {
   const r = X.alloc(10);
   return r[0] = 129, r[1] = 127, r.writeBigUInt64BE(BigInt(n), 2), X.concat([r, t]);
 }
-function cl(e) {
+function ul(e) {
   const t = [];
   let n = 0;
   for (; n + 2 <= e.length; ) {
@@ -3874,42 +3909,42 @@ function cl(e) {
       c = e.readUInt16BE(n), n += 2;
     } else if (c === 127) {
       if (n + 8 > e.length) break;
-      const f = e.readBigUInt64BE(n);
-      if (f > BigInt(Number.MAX_SAFE_INTEGER)) break;
-      c = Number(f), n += 8;
+      const h = e.readBigUInt64BE(n);
+      if (h > BigInt(Number.MAX_SAFE_INTEGER)) break;
+      c = Number(h), n += 8;
     }
-    let l = null;
+    let p = null;
     if (i) {
       if (n + 4 > e.length) break;
-      l = e.subarray(n, n + 4), n += 4;
+      p = e.subarray(n, n + 4), n += 4;
     }
     if (n + c > e.length) break;
-    const p = X.from(e.subarray(n, n + c));
-    if (n += c, l)
-      for (let f = 0; f < p.length; f += 1)
-        p[f] ^= l[f % 4];
-    a === 1 && t.push(p.toString("utf8"));
+    const l = X.from(e.subarray(n, n + c));
+    if (n += c, p)
+      for (let h = 0; h < l.length; h += 1)
+        l[h] ^= p[h % 4];
+    a === 1 && t.push(l.toString("utf8"));
   }
   return t;
 }
-function ll(e) {
+function dl(e) {
   const t = e.headers.host || "127.0.0.1";
   return new URL(e.url || "/", `http://${t}`);
 }
-function pl(e) {
+function ml(e) {
   if (!e || typeof e != "object")
     return !1;
   const t = e, n = t.response;
   return t.protocolVersion === de && typeof t.requestId == "string" && !!n && typeof n == "object" && typeof n.command == "string" && typeof n.ok == "boolean";
 }
-class ul {
+class fl {
   constructor(t) {
-    this.clients = /* @__PURE__ */ new Set(), this.pendingResponses = /* @__PURE__ */ new Map(), this.sessions = /* @__PURE__ */ new Map(), this.server = null, this.nextClientId = 0, this.authoritativeClientId = null, Qc(t.host), this.options = t, this.auditLog = t.auditLog ?? new tn();
+    this.clients = /* @__PURE__ */ new Set(), this.pendingResponses = /* @__PURE__ */ new Map(), this.sessions = /* @__PURE__ */ new Map(), this.server = null, this.nextClientId = 0, this.authoritativeClientId = null, nl(t.host), this.options = t, this.auditLog = t.auditLog ?? new rn();
   }
   async start() {
     if (this.server)
       return;
-    const t = pr();
+    const t = dr();
     this.server = t, t.on("upgrade", (n, r) => {
       this.handleUpgrade(n, r);
     }), await new Promise((n) => {
@@ -3918,7 +3953,7 @@ class ul {
   }
   async stop() {
     const t = this.server;
-    this.server = null, this.rejectPendingResponses(new O("UNAVAILABLE", "Agent bridge server stopped."));
+    this.server = null, this.rejectPendingResponses(new z("UNAVAILABLE", "Agent bridge server stopped."));
     for (const n of this.clients)
       n.close();
     this.clients.clear(), this.sessions.clear(), this.authoritativeClientId = null, t && await new Promise((n) => {
@@ -3952,13 +3987,13 @@ class ul {
     this.audit({
       action: "access_revoked",
       clientId: t
-    }), this.rejectPendingResponses(new O("PERMISSION_DENIED", "TaskTime Pro agent bridge access was revoked.")), this.sessions.clear();
+    }), this.rejectPendingResponses(new z("PERMISSION_DENIED", "TaskTime Pro agent bridge access was revoked.")), this.sessions.clear();
     for (const n of this.clients)
       n.close();
   }
   createSessionRequest(t, n, r, o, a) {
     if (!t.session)
-      throw new O("PERMISSION_DENIED", "TaskTime Pro app session is not paired.");
+      throw new z("PERMISSION_DENIED", "TaskTime Pro app session is not paired.");
     const i = {
       protocolVersion: de,
       requestId: n,
@@ -3978,7 +4013,7 @@ class ul {
   sendAppSessionRequest(t, n = {}) {
     const r = n.client || this.getAuthoritativeClient();
     if (this.pendingResponses.has(t.requestId))
-      throw new O("CONFLICT", "Agent app-session request ID is already pending.", {
+      throw new z("CONFLICT", "Agent app-session request ID is already pending.", {
         requestId: t.requestId
       });
     return new Promise((o, a) => {
@@ -3993,10 +4028,10 @@ class ul {
           details: {
             reason: "timeout"
           }
-        }), a(new O("UNAVAILABLE", "Agent app-session request timed out.", {
+        }), a(new z("UNAVAILABLE", "Agent app-session request timed out.", {
           requestId: t.requestId
         }));
-      }, n.timeoutMs ?? ol);
+      }, n.timeoutMs ?? sl);
       this.pendingResponses.set(t.requestId, {
         client: r,
         timeoutId: i,
@@ -4012,10 +4047,10 @@ class ul {
   }
   getAuthoritativeClient() {
     if (this.clients.size === 0)
-      throw new O("UNAVAILABLE", "No TaskTime Pro app session is connected.");
+      throw new z("UNAVAILABLE", "No TaskTime Pro app session is connected.");
     const t = Array.from(this.clients).find((n) => n.id === this.authoritativeClientId);
     if (!t)
-      throw new O("UNAVAILABLE", "No authoritative TaskTime Pro app session is available.");
+      throw new z("UNAVAILABLE", "No authoritative TaskTime Pro app session is available.");
     return t;
   }
   electAuthoritativeClient() {
@@ -4067,12 +4102,12 @@ class ul {
   createSessionConnection(t) {
     const n = this.options.pairing, r = n?.now ? n.now() : Date.now(), o = t.searchParams.get("sessionToken")?.trim();
     if (o) {
-      const p = this.sessions.get(o);
-      if (!p || jr(p, r))
-        throw p && this.sessions.delete(o), new O("PERMISSION_DENIED", "Agent bridge session expired or not found.");
+      const l = this.sessions.get(o);
+      if (!l || Or(l, r))
+        throw l && this.sessions.delete(o), new z("PERMISSION_DENIED", "Agent bridge session expired or not found.");
       return {
         resumed: !0,
-        session: p
+        session: l
       };
     }
     if (!n)
@@ -4081,9 +4116,9 @@ class ul {
     if (!a || !i) {
       if (n.required === !1)
         return null;
-      throw new O("PERMISSION_DENIED", "Pairing credentials are required for the TaskTime Pro agent bridge.");
+      throw new z("PERMISSION_DENIED", "Pairing credentials are required for the TaskTime Pro agent bridge.");
     }
-    const c = n.store.consume(a, i, r), l = Er({
+    const c = n.store.consume(a, i, r), p = zr({
       scopes: c.scopes,
       now: () => r,
       ttlMs: n.sessionTtlMs,
@@ -4092,7 +4127,7 @@ class ul {
       agentId: c.agentId,
       agentLabel: c.agentLabel
     });
-    return this.sessions.set(l.sessionToken, l), { challenge: c, resumed: !1, session: l };
+    return this.sessions.set(p.sessionToken, p), { challenge: c, resumed: !1, session: p };
   }
   createPairingMessage(t) {
     const n = {
@@ -4110,9 +4145,9 @@ class ul {
   }
   async handleUpgrade(t, n) {
     try {
-      tl(t.headers.origin, this.options.allowedOrigins || Fn);
-      const r = ll(t);
-      if (r.pathname !== (this.options.path || rl))
+      ol(t.headers.origin, this.options.allowedOrigins || Jn);
+      const r = dl(t);
+      if (r.pathname !== (this.options.path || al))
         throw new Error("Invalid agent bridge WebSocket path.");
       const o = t.headers["sec-websocket-key"];
       if (typeof o != "string" || !o.trim())
@@ -4122,12 +4157,12 @@ class ul {
         "HTTP/1.1 101 Switching Protocols",
         "Upgrade: websocket",
         "Connection: Upgrade",
-        `Sec-WebSocket-Accept: ${al(o)}`,
+        `Sec-WebSocket-Accept: ${ll(o)}`,
         "",
         ""
       ].join(`\r
 `));
-      const i = new il(n, `client-${this.nextClientId++}`, a?.session ?? null);
+      const i = new cl(n, `client-${this.nextClientId++}`, a?.session ?? null);
       this.clients.add(i), this.authoritativeClientId || (this.authoritativeClientId = i.id), this.audit({
         action: "session_connected",
         clientId: i.id,
@@ -4145,20 +4180,20 @@ class ul {
           expiresAt: a.session.expiresAt
         }
       }), this.options.onSessionCreated?.(a.session, i, a.challenge))), this.options.onClientConnected?.(i), n.on("data", (c) => {
-        for (const l of cl(c)) {
-          let p;
+        for (const p of ul(c)) {
+          let l;
           try {
-            p = JSON.parse(l);
+            l = JSON.parse(p);
           } catch {
-            p = l;
+            l = p;
           }
-          pl(p) && this.resolvePendingResponse(p, i) || Vc(p) && this.handleControlMessage(p, i) || Kc(p) && this.handleApprovalGrantMessage(p, i) || Wc(p) && this.handleApprovalGrantRevocationMessage(p, i) || this.options.onMessage?.(p, i);
+          ml(l) && this.resolvePendingResponse(l, i) || Hc(l) && this.handleControlMessage(l, i) || Xc(l) && this.handleApprovalGrantMessage(l, i) || Yc(l) && this.handleApprovalGrantRevocationMessage(l, i) || this.options.onMessage?.(l, i);
         }
       }), n.on("end", () => {
         n.destroy();
       }), n.on("close", () => {
         const c = this.authoritativeClientId === i.id;
-        this.clients.delete(i), c && this.electAuthoritativeClient(), this.rejectPendingResponses(new O("UNAVAILABLE", "TaskTime Pro app session disconnected."), i), this.audit({
+        this.clients.delete(i), c && this.electAuthoritativeClient(), this.rejectPendingResponses(new z("UNAVAILABLE", "TaskTime Pro app session disconnected."), i), this.audit({
           action: "session_disconnected",
           clientId: i.id,
           details: {
@@ -4175,9 +4210,9 @@ Connection: close\r
     }
   }
 }
-class dl {
+class hl {
   constructor(t) {
-    this.pairingStore = new Tr(), this.approvalGrants = /* @__PURE__ */ new Map(), this.options = t, this.auditLog = t.auditLog ?? new tn();
+    this.pairingStore = new Pr(), this.approvalGrants = /* @__PURE__ */ new Map(), this.options = t, this.auditLog = t.auditLog ?? new rn();
     const n = {
       host: t.host,
       port: t.port,
@@ -4199,7 +4234,7 @@ class dl {
         this.approvalGrants.delete(r);
       }
     };
-    this.server = new ul(n);
+    this.server = new fl(n);
   }
   async start() {
     await this.server.start();
@@ -4245,19 +4280,21 @@ class dl {
     return this.server.getAuthoritativeClientId();
   }
   createApprovalToken(t) {
-    const n = ml(t.scopes), r = this.options.now ? this.options.now() : Date.now(), o = t.grantId ? this.approvalGrants.get(t.grantId) ?? null : Array.from(this.approvalGrants.values()).find((a) => Zt(a.scopes, n)) ?? null;
+    const n = gl(t.scopes), r = this.options.now ? this.options.now() : Date.now(), o = t.grantId ? this.approvalGrants.get(t.grantId) ?? null : Array.from(this.approvalGrants.values()).find((a) => this.isGrantBoundToConfiguredAgent(a) && Ut(a.scopes, n)) ?? null;
     if (!o)
-      throw new O("UNAVAILABLE", "No trusted TaskTime Pro approval grant is available for this bridge process.");
+      throw new z("UNAVAILABLE", "No trusted TaskTime Pro approval grant is available for this bridge process.");
+    if (!this.isGrantBoundToConfiguredAgent(o))
+      throw new z("PERMISSION_DENIED", "Trusted TaskTime Pro approval grant belongs to a different agent identity.");
     if (o.expiresAt != null && o.expiresAt <= r)
-      throw new O("PERMISSION_DENIED", "Trusted TaskTime Pro approval grant expired.");
-    if (!Zt(o.scopes, n))
-      throw new O("PERMISSION_DENIED", "Trusted TaskTime Pro approval grant does not cover the requested scopes.");
-    return _r({
+      throw new z("PERMISSION_DENIED", "Trusted TaskTime Pro approval grant expired.");
+    if (!Ut(o.scopes, n))
+      throw new z("PERMISSION_DENIED", "Trusted TaskTime Pro approval grant does not cover the requested scopes.");
+    return vr({
       grant: o,
       command: t.command,
       inputHash: t.inputHash,
       scopes: n,
-      category: t.category ?? fl(t.command, n),
+      category: t.category ?? yl(t.command, n),
       now: () => r,
       ttlMs: t.ttlMs,
       nonce: t.nonce
@@ -4266,90 +4303,93 @@ class dl {
   getEndpoint() {
     const t = this.server.getAddress();
     if (!t || typeof t == "string")
-      throw new O("UNAVAILABLE", "Local agent bridge must be started before creating a pairing challenge.");
+      throw new z("UNAVAILABLE", "Local agent bridge must be started before creating a pairing challenge.");
     const n = this.options.path ?? "/tasktime-agent";
-    return `ws://${hl(this.options.host, t)}:${t.port}${n}`;
+    return `ws://${bl(this.options.host, t)}:${t.port}${n}`;
+  }
+  isGrantBoundToConfiguredAgent(t) {
+    return !this.options.agentId || t.clientId === this.options.agentId;
   }
 }
-function ml(e) {
+function gl(e) {
   return [...new Set(e)];
 }
-function Zt(e, t) {
+function Ut(e, t) {
   const n = new Set(e);
   return t.every((r) => n.has(r));
 }
-function fl(e, t) {
+function yl(e, t) {
   return t.includes("billing") ? "billing" : t.includes("email") ? "email" : t.includes("export") ? "export" : e.startsWith("delete_") || e.startsWith("cascade_delete_") || e.startsWith("restore_") || e === "undo_latest_invoice" ? "destructive" : "sensitive";
 }
-function hl(e, t) {
+function bl(e, t) {
   return e === "::1" || t.family === "IPv6" ? "[::1]" : e;
 }
-const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m = { type: ["string", "null"] }, Ut = {
+const s = { type: "string" }, w = { type: "number" }, g = { type: "boolean" }, f = { type: ["string", "null"] }, qt = {
   type: "object",
   properties: {
     id: s,
     title: s,
-    hours: I,
-    hourlyRate: I,
-    flatRate: I,
-    quantity: I,
+    hours: w,
+    hourlyRate: w,
+    flatRate: w,
+    quantity: w,
     useFlatRate: g,
-    parentTaskId: m
+    parentTaskId: f
   },
   required: ["title"],
   additionalProperties: !1
 }, Xe = {
   projectId: s,
-  clientId: m,
-  businessInfoId: m,
-  paymentMethodId: m,
-  invoiceTemplateId: m,
+  clientId: f,
+  businessInfoId: f,
+  paymentMethodId: f,
+  invoiceTemplateId: f,
   note: s,
   quoteDate: s,
   quoteTimestamp: s,
   quoteTasks: {
     type: "array",
-    items: Ut
+    items: qt
   },
   additionalTasks: {
     type: "array",
-    items: Ut
+    items: qt
   }
-}, qt = {
+}, Bt = {
   ...Xe,
-  emailTemplateId: m,
-  to: m,
-  fromName: m,
-  replyTo: m,
-  subject: m,
-  body: m,
-  attachmentTitle: m,
+  emailTemplateId: f,
+  to: f,
+  fromName: f,
+  replyTo: f,
+  subject: f,
+  body: f,
+  attachmentTitle: f,
   forwardToSelf: g
-}, U = {
+}, q = {
   type: "object",
   properties: {},
   additionalProperties: !1
-}, pt = [
+}, ut = [
   {
     name: "get_pairing_status",
     description: "Return the active local TaskTime Pro bridge endpoint, launch URL, pairing expiry, stable agent identity, and app-session status. This tool works before the browser app is paired.",
     scopes: [],
-    inputSchema: U,
+    inputSchema: q,
     bridgeLocal: !0
   },
   {
     name: "refresh_pairing",
     description: "Create a fresh local TaskTime Pro pairing challenge and launch URL for the same bridge process when the previous pairing code expired or was consumed. This tool works before the browser app is paired.",
     scopes: [],
-    inputSchema: U,
+    inputSchema: q,
     bridgeLocal: !0
   }
-], Gn = [
+], Vn = [
   {
     name: "list_projects",
     description: "List active TaskTime Pro projects visible to the paired app session.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "create_project",
@@ -4363,14 +4403,14 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         description: s,
         hourlyRate: { type: ["number", "null"] },
         flatRate: g,
-        preferredClientId: m,
+        preferredClientId: f,
         isPersonal: g,
-        color: m,
+        color: f,
         billableTimeIncrementMinutes: { type: ["number", "null"] },
         taskView: { type: "string", enum: ["list", "kanban"] },
         taskSort: { type: "string", enum: ["createdAt", "lastActive", "name", "manual"] },
         statusMode: { type: "string", enum: ["active", "quote"] },
-        deadline: m,
+        deadline: f,
         budgetAmount: { type: ["number", "null"] },
         idempotencyKey: s
       },
@@ -4528,7 +4568,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         hourlyRate: { type: ["number", "null"] },
         flatRate: g,
         defaultCurrency: s,
-        color: m,
+        color: f,
         idempotencyKey: s
       },
       required: ["title"],
@@ -4660,7 +4700,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "list_business_infos",
     description: "List business profiles used for invoices, expenses, and tax/reporting context.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "create_business_info",
@@ -4687,7 +4727,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         isDefault: g,
         taxEnabled: g,
         taxLabel: s,
-        taxRate: I,
+        taxRate: w,
         branding: { type: "object" },
         idempotencyKey: s
       },
@@ -4762,10 +4802,10 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         kind: { type: "string", enum: ["logo"] },
         dataUrl: s,
         mimeType: { type: "string", enum: ["image/svg+xml", "image/png", "image/jpeg", "image/webp"] },
-        fileName: m,
-        width: I,
-        height: I,
-        byteSize: I,
+        fileName: f,
+        width: w,
+        height: w,
+        byteSize: w,
         contentHash: s,
         idempotencyKey: s
       },
@@ -4832,7 +4872,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "list_payment_methods",
     description: "List payment methods used on invoices and expenses.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "create_payment_method",
@@ -4904,7 +4944,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "list_invoice_templates",
     description: "List invoice templates, including sequence and branding defaults.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "create_invoice_template",
@@ -4917,10 +4957,10 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         name: s,
         prefix: s,
         useSequentialNumbers: g,
-        currentSequentialNumber: I,
+        currentSequentialNumber: w,
         defaultNotes: s,
-        defaultTaxRate: I,
-        defaultDueDays: I,
+        defaultTaxRate: w,
+        defaultDueDays: w,
         isDefault: g,
         brandingOptions: { type: "object" },
         layoutStyle: { type: "string", enum: ["classic", "neutral"] },
@@ -5073,7 +5113,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         id: s,
         name: s,
-        group: m,
+        group: f,
         isDefault: g,
         archived: g,
         idempotencyKey: s
@@ -5141,7 +5181,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "get_preferences",
     description: "Return validated TaskTime Pro user preferences. Sync/backup control state is readable but not mutable through update_preferences.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "update_preferences",
@@ -5158,7 +5198,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
             timeFormat: s,
             theme: { type: "string", enum: ["light", "dark", "system"] },
             defaultView: s,
-            weekStartsOn: I,
+            weekStartsOn: w,
             autoHideTotalsOnRevisit: g,
             showCompletedTasks: g,
             defaultBillable: g,
@@ -5183,7 +5223,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        projectId: m
+        projectId: f
       },
       additionalProperties: !1
     }
@@ -5196,9 +5236,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         title: s,
-        projectId: m,
-        parentTaskId: m,
-        note: m,
+        projectId: f,
+        parentTaskId: f,
+        note: f,
         billable: g,
         idempotencyKey: s
       },
@@ -5323,7 +5363,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "get_active_timers",
     description: "List active timers with resolved timer keys and elapsed time.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "start_timer",
@@ -5349,7 +5389,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         timerKey: s,
         taskId: s,
-        pausedAt: I
+        pausedAt: w
       },
       additionalProperties: !1
     }
@@ -5362,7 +5402,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         timerKey: s,
-        taskId: s
+        taskId: s,
+        idempotencyKey: s
       },
       additionalProperties: !1
     }
@@ -5405,8 +5446,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         timerKey: s,
         taskId: s,
-        startTime: I,
-        note: m
+        startTime: w,
+        note: f
       },
       additionalProperties: !1
     }
@@ -5419,8 +5460,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         taskId: s,
-        start: I,
-        end: I,
+        start: w,
+        end: w,
         note: s,
         billingIncrementMinutes: { type: ["number", "null"] },
         idempotencyKey: s
@@ -5438,9 +5479,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         entryId: s,
         taskId: s,
-        start: I,
-        end: I,
-        note: m,
+        start: w,
+        end: w,
+        note: f,
         billingIncrementMinutes: { type: ["number", "null"] }
       },
       required: ["entryId"],
@@ -5473,7 +5514,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         referenceId: s,
         mode: { type: "string", enum: ["static", "date", "weekday"] },
         date: s,
-        weekday: I
+        weekday: w
       },
       additionalProperties: !1
     }
@@ -5488,9 +5529,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         type: { type: "string", enum: ["client", "project", "task"] },
         referenceId: s,
         mode: { type: "string", enum: ["static", "date", "weekday", "week", "every-week"] },
-        date: m,
+        date: f,
         weekday: { type: ["number", "null"] },
-        weekStartDate: m,
+        weekStartDate: f,
         includeWeekends: g,
         estimatedHours: { type: ["number", "null"] },
         duplicateMode: { type: "string", enum: ["reject", "skip", "overwrite"] },
@@ -5534,7 +5575,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        weekday: I
+        weekday: w
       },
       additionalProperties: !1
     }
@@ -5546,7 +5587,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        weekday: I,
+        weekday: w,
         targetHours: { type: ["number", "null"] },
         targetEarnings: { type: ["number", "null"] }
       },
@@ -5561,7 +5602,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        weekday: I
+        weekday: w
       },
       required: ["weekday"],
       additionalProperties: !1
@@ -5606,8 +5647,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        clientId: m,
-        projectId: m,
+        clientId: f,
+        projectId: f,
         billableOnly: g
       },
       additionalProperties: !1
@@ -5622,12 +5663,12 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         title: s,
         date: s,
-        amount: I,
+        amount: w,
         currency: s,
         isPersonal: g,
         billable: g,
-        clientId: m,
-        projectId: m,
+        clientId: f,
+        projectId: f,
         idempotencyKey: s
       },
       required: ["title", "date", "amount", "currency", "isPersonal", "billable"],
@@ -5657,8 +5698,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         activeOnly: g,
-        clientId: m,
-        projectId: m
+        clientId: f,
+        projectId: f
       },
       additionalProperties: !1
     }
@@ -5672,28 +5713,28 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         id: s,
         title: s,
-        note: m,
-        supplierName: m,
-        paidBy: m,
+        note: f,
+        supplierName: f,
+        paidBy: f,
         paymentMode: { type: "string", enum: ["manual", "auto"] },
         currency: s,
-        amount: I,
+        amount: w,
         amountType: { type: "string", enum: ["fixed", "variable"] },
         repeat: { type: "string", enum: ["monthly", "yearly"] },
         monthlyType: { type: "string", enum: ["first", "last", "specific"] },
-        monthlyDay: I,
+        monthlyDay: w,
         startDate: s,
-        endDate: m,
-        clientId: m,
-        projectId: m,
-        businessId: m,
-        categoryId: m,
+        endDate: f,
+        clientId: f,
+        projectId: f,
+        businessId: f,
+        categoryId: f,
         isPersonal: g,
         billable: g,
-        taxNumber: m,
+        taxNumber: f,
         isTaxExempt: g,
         amountExcludingTax: { type: ["number", "null"] },
-        taxLabel: m,
+        taxLabel: f,
         taxRate: { type: ["number", "null"] },
         active: g,
         generateInitial: g,
@@ -5766,9 +5807,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         expenseId: s,
-        amount: I,
-        paidOn: m,
-        paidBy: m
+        amount: w,
+        paidOn: f,
+        paidBy: f
       },
       required: ["expenseId"],
       additionalProperties: !1
@@ -5791,7 +5832,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "list_tax_return_periods",
     description: "List tax return periods used by Reports tax-claim workflows.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "create_tax_return_period",
@@ -5805,11 +5846,11 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         type: { type: "string", enum: ["vat", "income-tax", "sales-tax", "other"] },
         startDate: s,
         endDate: s,
-        businessInfoId: m,
+        businessInfoId: f,
         status: { type: "string", enum: ["draft", "filed", "paid"] },
         filedAt: { type: ["number", "null"] },
         paidAt: { type: ["number", "null"] },
-        notes: m,
+        notes: f,
         idempotencyKey: s
       },
       required: ["title", "type", "startDate", "endDate"],
@@ -5841,7 +5882,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         taxReturnPeriodId: s,
-        filedAt: I,
+        filedAt: w,
         confirmFiled: g
       },
       required: ["taxReturnPeriodId", "confirmFiled"],
@@ -5856,8 +5897,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         taxReturnPeriodId: s,
-        filedAt: I,
-        paidAt: I,
+        filedAt: w,
+        paidAt: w,
         confirmPaid: g
       },
       required: ["taxReturnPeriodId", "confirmPaid"],
@@ -5908,10 +5949,10 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        clientId: m,
-        projectId: m,
+        clientId: f,
+        projectId: f,
         status: { enum: ["draft", "sent", "paid", "overdue"] },
-        limit: I
+        limit: w
       },
       additionalProperties: !1
     }
@@ -5944,10 +5985,10 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         clientId: s,
         invoiceNumber: s,
         invoiceDate: s,
-        dueDate: m,
-        templateId: m,
-        businessInfoId: m,
-        paymentMethodId: m,
+        dueDate: f,
+        templateId: f,
+        businessInfoId: f,
+        paymentMethodId: f,
         notes: s,
         billingPeriodStart: s,
         billingPeriodEnd: s,
@@ -5985,7 +6026,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         confirmFinalize: g,
-        finalizedAt: I,
+        finalizedAt: w,
         idempotencyKey: s
       },
       required: ["invoiceId", "confirmFinalize"],
@@ -6001,7 +6042,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         confirmPaid: g,
-        paidAt: I,
+        paidAt: w,
         exchangeRates: { type: ["object", "null"] },
         idempotencyKey: s
       },
@@ -6018,7 +6059,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         confirmUnpaid: g,
-        referenceAt: I,
+        referenceAt: w,
         idempotencyKey: s
       },
       required: ["invoiceId", "confirmUnpaid"],
@@ -6035,7 +6076,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         invoiceId: s,
         confirmUndo: g,
         confirmationText: s,
-        undoneAt: I,
+        undoneAt: w,
         idempotencyKey: s
       },
       required: ["invoiceId", "confirmUndo", "confirmationText"],
@@ -6087,7 +6128,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     scopes: ["read"],
     inputSchema: {
       type: "object",
-      properties: qt,
+      properties: Bt,
       required: ["projectId"],
       additionalProperties: !1
     }
@@ -6099,7 +6140,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        ...qt,
+        ...Bt,
         confirmSend: g,
         idempotencyKey: s
       },
@@ -6116,13 +6157,13 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         sendType: { type: "string", enum: ["invoice", "reminder", "quote"] },
-        templateId: m,
-        to: m,
-        fromName: m,
-        replyTo: m,
-        subject: m,
-        body: m,
-        attachmentTitle: m,
+        templateId: f,
+        to: f,
+        fromName: f,
+        replyTo: f,
+        subject: f,
+        body: f,
+        attachmentTitle: f,
         forwardToSelf: g
       },
       required: ["invoiceId"],
@@ -6138,13 +6179,13 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         sendType: { type: "string", enum: ["invoice", "reminder", "quote"] },
-        templateId: m,
-        to: m,
-        fromName: m,
-        replyTo: m,
-        subject: m,
-        body: m,
-        attachmentTitle: m,
+        templateId: f,
+        to: f,
+        fromName: f,
+        replyTo: f,
+        subject: f,
+        body: f,
+        attachmentTitle: f,
         forwardToSelf: g,
         confirmSend: g,
         idempotencyKey: s
@@ -6157,7 +6198,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "get_dashboard_summary",
     description: "Get a bounded summary of current TaskTime Pro work, timers, unbilled time, expenses, and draft invoices.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "get_project_overview",
@@ -6194,18 +6235,18 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         section: { type: "string", enum: ["overview", "monthly", "statement", "work-summary", "tax", "invoices", "outstanding", "expenses", "hours", "to-invoice"] },
         period: { type: "string", enum: ["this-month", "last-month", "this-quarter", "last-quarter", "this-year", "last-year", "custom"] },
-        customStart: m,
-        customEnd: m,
-        businessId: m,
-        clientId: m,
-        projectId: m,
-        categoryId: m,
+        customStart: f,
+        customEnd: f,
+        businessId: f,
+        clientId: f,
+        projectId: f,
+        categoryId: f,
         invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
         includeRows: g,
-        rowLimit: I
+        rowLimit: w
       },
       additionalProperties: !1
     }
@@ -6219,17 +6260,17 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         section: { type: "string", enum: ["overview", "monthly", "statement", "work-summary", "tax", "invoices", "outstanding", "expenses", "hours", "to-invoice"] },
         period: { type: "string", enum: ["this-month", "last-month", "this-quarter", "last-quarter", "this-year", "last-year", "custom"] },
-        customStart: m,
-        customEnd: m,
-        businessId: m,
-        clientId: m,
-        projectId: m,
-        categoryId: m,
+        customStart: f,
+        customEnd: f,
+        businessId: f,
+        clientId: f,
+        projectId: f,
+        categoryId: f,
         invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
-        rowLimit: I,
+        rowLimit: w,
         filename: s
       },
       required: ["section"],
@@ -6245,17 +6286,17 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         section: { type: "string", enum: ["overview", "monthly", "statement", "work-summary", "invoices", "outstanding", "expenses"] },
         period: { type: "string", enum: ["this-month", "last-month", "this-quarter", "last-quarter", "this-year", "last-year", "custom"] },
-        customStart: m,
-        customEnd: m,
-        businessId: m,
-        clientId: m,
-        projectId: m,
-        categoryId: m,
+        customStart: f,
+        customEnd: f,
+        businessId: f,
+        clientId: f,
+        projectId: f,
+        categoryId: f,
         invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
-        rowLimit: I,
+        rowLimit: w,
         filename: s
       },
       required: ["section"],
@@ -6270,17 +6311,17 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         period: { type: "string", enum: ["this-month", "last-month", "this-quarter", "last-quarter", "this-year", "last-year", "custom"] },
-        customStart: m,
-        customEnd: m,
-        businessId: m,
-        clientId: m,
-        projectId: m,
-        categoryId: m,
+        customStart: f,
+        customEnd: f,
+        businessId: f,
+        clientId: f,
+        projectId: f,
+        categoryId: f,
         invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
-        rowLimit: I,
+        rowLimit: w,
         filename: s,
         includeInvoicePdfs: g
       },
@@ -6305,13 +6346,13 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "list_drive_backups",
     description: "List TaskTime Pro backup snapshots available in Google Drive without returning backup contents.",
     scopes: ["read", "export"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "create_drive_backup",
     description: "Create a TaskTime Pro backup snapshot in Google Drive using the existing backup manager.",
     scopes: ["read", "export"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "download_drive_backup_json",
@@ -6374,7 +6415,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "get_sync_status",
     description: "Read current Google Drive sync status, auto-sync mode, pending changes, and backup preference metadata.",
     scopes: ["read"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "update_sync_settings",
@@ -6386,7 +6427,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         autoSyncEnabled: g,
         autoSyncMode: { type: "string", enum: ["backup", "sync"] },
         backupEnabled: g,
-        backupFrequencyHours: I,
+        backupFrequencyHours: w,
         confirmBackupMode: g,
         runSync: g
       },
@@ -6415,9 +6456,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        projectId: m,
-        taskId: m,
-        limit: I
+        projectId: f,
+        taskId: f,
+        limit: w
       },
       additionalProperties: !1
     }
@@ -6429,9 +6470,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        projectId: m,
-        taskId: m,
-        limit: I
+        projectId: f,
+        taskId: f,
+        limit: w
       },
       additionalProperties: !1
     }
@@ -6440,7 +6481,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "open_dashboard_view",
     description: "Open the TaskTime Pro dashboard route in the paired app session.",
     scopes: ["navigation"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "open_planner_view",
@@ -6449,8 +6490,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        year: I,
-        week: I
+        year: w,
+        week: w
       },
       additionalProperties: !1
     }
@@ -6525,7 +6566,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     name: "open_reports_view",
     description: "Open the TaskTime Pro reports route in the paired app session.",
     scopes: ["navigation"],
-    inputSchema: U
+    inputSchema: q
   },
   {
     name: "focus_running_timer",
@@ -6541,36 +6582,66 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     }
   }
 ];
-function gl(e) {
+function _l(e) {
   return [
-    ...pt,
-    ...Gn.filter((t) => t.scopes.every((n) => e.has(n)))
+    ...ut,
+    ...Vn.filter((t) => t.scopes.every((n) => e.has(n)))
   ].sort((t, n) => t.name.localeCompare(n.name));
 }
-function Bt(e) {
-  return pt.find((t) => t.name === e) ?? Gn.find((t) => t.name === e) ?? null;
-}
 function Ft(e) {
-  return pt.some((t) => t.name === e);
+  return ut.find((t) => t.name === e) ?? Vn.find((t) => t.name === e) ?? null;
 }
-const yl = "2025-11-25", Ae = "2.0", _l = 120, bl = 6e4, vl = 5 * 6e4;
-class wl {
+function Gt(e) {
+  return ut.some((t) => t.name === e);
+}
+const vl = (e) => e === null ? "null" : Array.isArray(e) ? "array" : typeof e;
+function Jt(e, t) {
+  const n = [];
+  return Ye(e, t, "$", n), { valid: n.length === 0, errors: n };
+}
+function Ye(e, t, n, r) {
+  if (!e || typeof e != "object") return;
+  const o = Array.isArray(e.type) ? e.type : e.type ? [e.type] : [], a = vl(t);
+  if (o.length > 0 && !o.includes(a)) {
+    r.push(`${n} must be ${o.join(" or ")}, received ${a}`);
+    return;
+  }
+  if (e.enum && !e.enum.some((i) => Object.is(i, t))) {
+    r.push(`${n} must be one of the advertised enum values`);
+    return;
+  }
+  if (a === "object") {
+    const i = t, c = e.properties ?? {};
+    for (const p of e.required ?? [])
+      Object.prototype.hasOwnProperty.call(i, p) || r.push(`${n}.${p} is required`);
+    for (const [p, l] of Object.entries(i)) {
+      const h = c[p];
+      h ? Ye(h, l, `${n}.${p}`, r) : e.additionalProperties === !1 && r.push(`${n}.${p} is not allowed`);
+    }
+  }
+  if (a === "array") {
+    const i = t;
+    typeof e.minItems == "number" && i.length < e.minItems && r.push(`${n} must contain at least ${e.minItems} item(s)`), e.items && i.forEach((c, p) => Ye(e.items, c, `${n}[${p}]`, r));
+  }
+}
+const Il = "2025-11-25", Ae = "2.0", wl = 120, kl = 6e4, Tl = 5 * 6e4;
+class Sl {
   constructor(t) {
-    if (this.toolCallCount = 0, this.nextRequestId = 0, this.bridge = t.bridge, this.scopes = new Set(t.scopes), this.commandTimeoutMs = t.commandTimeoutMs, this.requestIdFactory = t.requestIdFactory ?? (() => `mcp-request-${this.nextRequestId++}`), this.toolCallRateLimit = t.toolCallRateLimit ?? _l, this.toolCallRateWindowMs = t.toolCallRateWindowMs ?? bl, this.now = t.now ?? (() => Date.now()), !Number.isInteger(this.toolCallRateLimit) || this.toolCallRateLimit < 0)
+    if (this.toolCallCount = 0, this.nextRequestId = 0, this.bridge = t.bridge, this.scopes = new Set(t.scopes), this.commandTimeoutMs = t.commandTimeoutMs, this.requestIdFactory = t.requestIdFactory ?? (() => `mcp-request-${this.nextRequestId++}`), this.toolCallRateLimit = t.toolCallRateLimit ?? wl, this.toolCallRateWindowMs = t.toolCallRateWindowMs ?? kl, this.now = t.now ?? (() => Date.now()), !Number.isInteger(this.toolCallRateLimit) || this.toolCallRateLimit < 0)
       throw new Error("toolCallRateLimit must be a non-negative integer.");
     if (!Number.isInteger(this.toolCallRateWindowMs) || this.toolCallRateWindowMs <= 0)
       throw new Error("toolCallRateWindowMs must be a positive integer.");
     this.toolCallWindowStartedAt = this.now();
   }
   async handleMessage(t) {
-    if (!xl(t))
+    if (!Ol(t))
       return this.error(null, -32600, "Invalid JSON-RPC request.");
     if (t.id === void 0)
       return null;
     switch (t.method) {
       case "initialize":
         return this.result(t.id, {
-          protocolVersion: yl,
+          protocolVersion: Il,
           capabilities: {
             tools: {}
           },
@@ -6583,7 +6654,7 @@ class wl {
         return this.result(t.id, {});
       case "tools/list":
         return this.result(t.id, {
-          tools: gl(this.scopes).map((n) => ({
+          tools: _l(this.scopes).map((n) => ({
             name: n.name,
             description: n.description,
             inputSchema: n.inputSchema
@@ -6600,87 +6671,97 @@ class wl {
   async callTool(t) {
     const n = t;
     if (!n || typeof n != "object" || typeof n.name != "string")
-      return R("INVALID_INPUT", "tools/call requires a string tool name.");
-    const r = Bt(n.name);
+      return C("INVALID_INPUT", "tools/call requires a string tool name.");
+    const r = Ft(n.name);
     if (!r)
-      return R("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.name}`);
-    if (Ft(r.name))
-      return this.callBridgeSetupTool(r.name);
-    const o = r.scopes.find((c) => !this.scopes.has(c));
-    if (o)
-      return R("PERMISSION_DENIED", `Missing ${o} permission.`, {
-        scope: o
+      return C("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.name}`);
+    const o = n.arguments ?? {}, a = Jt(r.inputSchema, o);
+    if (!a.valid)
+      return C("INVALID_INPUT", `Invalid input for ${r.name}.`, {
+        validationErrors: a.errors
       });
-    const a = this.consumeToolCallBudget(r.name);
-    if (a)
-      return a;
-    let i;
+    if (Gt(r.name))
+      return this.callBridgeSetupTool(r.name);
+    const i = r.scopes.find((l) => !this.scopes.has(l));
+    if (i)
+      return C("PERMISSION_DENIED", `Missing ${i} permission.`, {
+        scope: i
+      });
+    const c = this.consumeToolCallBudget(r.name);
+    if (c)
+      return c;
+    let p;
     try {
-      i = await this.bridge.sendCommand(
+      p = await this.bridge.sendCommand(
         this.requestIdFactory(),
         r.name,
-        n.arguments ?? {},
+        o,
         this.commandTimeoutMs,
-        Il(n.approval)
+        Pl(n.approval)
       );
-    } catch (c) {
-      return c instanceof O ? R(c.code, c.message, Gt(c)) : R(
+    } catch (l) {
+      return l instanceof z ? C(l.code, l.message, Vt(l)) : C(
         "UNAVAILABLE",
-        c instanceof Error ? c.message : "TaskTime Pro app session is unavailable.",
-        Jn()
+        l instanceof Error ? l.message : "TaskTime Pro app session is unavailable.",
+        Kn()
       );
     }
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(i.response)
+          text: JSON.stringify(p.response)
         }
       ],
-      structuredContent: i.response,
-      isError: !i.response.ok
+      structuredContent: p.response,
+      isError: !p.response.ok
     };
   }
   callBridgeSetupTool(t) {
-    return t === "get_pairing_status" ? this.bridge.getPairingStatus ? Jt(t, this.bridge.getPairingStatus()) : R("UNAVAILABLE", "TaskTime Pro bridge pairing status is unavailable.") : this.bridge.refreshPairing ? Jt(t, this.bridge.refreshPairing()) : R("UNAVAILABLE", "TaskTime Pro bridge pairing refresh is unavailable.");
+    return t === "get_pairing_status" ? this.bridge.getPairingStatus ? Kt(t, this.bridge.getPairingStatus()) : C("UNAVAILABLE", "TaskTime Pro bridge pairing status is unavailable.") : this.bridge.refreshPairing ? Kt(t, this.bridge.refreshPairing()) : C("UNAVAILABLE", "TaskTime Pro bridge pairing refresh is unavailable.");
   }
   async createApprovalToken(t) {
     if (!this.bridge.createApprovalToken)
-      return R("UNAVAILABLE", "TaskTime Pro approval-token signing is unavailable.");
+      return C("UNAVAILABLE", "TaskTime Pro approval-token signing is unavailable.");
     const n = t;
     if (!n || typeof n != "object" || typeof n.command != "string")
-      return R("INVALID_INPUT", "tasktime/create_approval_token requires a string command.");
-    const r = Bt(n.command);
+      return C("INVALID_INPUT", "tasktime/create_approval_token requires a string command.");
+    const r = Ft(n.command);
     if (!r)
-      return R("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.command}`);
-    if (Ft(r.name))
-      return R("INVALID_INPUT", `TaskTime Pro setup tool does not require approval tokens: ${n.command}`);
-    const o = kl(n.scopes, r.scopes);
-    if (!o)
-      return R("INVALID_INPUT", "Approval token scopes must be an array of strings.");
-    const a = o.find((c) => !this.scopes.has(c));
-    if (a)
-      return R("PERMISSION_DENIED", `Missing ${a} permission.`, {
-        scope: a
+      return C("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.command}`);
+    if (Gt(r.name))
+      return C("INVALID_INPUT", `TaskTime Pro setup tool does not require approval tokens: ${n.command}`);
+    const o = n.arguments ?? {}, a = Jt(r.inputSchema, o);
+    if (!a.valid)
+      return C("INVALID_INPUT", `Invalid input for ${r.name}.`, {
+        validationErrors: a.errors
       });
-    const i = Sl(n.ttlMs);
-    if (i === null)
-      return R("INVALID_INPUT", "Approval token ttlMs must be a positive integer no greater than 300000.");
+    const i = Al(n.scopes, r.scopes);
+    if (!i)
+      return C("INVALID_INPUT", "Approval token scopes must be an array of strings.");
+    const c = i.find((l) => !this.scopes.has(l));
+    if (c)
+      return C("PERMISSION_DENIED", `Missing ${c} permission.`, {
+        scope: c
+      });
+    const p = El(n.ttlMs);
+    if (p === null)
+      return C("INVALID_INPUT", "Approval token ttlMs must be a positive integer no greater than 300000.");
     try {
-      const c = typeof n.inputHash == "string" ? n.inputHash : Tl(n.arguments ?? {});
+      const l = typeof n.inputHash == "string" ? n.inputHash : xl(o);
       return {
         approval: this.bridge.createApprovalToken({
           grantId: typeof n.grantId == "string" ? n.grantId : void 0,
           command: n.command,
-          inputHash: c,
-          scopes: o,
+          inputHash: l,
+          scopes: i,
           category: typeof n.category == "string" ? n.category : void 0,
-          ttlMs: i,
+          ttlMs: p,
           nonce: typeof n.nonce == "string" ? n.nonce : void 0
         })
       };
-    } catch (c) {
-      return c instanceof O ? R(c.code, c.message, Gt(c)) : R("UNAVAILABLE", c instanceof Error ? c.message : "TaskTime Pro approval-token signing failed.");
+    } catch (l) {
+      return l instanceof z ? C(l.code, l.message, Vt(l)) : C("UNAVAILABLE", l instanceof Error ? l.message : "TaskTime Pro approval-token signing failed.");
     }
   }
   consumeToolCallBudget(t) {
@@ -6689,7 +6770,7 @@ class wl {
     const n = this.now();
     if (n - this.toolCallWindowStartedAt >= this.toolCallRateWindowMs && (this.toolCallWindowStartedAt = n, this.toolCallCount = 0), this.toolCallCount >= this.toolCallRateLimit) {
       const r = Math.max(0, this.toolCallRateWindowMs - (n - this.toolCallWindowStartedAt));
-      return R("RATE_LIMITED", "TaskTime Pro MCP tool call rate limit exceeded.", {
+      return C("RATE_LIMITED", "TaskTime Pro MCP tool call rate limit exceeded.", {
         tool: t,
         limit: this.toolCallRateLimit,
         windowMs: this.toolCallRateWindowMs,
@@ -6717,36 +6798,36 @@ class wl {
     };
   }
 }
-function Il(e) {
+function Pl(e) {
   if (!e || typeof e != "object")
     return;
   const t = e;
   if (!(typeof t.token != "string" || t.token.trim().length === 0))
     return t;
 }
-function kl(e, t) {
+function Al(e, t) {
   return e === void 0 ? t : !Array.isArray(e) || !e.every((n) => typeof n == "string") ? null : e;
 }
-function Ye(e) {
-  return e === void 0 || typeof e == "function" || typeof e == "symbol" ? null : e === null || typeof e == "string" || typeof e == "number" || typeof e == "boolean" ? e : Array.isArray(e) ? e.map((t) => Ye(t)) : typeof e == "object" ? Object.fromEntries(
-    Object.entries(e).filter(([, t]) => t !== void 0 && typeof t != "function" && typeof t != "symbol").sort(([t], [n]) => t.localeCompare(n)).map(([t, n]) => [t, Ye(n)])
+function Qe(e) {
+  return e === void 0 || typeof e == "function" || typeof e == "symbol" ? null : e === null || typeof e == "string" || typeof e == "number" || typeof e == "boolean" ? e : Array.isArray(e) ? e.map((t) => Qe(t)) : typeof e == "object" ? Object.fromEntries(
+    Object.entries(e).filter(([, t]) => t !== void 0 && typeof t != "function" && typeof t != "symbol").sort(([t], [n]) => t.localeCompare(n)).map(([t, n]) => [t, Qe(n)])
   ) : null;
 }
-function Tl(e) {
-  const t = JSON.stringify(Ye(e ?? {}));
-  return `sha256:${en("sha256").update(t).digest("hex")}`;
+function xl(e) {
+  const t = JSON.stringify(Qe(e ?? {}));
+  return `sha256:${nn("sha256").update(t).digest("hex")}`;
 }
-function Sl(e) {
+function El(e) {
   if (e !== void 0)
-    return !Number.isInteger(e) || e <= 0 || e > vl ? null : e;
+    return !Number.isInteger(e) || e <= 0 || e > Tl ? null : e;
 }
-function Gt(e) {
+function Vt(e) {
   return e.code !== "UNAVAILABLE" ? e.details : {
     ...e.details,
-    ...Jn()
+    ...Kn()
   };
 }
-function Jn() {
+function Kn() {
   return {
     recovery: {
       action: "launch_tasktime",
@@ -6757,7 +6838,7 @@ function Jn() {
     }
   };
 }
-function Jt(e, t) {
+function Kt(e, t) {
   const n = {
     ok: !0,
     command: e,
@@ -6774,7 +6855,7 @@ function Jt(e, t) {
     isError: !1
   };
 }
-function R(e, t, n) {
+function C(e, t, n) {
   const r = {
     ok: !1,
     command: "tools/call",
@@ -6795,21 +6876,21 @@ function R(e, t, n) {
     isError: !0
   };
 }
-function Pl(e) {
+function jl(e) {
   let t = "";
   const n = (r) => {
     for (t += r.toString(); t.includes(`
 `); ) {
       const o = t.indexOf(`
 `), a = t.slice(0, o).trim();
-      t = t.slice(o + 1), a && Al(a, e);
+      t = t.slice(o + 1), a && zl(a, e);
     }
   };
   return e.input.on("data", n), () => {
     e.input.off("data", n);
   };
 }
-async function Al(e, t) {
+async function zl(e, t) {
   try {
     const n = await t.server.handleMessage(JSON.parse(e));
     n && t.output.write(`${JSON.stringify(n)}
@@ -6827,29 +6908,29 @@ async function Al(e, t) {
 `);
   }
 }
-function xl(e) {
+function Ol(e) {
   if (!e || typeof e != "object")
     return !1;
   const t = e;
   return t.jsonrpc === Ae && typeof t.method == "string";
 }
-const El = "127.0.0.1", Vt = 0, Vn = "/tasktime-agent", Qe = ["read", "write", "navigation"], Le = 300 * 1e3, Kt = 12e4, Wt = 120, Ht = 6e4, xe = "tasktime.agent.local-bridge", et = "Local agent bridge", Ee = ["read", "write", "billing", "export", "email", "navigation"];
-function jl(e, t = process.env) {
+const Dl = "127.0.0.1", Wt = 0, Wn = "/tasktime-agent", et = ["read", "write", "navigation"], Le = 300 * 1e3, Ht = 12e4, Xt = 120, Yt = 6e4, xe = "tasktime.agent.local-bridge", tt = "Local agent bridge", Ee = ["read", "write", "billing", "export", "email", "navigation"];
+function Nl(e, t = process.env) {
   const n = {
-    host: t.TASKTIME_AGENT_BRIDGE_HOST || El,
-    port: K(t.TASKTIME_AGENT_BRIDGE_PORT, Vt, "TASKTIME_AGENT_BRIDGE_PORT"),
-    path: t.TASKTIME_AGENT_BRIDGE_PATH || Vn,
-    scopes: Hn(t.TASKTIME_AGENT_BRIDGE_SCOPES) ?? Qe,
-    allowedOrigins: Wn(t.TASKTIME_AGENT_BRIDGE_ORIGINS),
+    host: t.TASKTIME_AGENT_BRIDGE_HOST || Dl,
+    port: K(t.TASKTIME_AGENT_BRIDGE_PORT, Wt, "TASKTIME_AGENT_BRIDGE_PORT"),
+    path: t.TASKTIME_AGENT_BRIDGE_PATH || Wn,
+    scopes: Yn(t.TASKTIME_AGENT_BRIDGE_SCOPES) ?? et,
+    allowedOrigins: Xn(t.TASKTIME_AGENT_BRIDGE_ORIGINS),
     agentId: oe(t.TASKTIME_AGENT_ID, xe, "TASKTIME_AGENT_ID"),
-    agentLabel: oe(t.TASKTIME_AGENT_LABEL, et, "TASKTIME_AGENT_LABEL"),
+    agentLabel: oe(t.TASKTIME_AGENT_LABEL, tt, "TASKTIME_AGENT_LABEL"),
     pairingTtlMs: K(t.TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS, Le, "TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS"),
-    sessionTtlMs: Rl(t.TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS, "TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS"),
-    commandTimeoutMs: K(t.TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS, Kt, "TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS"),
-    toolCallRateLimit: K(t.TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT, Wt, "TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT"),
-    toolCallRateWindowMs: Qt(t.TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS, Ht, "TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS"),
-    appUrl: Ll(t.TASKTIME_APP_URL, "TASKTIME_APP_URL"),
-    statusFile: Ml(t.TASKTIME_AGENT_BRIDGE_STATUS_FILE, "TASKTIME_AGENT_BRIDGE_STATUS_FILE"),
+    sessionTtlMs: Ul(t.TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS, "TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS"),
+    commandTimeoutMs: K(t.TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS, Ht, "TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS"),
+    toolCallRateLimit: K(t.TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT, Xt, "TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT"),
+    toolCallRateWindowMs: tn(t.TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS, Yt, "TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS"),
+    appUrl: ql(t.TASKTIME_APP_URL, "TASKTIME_APP_URL"),
+    statusFile: Bl(t.TASKTIME_AGENT_BRIDGE_STATUS_FILE, "TASKTIME_AGENT_BRIDGE_STATUS_FILE"),
     help: !1,
     manifest: !1
   }, r = [], o = [];
@@ -6864,57 +6945,57 @@ function jl(e, t = process.env) {
         n.manifest = !0;
         break;
       case "--host":
-        n.host = M(e, ++a, i);
+        n.host = Z(e, ++a, i);
         break;
       case "--port":
-        n.port = K(M(e, ++a, i), Vt, i);
+        n.port = K(Z(e, ++a, i), Wt, i);
         break;
       case "--path":
-        n.path = Yt(M(e, ++a, i));
+        n.path = en(Z(e, ++a, i));
         break;
       case "--scopes":
-        n.scopes = $l(M(e, ++a, i), i);
+        n.scopes = Zl(Z(e, ++a, i), i);
         break;
       case "--scope":
-        r.push(Xn(M(e, ++a, i), i));
+        r.push(Qn(Z(e, ++a, i), i));
         break;
       case "--origin":
-        o.push(M(e, ++a, i));
+        o.push(Z(e, ++a, i));
         break;
       case "--agent-id":
-        n.agentId = oe(M(e, ++a, i), xe, i);
+        n.agentId = oe(Z(e, ++a, i), xe, i);
         break;
       case "--agent-label":
-        n.agentLabel = oe(M(e, ++a, i), et, i);
+        n.agentLabel = oe(Z(e, ++a, i), tt, i);
         break;
       case "--pairing-ttl-ms":
-        n.pairingTtlMs = K(M(e, ++a, i), Le, i);
+        n.pairingTtlMs = K(Z(e, ++a, i), Le, i);
         break;
       case "--session-ttl-ms":
-        n.sessionTtlMs = K(M(e, ++a, i), Le, i);
+        n.sessionTtlMs = K(Z(e, ++a, i), Le, i);
         break;
       case "--command-timeout-ms":
-        n.commandTimeoutMs = K(M(e, ++a, i), Kt, i);
+        n.commandTimeoutMs = K(Z(e, ++a, i), Ht, i);
         break;
       case "--tool-rate-limit":
-        n.toolCallRateLimit = K(M(e, ++a, i), Wt, i);
+        n.toolCallRateLimit = K(Z(e, ++a, i), Xt, i);
         break;
       case "--tool-rate-window-ms":
-        n.toolCallRateWindowMs = Qt(M(e, ++a, i), Ht, i);
+        n.toolCallRateWindowMs = tn(Z(e, ++a, i), Yt, i);
         break;
       case "--app-url":
-        n.appUrl = ut(M(e, ++a, i), i);
+        n.appUrl = dt(Z(e, ++a, i), i);
         break;
       case "--status-file":
-        n.statusFile = oe(M(e, ++a, i), "", i);
+        n.statusFile = oe(Z(e, ++a, i), "", i);
         break;
       default:
         throw new Error(`Unsupported option: ${i}`);
     }
   }
-  return r.length > 0 && (n.scopes = tt(r)), o.length > 0 && (n.allowedOrigins = o), n.path = Yt(n.path), n.scopes = tt(n.scopes), n;
+  return r.length > 0 && (n.scopes = nt(r)), o.length > 0 && (n.allowedOrigins = o), n.path = en(n.path), n.scopes = nt(n.scopes), n;
 }
-function zl() {
+function $l() {
   return [
     "TaskTime Pro local agent bridge",
     "",
@@ -6945,7 +7026,7 @@ function zl() {
   ].join(`
 `);
 }
-function Ol() {
+function Cl() {
   return {
     schemaVersion: 1,
     app: {
@@ -6980,7 +7061,7 @@ function Ol() {
       },
       appSession: {
         protocol: "websocket",
-        defaultPath: Vn,
+        defaultPath: Wn,
         allowedHosts: ["127.0.0.1", "localhost", "::1"],
         pairingRequired: !0,
         defaultSessionTtlMs: 1440 * 60 * 1e3,
@@ -7000,8 +7081,8 @@ function Ol() {
         labelArgument: "--agent-label",
         defaultAgentId: xe
       },
-      defaultScopes: Qe,
-      optionalScopes: Ee.filter((e) => !Qe.includes(e)),
+      defaultScopes: et,
+      optionalScopes: Ee.filter((e) => !et.includes(e)),
       methods: {
         mcp: ["initialize", "ping", "tools/list", "tools/call"],
         tasktime: ["tasktime/create_approval_token"]
@@ -7025,7 +7106,8 @@ function Ol() {
           pairingId: "agentBridgePairingId",
           pairingCode: "agentBridgePairingCode",
           agentId: "agentBridgeAgentId",
-          agentLabel: "agentBridgeAgentLabel"
+          agentLabel: "agentBridgeAgentLabel",
+          scopes: "agentBridgeScopes"
         }
       },
       recovery: {
@@ -7036,32 +7118,32 @@ function Ol() {
     }
   };
 }
-function Kn(e, t) {
-  const n = new URL(ut(t, "app URL"));
-  return n.pathname = "/account", n.search = "", n.hash = "", n.searchParams.set("section", "agent"), n.searchParams.set("agentBridgeEndpoint", e.endpoint), n.searchParams.set("agentBridgePairingId", e.id), n.searchParams.set("agentBridgePairingCode", e.code), e.agentId && n.searchParams.set("agentBridgeAgentId", e.agentId), e.agentLabel && n.searchParams.set("agentBridgeAgentLabel", e.agentLabel), n.toString();
+function Hn(e, t) {
+  const n = new URL(dt(t, "app URL"));
+  return n.pathname = "/account", n.search = "", n.hash = "", n.searchParams.set("section", "agent"), n.searchParams.set("agentBridgeEndpoint", e.endpoint), n.searchParams.set("agentBridgePairingId", e.id), n.searchParams.set("agentBridgePairingCode", e.code), n.searchParams.set("agentBridgeScopes", e.scopes.join(",")), e.agentId && n.searchParams.set("agentBridgeAgentId", e.agentId), e.agentLabel && n.searchParams.set("agentBridgeAgentLabel", e.agentLabel), n.toString();
 }
-function Dl(e, t) {
+function Rl(e, t) {
   const n = [
     "TaskTime Pro local agent bridge is running.",
     `App endpoint: ${e.endpoint}`,
     `Pairing ID: ${e.id}`,
     `Pairing code: ${e.code}`,
-    `Agent: ${e.agentLabel || et} (${e.agentId || xe})`,
+    `Agent: ${e.agentLabel || tt} (${e.agentId || xe})`,
     `Scopes: ${e.scopes.join(",")}`,
     `Pairing expires at: ${new Date(e.expiresAt).toISOString()}`
   ];
-  return t && n.push(`TaskTime Pro launch URL: ${Kn(e, t)}`), n.push(
+  return t && n.push(`TaskTime Pro launch URL: ${Hn(e, t)}`), n.push(
     "",
     "Open TaskTime Pro and connect the agent bridge using the endpoint, pairing ID, and pairing code above."
   ), n.join(`
 `);
 }
-async function Nl(e, t) {
+async function Ll(e, t) {
   let n = null, r = null, o = null;
-  const a = (/* @__PURE__ */ new Date()).toISOString(), i = e.statusFile ? rr(e.statusFile) : void 0, c = () => {
+  const a = (/* @__PURE__ */ new Date()).toISOString(), i = e.statusFile ? ir(e.statusFile) : void 0, c = () => {
     if (!(!i || !r || !o))
       try {
-        tr(or(i), { recursive: !0 }), nr(i, `${JSON.stringify(Xt({
+        rr(ar(i), { recursive: !0 }), or(i, `${JSON.stringify(Qt({
           bridge: o,
           challenge: r,
           appUrl: e.appUrl,
@@ -7071,38 +7153,39 @@ async function Nl(e, t) {
           activeSessionExpiresAt: n
         }), null, 2)}
 `);
-      } catch (L) {
-        t.stderr.write(`TaskTime Pro bridge status file write failed: ${L instanceof Error ? L.message : String(L)}
+      } catch (M) {
+        t.stderr.write(`TaskTime Pro bridge status file write failed: ${M instanceof Error ? M.message : String(M)}
 `);
       }
-  }, l = (L) => {
-    L.action === "pairing_succeeded" && (n = typeof L.details?.expiresAt == "number" ? L.details.expiresAt : null), L.action === "session_disconnected" && o?.getClientCount() === 0 && (n = null), c();
+  }, p = (M) => {
+    M.action === "pairing_succeeded" && (n = typeof M.details?.expiresAt == "number" ? M.details.expiresAt : null), M.action === "session_disconnected" && o?.getClientCount() === 0 && (n = null), c();
   };
-  o = new dl({
+  o = new hl({
     host: e.host,
     port: e.port,
     path: e.path,
+    agentId: e.agentId,
     allowedOrigins: e.allowedOrigins,
     sessionTtlMs: e.sessionTtlMs,
-    onAudit: l
+    onAudit: p
   }), await o.start();
-  const p = o, f = () => (r = p.createPairingChallenge({
+  const l = o, h = () => (r = l.createPairingChallenge({
     scopes: e.scopes,
     ttlMs: e.pairingTtlMs,
     agentId: e.agentId,
     agentLabel: e.agentLabel
-  }), c(), r), y = () => Xt({
-    bridge: p,
-    challenge: r ?? f(),
+  }), c(), r), y = () => Qt({
+    bridge: l,
+    challenge: r ?? h(),
     appUrl: e.appUrl,
     agentId: e.agentId,
     agentLabel: e.agentLabel,
     startedAt: a,
     activeSessionExpiresAt: n
-  }), v = () => (f(), y()), w = f(), $ = new wl({
+  }), v = () => (h(), y()), I = h(), L = new Sl({
     bridge: {
-      sendCommand: p.sendCommand.bind(p),
-      createApprovalToken: p.createApprovalToken.bind(p),
+      sendCommand: l.sendCommand.bind(l),
+      createApprovalToken: l.createApprovalToken.bind(l),
       getPairingStatus: y,
       refreshPairing: v
     },
@@ -7110,27 +7193,27 @@ async function Nl(e, t) {
     commandTimeoutMs: e.commandTimeoutMs,
     toolCallRateLimit: e.toolCallRateLimit,
     toolCallRateWindowMs: e.toolCallRateWindowMs
-  }), C = Pl({
+  }), $ = jl({
     input: t.stdin,
     output: t.stdout,
-    server: $,
-    onError: (L) => {
-      t.stderr.write(`TaskTime Pro MCP bridge error: ${L.message}
+    server: L,
+    onError: (M) => {
+      t.stderr.write(`TaskTime Pro MCP bridge error: ${M.message}
 `);
     }
   });
-  return t.stderr.write(`${Dl(w, e.appUrl)}
+  return t.stderr.write(`${Rl(I, e.appUrl)}
 `), {
-    bridge: p,
-    challenge: w,
+    bridge: l,
+    challenge: I,
     getStatus: y,
     refreshPairing: v,
     stop: async () => {
-      C(), await p.stop();
+      $(), await l.stop();
     }
   };
 }
-function Xt(e) {
+function Qt(e) {
   const t = Date.now();
   return {
     schemaVersion: 1,
@@ -7143,7 +7226,7 @@ function Xt(e) {
     },
     endpoint: e.challenge.endpoint,
     appUrl: e.appUrl,
-    launchUrl: e.appUrl ? Kn(e.challenge, e.appUrl) : void 0,
+    launchUrl: e.appUrl ? Hn(e.challenge, e.appUrl) : void 0,
     scopes: [...e.challenge.scopes],
     pairing: {
       id: e.challenge.id,
@@ -7159,19 +7242,19 @@ function Xt(e) {
     }
   };
 }
-async function Cl(e = process.argv.slice(2), t = {
+async function Ml(e = process.argv.slice(2), t = {
   stdin: process.stdin,
   stdout: process.stdout,
   stderr: process.stderr
 }, n = process.env) {
-  const r = jl(e, n);
+  const r = Nl(e, n);
   if (r.help)
-    return t.stderr.write(`${zl()}
+    return t.stderr.write(`${$l()}
 `), null;
   if (r.manifest)
-    return t.stdout.write(`${JSON.stringify(Ol(), null, 2)}
+    return t.stdout.write(`${JSON.stringify(Cl(), null, 2)}
 `), null;
-  const o = await Nl(r, t), a = async () => {
+  const o = await Ll(r, t), a = async () => {
     await o.stop(), process.exit(0);
   };
   return process.once("SIGINT", () => {
@@ -7180,35 +7263,35 @@ async function Cl(e = process.argv.slice(2), t = {
     a();
   }), o;
 }
-function Wn(e) {
+function Xn(e) {
   if (!e)
     return;
   const t = e.split(",").map((n) => n.trim()).filter(Boolean);
   return t.length > 0 ? t : void 0;
 }
-function $l(e, t) {
-  const n = Hn(e);
+function Zl(e, t) {
+  const n = Yn(e);
   if (!n || n.length === 0)
     throw new Error(`${t} must include at least one scope.`);
   return n;
 }
-function Hn(e) {
-  const t = Wn(e);
+function Yn(e) {
+  const t = Xn(e);
   if (t)
-    return tt(t.map((n) => Xn(n, "scope")));
+    return nt(t.map((n) => Qn(n, "scope")));
 }
-function Xn(e, t) {
+function Qn(e, t) {
   if (Ee.includes(e))
     return e;
   throw new Error(`${t} must be one of: ${Ee.join(", ")}`);
 }
-function tt(e) {
+function nt(e) {
   return Ee.filter((t) => e.includes(t));
 }
-function Yt(e) {
+function en(e) {
   return e.startsWith("/") ? e : `/${e}`;
 }
-function M(e, t, n) {
+function Z(e, t, n) {
   const r = e[t];
   if (!r || r.startsWith("--"))
     throw new Error(`${n} requires a value.`);
@@ -7222,21 +7305,21 @@ function K(e, t, n) {
     throw new Error(`${n} must be a non-negative integer.`);
   return r;
 }
-function Rl(e, t) {
+function Ul(e, t) {
   if (!(e === void 0 || e === ""))
     return K(e, 0, t);
 }
-function Qt(e, t, n) {
+function tn(e, t, n) {
   const r = K(e, t, n);
   if (r <= 0)
     throw new Error(`${n} must be a positive integer.`);
   return r;
 }
-function Ll(e, t) {
+function ql(e, t) {
   if (e)
-    return ut(e, t);
+    return dt(e, t);
 }
-function Ml(e, t) {
+function Bl(e, t) {
   if (!(e === void 0 || e === ""))
     return oe(e, "", t);
 }
@@ -7246,7 +7329,7 @@ function oe(e, t, n) {
     throw new Error(`${n} must be a non-empty string.`);
   return r.trim();
 }
-function ut(e, t) {
+function dt(e, t) {
   let n;
   try {
     n = new URL(e);
@@ -7257,26 +7340,26 @@ function ut(e, t) {
     throw new Error(`${t} must be a valid http:// or https:// URL.`);
   return n.toString();
 }
-function Zl() {
+function Fl() {
   const e = process.argv[1];
   if (!e)
     return !1;
   try {
-    return dt(e) === dt(ir(import.meta.url));
+    return mt(e) === mt(sr(import.meta.url));
   } catch {
-    return import.meta.url === ar(e).href;
+    return import.meta.url === cr(e).href;
   }
 }
-Zl() && Cl().catch((e) => {
+Fl() && Ml().catch((e) => {
   process.stderr.write(`TaskTime Pro local agent bridge failed: ${e instanceof Error ? e.message : String(e)}
 `), process.exitCode = 1;
 });
 export {
-  Kn as buildTaskTimeAgentBridgeLaunchUrl,
-  Dl as formatPairingInstructions,
-  zl as getTaskTimeAgentBridgeCliUsage,
-  Ol as getTaskTimeAgentBridgeManifest,
-  jl as parseTaskTimeAgentBridgeCliOptions,
-  Cl as runTaskTimeAgentBridgeCli,
-  Nl as startTaskTimeAgentBridgeCli
+  Hn as buildTaskTimeAgentBridgeLaunchUrl,
+  Rl as formatPairingInstructions,
+  $l as getTaskTimeAgentBridgeCliUsage,
+  Cl as getTaskTimeAgentBridgeManifest,
+  Nl as parseTaskTimeAgentBridgeCliOptions,
+  Ml as runTaskTimeAgentBridgeCli,
+  Ll as startTaskTimeAgentBridgeCli
 };
