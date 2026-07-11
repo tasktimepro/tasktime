@@ -32,7 +32,8 @@ import {
 import { sendInvoiceEmail, isEmailSendError } from '@/utils/emailService';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { getCurrentInvoiceHtmlContent, generatePDFBase64 } from '@/utils/pdfUtils.ts';
-import { getCurrencySymbol, getPreferredCurrency } from '@/utils/currencyUtils.ts';
+import { getCurrencySymbol, normalizeCurrencyCode } from '@/utils/currencyUtils.ts';
+import { usePreferences } from '@/hooks/usePreferences.ts';
 import { getInvoiceTotal } from '@/utils/invoiceUtils.ts';
 import { toDisplayDate } from '@/utils/dateUtils.ts';
 
@@ -58,6 +59,7 @@ const EmailPreviewModal = ({
     const { updateInvoice } = useInvoices();
     const { getByType, getDefaultForType } = useEmailTemplates();
     const { showSuccess } = useToast();
+    const { preferences } = usePreferences();
 
     const [sending, setSending] = useState(false);
     const [error, setError] = useState(null);
@@ -77,7 +79,7 @@ const EmailPreviewModal = ({
 
     const businessName = businessInfo?.businessName || businessInfo?.name || businessInfo?.title || '';
     const defaultReplyToEmail = businessInfo?.email || '';
-    const invoiceCurrency = invoice?.currency || getPreferredCurrency();
+    const invoiceCurrency = invoice?.currency || normalizeCurrencyCode(preferences.currency);
     const currencySymbol = getCurrencySymbol(invoiceCurrency);
     const invoiceTotal = invoice ? getInvoiceTotal(invoice) : 0;
     const isQuoteSend = sendType === 'quote';
@@ -201,6 +203,11 @@ const EmailPreviewModal = ({
             return;
         }
 
+        if (!isQuoteSend && invoice.status === 'draft') {
+            setError('Finalize this draft before sending it by email.');
+            return;
+        }
+
         if (!to) {
             setError('Recipient email is required.');
             return;
@@ -250,10 +257,6 @@ const EmailPreviewModal = ({
                         sentAt: Date.now(),
                         sentToEmail: to,
                     };
-
-                    if (sendType === 'invoice' && invoice.status === 'draft') {
-                        updates.status = 'sent';
-                    }
 
                     updateInvoice(invoice.id, updates);
                 }

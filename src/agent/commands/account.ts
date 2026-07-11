@@ -1,6 +1,6 @@
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
-import { getBackupImportCounts, parseBackupImportJson } from '@/utils/backupData';
+import { getBackupImportCounts, parseBackupImportJson, type BackupImportPayload } from '@/utils/backupData';
 import { resetOnboardingCompleted } from '@/utils/onboardingUtils';
 import { assertPermission, assertReady, requireString } from './shared';
 
@@ -233,11 +233,20 @@ export function previewBackupImportJsonCommand(context: AgentCommandContext, inp
 async function clearAllDataForRestore(context: AgentCommandContext) {
     if (context.clearAllData) {
         await context.clearAllData();
+    } else {
+        await context.store.clearAllData();
+        await context.store.initialize();
+    }
+}
+
+async function replaceAllDataForRestore(context: AgentCommandContext, backup: BackupImportPayload) {
+    if (context.restoreBackupData) {
+        await context.restoreBackupData(backup);
         return;
     }
 
-    await context.store.clearAllData();
-    await context.store.initialize();
+    await clearAllDataForRestore(context);
+    await context.store.importBackupData(backup);
 }
 
 export async function restoreBackupJsonCommand(context: AgentCommandContext, input: RestoreBackupJsonCommandInput = {}) {
@@ -260,8 +269,7 @@ export async function restoreBackupJsonCommand(context: AgentCommandContext, inp
     const backup = parseBackupImportJson(backupJson);
     const counts = getBackupImportCounts(backup);
 
-    await clearAllDataForRestore(context);
-    await context.store.importBackupData(backup);
+    await replaceAllDataForRestore(context, backup);
 
     return {
         restored: true,
@@ -294,8 +302,7 @@ export async function restoreDriveBackupCommand(context: AgentCommandContext, in
     const backup = parseDownloadedBackup(data);
     const counts = getBackupImportCounts(backup);
 
-    await clearAllDataForRestore(context);
-    await context.store.importBackupData(backup);
+    await replaceAllDataForRestore(context, backup);
 
     return {
         restored: true,

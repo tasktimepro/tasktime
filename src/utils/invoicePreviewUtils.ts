@@ -14,6 +14,7 @@ type InvoicePreviewOptions = {
     billingPeriodStart?: string;
     billingPeriodEnd?: string;
     includeClientLevelExpenses?: boolean;
+    preferredCurrency?: string;
 };
 
 export type ProjectInvoicePreview = {
@@ -25,6 +26,38 @@ export type ProjectInvoicePreview = {
     unpricedHours: number;
     selectedExpenseCount: number;
     excludedExpenseCount: number;
+    entrySelections: ProjectInvoiceEntrySelection[];
+    taskSelections: ProjectInvoiceTaskSelection[];
+    expenseSelections: ProjectInvoiceExpenseSelection[];
+};
+
+export type ProjectInvoiceEntrySelection = {
+    entryId: string;
+    taskId: string;
+    start: number;
+    end: number;
+    actualDurationMs: number;
+    billableDurationMs: number;
+};
+
+export type ProjectInvoiceTaskSelection = {
+    taskId: string;
+    title: string;
+    pricingMode: 'hourly' | 'flat';
+    quantity: number;
+    rate: number;
+    amount: number;
+    quotedAmount: number | null;
+};
+
+export type ProjectInvoiceExpenseSelection = {
+    expenseId: string;
+    title: string;
+    sourceAmount: number;
+    sourceCurrency: string;
+    invoiceAmount: number;
+    invoiceCurrency: string;
+    exchangeRate: number;
 };
 
 const roundCurrency = (value: number): number => Math.round(value * 100) / 100;
@@ -94,16 +127,18 @@ export const getProjectInvoicePreview = (
         billingPeriodStart,
         billingPeriodEnd,
         includeClientLevelExpenses = false,
+        preferredCurrency,
     }: InvoicePreviewOptions = {}
 ): ProjectInvoicePreview => {
     const defaultBillingPeriod = getBillingPeriodRange();
     const activeBillingPeriodStart = billingPeriodStart ?? defaultBillingPeriod.startDate;
     const activeBillingPeriodEnd = billingPeriodEnd ?? defaultBillingPeriod.endDate;
-    const projectCurrency = getProjectCurrency(project, clients);
+    const projectCurrency = getProjectCurrency(project, clients, preferredCurrency);
     const projectClient = getProjectClient(project, clients);
-    const projectTasks = tasks.filter((task) => task.projectId === project.id && task.archived !== true);
+    const projectTasks = tasks.filter((task) => task.projectId === project.id);
     const projectTaskMap = new Map(projectTasks.map((task) => [task.id, task]));
     const taskTimeMap = new Map<string, number>();
+    const entrySelections: ProjectInvoiceEntrySelection[] = [];
 
     timeEntries.forEach((entry) => {
         const task = projectTaskMap.get(entry.taskId);
@@ -111,15 +146,25 @@ export const getProjectInvoicePreview = (
         if (!task || task.billable !== true) return;
         if (!entry.end || entry.end <= entry.start) return;
         if (entry.source === 'invoice-adjustment') return;
-        if ((entry.start || 0) <= (task.lastBilledAt || 0)) return;
+        if (entry.billedInvoiceId || entry.billedAt) return;
         if (!isStoredDateWithinBillingRange(entry.start, activeBillingPeriodStart, activeBillingPeriodEnd)) return;
 
-        taskTimeMap.set(task.id, (taskTimeMap.get(task.id) || 0) + getBillableDurationMs(entry));
+        const billableDurationMs = getBillableDurationMs(entry);
+        taskTimeMap.set(task.id, (taskTimeMap.get(task.id) || 0) + billableDurationMs);
+        entrySelections.push({
+            entryId: entry.id,
+            taskId: entry.taskId,
+            start: entry.start,
+            end: entry.end,
+            actualDurationMs: entry.end - entry.start,
+            billableDurationMs,
+        });
     });
 
     let taskAmount = 0;
     let unbilledHours = 0;
     let unpricedHours = 0;
+    const taskSelections: ProjectInvoiceTaskSelection[] = [];
     const effectiveHourlyRate = normalizeFiniteNumber(project.hourlyRate) ?? getClientHourlyRate(projectClient);
 
     projectTasks
@@ -137,11 +182,34 @@ export const getProjectInvoicePreview = (
                 }
 
                 taskAmount += quotedAmount;
+                if (quotedAmount > 0) {
+                    taskSelections.push({
+                        taskId: task.id,
+                        title: task.title,
+                        pricingMode: 'flat',
+                        quantity: 1,
+                        rate: quotedAmount,
+                        amount: quotedAmount,
+                        quotedAmount,
+                    });
+                }
                 return;
             }
 
             if (effectiveHourlyRate > 0) {
-                taskAmount += taskHours * effectiveHourlyRate;
+                const amount = roundCurrency(taskHours * effectiveHourlyRate);
+                taskAmount += amount;
+                if (taskHours > 0) {
+                    taskSelections.push({
+                        taskId: task.id,
+                        title: task.title,
+                        pricingMode: 'hourly',
+                        quantity: taskHours,
+                        rate: effectiveHourlyRate,
+                        amount,
+                        quotedAmount: null,
+                    });
+                }
             } else {
                 unpricedHours += taskHours;
             }
@@ -150,6 +218,7 @@ export const getProjectInvoicePreview = (
     let expenseAmount = 0;
     let selectedExpenseCount = 0;
     let excludedExpenseCount = 0;
+    const expenseSelections: ProjectInvoiceExpenseSelection[] = [];
 
     expenses
         .filter((expense) => {
@@ -172,6 +241,17 @@ export const getProjectInvoicePreview = (
 
             selectedExpenseCount += 1;
             expenseAmount += converted.amount;
+            const sourceAmount = normalizeFiniteNumber(expense.amount) ?? 0;
+            const sourceCurrency = normalizeCurrencyCode(expense.currency || projectCurrency);
+            expenseSelections.push({
+                expenseId: expense.id,
+                title: expense.title,
+                sourceAmount,
+                sourceCurrency,
+                invoiceAmount: converted.amount,
+                invoiceCurrency: projectCurrency,
+                exchangeRate: sourceAmount === 0 ? 1 : converted.amount / sourceAmount,
+            });
         });
 
     const roundedTaskAmount = roundCurrency(taskAmount);
@@ -186,5 +266,8 @@ export const getProjectInvoicePreview = (
         unpricedHours: roundCurrency(unpricedHours),
         selectedExpenseCount,
         excludedExpenseCount,
+        entrySelections,
+        taskSelections,
+        expenseSelections,
     };
 };

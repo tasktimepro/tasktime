@@ -111,6 +111,7 @@ const yjsHookState = vi.hoisted(() => ({
     loadArchivedInvoices: vi.fn(),
     getAvailableYears: vi.fn().mockResolvedValue([]),
     clearAllData: vi.fn(),
+    restoreBackupData: vi.fn(),
     driveSessionId: null,
 }))
 
@@ -420,6 +421,7 @@ describe('App component', () => {
         yjsHookState.getAvailableYears.mockReset()
         yjsHookState.getAvailableYears.mockResolvedValue([])
         yjsHookState.clearAllData.mockReset()
+        yjsHookState.restoreBackupData.mockReset()
         yjsHookState.driveSessionId = null
         localStorage.getItem.mockImplementation((key) => {
             if (key === 'tasktime-onboarding-completed') {

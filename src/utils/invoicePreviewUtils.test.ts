@@ -25,6 +25,28 @@ describe('invoicePreviewUtils', () => {
             selectedExpenseCount: 1,
             excludedExpenseCount: 0,
         }));
+        expect(preview.entrySelections).toEqual([expect.objectContaining({
+            entryId: 'entry-1',
+            taskId: 'task-1',
+            billableDurationMs: 2 * 60 * 60 * 1000,
+        })]);
+        expect(preview.taskSelections).toEqual([{
+            taskId: 'task-1',
+            title: 'Task',
+            pricingMode: 'hourly',
+            quantity: 2,
+            rate: 100,
+            amount: 200,
+            quotedAmount: null,
+        }]);
+        expect(preview.expenseSelections).toEqual([expect.objectContaining({
+            expenseId: 'expense-1',
+            sourceAmount: 40,
+            sourceCurrency: 'CHF',
+            invoiceAmount: 40,
+            invoiceCurrency: 'CHF',
+            exchangeRate: 1,
+        })]);
     });
 
     it('can include client-level expenses when explicitly requested', () => {
@@ -153,5 +175,23 @@ describe('invoicePreviewUtils', () => {
         expect(preview.total).toBe(0);
         expect(preview.selectedExpenseCount).toBe(0);
         expect(preview.excludedExpenseCount).toBe(1);
+    });
+
+    it('keeps late-synced unbilled entries eligible even when they predate the legacy task cutoff', () => {
+        const preview = getProjectInvoicePreview(
+            { id: 'project-1', title: 'Build', preferredClientId: 'client-1', hourlyRate: 100, flatRate: false },
+            {
+                clients: [{ id: 'client-1', title: 'Acme', defaultCurrency: 'EUR' }],
+                tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Archived work', billable: true, archived: true, lastBilledAt: 10_000 }],
+                timeEntries: [
+                    { id: 'entry-late', taskId: 'task-1', start: 1_000, end: 3_601_000 },
+                    { id: 'entry-billed', taskId: 'task-1', start: 4_000, end: 3_604_000, billedInvoiceId: 'invoice-old' },
+                ],
+            }
+        );
+
+        expect(preview.entrySelections.map((entry) => entry.entryId)).toEqual(['entry-late']);
+        expect(preview.unbilledHours).toBe(1);
+        expect(preview.total).toBe(100);
     });
 });

@@ -14,7 +14,7 @@ import {
     resolveTemplate,
     type EmailSendType,
 } from '@/utils/emailTemplateUtils';
-import { getCurrencySymbol, getPreferredCurrency } from '@/utils/currencyUtils';
+import { DEFAULT_CURRENCY, getCurrencySymbol } from '@/utils/currencyUtils';
 import { toDisplayDate } from '@/utils/dateUtils';
 import { getInvoiceTotal } from '@/utils/invoiceUtils';
 
@@ -51,6 +51,7 @@ export interface ResolveInvoiceEmailDraftInput {
     emailTemplates: EmailTemplate[];
     sendType?: EmailSendType;
     overrides?: InvoiceEmailDraftOverrides;
+    preferredCurrency?: string;
 }
 
 export function resolveInvoiceEmailDraft({
@@ -60,11 +61,12 @@ export function resolveInvoiceEmailDraft({
     emailTemplates,
     sendType = 'invoice',
     overrides = {},
+    preferredCurrency,
 }: ResolveInvoiceEmailDraftInput): InvoiceEmailDraft {
     const isQuoteSend = sendType === 'quote';
     const isReminderSend = sendType === 'reminder';
     const templateType = isQuoteSend ? 'quote' : 'invoice';
-    const templateValues = getInvoiceEmailTemplateValues(invoice, client, businessInfo);
+    const templateValues = getInvoiceEmailTemplateValues(invoice, client, businessInfo, preferredCurrency);
     const typedTemplates = [...emailTemplates]
         .filter((template) => template.type === templateType)
         .sort((a, b) => {
@@ -119,8 +121,8 @@ export function resolveInvoiceEmailDraft({
     };
 }
 
-function getInvoiceEmailTemplateValues(invoice: Invoice, client?: Client | null, businessInfo?: BusinessInfo | null) {
-    const invoiceCurrency = invoice.currency || getPreferredCurrency();
+function getInvoiceEmailTemplateValues(invoice: Invoice, client?: Client | null, businessInfo?: BusinessInfo | null, preferredCurrency?: string) {
+    const invoiceCurrency = invoice.currency || preferredCurrency || DEFAULT_CURRENCY;
     const currencySymbol = getCurrencySymbol(invoiceCurrency);
     const invoiceTotal = getInvoiceTotal(invoice);
 

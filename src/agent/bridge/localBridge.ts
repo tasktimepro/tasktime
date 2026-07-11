@@ -17,6 +17,8 @@ export interface LocalAgentBridgeOptions {
     tokenBytes?: number;
     tokenFactory?: (byteLength?: number) => string;
     onAudit?: (event: BridgeAuditEvent) => void;
+    /** Stable identity of the agent process allowed to consume persistent grants. */
+    agentId?: string;
 }
 
 export interface CreateLocalAgentPairingOptions {
@@ -141,10 +143,17 @@ export class LocalAgentBridge {
         const now = this.options.now ? this.options.now() : Date.now();
         const grant = options.grantId
             ? this.approvalGrants.get(options.grantId) ?? null
-            : Array.from(this.approvalGrants.values()).find((item) => hasAllScopes(item.scopes, requestedScopes)) ?? null;
+            : Array.from(this.approvalGrants.values()).find((item) => {
+                return this.isGrantBoundToConfiguredAgent(item)
+                    && hasAllScopes(item.scopes, requestedScopes);
+            }) ?? null;
 
         if (!grant) {
             throw new AgentCommandError('UNAVAILABLE', 'No trusted TaskTime Pro approval grant is available for this bridge process.');
+        }
+
+        if (!this.isGrantBoundToConfiguredAgent(grant)) {
+            throw new AgentCommandError('PERMISSION_DENIED', 'Trusted TaskTime Pro approval grant belongs to a different agent identity.');
         }
 
         if (grant.expiresAt != null && grant.expiresAt <= now) {
@@ -178,6 +187,10 @@ export class LocalAgentBridge {
         const host = formatEndpointHost(this.options.host, address);
 
         return `ws://${host}:${address.port}${path}`;
+    }
+
+    private isGrantBoundToConfiguredAgent(grant: AgentAppSessionApprovalGrantPayload): boolean {
+        return !this.options.agentId || grant.clientId === this.options.agentId;
     }
 }
 

@@ -4,13 +4,22 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
+[x] Add explicit UI-versus-agent timer parity tests for start, pause, resume, stop, and resulting time-entry data
+
+[ ] Centralize remaining shared UI/agent operations in separate controlled updates
+    [ ] Timer lifecycle and stop recovery — the highest-priority shared operation
+    [ ] Manual time-entry validation — overlaps, billing cutoff, duration fields, updates, and deletion
+    [ ] Task completion and recurring-task state — completion dates, skipping, and stale-skip reconciliation
+    [ ] Task/project/client creation and updates where relationship invariants apply
+
 [x] docs/todo/local-agent-bridge-proposal.md
     [x] Make sure this is full-parity with UI and that the agent can really do anything a user can do currently
     [x] Add public Astro agent docs at `/agents/` with `llms.txt`, generated MCP tool JSON, and Skill/OpenClaw pointers
     [x] Prepare final MCP/OpenClaw skill and plugin for publishing package metadata and so on
     [x] Publish everything under the new github org /tasktimepro in clawhub
         [x] Canonical ClawHub skill: @tasktimepro/tasktime-agent (legacy @tasktimepro/tasktime and @tasktimepro/tasktime-pro redirect here)
-    [ ] Actually validate the skill/MCP with our own OpenClaw
+
+    [ ] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
         - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
         - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
 
@@ -21,18 +30,6 @@
         [ ] MCP
     [ ] Glama
     [ ] MCP.so
-
-[x] Merge Agents Kit so that we have a proper agent setup/scaffold
-    [ ] Run deep validations on the core parts of the product like:
-        - Cloud sync gaps / should not let data be unsynced or lost
-        - Storage and stored data 
-        - Invoicing generation (calculations, currency related conversions, all tasks + timings properly calculated, billed hours, undo last invoice properly undoes everything well, etc.)
-        - Reporting totals conditions & calculations
-        - Export / Import
-    [ ] Set these as part of the rules/spec that we must always be very careful here about the most crucial parts of the app - there should be rules that we cannot ever break - for example, the worker sync should always be efficient, we must keep as low requests as possible. | Important data should always be sent to the cloud, backups, and export/import, so new features that will include user data must obey these rules | Agent bridge and commands should always be kept in parity with things the user can do from within the UI.
-        - and we can try to determine if there are other similarly important things that could break the app that is critical
-    [ ] Run any suggested improvements in general throughout the app. Is everything implemented as expected, did we leave any potential critical gaps behind? Are all timings accurate by the second? Determine all the critical paths of this app and make sure everything works as expected.
-    [ ] Are agents able to handle bulk commands, like bulk mark as completed, delete, etc? Or for now doing things individually is ok for this kind of project?
 
 
 ---

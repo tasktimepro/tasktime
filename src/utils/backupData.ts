@@ -17,6 +17,8 @@ import type {
     TaxReturnPeriod,
     TimeEntry,
 } from '@/stores/yjs/types';
+import { validateCollectionEntity, validatePreferencesRecord } from '@/stores/yjs/validation';
+import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 
 export const BACKUP_VERSION = '1.4';
 export const SUPPORTED_BACKUP_IMPORT_VERSIONS = Array.from(new Set(['1.0', '1.1', '1.3', BACKUP_VERSION]));
@@ -198,9 +200,65 @@ export function parseBackupImportJson(backupJson: string): NormalizedBackupImpor
     const plannerAttachments = assertOptionalArray(parsed.plannerAttachments, 'plannerAttachments') as PlannerAttachment[];
     const preferences = parsed.preferences === undefined ? {} : assertObject(parsed.preferences, 'preferences') as Preferences;
 
+    return validateBackupImportPayload({
+        version: typeof parsed.version === 'string' ? parsed.version : undefined,
+        exportDate: typeof parsed.exportDate === 'string' ? parsed.exportDate : undefined,
+        backupType: parsed.backupType === 'automatic' || parsed.backupType === 'manual' ? parsed.backupType : undefined,
+        projects,
+        tasks,
+        timeEntries,
+        invoices,
+        paymentMethods,
+        expenseCategories,
+        taxReturnPeriods,
+        businessInfos,
+        businessBrandAssets,
+        clients,
+        invoiceTemplates,
+        emailTemplates,
+        expenses,
+        expenseRecurrences,
+        dailyGoals,
+        plannerAttachments,
+        preferences,
+    });
+}
+
+export function validateBackupImportPayload(data: NormalizedBackupImportPayload): NormalizedBackupImportPayload {
+    const projects = data.projects || [];
+    const tasks = data.tasks || [];
+    const timeEntries = data.timeEntries || [];
+    const invoices = data.invoices || [];
+    const paymentMethods = data.paymentMethods || [];
+    const expenseCategories = data.expenseCategories || [];
+    const taxReturnPeriods = data.taxReturnPeriods || [];
+    const businessInfos = data.businessInfos || [];
+    const businessBrandAssets = data.businessBrandAssets || [];
+    const clients = data.clients || [];
+    const invoiceTemplates = data.invoiceTemplates || [];
+    const emailTemplates = data.emailTemplates || [];
+    const expenses = data.expenses || [];
+    const expenseRecurrences = data.expenseRecurrences || [];
+    const dailyGoals = data.dailyGoals || [];
+    const plannerAttachments = data.plannerAttachments || [];
+    const preferences = data.preferences || {};
+
     const projectIds = collectUniqueIds(projects, 'project', true);
     const taskIds = collectUniqueIds(tasks, 'task', true);
     const invoiceIds = collectUniqueIds(invoices, 'invoice');
+
+    collectUniqueIds(paymentMethods, 'payment method');
+    collectUniqueIds(expenseCategories, 'expense category');
+    collectUniqueIds(taxReturnPeriods, 'tax return period');
+    collectUniqueIds(businessInfos, 'business info');
+    collectUniqueIds(businessBrandAssets, 'business brand asset');
+    collectUniqueIds(clients, 'client');
+    collectUniqueIds(invoiceTemplates, 'invoice template');
+    collectUniqueIds(emailTemplates, 'email template');
+    collectUniqueIds(expenses, 'expense');
+    collectUniqueIds(expenseRecurrences, 'expense recurrence');
+    collectUniqueIds(dailyGoals, 'daily goal');
+    collectUniqueIds(plannerAttachments, 'planner attachment');
 
     for (const task of tasks) {
         if (task.parentTaskId && !taskIds.has(task.parentTaskId)) {
@@ -239,26 +297,27 @@ export function parseBackupImportJson(backupJson: string): NormalizedBackupImpor
     }
 
     return {
-        version: typeof parsed.version === 'string' ? parsed.version : undefined,
-        exportDate: typeof parsed.exportDate === 'string' ? parsed.exportDate : undefined,
-        backupType: parsed.backupType === 'automatic' || parsed.backupType === 'manual' ? parsed.backupType : undefined,
-        projects,
-        tasks,
-        timeEntries,
-        invoices,
-        paymentMethods,
-        expenseCategories,
-        taxReturnPeriods,
-        businessInfos,
-        businessBrandAssets,
-        clients,
-        invoiceTemplates,
-        emailTemplates,
-        expenses,
-        expenseRecurrences,
-        dailyGoals,
-        plannerAttachments,
-        preferences,
+        ...data,
+        projects: projects.map((project) => validateCollectionEntity<Project>('projects', project, `backup project ${project.id}`)),
+        tasks: tasks.map((task) => validateCollectionEntity<Task>('tasks', task, `backup task ${task.id}`)),
+        timeEntries: timeEntries.map((entry) => validateCollectionEntity<TimeEntry>('timeEntries', entry, `backup time entry ${entry.id}`)),
+        invoices: invoices.map((invoice) => {
+            const normalized = normalizeInvoiceRecord(invoice);
+            return validateCollectionEntity<Invoice>('invoices', normalized, `backup invoice ${invoice.id}`);
+        }),
+        paymentMethods: paymentMethods.map((method) => validateCollectionEntity<PaymentMethod>('paymentMethods', method, `backup payment method ${method.id}`)),
+        expenseCategories: expenseCategories.map((category) => validateCollectionEntity<ExpenseCategory>('expenseCategories', category, `backup expense category ${category.id}`)),
+        taxReturnPeriods: taxReturnPeriods.map((period) => validateCollectionEntity<TaxReturnPeriod>('taxReturnPeriods', period, `backup tax return period ${period.id}`)),
+        businessInfos: businessInfos.map((info) => validateCollectionEntity<BusinessInfo>('businessInfos', info, `backup business info ${info.id}`)),
+        businessBrandAssets: businessBrandAssets.map((asset) => validateCollectionEntity<BusinessBrandAsset>('businessBrandAssets', asset, `backup business brand asset ${asset.id}`)),
+        clients: clients.map((client) => validateCollectionEntity<Client>('clients', client, `backup client ${client.id}`)),
+        invoiceTemplates: invoiceTemplates.map((template) => validateCollectionEntity<InvoiceTemplate>('invoiceTemplates', template, `backup invoice template ${template.id}`)),
+        emailTemplates: emailTemplates.map((template) => validateCollectionEntity<EmailTemplate>('emailTemplates', template, `backup email template ${template.id}`)),
+        expenses: expenses.map((expense) => validateCollectionEntity<Expense>('expenses', expense, `backup expense ${expense.id}`)),
+        expenseRecurrences: expenseRecurrences.map((recurrence) => validateCollectionEntity<ExpenseRecurrence>('expenseRecurrences', recurrence, `backup expense recurrence ${recurrence.id}`)),
+        dailyGoals: dailyGoals.map((goal) => validateCollectionEntity<DailyGoal>('dailyGoals', goal, `backup daily goal ${goal.id}`)),
+        plannerAttachments: plannerAttachments.map((attachment) => validateCollectionEntity<PlannerAttachment>('plannerAttachments', attachment, `backup planner attachment ${attachment.id}`)),
+        preferences: validatePreferencesRecord(preferences as Record<string, unknown>, 'backup preferences'),
     };
 }
 

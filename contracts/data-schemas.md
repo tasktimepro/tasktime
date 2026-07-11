@@ -15,6 +15,15 @@ All persisted entities use string identifiers. Timestamps are epoch milliseconds
 
 Movement between documents must preserve entity identifiers and references.
 
+Tasks, time entries, invoices, and expenses may carry additive
+`_archiveTransition` metadata (`operationId`, `targetDoc`, `changedAt`). New
+cross-document moves write their destination first and retain this identity so
+an interrupted move or stale cloud replay can be completed deterministically.
+When both source and destination copies exist, loaded-document and post-sync
+reconciliation keeps one canonical copy; legacy task duplicates prefer the
+archive destination, while one-way archives retain the freshest valid record
+and re-evaluate whether it still meets the archive predicate.
+
 Validated collection keys are: `projects`, `tasks`, `timeEntries`, `clients`, `businessInfos`, `businessBrandAssets`, `invoices`, `invoiceTemplates`, `emailTemplates`, `paymentMethods`, `expenseCategories`, `taxReturnPeriods`, `expenses`, `expenseRecurrences`, `plannerAttachments`, `dailyGoals`, `preferences`, and `timers`.
 
 ## Core work entities
@@ -41,7 +50,12 @@ Recurrence types are weekly, monthly, or yearly with their corresponding day/dat
 
 ### TimeEntry
 
-Required: `id`, `taskId`, finite `start`, finite `end`; `end >= start`. Optional timestamps, note/source, billed rate/date/invoice/duration/increment snapshots, and stopped-timer reconciliation identity.
+Required: `id`, `taskId`, finite `start`, finite `end`; `end >= start`. Optional timestamps, note/source, billed rate/date/invoice/duration/increment snapshots, and stopped-timer instance/operation reconciliation identity.
+
+For billing periods, dashboards, reports, and exports, a time entry is assigned
+wholly to the local calendar date of its `start` timestamp. Entries crossing
+midnight are not clipped or divided between periods; billing continues to
+consume the exact persisted entry identity.
 
 ### MultiTimerState
 
@@ -57,7 +71,15 @@ Optional fields include multiple project IDs/breakdowns, expense breakdowns, bus
 
 Each invoice item requires description, quantity, rate, and amount and may reference project/task/expense, original currency/exchange rate, line type, labels, and pricing mode (`hourly|flat|mixed`).
 
-Billing snapshots are immutable evidence used for reporting/undo. Historical invoices may lack newer snapshots and require compatible fallback behavior.
+`billingSelectionSnapshot` is additive, immutable versioned evidence captured before finalization. Version 1 records the invoice currency; exact selected entry IDs, task IDs, intervals, actual/billable durations, and billed rates; exact task pricing mode, quantity, rate, amount, and quoted allocation; and exact expense source/invoice amounts, currencies, and exchange rate. Finalization of a snapshot-backed draft must reject missing, changed, or already-consumed source records and must not discover newly arrived work during commit.
+
+Billing snapshots are immutable evidence used for reporting/undo. Historical invoices may lack newer snapshots and require compatible fallback behavior; their absence must not make old records unreadable.
+
+### Invoice billing operation journal
+
+The core Yjs document contains an internal `invoiceBillingOperations` map for cross-document finalization and undo recovery. Version 1 records have a stable operation ID, invoice ID, operation kind (`finalize|undo`), created/updated timestamps, prepared/complete state, last completed phase, and the deterministic desired-state application plan. Finalization records also retain the desired invoice; undo records retain the removed invoice as reversal evidence.
+
+The journal is written before product data is mutated, is replayed at startup for pending operations, and is replayed after sync for both pending and completed operations so late-arriving document updates converge. Replay must be conditional and idempotent: it must not replace a newer invoice payment state, a newer task cutoff, a different invoice's entry/expense/quote claim, a later project invoice reference, or an advanced template sequence. Journal records are sync metadata in the core document and are intentionally omitted from portable backups; export must finish any pending operation before creating a backup snapshot.
 
 ### Templates and payment methods
 

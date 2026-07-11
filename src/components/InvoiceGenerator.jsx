@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { buildInvoiceHtmlContent, generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
-import { toStorageDate, timestampToDateString } from '../utils/dateUtils.ts';
+import { parseStoredDate, toStorageDate, timestampToDateString } from '../utils/dateUtils.ts';
 import {
     DEFAULT_INVOICE_LAYOUT_STYLE,
     DEFAULT_INVOICE_LOGO_PLACEMENT,
     normalizeInvoiceLayoutStyle,
     normalizeInvoiceLogoPlacement,
 } from '../utils/invoiceBranding.ts';
-import { getCurrencySymbol, getPreferredCurrency, fetchExchangeRates, convertCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
+import { getCurrencySymbol, fetchExchangeRates, convertCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import InvoiceModal from './invoice/InvoiceModal';
 import InvoiceGeneratorButton from './invoice/InvoiceGeneratorButton';
@@ -27,6 +27,7 @@ import { useExpenses } from '../hooks/useExpenses.ts';
 import { useInvoiceTemplates } from '../hooks/useInvoiceTemplates.ts';
 import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
 import { useTimers } from '../hooks/useTimers.ts';
+import { usePreferences } from '../hooks/usePreferences.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,7 @@ import {
     getInvoicesForProject,
     getInvoiceSequenceRollback,
     getInvoiceTotal,
+    allocateInvoiceProjectBreakdowns,
     getLatestInvoiceForProject,
     getNextSequentialNumberForTemplate,
     resolveCurrentInvoiceTemplate,
@@ -59,6 +61,7 @@ import {
     buildInvoiceEditApplication,
     buildInvoiceFinalizationApplication,
 } from '../domain/invoices/invoiceFinalizationApplication.ts';
+import { buildInvoiceBillingSelectionSnapshotFromPlan } from '../domain/invoices/invoiceBillingSelection.ts';
 
 const INVOICE_DRAFT_CACHE = new Map();
 const INVOICE_DRAFT_TTL_MS = 12 * 60 * 60 * 1000;
@@ -244,7 +247,7 @@ const clearCachedInvoiceDraft = (contextKey) => {
 const InvoiceGenerator = ({ 
     project, 
     client, // Add client prop for pre-selection
-    timeEntries,
+    timeEntries: providedTimeEntries = [],
     editingInvoice,
     onInvoiceSaved,
     paymentMethods = [],
@@ -264,15 +267,53 @@ const InvoiceGenerator = ({
     const isQuoteMode = mode === 'quote';
     const openedFromProjectContext = Boolean(project && !client);
     const allowAdditionalProjectsSelection = !project;
+    const defaultBillingPeriodState = useMemo(() => getDefaultInvoiceBillingPeriodState(), []);
+    const [billingPeriodPreset, setBillingPeriodPreset] = useState(defaultBillingPeriodState.preset);
+    const [billingPeriodStart, setBillingPeriodStart] = useState(defaultBillingPeriodState.startDate);
+    const [billingPeriodEnd, setBillingPeriodEnd] = useState(defaultBillingPeriodState.endDate);
+    const { startDate: activeBillingPeriodStart, endDate: activeBillingPeriodEnd } = useMemo(() => {
+        return getBillingPeriodRange({
+            preset: billingPeriodPreset,
+            customStart: billingPeriodStart,
+            customEnd: billingPeriodEnd,
+        });
+    }, [billingPeriodEnd, billingPeriodPreset, billingPeriodStart]);
+    const billingRangeTimestamps = useMemo(() => {
+        const start = parseStoredDate(activeBillingPeriodStart);
+        const end = parseStoredDate(activeBillingPeriodEnd);
+
+        return {
+            startDate: start ? new Date(start).setHours(0, 0, 0, 0) : undefined,
+            endDate: end ? new Date(end).setHours(23, 59, 59, 999) : undefined,
+        };
+    }, [activeBillingPeriodEnd, activeBillingPeriodStart]);
     // Yjs hooks for data access
-    const { invoices, createInvoice, updateInvoice, undoLatestInvoice, canUndoInvoice } = useInvoices();
-    const { projects, updateProject } = useProjects();
-    const { tasks, updateTask } = useTasks();
+    const { invoices, createInvoice, updateInvoice, finalizeInvoice, undoLatestInvoice, canUndoInvoice } = useInvoices();
+    const { projects } = useProjects();
+    const { tasks, updateTask, isLoading: billingTasksLoading } = useTasks({ includeArchived: true });
     const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
-    const { expenses, updateExpense } = useExpenses();
+    const {
+        entries: loadedBillingTimeEntries,
+        isLoading: billingTimeEntriesLoading,
+        isLoadingMore: billingHistoricalEntriesLoading,
+    } = useTimeEntries(billingRangeTimestamps);
+    const { expenses, updateExpense, isLoading: billingExpensesLoading } = useExpenses({ includeArchived: true });
     const { invoiceTemplates, updateInvoiceTemplate } = useInvoiceTemplates();
     const { businessBrandAssets, getBusinessBrandAsset } = useBusinessBrandAssets();
     const { getTimerForProject } = useTimers();
+    const { preferences } = usePreferences();
+    const preferredCurrency = normalizeCurrencyCode(preferences.currency);
+    const timeEntries = Array.isArray(loadedBillingTimeEntries)
+        && !billingTimeEntriesLoading
+        && !billingHistoricalEntriesLoading
+        ? loadedBillingTimeEntries
+        : providedTimeEntries;
+    const billingCandidatesLoading = Boolean(
+        billingTasksLoading
+        || billingExpensesLoading
+        || billingTimeEntriesLoading
+        || billingHistoricalEntriesLoading
+    );
     
     const [showInvoiceForm, setShowInvoiceForm] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
@@ -300,19 +341,7 @@ const InvoiceGenerator = ({
     const [showUndoInvoiceConfirm, setShowUndoInvoiceConfirm] = useState(false);
     const [undoInvoiceConfirmationText, setUndoInvoiceConfirmationText] = useState('');
     const [isUndoingInvoice, setIsUndoingInvoice] = useState(false);
-    const defaultBillingPeriodState = useMemo(() => getDefaultInvoiceBillingPeriodState(), []);
-    const [billingPeriodPreset, setBillingPeriodPreset] = useState(defaultBillingPeriodState.preset);
-    const [billingPeriodStart, setBillingPeriodStart] = useState(defaultBillingPeriodState.startDate);
-    const [billingPeriodEnd, setBillingPeriodEnd] = useState(defaultBillingPeriodState.endDate);
     const [pendingDraftRestore, setPendingDraftRestore] = useState(null);
-
-    const { startDate: activeBillingPeriodStart, endDate: activeBillingPeriodEnd } = useMemo(() => {
-        return getBillingPeriodRange({
-            preset: billingPeriodPreset,
-            customStart: billingPeriodStart,
-            customEnd: billingPeriodEnd,
-        });
-    }, [billingPeriodEnd, billingPeriodPreset, billingPeriodStart]);
 
     const selectedProjectIdsForInvoice = useMemo(() => {
         const ids = [];
@@ -418,7 +447,7 @@ const InvoiceGenerator = ({
         return getInvoicesForProject(invoices, currentProject.id);
     }, [invoices, selectedProject, project]);
 
-    const invoiceCurrency = selectedClient?.defaultCurrency || getPreferredCurrency();
+    const invoiceCurrency = selectedClient?.defaultCurrency || preferredCurrency;
     const normalizedInvoiceCurrency = normalizeCurrencyCode(invoiceCurrency);
     const selectedClientHourlyRate = getClientHourlyRate(selectedClient);
 
@@ -609,6 +638,10 @@ const InvoiceGenerator = ({
 
     // Auto-open the form when showButton is false (modal mode)
     useEffect(() => {
+        if (!isQuoteMode && billingCandidatesLoading) {
+            return;
+        }
+
         if (!showButton) { // Modal mode (auto-open is possible)
             const canAutoOpenFromContext = !client && !editingInvoice && !handledEditingInvoice;
 
@@ -621,7 +654,7 @@ const InvoiceGenerator = ({
             // so it can auto-open next time if props change to modal mode.
             didAutoOpenModalRef.current = false;
         }
-    }, [showButton, client, editingInvoice, handledEditingInvoice, forceOpenOnMount]); // Added handledEditingInvoice dependency
+    }, [billingCandidatesLoading, client, editingInvoice, forceOpenOnMount, handledEditingInvoice, isQuoteMode, showButton]); // Added handledEditingInvoice dependency
 
     /**
      * Initialize payment method based on previous invoices or editing invoice
@@ -2117,24 +2150,12 @@ const InvoiceGenerator = ({
                 subtotal: Math.round((taskSubtotal + expenseSubtotal) * 100) / 100,
             };
         });
-        const invoiceSubtotal = Number(pricing?.subtotal) || 0;
-        const invoiceDiscount = Number(pricing?.discount) || 0;
-        const invoiceShipping = Number(pricing?.shipping) || 0;
-        const invoiceTax = Number(pricing?.tax) || 0;
-
-        return projectBreakdowns.map((breakdown) => {
-            const ratio = invoiceSubtotal > 0 ? breakdown.subtotal / invoiceSubtotal : 0;
-            const allocatedDiscount = Math.round(invoiceDiscount * ratio * 100) / 100;
-            const allocatedShipping = Math.round(invoiceShipping * ratio * 100) / 100;
-            const allocatedTax = Math.round(invoiceTax * ratio * 100) / 100;
-
-            return {
-                ...breakdown,
-                allocatedDiscount,
-                allocatedShipping,
-                allocatedTax,
-                allocatedTotal: Math.round((breakdown.subtotal - allocatedDiscount + allocatedShipping + allocatedTax) * 100) / 100,
-            };
+        return allocateInvoiceProjectBreakdowns(projectBreakdowns, {
+            subtotal: Number(pricing?.subtotal) || 0,
+            discount: Number(pricing?.discount) || 0,
+            shipping: Number(pricing?.shipping) || 0,
+            tax: Number(pricing?.tax) || 0,
+            total: Number(pricing?.total) || 0,
         });
     }, [getInvoiceTaskAmount, selectedClient?.id, selectedProjectsForInvoice]);
 
@@ -2165,12 +2186,13 @@ const InvoiceGenerator = ({
                 additionalTasks: getNormalizedAdditionalDocumentTasks(),
                 quoteDate,
                 quoteTimestamp: quoteNumberTimestamp || getQuoteNumberTimestamp(),
+                preferredCurrency: preferences.currency,
             });
         } catch (error) {
             showError(error instanceof Error ? error.message : 'Unable to prepare quote.');
             return null;
         }
-    }, [businessInfos, clients, getNormalizedAdditionalDocumentTasks, getNormalizedDocumentTasks, invoiceDateOverride, invoiceNote, invoiceTemplates, paymentMethods, quoteNumberTimestamp, resolveCurrentBusinessInfo, selectedBusinessInfo, selectedClient, selectedPaymentMethod, selectedProject, selectedTemplate, showError, tasks, useInvoiceDateOverride]);
+    }, [businessInfos, clients, getNormalizedAdditionalDocumentTasks, getNormalizedDocumentTasks, invoiceDateOverride, invoiceNote, invoiceTemplates, paymentMethods, preferences.currency, quoteNumberTimestamp, resolveCurrentBusinessInfo, selectedBusinessInfo, selectedClient, selectedPaymentMethod, selectedProject, selectedTemplate, showError, tasks, useInvoiceDateOverride]);
 
     /**
      * Build invoice data for preview or save
@@ -2406,7 +2428,7 @@ const InvoiceGenerator = ({
             billingPeriodStart: activeBillingPeriodStart || null,
             billingPeriodEnd: activeBillingPeriodEnd || null,
             clientId: selectedClient?.id || null,
-            currency: selectedClient?.defaultCurrency || getPreferredCurrency(),
+            currency: selectedClient?.defaultCurrency || preferredCurrency,
             template: resolvedTemplate ? { ...resolvedTemplate } : null,
             templateId: resolvedTemplate?.id || null,
             invoiceNumber: invoiceNumber,
@@ -2427,10 +2449,17 @@ const InvoiceGenerator = ({
     /**
      * Save invoice (create new or update existing)
      */
-    const handleSaveInvoice = (e) => {
+    const handleSaveInvoice = async (e) => {
         e.preventDefault();
 
         if (isQuoteMode) {
+            return;
+        }
+
+        if (editingInvoice && editingInvoice.status !== 'draft') {
+            showError(
+                'Finalized invoices cannot be edited directly. Undo the latest eligible invoice or create a corrected invoice.'
+            );
             return;
         }
 
@@ -2441,26 +2470,39 @@ const InvoiceGenerator = ({
 
         const adjustmentTimestamp = Date.now();
         const shouldUseSharedFinalizationPlan = !editingInvoice && !isQuoteMode;
-        const shouldUseSharedEditPlan = Boolean(editingInvoice && !isQuoteMode);
+        const shouldUseSharedEditPlan = Boolean(editingInvoice && editingInvoice.status !== 'draft' && !isQuoteMode);
         let finalizationApplication = null;
         let editApplication = null;
 
         if (shouldUseSharedFinalizationPlan) {
-            finalizationApplication = buildInvoiceFinalizationApplication({
-                invoice: invoiceData,
-                projects,
-                clients,
-                tasks,
-                entries: timeEntries,
-                expenses,
-                finalizedAt: adjustmentTimestamp,
-                createAdjustmentId: generateId,
-                invoiceTemplate: resolveCurrentInvoiceTemplate(invoiceData, invoiceTemplates),
-                invoices: [...invoices, invoiceData],
-            }).application;
+            let finalizationResult;
+
+            try {
+                finalizationResult = buildInvoiceFinalizationApplication({
+                    invoice: invoiceData,
+                    projects,
+                    clients,
+                    tasks,
+                    entries: timeEntries,
+                    expenses,
+                    finalizedAt: adjustmentTimestamp,
+                    createAdjustmentId: generateId,
+                    invoiceTemplate: resolveCurrentInvoiceTemplate(invoiceData, invoiceTemplates),
+                    invoices: [...invoices, invoiceData],
+                });
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Unable to finalize this invoice safely.');
+                return;
+            }
+            finalizationApplication = finalizationResult.application;
 
             invoiceData = {
                 ...invoiceData,
+                billingSelectionSnapshot: buildInvoiceBillingSelectionSnapshotFromPlan({
+                    invoice: invoiceData,
+                    plan: finalizationResult.plan,
+                    capturedAt: adjustmentTimestamp,
+                }),
                 ...finalizationApplication.invoiceUpdates,
             };
         }
@@ -2469,21 +2511,34 @@ const InvoiceGenerator = ({
             const selectedExpenseIds = Object.keys(selectedExpensesForBilling)
                 .filter((expenseId) => selectedExpensesForBilling[expenseId]);
 
-            editApplication = buildInvoiceEditApplication({
-                invoice: invoiceData,
-                projects,
-                clients,
-                tasks,
-                entries: timeEntries,
-                expenses,
-                editedAt: adjustmentTimestamp,
-                createAdjustmentId: generateId,
-                selectedExpenseIds,
-            }).application;
+            try {
+                editApplication = buildInvoiceEditApplication({
+                    invoice: invoiceData,
+                    projects,
+                    clients,
+                    tasks,
+                    entries: timeEntries,
+                    expenses,
+                    editedAt: adjustmentTimestamp,
+                    createAdjustmentId: generateId,
+                    selectedExpenseIds,
+                }).application;
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Unable to update this invoice safely.');
+                return;
+            }
         }
 
-        // Store invoice in the invoices collection
-        if (editingInvoice) {
+        // Store invoice and its cross-document billing effects through the
+        // durable operation journal when this is a new finalization.
+        if (finalizationApplication) {
+            try {
+                await finalizeInvoice(invoiceData, finalizationApplication, adjustmentTimestamp);
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Unable to finalize this invoice safely.');
+                return;
+            }
+        } else if (editingInvoice) {
             // Update existing invoice - preserving original createdAt
             updateInvoice(editingInvoice.id, { ...invoiceData, createdAt: editingInvoice.createdAt });
         } else {
@@ -2491,49 +2546,7 @@ const InvoiceGenerator = ({
             createInvoice(invoiceData);
         }
 
-        if (finalizationApplication) {
-            finalizationApplication.adjustmentEntryIdsToDelete.forEach((entryId) => {
-                deleteEntry(entryId);
-            });
-
-            finalizationApplication.adjustmentEntriesToUpdate.forEach(({ id, updates }) => {
-                updateEntry(id, updates);
-            });
-
-            finalizationApplication.adjustmentEntriesToCreate.forEach(({ id, entry }) => {
-                createEntry({
-                    id,
-                    ...entry,
-                });
-            });
-
-            finalizationApplication.timeEntryUpdates.forEach(({ id, updates }) => {
-                updateEntry(id, updates);
-            });
-
-            finalizationApplication.expenseUpdates.forEach(({ id, updates }) => {
-                updateExpense(id, updates);
-            });
-
-            finalizationApplication.taskCutoffUpdates.forEach(({ id, updates }) => {
-                updateTask(id, updates);
-            });
-
-            finalizationApplication.quotedTaskUpdates.forEach(({ id, updates }) => {
-                updateTask(id, updates);
-            });
-
-            finalizationApplication.projectLinkUpdates.forEach(({ id, updates }) => {
-                updateProject(id, updates);
-            });
-
-            if (finalizationApplication.invoiceTemplateSequenceUpdate) {
-                updateInvoiceTemplate(
-                    finalizationApplication.invoiceTemplateSequenceUpdate.id,
-                    finalizationApplication.invoiceTemplateSequenceUpdate.updates
-                );
-            }
-        } else if (editApplication) {
+        if (editApplication) {
             editApplication.adjustmentEntryIdsToDelete.forEach((entryId) => {
                 deleteEntry(entryId);
             });
@@ -2629,6 +2642,11 @@ const InvoiceGenerator = ({
     const openInvoiceForm = useCallback(() => {
         // Don't open again if it's already open to avoid re-rendering issues
         if (showInvoiceForm) return;
+
+        if (!isQuoteMode && billingCandidatesLoading) {
+            showWarning('Loading complete billing history. Please try again in a moment.');
+            return;
+        }
         
         // Check if a timer is currently active (running, not paused)
         if (isTimerActive && !isTimerPaused) {
@@ -2859,19 +2877,19 @@ const InvoiceGenerator = ({
         skipNextDraftRestoreRef.current = false;
         setPendingDraftRestore(nextDraftRestore);
         setShowInvoiceForm(true);
-    }, [allowAdditionalProjectsSelection, availableExpensesWithConversion, client, clients, editingInvoice, expenses, getInvoiceFormState, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, shouldSelectExpenseByDefault, showError, showInvoiceForm, tasks]);
+    }, [allowAdditionalProjectsSelection, availableExpensesWithConversion, billingCandidatesLoading, client, clients, editingInvoice, expenses, getInvoiceFormState, isQuoteMode, isTimerActive, isTimerPaused, prepareInvoiceDataForProjects, projects, quoteNumberTimestamp, selectedClient, selectedProject, selectedProjectsForInvoice, setIsProjectContextFixed, shouldSelectExpenseByDefault, showError, showInvoiceForm, showWarning, tasks]);
 
     // Auto-open form when editing an invoice
     useEffect(() => {
         // Only open if we have a new editing invoice and the modal isn't already shown
-        if (editingInvoice && !showInvoiceForm && editingInvoice.id !== handledEditingInvoice) {
+        if (editingInvoice && !showInvoiceForm && !billingCandidatesLoading && editingInvoice.id !== handledEditingInvoice) {
             setHandledEditingInvoice(editingInvoice.id);
             openInvoiceForm();
         } else if (!editingInvoice) {
             // Reset the handled state when not editing
             setHandledEditingInvoice(null);
         }
-    }, [editingInvoice, openInvoiceForm, showInvoiceForm, handledEditingInvoice]);
+    }, [billingCandidatesLoading, editingInvoice, openInvoiceForm, showInvoiceForm, handledEditingInvoice]);
 
     // Calculate the project-context invoice preview total before the modal opens.
     const currentProjectForCalculation = (!client && !editingInvoice) ? (selectedProject || project) : null;
@@ -2882,6 +2900,7 @@ const InvoiceGenerator = ({
             timeEntries,
             expenses,
             exchangeRates,
+            preferredCurrency: preferences.currency,
             billingPeriodStart: activeBillingPeriodStart,
             billingPeriodEnd: activeBillingPeriodEnd,
         })
@@ -2897,6 +2916,7 @@ const InvoiceGenerator = ({
                     invoicePreview={invoicePreview}
                     clients={clients}
                     mode={mode}
+                    isLoading={!isQuoteMode && billingCandidatesLoading}
                 />
             )}
             {/* Invoice Generation Modal */}
@@ -2912,6 +2932,7 @@ const InvoiceGenerator = ({
                     canUndoInvoice={canUndoEditingInvoice}
                     handleUndoInvoice={openUndoInvoiceConfirm}
                     mode={mode}
+                    preferredCurrency={preferredCurrency}
                     openedFromProjectContext={openedFromProjectContext}
                     allowAdditionalProjectsSelection={allowAdditionalProjectsSelection}
                     isProjectContextFixed={isProjectContextFixed}
@@ -3087,7 +3108,7 @@ const InvoiceGenerator = ({
                                 </p>
                                 <p>
                                     Total: <span className="font-medium text-foreground">
-                                        {getCurrencySymbol(editingInvoice.currency || getPreferredCurrency())}{getInvoiceTotal(editingInvoice).toFixed(2)}
+                                        {getCurrencySymbol(editingInvoice.currency || preferredCurrency)}{getInvoiceTotal(editingInvoice).toFixed(2)}
                                     </span>
                                 </p>
                                 <p>

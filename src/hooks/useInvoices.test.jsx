@@ -770,6 +770,38 @@ describe('useInvoices', () => {
                 const archived = Array.from(loadedYearMaps.values()).flatMap((map) => Array.from(map.values()))
                 return [...active, ...archived]
             },
+            commitInvoiceUndo: vi.fn(async ({ invoice, application }) => {
+                const entryMaps = [activeEntries, year2025Entries]
+                application.entriesToDelete.forEach((entry) => {
+                    entryMaps.find((map) => map.has(entry.id))?.delete(entry.id)
+                })
+                application.entriesToClear.forEach(({ entry, updates }) => {
+                    const map = entryMaps.find((candidate) => candidate.has(entry.id))
+                    if (map) {
+                        const current = readStored(map, entry.id)
+                        map.set(entry.id, { ...current, ...updates })
+                    }
+                })
+                application.expenseUpdatesToUnbill.forEach(({ id, updates }) => {
+                    const map = expensesMap.has(id) ? expensesMap : archivedExpensesMap
+                    const current = readStored(map, id)
+                    if (current) map.set(id, { ...current, ...updates })
+                })
+                ;[...application.quotedTaskUpdates, ...application.taskCutoffUpdates].forEach(({ id, updates }) => {
+                    const map = tasksMap.has(id) ? tasksMap : archivedTasksMap
+                    const current = readStored(map, id)
+                    if (current) map.set(id, { ...current, ...updates })
+                })
+                application.projectUnlinkUpdates.forEach(({ id, updates }) => {
+                    const current = readStored(projectsMap, id)
+                    if (current) projectsMap.set(id, { ...current, ...updates })
+                })
+                if (application.invoiceTemplateSequenceUpdate) {
+                    const { id, updates } = application.invoiceTemplateSequenceUpdate
+                    templatesMap.set(id, { ...readStored(templatesMap, id), ...updates })
+                }
+                invoicesMap.delete(invoice.id)
+            }),
         }
         mockUseYjs.mockReturnValue({
             store,
@@ -872,6 +904,7 @@ describe('useInvoices', () => {
                 createdAt: 2,
             },
         }, coreDoc, 'invoices')
+        const tasksMap = createTestYMap({}, coreDoc, 'tasks')
         const remove = vi.fn((id) => invoicesMap.delete(id))
 
         mockUseYjs.mockReturnValue({
@@ -880,7 +913,7 @@ describe('useInvoices', () => {
                 archivedTasks: null,
                 archivedExpenses: null,
                 preferences: mockPreferences,
-                tasks: createTestYMap({}, coreDoc, 'tasks'),
+                tasks: tasksMap,
                 expenses: createTestYMap({}, coreDoc, 'expenses'),
                 projects: createTestYMap({}, coreDoc, 'projects'),
                 invoiceTemplates: createTestYMap({}, coreDoc, 'invoiceTemplates'),
@@ -888,6 +921,15 @@ describe('useInvoices', () => {
                 activeTimeEntries: activeEntries,
                 coreDoc,
                 getAllTimeEntries: () => Array.from(activeEntries.values()),
+                commitInvoiceUndo: vi.fn(async ({ invoice, application }) => {
+                    application.entriesToClear.forEach(({ entry, updates }) => {
+                        activeEntries.set(entry.id, { ...readStored(activeEntries, entry.id), ...updates })
+                    })
+                    application.taskCutoffUpdates.forEach(({ id, updates }) => {
+                        tasksMap.set(id, { ...readStored(tasksMap, id), ...updates })
+                    })
+                    invoicesMap.delete(invoice.id)
+                }),
             },
             isReady: true,
             loadArchivedInvoices: vi.fn(async () => {}),
@@ -978,6 +1020,15 @@ describe('useInvoices', () => {
                 activeTimeEntries: activeEntries,
                 coreDoc,
                 getAllTimeEntries: () => Array.from(activeEntries.values()),
+                commitInvoiceUndo: vi.fn(async ({ invoice, application }) => {
+                    application.entriesToClear.forEach(({ entry, updates }) => {
+                        activeEntries.set(entry.id, { ...readStored(activeEntries, entry.id), ...updates })
+                    })
+                    application.taskCutoffUpdates.forEach(({ id, updates }) => {
+                        tasksMap.set(id, { ...readStored(tasksMap, id), ...updates })
+                    })
+                    invoicesMap.delete(invoice.id)
+                }),
             },
             isReady: true,
             loadArchivedInvoices: vi.fn(async () => {}),

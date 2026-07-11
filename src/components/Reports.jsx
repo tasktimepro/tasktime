@@ -41,6 +41,7 @@ import { getInvoicePaidAtTimestamp, getInvoiceProjectFinancials, getInvoiceProje
 import { buildMonthlyReportHtml, exportClientStatementPdf, exportExpensesReportPdf, exportInvoicesReportPdf, exportMonthlyReportPdf, exportOutstandingReportPdf, exportProjectWorkSummaryPdf } from '@/utils/reportPdfUtils';
 import { generatePDFBlob, getCurrentInvoiceHtmlContent } from '@/utils/pdfUtils.ts';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
+import { isTimestampStartWithinStoredDateRange } from '@/utils/reportDateBoundary';
 
 const REPORT_TABS = [
     { value: 'overview', label: 'Overview', icon: ChartBarIcon },
@@ -106,6 +107,15 @@ const REPORTS_LOADER_SETTLE_DELAY_MS = 120;
 
 const formatPercent = (value) => `${value.toFixed(0)}%`;
 const slugifyFilePart = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'statement';
+const sanitizeInvoiceFilePart = (value) => String(value)
+    .normalize('NFKC')
+    .split('')
+    .map((character) => character.charCodeAt(0) < 32 ? '-' : character)
+    .join('')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'invoice';
 const createTaxReturnPeriodDraft = (resolvedRange) => ({
     title: `${getDateRangeLabel(resolvedRange)} VAT return`,
     type: 'vat',
@@ -461,9 +471,10 @@ function Reports({ onReadyChange = null }) {
     const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
     const { showError, showSuccess } = useToast();
-    const { invoices } = useInvoices({ includeArchived: true });
+    const { invoices, isLoading: loadingInvoices } = useInvoices({ includeArchived: true });
     const {
         expenses,
+        isLoading: loadingExpenses,
         markManyAsClaimed,
         markManyAsUnclaimed,
     } = useExpenses({ includeArchived: true });
@@ -476,7 +487,7 @@ function Reports({ onReadyChange = null }) {
         taxReturnPeriods,
         createTaxReturnPeriod,
     } = useTaxReturnPeriods();
-    const { activeTasks, archivedTasks } = useTasks({ includeArchived: true });
+    const { activeTasks, archivedTasks, isLoading: loadingTasks } = useTasks({ includeArchived: true });
     const [period, setPeriod] = useState(getDefaultReportPeriod);
     const [customRange] = useState(() => getDefaultCustomRange());
     const [customStart, setCustomStart] = useState(customRange.customStart);
@@ -514,14 +525,23 @@ function Reports({ onReadyChange = null }) {
         missingExchangeRates,
     } = useCurrencyConversion({ projects, invoices, clients });
 
-    const { entries: timeEntries, isLoadingMore: loadingHistoricalEntries } = useTimeEntries({
+    const {
+        entries: timeEntries,
+        isLoading: loadingTimeEntries,
+        isLoadingMore: loadingHistoricalEntries,
+    } = useTimeEntries({
         startDate: startOfDay(parseStoredDate(resolvedRange.startDate) || new Date()).getTime(),
         endDate: endOfDay(parseStoredDate(resolvedRange.endDate) || new Date()).getTime(),
     });
+    const loadingReportData = loadingInvoices
+        || loadingExpenses
+        || loadingTasks
+        || loadingTimeEntries
+        || loadingHistoricalEntries;
     const [isReportContentPaintReady, setIsReportContentPaintReady] = useState(false);
 
     useEffect(() => {
-        if (loadingHistoricalEntries) {
+        if (loadingReportData) {
             setIsReportContentPaintReady(false);
             return;
         }
@@ -552,11 +572,11 @@ function Reports({ onReadyChange = null }) {
                 window.clearTimeout(settleTimeoutHandle);
             }
         };
-    }, [loadingHistoricalEntries]);
+    }, [loadingReportData]);
 
     useEffect(() => {
-        onReadyChange?.(!loadingHistoricalEntries && isReportContentPaintReady);
-    }, [isReportContentPaintReady, loadingHistoricalEntries, onReadyChange]);
+        onReadyChange?.(!loadingReportData && isReportContentPaintReady);
+    }, [isReportContentPaintReady, loadingReportData, onReadyChange]);
 
     const allTasks = useMemo(() => [...activeTasks, ...archivedTasks], [activeTasks, archivedTasks]);
     const invoicesById = useMemo(() => new Map(invoices.map((invoice) => [invoice.id, invoice])), [invoices]);
@@ -922,6 +942,14 @@ function Reports({ onReadyChange = null }) {
                 };
             })
             .filter((entry) => {
+                if (!isTimestampStartWithinStoredDateRange(
+                    entry.start,
+                    resolvedRange.startDate,
+                    resolvedRange.endDate,
+                )) {
+                    return false;
+                }
+
                 if (!entry.task) {
                     return false;
                 }
@@ -936,7 +964,7 @@ function Reports({ onReadyChange = null }) {
 
                 return true;
             });
-    }, [clientId, clientsById, projectId, projectsById, tasksById, timeEntries]);
+    }, [clientId, clientsById, projectId, projectsById, resolvedRange.endDate, resolvedRange.startDate, tasksById, timeEntries]);
 
     const workSummaryProjectIds = useMemo(() => {
         return Array.from(new Set(
@@ -1002,7 +1030,7 @@ function Reports({ onReadyChange = null }) {
             const project = activeProjects.find((item) => item.title === row.projectTitle)
                 || activeProjects.find((item) => item.id === row.key);
             const hourlyRate = typeof project?.hourlyRate === 'number' ? project.hourlyRate : 0;
-            const projectCurrency = project ? getProjectCurrency(project, clients) : preferredCurrency;
+            const projectCurrency = project ? getProjectCurrency(project, clients, preferredCurrency) : preferredCurrency;
             const estimatedAmount = hourlyRate > 0
                 ? Math.round(millisecondsToHours(row.unbilledBillableMs) * hourlyRate * 100) / 100
                 : 0;
@@ -1911,7 +1939,7 @@ function Reports({ onReadyChange = null }) {
         }
 
         const hourlyRate = typeof workSummaryProject?.hourlyRate === 'number' ? workSummaryProject.hourlyRate : 0;
-        const projectCurrency = workSummaryProject ? getProjectCurrency(workSummaryProject, clients) : preferredCurrency;
+        const projectCurrency = workSummaryProject ? getProjectCurrency(workSummaryProject, clients, preferredCurrency) : preferredCurrency;
         const estimatedAmount = hourlyRate > 0
             ? Math.round(millisecondsToHours(projectWorkSummary.totals.billableMs) * hourlyRate * 100) / 100
             : 0;
@@ -2014,14 +2042,29 @@ function Reports({ onReadyChange = null }) {
     ]);
 
     const accountantPackInvoicePdfFiles = useMemo(() => {
+        const usedFilenames = new Set();
+
         return filteredInvoices
             .filter((invoice) => invoice.invoiceNumber)
-            .map((invoice) => ({
-                invoiceId: invoice.id,
-                invoiceNumber: invoice.invoiceNumber,
-                filename: `invoice-${invoice.invoiceNumber}.pdf`,
-                htmlContent: getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets),
-            }));
+            .map((invoice) => {
+                const baseFilename = `invoice-${sanitizeInvoiceFilePart(invoice.invoiceNumber)}`;
+                let filename = `${baseFilename}.pdf`;
+                let duplicateIndex = 2;
+
+                while (usedFilenames.has(filename.toLowerCase())) {
+                    filename = `${baseFilename}-${duplicateIndex}.pdf`;
+                    duplicateIndex += 1;
+                }
+
+                usedFilenames.add(filename.toLowerCase());
+
+                return {
+                    invoiceId: invoice.id,
+                    invoiceNumber: invoice.invoiceNumber,
+                    filename,
+                    htmlContent: getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets),
+                };
+            });
     }, [businessBrandAssets, clients, filteredInvoices]);
 
     const accountantPackManifestRows = useMemo(() => {

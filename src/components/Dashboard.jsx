@@ -1181,6 +1181,7 @@ const Dashboard = ({
                             navigateToProject={navigateToProject}
                             handleClientTitleClick={handleClientTitleClick}
                             clients={clients}
+                            preferredCurrency={preferredCurrency}
                         />
                     </div>
 

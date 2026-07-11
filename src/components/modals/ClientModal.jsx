@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CustomCheckbox from '../CustomCheckbox';
-import { getPreferredCurrency } from '../../utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY } from '../../utils/currencyUtils.ts';
+import { usePreferences } from '@/hooks/usePreferences';
 import Modal from '../Modal';
 import { ColorPicker } from '@/components/ui/color-picker';
 import CurrencySelect from '@/components/ui/currency-select';
 import { parseOptionalNumberInput, parseOptionalPositiveNumberInput } from '@/utils/numberInputUtils.ts';
 
-const createDefaultFormData = () => ({
+const createDefaultFormData = (preferredCurrency = DEFAULT_CURRENCY) => ({
     title: '',
     clientName: '',
     contactPerson: '',
@@ -30,15 +31,15 @@ const createDefaultFormData = () => ({
     phone: '',
     custom: [],
     disableTax: false,
-    defaultCurrency: getPreferredCurrency(),
+    defaultCurrency: preferredCurrency,
     hourlyRate: '',
     flatRate: false,
     color: ''
 });
 
-const createInitialFormData = (client) => {
+const createInitialFormData = (client, preferredCurrency = DEFAULT_CURRENCY) => {
     if (!client) {
-        return createDefaultFormData();
+        return createDefaultFormData(preferredCurrency);
     }
 
     return {
@@ -57,7 +58,7 @@ const createInitialFormData = (client) => {
         phone: client.phone || '',
         custom: client.custom || [],
         disableTax: client.disableTax || false,
-        defaultCurrency: client.defaultCurrency || getPreferredCurrency(),
+        defaultCurrency: client.defaultCurrency || preferredCurrency,
         hourlyRate: client.hourlyRate ? client.hourlyRate.toString() : '',
         flatRate: client.flatRate || false,
         color: client.color || ''
@@ -79,8 +80,12 @@ const ClientModal = ({
 }) => {
     const { showSuccess } = useToast();
     const { createClient, updateClient } = useClients();
+    const { preferences } = usePreferences();
 
-    const [formData, setFormData] = useState(() => createInitialFormData(editingClient));
+    const [formData, setFormData] = useState(() => createInitialFormData(
+        editingClient,
+        preferences.currency || DEFAULT_CURRENCY,
+    ));
 
     const [expandedSections, setExpandedSections] = useState(() => createInitialExpandedSections());
 

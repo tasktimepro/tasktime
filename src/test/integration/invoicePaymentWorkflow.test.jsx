@@ -65,6 +65,10 @@ vi.mock('../../hooks/useBusinessBrandAssets.ts', () => ({
     })
 }))
 
+vi.mock('../../hooks/usePreferences.ts', () => ({
+    usePreferences: () => ({ preferences: { currency: 'EUR' } })
+}))
+
 describe('Invoice payment workflow integration', () => {
 
     beforeEach(() => {

@@ -162,9 +162,8 @@ function AppContent() {
         forceSyncDrive,
         autoSyncEnabled,
         lastSyncedAt,
-        clearAllData,
+        restoreBackupData,
         driveSessionId,
-        store,
     } = useYjs();
     const { hadPreviousSession, isLoading: authLoading, isSignedIn } = useGoogleAuth();
     const toast = useContext(ToastContext);
@@ -1137,8 +1136,7 @@ function AppContent() {
 
     // === Import Handler ===
     const handleImport = async (importData) => {
-        await clearAllData();
-        await store.importBackupData(importData);
+        await restoreBackupData(importData);
     };
 
     const [isMobileLayout, setIsMobileLayout] = useState(() => {
@@ -1985,6 +1983,7 @@ function AppContent() {
                 onNavigateToProject={navigateToProject}
                 onOpenTimeEntries={handleOpenTaskTimeEntries}
                 onOpenPlannerOptions={handleOpenTaskPlannerOptions}
+                preferredCurrency={preferences.currency}
             />
         )}
 

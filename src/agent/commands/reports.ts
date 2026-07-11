@@ -1,4 +1,4 @@
-import { endOfDay, startOfDay } from 'date-fns';
+import { endOfDay } from 'date-fns';
 import type { AgentCommandContext } from '@/agent/types';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 import type { BusinessBrandAsset, BusinessInfo, Client, Expense, ExpenseCategory, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
@@ -17,7 +17,7 @@ import {
 } from '@/utils/reportCalculations';
 import { getDefaultCustomRange, getDefaultReportPeriod, resolveReportDateRange, type ReportPeriodValue } from '@/utils/reportDateUtils';
 import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
-import { formatDuration, millisecondsToHours, parseStoredDate, toDisplayDate } from '@/utils/dateUtils';
+import { formatDuration, millisecondsToHours, parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils';
 import {
     getInvoicePaidAtTimestamp,
     getInvoiceProjectFinancials,
@@ -30,6 +30,7 @@ import {
     isInvoicePaid,
 } from '@/utils/invoiceUtils';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
+import { isTimestampStartWithinStoredDateRange } from '@/utils/reportDateBoundary';
 import { assertPermission, assertReady } from './shared';
 
 type ReportSection =
@@ -186,8 +187,7 @@ const getTimestampDateString = (timestamp: number | null | undefined) => {
         return null;
     }
 
-    const date = new Date(timestamp);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+    return toStorageDate(timestamp);
 };
 
 const getInvoicePaymentDateString = (invoice: Invoice) => getTimestampDateString(getInvoicePaidAtTimestamp(invoice));
@@ -238,19 +238,37 @@ const getPreferredCurrency = (context: AgentCommandContext) => {
     return typeof value === 'string' && value.trim() ? value.trim().toUpperCase() : 'EUR';
 };
 
-const collectReportsData = (context: AgentCommandContext) => ({
-    businessInfos: collectValidatedEntities<BusinessInfo>('businessInfos', context.store.businessInfos as any, 'agent report business infos'),
-    clients: collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent report clients'),
-    expenseCategories: collectValidatedEntities<ExpenseCategory>('expenseCategories', context.store.expenseCategories as any, 'agent report expense categories'),
-    expenses: collectValidatedEntities<Expense>('expenses', context.store.expenses as any, 'agent report expenses'),
-    invoices: collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent report invoices'),
-    projects: collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent report projects'),
-    tasks: collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent report tasks'),
-    timeEntries: context.store.getAllTimeEntries()
-        .filter((entry): entry is TimeEntry => !!entry && typeof entry.id === 'string' && typeof entry.taskId === 'string'),
-});
+const collectReportsData = async (context: AgentCommandContext) => {
+    const store = context.store;
+    const [expenses, invoices, tasks, timeEntries] = await Promise.all([
+        typeof store.getAllExpenses === 'function'
+            ? store.getAllExpenses()
+            : Promise.resolve(collectValidatedEntities<Expense>('expenses', store.expenses as any, 'agent report expenses')),
+        typeof store.getAllInvoices === 'function'
+            ? store.getAllInvoices()
+            : Promise.resolve(collectValidatedEntities<Invoice>('invoices', store.invoices as any, 'agent report invoices')),
+        typeof store.getAllTasks === 'function'
+            ? store.getAllTasks()
+            : Promise.resolve(collectValidatedEntities<Task>('tasks', store.tasks as any, 'agent report tasks')),
+        typeof store.loadAllTimeEntries === 'function'
+            ? store.loadAllTimeEntries()
+            : Promise.resolve(store.getAllTimeEntries()),
+    ]);
 
-export function getReportSummaryCommand(context: AgentCommandContext, input: ReportSummaryInput = {}) {
+    return {
+        businessInfos: collectValidatedEntities<BusinessInfo>('businessInfos', store.businessInfos as any, 'agent report business infos'),
+        clients: collectValidatedEntities<Client>('clients', store.clients as any, 'agent report clients'),
+        expenseCategories: collectValidatedEntities<ExpenseCategory>('expenseCategories', store.expenseCategories as any, 'agent report expense categories'),
+        expenses,
+        invoices,
+        projects: collectValidatedEntities<Project>('projects', store.projects as any, 'agent report projects'),
+        tasks,
+        timeEntries: timeEntries
+            .filter((entry): entry is TimeEntry => !!entry && typeof entry.id === 'string' && typeof entry.taskId === 'string'),
+    };
+};
+
+export async function getReportSummaryCommand(context: AgentCommandContext, input: ReportSummaryInput = {}) {
     assertReady(context);
     assertPermission(context, 'read');
 
@@ -273,7 +291,7 @@ export function getReportSummaryCommand(context: AgentCommandContext, input: Rep
     const rowLimit = clampRowLimit(input.rowLimit, input.rowLimitMax ?? MAX_ROW_LIMIT);
     const preferredCurrency = getPreferredCurrency(context);
     const reportReferenceDate = endOfDay(parseStoredDate(resolvedRange.endDate) || new Date(context.now?.() || Date.now()));
-    const data = collectReportsData(context);
+    const data = await collectReportsData(context);
     const projectsById = new Map(data.projects.map((project) => [project.id, project]));
     const clientsById = new Map(data.clients.map((client) => [client.id, client]));
     const businessInfosById = new Map(data.businessInfos.map((businessInfo) => [businessInfo.id, businessInfo]));
@@ -328,8 +346,11 @@ export function getReportSummaryCommand(context: AgentCommandContext, input: Rep
         return matchesStoredDateRange(dateValue, resolvedRange.startDate, resolvedRange.endDate);
     });
     const filteredTimeEntries = data.timeEntries
-        .filter((entry) => entry.start >= startOfDay(parseStoredDate(resolvedRange.startDate) || new Date()).getTime()
-            && entry.start <= endOfDay(parseStoredDate(resolvedRange.endDate) || new Date()).getTime())
+        .filter((entry) => isTimestampStartWithinStoredDateRange(
+            entry.start,
+            resolvedRange.startDate,
+            resolvedRange.endDate,
+        ))
         .map((entry) => {
             const task = tasksById.get(entry.taskId) || null;
             const project = task?.projectId ? projectsById.get(task.projectId) || null : null;
@@ -371,7 +392,7 @@ export function getReportSummaryCommand(context: AgentCommandContext, input: Rep
     const toInvoiceRows = Array.from(hoursRows.reduce((grouped, row) => {
         const project = activeProjects.find((item) => item.title === row.projectTitle) || activeProjects.find((item) => item.id === row.key);
         const hourlyRate = typeof project?.hourlyRate === 'number' ? project.hourlyRate : 0;
-        const projectCurrency = project ? getProjectCurrency(project, data.clients) : preferredCurrency;
+        const projectCurrency = project ? getProjectCurrency(project, data.clients, preferredCurrency) : preferredCurrency;
         const estimatedAmount = hourlyRate > 0
             ? Math.round(millisecondsToHours(row.unbilledBillableMs) * hourlyRate * 100) / 100
             : 0;
@@ -468,6 +489,14 @@ export function getReportSummaryCommand(context: AgentCommandContext, input: Rep
             projectId,
         },
         rowLimit: includeRows ? rowLimit : undefined,
+        rowMetadata: includeRows ? {
+            invoices: { total: filteredInvoices.length, returned: Math.min(filteredInvoices.length, rowLimit), truncated: filteredInvoices.length > rowLimit },
+            expenses: { total: filteredExpenses.length, returned: Math.min(filteredExpenses.length, rowLimit), truncated: filteredExpenses.length > rowLimit },
+            hours: { total: hoursRows.length, returned: Math.min(hoursRows.length, rowLimit), truncated: hoursRows.length > rowLimit },
+            timeEntries: { total: filteredTimeEntries.length, returned: Math.min(filteredTimeEntries.length, rowLimit), truncated: filteredTimeEntries.length > rowLimit },
+            outstanding: { total: outstandingInvoices.length, returned: Math.min(outstandingInvoices.length, rowLimit), truncated: outstandingInvoices.length > rowLimit },
+            toInvoice: { total: normalizedToInvoiceRows.length, returned: Math.min(normalizedToInvoiceRows.length, rowLimit), truncated: normalizedToInvoiceRows.length > rowLimit },
+        } : undefined,
         period: resolvedRange,
         preferredCurrency,
         counts: {
@@ -553,7 +582,7 @@ export function getReportSummaryCommand(context: AgentCommandContext, input: Rep
                 const actualMs = Math.max(0, (entry.end || 0) - entry.start);
                 const billableMs = entry.task?.billable ? getBillableDurationMs(entry) : 0;
                 const billedInvoice = entry.billedInvoiceId
-                    ? filteredInvoices.find((invoice) => invoice.id === entry.billedInvoiceId)
+                    ? data.invoices.find((invoice) => invoice.id === entry.billedInvoiceId)
                     : null;
 
                 return {
@@ -624,7 +653,7 @@ export async function exportReportCsvCommand(context: AgentCommandContext, input
     assertPermission(context, 'export');
 
     const section = input.section;
-    const report = getReportSummaryCommand(context, {
+    const report = await getReportSummaryCommand(context, {
         ...input,
         includeRows: true,
         rowLimit: input.rowLimit ?? MAX_ROW_LIMIT,
@@ -638,11 +667,15 @@ export async function exportReportCsvCommand(context: AgentCommandContext, input
     const { buildCsvContent, downloadCsvFile } = await import('@/utils/reportCsvUtils');
 
     downloadCsvFile(filename, buildCsvContent(columns as any, rows));
+    const metadataKey = section === 'to-invoice' ? 'toInvoice' : section;
+    const rowMetadata = report.rowMetadata?.[metadataKey];
 
     return {
         section,
         filename,
         rowCount: rows.length,
+        totalRowCount: rowMetadata?.total ?? rows.length,
+        truncated: rowMetadata?.truncated ?? false,
         downloadStarted: true,
     };
 }
@@ -653,7 +686,7 @@ export async function exportReportPdfCommand(context: AgentCommandContext, input
     assertPermission(context, 'export');
 
     const section = input.section;
-    const report = getReportSummaryCommand(context, {
+    const report = await getReportSummaryCommand(context, {
         ...input,
         includeRows: true,
         rowLimit: input.rowLimit ?? MAX_ROW_LIMIT,
@@ -688,7 +721,7 @@ export async function exportAccountantPackCommand(context: AgentCommandContext, 
     assertPermission(context, 'read');
     assertPermission(context, 'export');
 
-    const report = getReportSummaryCommand(context, {
+    const report = await getReportSummaryCommand(context, {
         ...input,
         section: 'monthly',
         includeRows: true,
@@ -710,7 +743,7 @@ export async function exportAccountantPackCommand(context: AgentCommandContext, 
     }];
     const invoicePdfFiles = input.includeInvoicePdfs === false
         ? []
-        : buildAccountantPackInvoicePdfFiles(context, report, getCurrentInvoiceHtmlContent);
+        : await buildAccountantPackInvoicePdfFiles(context, report, getCurrentInvoiceHtmlContent);
     const invoicePdfEntries = await Promise.all(invoicePdfFiles.map(async (file) => ({
         filename: file.filename,
         content: await generatePDFBlob(file.htmlContent),
@@ -751,6 +784,9 @@ export async function exportAccountantPackCommand(context: AgentCommandContext, 
         csvFileCount: csvFiles.length,
         reportPdfCount: reportPdfEntries.length,
         invoicePdfCount: invoicePdfEntries.length,
+        truncatedSections: Object.entries(report.rowMetadata || {})
+            .filter(([, metadata]: [string, any]) => metadata.truncated)
+            .map(([section]) => section),
         downloadStarted: true,
     };
 }
@@ -1094,23 +1130,49 @@ const buildReviewChecklistRows = (report: any) => {
     ].filter((row) => row.count > 0);
 };
 
-const buildAccountantPackInvoicePdfFiles = (
+const buildAccountantPackInvoicePdfFiles = async (
     context: AgentCommandContext,
     report: any,
     getCurrentInvoiceHtmlContent: (invoice: any, clients: any[], businessBrandAssets: any[]) => string
 ) => {
     const invoiceIds = new Set((report.rows.invoices || []).map((invoice: any) => invoice.id).filter(Boolean));
-    const invoices = collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent accountant pack invoices')
+    const allInvoices = typeof context.store.getAllInvoices === 'function'
+        ? await context.store.getAllInvoices()
+        : collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent accountant pack invoices');
+    const invoices = allInvoices
         .filter((invoice) => invoiceIds.has(invoice.id) && invoice.invoiceNumber);
     const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent accountant pack clients');
     const businessBrandAssets = collectValidatedEntities<BusinessBrandAsset>('businessBrandAssets', context.store.businessBrandAssets as any, 'agent accountant pack brand assets');
+    const usedFilenames = new Set<string>();
 
-    return invoices.map((invoice) => ({
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        filename: `invoice-${invoice.invoiceNumber}.pdf`,
-        htmlContent: getCurrentInvoiceHtmlContent(invoice as any, clients as any, businessBrandAssets as any),
-    }));
+    return invoices.map((invoice) => {
+        const safeInvoiceNumber = String(invoice.invoiceNumber)
+            .normalize('NFKC')
+            .split('')
+            .map((character) => character.charCodeAt(0) < 32 ? '-' : character)
+            .join('')
+            .replace(/[\\/:*?"<>|]/g, '-')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/(^-|-$)/g, '') || 'invoice';
+        const baseFilename = `invoice-${safeInvoiceNumber}`;
+        let filename = `${baseFilename}.pdf`;
+        let duplicateIndex = 2;
+
+        while (usedFilenames.has(filename.toLowerCase())) {
+            filename = `${baseFilename}-${duplicateIndex}.pdf`;
+            duplicateIndex += 1;
+        }
+
+        usedFilenames.add(filename.toLowerCase());
+
+        return {
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            filename,
+            htmlContent: getCurrentInvoiceHtmlContent(invoice as any, clients as any, businessBrandAssets as any),
+        };
+    });
 };
 
 const getEmptyReportCsvColumns = (section: ReportSection) => {

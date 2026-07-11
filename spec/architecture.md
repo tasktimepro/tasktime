@@ -41,3 +41,5 @@ The app uses `useUrlState` and History API events rather than React Router. App 
 ## Evolution rules
 
 Architecture changes must update `SYSTEM_OVERVIEW.md`, `ARCHITECTURE_MAP.md`, relevant contracts/rules, public docs, comments, tests, and status in the same slice. Production migrations precede removal of historical compatibility code.
+
+New persisted data follows the complete consumer review in `rules/production-hardening.md` and requirement `DATA-6`. New or changed user-facing business actions follow the cross-surface parity rules in `rules/architectural-constraints.md` and requirement `AGENT-4`. Shared domain/application operations remain the authoritative behavior; UI and agent layers are adapters, not independent implementations.

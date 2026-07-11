@@ -50,7 +50,7 @@ Sync must stay fast and Worker-friendly.
 
 - Normal sync checks manifest `modifiedTime` first.
 - If the manifest is unchanged, do not download document files.
-- Do not call full appDataFolder listing on every sync.
+- Do not call full appDataFolder listing on unchanged/no-op syncs. A manifest write may list files once to merge concurrent writer evidence safely.
 - `listAppDataFiles()` is for connect/load, backup listing, wipe, and stale-file recovery.
 - Keep periodic sync at 15 minutes unless there is a measured reason to change it.
 - Keep foreground sync cooldowns so focus/online events do not spam the Worker.
@@ -73,9 +73,12 @@ Reliability can add checks, but heavy checks must stay off the normal no-change 
 
 - Save manifest references only after the referenced file upload succeeds.
 - Do not delete delta files before the manifest no longer references them.
+- Before overwriting an existing manifest, merge the latest remote revision with the local mutation and the authoritative uploaded-file list.
+- Manifest revisions and write identities are additive diagnostics; delta-file union and base-file `modifiedTime` evidence prevent stale version metadata from hiding remote work.
+- Compaction records bounded delta tombstones so a stale concurrent writer cannot resurrect references while the compacted files are being removed.
 - If cached Drive file IDs return 404, refresh the file cache and retry before treating the file as missing.
 - Searches and listings must exclude trashed files.
-- Missing orphaned deltas may be pruned from the manifest, but local pending changes must stay queued.
+- A referenced missing/corrupt file makes reconciliation incomplete; do not report sync success or silently prune it as though it was applied.
 - Manifest save failures must leave sync state visible as failed and preserve retry state.
 
 ## Pending Local Changes

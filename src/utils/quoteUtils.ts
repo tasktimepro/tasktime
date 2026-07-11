@@ -38,6 +38,7 @@ type QuoteDocumentParams = {
     }>;
     quoteDate?: string;
     quoteTimestamp?: string;
+    preferredCurrency?: string;
 };
 
 export const getQuoteNumberTimestamp = (value = new Date()): string => {
@@ -147,6 +148,7 @@ export const buildQuoteDocumentData = ({
     additionalTasks: providedAdditionalTasks,
     quoteDate = toStorageDate(new Date()),
     quoteTimestamp = getQuoteNumberTimestamp(),
+    preferredCurrency,
 }: QuoteDocumentParams) => {
     const derivedLineItems = buildProjectQuoteLineItems({ project, tasks, clients });
     const client = providedClient || derivedLineItems.client;
@@ -163,7 +165,7 @@ export const buildQuoteDocumentData = ({
 
     const paymentMethod = providedPaymentMethod || resolveDefaultPaymentMethod(paymentMethods);
     const template = providedTemplate || resolveDefaultTemplate(invoiceTemplates);
-    const currency = getProjectCurrency(project, clients);
+    const currency = getProjectCurrency(project, clients, preferredCurrency);
     const quoteTasks = providedQuoteTasks ?? derivedLineItems.quoteTasks;
     const additionalTasks = providedAdditionalTasks ?? derivedLineItems.additionalTasks;
 

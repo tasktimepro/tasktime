@@ -53,6 +53,26 @@ describe('reportCsvUtils', () => {
         expect(content).toBe('Invoice,Paid Date,Notes\nINV-003,,');
     });
 
+    it('neutralizes spreadsheet formulas in exported text fields', () => {
+        const content = buildCsvContent(
+            [{ key: 'client', header: 'Client' }],
+            [
+                { client: '=HYPERLINK("https://example.invalid")' },
+                { client: ' +SUM(1,2)' },
+                { client: '@malicious' },
+                { client: '-10+20' },
+            ]
+        );
+
+        expect(content).toBe([
+            'Client',
+            `"'=HYPERLINK(""https://example.invalid"")"`,
+            `"' +SUM(1,2)"`,
+            `'@malicious`,
+            `'-10+20`,
+        ].join('\n'));
+    });
+
     it('downloads the csv content using a temporary blob url', () => {
         const createObjectURL = vi.spyOn(window.URL, 'createObjectURL').mockReturnValue('blob:report');
         const revokeObjectURL = vi.spyOn(window.URL, 'revokeObjectURL').mockImplementation(() => {});

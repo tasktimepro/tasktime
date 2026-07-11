@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { fetchExchangeRates, formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY, fetchExchangeRates, formatCurrency, getCurrencySymbol, getProjectCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, formatDuration, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
@@ -80,8 +80,8 @@ const ClientDashboard = ({
     const [exchangeRates, setExchangeRates] = useState(null);
     // Get client's currency
     const clientCurrency = useMemo(() => {
-        return client.defaultCurrency || getPreferredCurrency();
-    }, [client.defaultCurrency]);
+        return client.defaultCurrency || preferences.currency || DEFAULT_CURRENCY;
+    }, [client.defaultCurrency, preferences.currency]);
 
     const getProjectColor = (project) => {
         if (project.color) return project.color;
@@ -121,12 +121,12 @@ const ClientDashboard = ({
                 return false;
             }
 
-            const projectCurrency = normalizeCurrencyCode(getProjectCurrency(expenseProject, clients));
+            const projectCurrency = normalizeCurrencyCode(getProjectCurrency(expenseProject, clients, preferences.currency));
             const expenseCurrency = normalizeCurrencyCode(expense.currency || projectCurrency);
 
             return expenseCurrency !== projectCurrency;
         });
-    }, [clientProjects, clients, expenses]);
+    }, [clientProjects, clients, expenses, preferences.currency]);
 
     useEffect(() => {
         if (!needsExchangeRatesForProjectExpenses) {
@@ -177,7 +177,7 @@ const ClientDashboard = ({
 
     const expenseTotalsByCurrency = useMemo(() => {
         return clientExpenses.reduce((acc, expense) => {
-            const currency = expense.currency || preferences.currency || getPreferredCurrency();
+            const currency = expense.currency || preferences.currency || DEFAULT_CURRENCY;
             acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
             return acc;
         }, {});
@@ -187,7 +187,7 @@ const ClientDashboard = ({
         return clientExpenses
             .filter((expense) => expense.billable && expense.billingStatus === 'unbilled')
             .reduce((acc, expense) => {
-                const currency = expense.currency || preferences.currency || getPreferredCurrency();
+                const currency = expense.currency || preferences.currency || DEFAULT_CURRENCY;
                 acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
                 return acc;
             }, {});
@@ -425,6 +425,7 @@ const ClientDashboard = ({
             timeEntries,
             expenses,
             exchangeRates,
+            preferredCurrency: preferences.currency,
         });
         const previewTitle = invoicePreview.excludedExpenseCount > 0
             ? `${invoicePreview.excludedExpenseCount} expense${invoicePreview.excludedExpenseCount === 1 ? '' : 's'} excluded until exchange rates are available`
@@ -513,8 +514,8 @@ const ClientDashboard = ({
                         {project.hourlyRate && !project.flatRate && (
                             <p className="text-sm text-muted-foreground">
                                 <span className="sensitive-data">
-                                    {getCurrencySymbol(getProjectCurrency(project, clients))}
-                                    {project.hourlyRate}/{getProjectCurrency(project, clients)} per hour
+                                    {getCurrencySymbol(getProjectCurrency(project, clients, preferences.currency))}
+                                    {project.hourlyRate}/{getProjectCurrency(project, clients, preferences.currency)} per hour
                                 </span>
                             </p>
                         )}

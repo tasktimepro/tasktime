@@ -8,15 +8,13 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
-**Critical-path assurance**
+**Maintainability evolution and publishing follow-through**
 
-- Cloud sync and stored-data loss analysis
-- Timer duration and time-entry exactness
-- Invoice generation, currency, billed-state, payment, and undo behavior
-- Reporting totals and filter consistency
-- Backup export/import compatibility
+- Gradual TypeScript and testing-infrastructure improvements
+- Installed OpenClaw validation and remaining agent-directory publication checks
+- Approved product backlog after its recorded ambiguities are resolved
 
-No assurance slice has started as part of the agent-kit setup.
+The July 2026 deep validation and Critical/High remediation are complete. Evidence, decisions, and the full release gate are recorded in `status/critical-path-assurance.md`.
 
 ## Completed
 
@@ -26,9 +24,14 @@ No assurance slice has started as part of the agent-kit setup.
 - [x] Created populated specification, contract, architecture, environment, evaluation, and multi-layer status documents.
 - [x] Validated required files, prompt/skill metadata, local references, environment coverage, route representation, Yjs collection coverage, and template removal.
 
+**Critical-path assurance — July 2026**
+
+- [x] Remediated sync/storage, backup/restore, billing/undo, reports/export, and agent trust findings.
+- [x] Passed unit/integration coverage, lint, production build, browser/PWA smoke, and packaged live-agent gates.
+
 ## Blockers and open questions
 
-- See `spec/ambiguities.md`. None blocks completing the documentation foundation.
+- See `spec/ambiguities.md`. Remaining decisions concern future product work or compatibility-policy evolution; none blocks the completed assurance slice.
 
 ## Quality gate
 

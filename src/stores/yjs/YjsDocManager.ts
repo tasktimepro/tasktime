@@ -12,6 +12,14 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import type { DocName } from './types';
+import {
+    listRegisteredPersistedDocs,
+    registerPersistedDoc,
+    unregisterPersistedDocs,
+} from './persistedDocRegistry';
+
+const DATABASE_CONTROL_CHANNEL = 'tasktime-yjs-database-control';
+const DATABASE_CLOSE_GRACE_MS = 75;
 
 class BroadcastChannelSync {
     private channel: BroadcastChannel | null;
@@ -78,6 +86,22 @@ export class YjsDocManager {
     private docs: Map<DocName, ManagedDoc> = new Map();
     private loadPromises: Map<DocName, Promise<Y.Doc>> = new Map();
     private errorListeners: Set<(error: Error, docName: DocName) => void> = new Set();
+    private databaseControlChannel: BroadcastChannel | null = null;
+
+    constructor() {
+        if (typeof BroadcastChannel === 'undefined') return;
+
+        this.databaseControlChannel = new BroadcastChannel(DATABASE_CONTROL_CHANNEL);
+        this.databaseControlChannel.onmessage = (event) => {
+            if (event.data?.type !== 'prepare-database-deletion') return;
+
+            this.closeManagedDocs();
+            this.databaseControlChannel?.postMessage({
+                type: 'database-handles-closed',
+                requestId: event.data.requestId,
+            });
+        };
+    }
 
     /**
      * Subscribe to persistence errors (e.g., IndexedDB quota exceeded)
@@ -162,8 +186,26 @@ export class YjsDocManager {
             .map(([name]) => name);
     }
 
+    /**
+     * Wait until every update queued before this call is committed by
+     * IndexedDB. Writing a marker through each persistence connection creates
+     * a transaction-ordering barrier without depending on y-indexeddb internals.
+     */
+    async flushPersistence(): Promise<void> {
+        await Promise.all(Array.from(this.docs.values())
+            .filter((managed) => managed.loaded)
+            .map((managed) => managed.persistence.set('tasktime-last-persistence-barrier', Date.now())));
+    }
+
     async listPersistedDocs(): Promise<DocName[]> {
         const persistedDocs = new Set<DocName>(this.getLoadedDocs());
+
+        try {
+            const registeredDocs = await listRegisteredPersistedDocs();
+            registeredDocs.forEach((docName) => persistedDocs.add(docName));
+        } catch (error) {
+            console.warn('[YjsDocManager] Unable to read persisted doc registry:', error);
+        }
 
         if (typeof indexedDB === 'undefined') {
             return Array.from(persistedDocs);
@@ -210,6 +252,12 @@ export class YjsDocManager {
      * Call this when the store is being destroyed
      */
     destroy(): void {
+        this.closeManagedDocs();
+        this.databaseControlChannel?.close();
+        this.databaseControlChannel = null;
+    }
+
+    private closeManagedDocs(): void {
         for (const [name, managed] of this.docs) {
             console.log(`[YjsDocManager] Destroying: ${name}`);
             managed.broadcast?.destroy();
@@ -228,14 +276,55 @@ export class YjsDocManager {
             return;
         }
 
+        await this.requestPeerDatabaseClose();
+
         await Promise.all(docNames.map((name) => {
-            return new Promise<void>((resolve) => {
-                const request = indexedDB.deleteDatabase(`tasktime-yjs-${name}`);
+            return new Promise<void>((resolve, reject) => {
+                const databaseName = `tasktime-yjs-${name}`;
+                const request = indexedDB.deleteDatabase(databaseName);
                 request.onsuccess = () => resolve();
-                request.onerror = () => resolve();
-                request.onblocked = () => resolve();
+                request.onerror = () => {
+                    const detail = request.error?.name ? ` (${request.error.name})` : '';
+                    reject(new Error(`Failed to delete local database ${databaseName}${detail}. Your existing data was not replaced.`));
+                };
+                request.onblocked = () => {
+                    reject(new Error(`Unable to delete local database ${databaseName}. Close other TaskTime Pro tabs and try again; your existing data was not replaced.`));
+                };
             });
         }));
+
+        const indexedDbWithDatabases = indexedDB as IDBFactory & {
+            databases?: () => Promise<Array<{ name?: string }>>;
+        };
+
+        if (indexedDbWithDatabases.databases) {
+            const databases = await indexedDbWithDatabases.databases();
+            const remaining = new Set(databases.map((database) => database.name));
+            const failed = docNames.find((docName) => remaining.has(`tasktime-yjs-${docName}`));
+
+            if (failed) {
+                throw new Error(`Local database tasktime-yjs-${failed} still exists after deletion. Your existing data was not replaced.`);
+            }
+        }
+
+        try {
+            await unregisterPersistedDocs(docNames);
+        } catch (error) {
+            console.warn('[YjsDocManager] Unable to update persisted doc registry after deletion:', error);
+        }
+    }
+
+    private async requestPeerDatabaseClose(): Promise<void> {
+        if (typeof BroadcastChannel === 'undefined') return;
+
+        const channel = new BroadcastChannel(DATABASE_CONTROL_CHANNEL);
+        channel.postMessage({
+            type: 'prepare-database-deletion',
+            requestId: crypto.randomUUID(),
+        });
+
+        await new Promise<void>((resolve) => setTimeout(resolve, DATABASE_CLOSE_GRACE_MS));
+        channel.close();
     }
 
     /**
@@ -288,6 +377,13 @@ export class YjsDocManager {
         });
 
         this.docs.set(name, { doc, persistence, broadcast, loaded: true });
+
+        try {
+            await registerPersistedDoc(name);
+        } catch (error) {
+            console.warn(`[YjsDocManager] Unable to register persisted doc ${name}:`, error);
+        }
+
         return doc;
     }
 }

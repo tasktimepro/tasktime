@@ -64,6 +64,17 @@ export interface ProjectNotes {
     updatedAt: number;
 }
 
+/**
+ * Durable identity for an entity move between Yjs documents. The metadata is
+ * additive so older records remain valid and lets reconciliation finish or
+ * undo an interrupted cross-document move after sync replay.
+ */
+export interface ArchiveTransition {
+    operationId: string;
+    targetDoc: DocName;
+    changedAt: number;
+}
+
 export interface Task {
     id: string;
     projectId?: string | null;
@@ -101,6 +112,7 @@ export interface Task {
         billedAt: number;
         total: number;
     } | null;
+    _archiveTransition?: ArchiveTransition;
 }
 
 export interface RecurringConfig {
@@ -129,6 +141,9 @@ export interface TimeEntry {
     _stoppedTimerKey?: string;
     /** Unique timer instance identity for cross-doc orphan reconciliation */
     _stoppedTimerInstanceId?: string;
+    /** Agent operation identity used to replay a completed stop after session loss */
+    _stoppedTimerOperationId?: string;
+    _archiveTransition?: ArchiveTransition;
 }
 
 export interface Client {
@@ -278,6 +293,39 @@ export interface InvoiceBillingStateSnapshot {
     taskLastBilledAt: Record<string, number | null>;
 }
 
+export interface InvoiceBillingSelectionSnapshot {
+    version: 1;
+    capturedAt: number;
+    invoiceCurrency: string;
+    entries: Array<{
+        entryId: string;
+        taskId: string;
+        start: number;
+        end: number;
+        actualDurationMs: number;
+        billableDurationMs: number;
+        billedHourlyRate: number | null;
+    }>;
+    tasks: Array<{
+        taskId: string;
+        title: string;
+        pricingMode: 'hourly' | 'flat';
+        quantity: number;
+        rate: number;
+        amount: number;
+        quotedAmount: number | null;
+    }>;
+    expenses: Array<{
+        expenseId: string;
+        title: string;
+        sourceAmount: number;
+        sourceCurrency: string;
+        invoiceAmount: number;
+        invoiceCurrency: string;
+        exchangeRate: number;
+    }>;
+}
+
 export interface Invoice {
     id: string;
     projectId: string | null;
@@ -310,6 +358,8 @@ export interface Invoice {
     sentToEmail?: string | null;
     brandingSnapshot?: InvoiceBrandingSnapshot | null;
     billingStateSnapshot?: InvoiceBillingStateSnapshot | null;
+    billingSelectionSnapshot?: InvoiceBillingSelectionSnapshot | null;
+    _archiveTransition?: ArchiveTransition;
 }
 
 export type InvoiceTemplateLogoPlacement =
@@ -428,6 +478,7 @@ export interface Expense {
     isPreview?: boolean;
     createdAt?: number;
     updatedAt?: number;
+    _archiveTransition?: ArchiveTransition;
 }
 
 export interface ExpenseRecurrence {

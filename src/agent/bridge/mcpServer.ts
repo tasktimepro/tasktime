@@ -3,6 +3,7 @@ import type { Readable, Writable } from 'node:stream';
 import { AgentCommandError, type AgentPermissionScope } from '@/agent/types';
 import type { AgentAppSessionApprovalToken, AgentAppSessionResponse } from '@/agent/transport/protocol';
 import { getMcpToolDefinition, isBridgeSetupToolName, listMcpToolDefinitions, type BridgeSetupToolName } from './mcpTools';
+import { validateJsonSchemaInput } from './jsonSchemaValidator';
 
 const MCP_PROTOCOL_VERSION = '2025-11-25';
 const JSON_RPC_VERSION = '2.0';
@@ -174,6 +175,15 @@ export class McpBridgeJsonRpcServer {
             return createToolError('INVALID_INPUT', `Unsupported TaskTime Pro tool: ${callParams.name}`);
         }
 
+        const input = callParams.arguments ?? {};
+        const validation = validateJsonSchemaInput(tool.inputSchema, input);
+
+        if (!validation.valid) {
+            return createToolError('INVALID_INPUT', `Invalid input for ${tool.name}.`, {
+                validationErrors: validation.errors,
+            });
+        }
+
         if (isBridgeSetupToolName(tool.name)) {
             return this.callBridgeSetupTool(tool.name);
         }
@@ -198,7 +208,7 @@ export class McpBridgeJsonRpcServer {
             response = await this.bridge.sendCommand(
                 this.requestIdFactory(),
                 tool.name,
-                callParams.arguments ?? {},
+                input,
                 this.commandTimeoutMs,
                 getApprovalToken(callParams.approval)
             );
@@ -263,6 +273,15 @@ export class McpBridgeJsonRpcServer {
             return createToolError('INVALID_INPUT', `TaskTime Pro setup tool does not require approval tokens: ${tokenParams.command}`);
         }
 
+        const approvalInput = tokenParams.arguments ?? {};
+        const validation = validateJsonSchemaInput(tool.inputSchema, approvalInput);
+
+        if (!validation.valid) {
+            return createToolError('INVALID_INPUT', `Invalid input for ${tool.name}.`, {
+                validationErrors: validation.errors,
+            });
+        }
+
         const scopes = parseApprovalScopes(tokenParams.scopes, tool.scopes);
 
         if (!scopes) {
@@ -286,7 +305,7 @@ export class McpBridgeJsonRpcServer {
         try {
             const inputHash = typeof tokenParams.inputHash === 'string'
                 ? tokenParams.inputHash
-                : createMcpCommandInputHash(tokenParams.arguments ?? {});
+                : createMcpCommandInputHash(approvalInput);
             const approval = this.bridge.createApprovalToken({
                 grantId: typeof tokenParams.grantId === 'string' ? tokenParams.grantId : undefined,
                 command: tokenParams.command,

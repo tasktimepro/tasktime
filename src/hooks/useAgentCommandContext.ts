@@ -9,7 +9,7 @@ function openAppRoute(path: string): void {
 }
 
 export function useAgentCommandContext(): AgentCommandContext {
-    const { store, isReady, driveSessionId, clearAllData } = useYjs();
+    const { store, isReady, driveSessionId, clearAllData, restoreBackupData } = useYjs();
     const { revokeAccess } = useGoogleAuth();
     const idempotencyRef = useRef(new Map<string, unknown>());
 
@@ -17,11 +17,12 @@ export function useAgentCommandContext(): AgentCommandContext {
         store,
         isReady,
         clearAllData,
+        restoreBackupData,
         revokeDriveAccess: revokeAccess,
         idempotency: idempotencyRef.current,
         navigation: {
             openRoute: openAppRoute,
         },
         driveSessionId,
-    }), [store, isReady, clearAllData, revokeAccess, driveSessionId]);
+    }), [store, isReady, clearAllData, restoreBackupData, revokeAccess, driveSessionId]);
 }

@@ -1,6 +1,6 @@
 import html2pdf from 'html2pdf.js';
 import DOMPurify from 'dompurify';
-import { getCurrencySymbol, getPreferredCurrency } from './currencyUtils';
+import { DEFAULT_CURRENCY, getCurrencySymbol } from './currencyUtils';
 import { formatBillingPeriodLabel } from './billingPeriodUtils';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import type {
@@ -126,6 +126,18 @@ type InvoiceData = {
     tasks: InvoiceTask[];
     additionalTasks?: InvoiceTask[];
     expenseItems?: InvoiceExpenseItem[];
+    items?: Array<{
+        description: string;
+        quantity: number;
+        rate: number;
+        amount: number;
+        projectId?: string;
+        taskId?: string;
+        expenseId?: string;
+        supplierName?: string | null;
+        lineType?: 'project' | 'project-subtotal' | 'task' | 'expense' | 'custom';
+        pricingMode?: 'hourly' | 'flat' | 'mixed';
+    }>;
     note?: string;
     totalHours?: number | string;
     total?: number;
@@ -519,7 +531,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
         billingPeriodPreset,
         billingPeriodStart,
         billingPeriodEnd,
-        currency = getPreferredCurrency(),
+        currency = DEFAULT_CURRENCY,
         brandingLogoDataUrl = null,
     } = invoiceData;
     const resolvedTotal = typeof total === 'number' ? total : (typeof totalAmount === 'number' ? totalAmount : 0);
@@ -1451,6 +1463,36 @@ export const buildInvoiceHtmlContent = (
         country: foundClient.country || ''
     } : (invoice.client || { name: '' });
 
+    const canonicalItems = invoice.items || [];
+    const canonicalTasks: InvoiceTask[] = canonicalItems
+        .filter((item) => item.lineType !== 'expense' && !item.expenseId)
+        .map((item, index) => ({
+            id: item.taskId || `invoice-item-${index}`,
+            title: item.description,
+            projectId: item.projectId || null,
+            ...(item.pricingMode === 'hourly'
+                ? {
+                    hours: item.quantity,
+                    hourlyRate: item.rate,
+                    useFlatRate: false,
+                }
+                : {
+                    flatRate: item.rate,
+                    quantity: item.quantity,
+                    useFlatRate: true,
+                }),
+        }));
+    const canonicalExpenses: InvoiceExpenseItem[] = canonicalItems
+        .filter((item) => item.lineType === 'expense' || Boolean(item.expenseId))
+        .map((item, index) => ({
+            id: item.expenseId || `invoice-expense-item-${index}`,
+            title: item.description,
+            amount: item.amount,
+            supplierName: item.supplierName,
+            projectId: item.projectId || null,
+        }));
+    const useCanonicalItems = canonicalItems.length > 0;
+
     return createInvoiceHTML({
         documentMode: invoice.documentMode,
         project: invoice.project,
@@ -1460,9 +1502,9 @@ export const buildInvoiceHtmlContent = (
         clientExpenseItems: invoice.clientExpenseItems || [],
         invoiceOnlyExpenseItems: invoice.invoiceOnlyExpenseItems || [],
         client: clientData,
-        tasks: invoice.tasks || [],
-        additionalTasks: invoice.additionalTasks || [],
-        expenseItems: invoice.expenseItems || [],
+        tasks: useCanonicalItems ? canonicalTasks : (invoice.tasks || []),
+        additionalTasks: useCanonicalItems ? [] : (invoice.additionalTasks || []),
+        expenseItems: useCanonicalItems ? canonicalExpenses : (invoice.expenseItems || []),
         note: invoice.note,
         totalHours: invoice.totalHours,
         total: invoice.total,

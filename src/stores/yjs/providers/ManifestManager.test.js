@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AuthorizationError, ManifestManager, isDriveFileNotFoundError } from './ManifestManager.ts'
+import {
+    AuthorizationError,
+    ManifestManager,
+    isDriveFileNotFoundError,
+    mergeConcurrentManifests,
+} from './ManifestManager.ts'
 
 function jsonResponse(body, init = {}) {
     return new Response(JSON.stringify(body), {
@@ -20,6 +25,144 @@ describe('ManifestManager', () => {
     afterEach(() => {
         vi.unstubAllGlobals()
         vi.useRealTimers()
+    })
+
+    it('merges simultaneous writer deltas into one revision regardless of save order', () => {
+        const base = {
+            version: 1,
+            deviceId: 'legacy-device',
+            lastSync: '2026-07-11T00:00:00.000Z',
+            revision: 4,
+            documents: {
+                core: {
+                    stateFile: 'tasktime-yjs-core.bin',
+                    stateVersion: 2,
+                    stateModifiedTime: '2026-07-11T00:00:00.000Z',
+                    lastCompaction: '2026-07-11T00:00:00.000Z',
+                    deltas: [],
+                },
+            },
+        }
+        const writerA = structuredClone(base)
+        writerA.documents.core.deltas.push({ id: 'writer-a', timestamp: '2026-07-11T00:00:01.000Z' })
+        const writerB = structuredClone(base)
+        writerB.documents.core.deltas.push({ id: 'writer-b', timestamp: '2026-07-11T00:00:02.000Z' })
+        const files = [
+            { id: 'base', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-07-11T00:00:00.000Z' },
+            { id: 'a', name: 'tasktime-yjs-core-delta-writer-a.bin', modifiedTime: '2026-07-11T00:00:01.000Z' },
+            { id: 'b', name: 'tasktime-yjs-core-delta-writer-b.bin', modifiedTime: '2026-07-11T00:00:02.000Z' },
+        ]
+
+        const savedByA = mergeConcurrentManifests(base, writerA, files, 'device-a', 'write-a')
+        const savedByB = mergeConcurrentManifests(savedByA, writerB, files, 'device-b', 'write-b')
+
+        expect(savedByB.revision).toBe(6)
+        expect(savedByB.lastWriterId).toBe('device-b')
+        expect(savedByB.documents.core.deltas.map((delta) => delta.id)).toEqual(['writer-a', 'writer-b'])
+    })
+
+    it('keeps compaction tombstones from being resurrected by a stale writer', () => {
+        const remote = {
+            version: 1,
+            deviceId: 'legacy-device',
+            lastSync: '2026-07-11T00:00:00.000Z',
+            revision: 7,
+            documents: {
+                core: {
+                    stateFile: 'tasktime-yjs-core.bin',
+                    stateVersion: 3,
+                    stateModifiedTime: '2026-07-11T00:00:00.000Z',
+                    lastCompaction: '2026-07-11T00:00:00.000Z',
+                    deltas: [
+                        { id: 'compacted', timestamp: '2026-07-11T00:00:01.000Z' },
+                        { id: 'concurrent', timestamp: '2026-07-11T00:00:02.000Z' },
+                    ],
+                },
+            },
+        }
+        const compactingWriter = structuredClone(remote)
+        compactingWriter.documents.core.stateVersion = 4
+        compactingWriter.documents.core.stateModifiedTime = '2026-07-11T00:00:03.000Z'
+        compactingWriter.documents.core.compactedDeltaIds = ['compacted']
+        compactingWriter.documents.core.deltas = [{ id: 'concurrent', timestamp: '2026-07-11T00:00:02.000Z' }]
+        const filesAfterCompaction = [
+            { id: 'base', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-07-11T00:00:03.000Z' },
+            { id: 'concurrent', name: 'tasktime-yjs-core-delta-concurrent.bin', modifiedTime: '2026-07-11T00:00:02.000Z' },
+        ]
+
+        const compacted = mergeConcurrentManifests(
+            remote,
+            compactingWriter,
+            filesAfterCompaction,
+            'device-a',
+            'write-a'
+        )
+        const staleWriter = structuredClone(remote)
+        staleWriter.documents.core.deltas.push({ id: 'new-delta', timestamp: '2026-07-11T00:00:04.000Z' })
+        const merged = mergeConcurrentManifests(
+            compacted,
+            staleWriter,
+            [
+                ...filesAfterCompaction,
+                { id: 'new', name: 'tasktime-yjs-core-delta-new-delta.bin', modifiedTime: '2026-07-11T00:00:04.000Z' },
+            ],
+            'device-b',
+            'write-b'
+        )
+
+        expect(merged.documents.core.compactedDeltaIds).toContain('compacted')
+        expect(merged.documents.core.deltas.map((delta) => delta.id)).toEqual(['concurrent', 'new-delta'])
+    })
+
+    it('re-reads and merges the remote manifest immediately before saving', async () => {
+        const manager = new ManifestManager('token-123')
+        manager.manifestFileId = 'manifest-id'
+        manager.manifest = {
+            version: 1,
+            deviceId: 'legacy-device',
+            lastSync: '2026-07-11T00:00:00.000Z',
+            revision: 2,
+            documents: {
+                core: {
+                    stateFile: 'tasktime-yjs-core.bin',
+                    stateVersion: 1,
+                    lastCompaction: '2026-07-11T00:00:00.000Z',
+                    deltas: [{ id: 'local', timestamp: '2026-07-11T00:00:02.000Z' }],
+                },
+            },
+        }
+        manager.downloadFileAsJson = vi.fn(async () => ({
+            version: 1,
+            deviceId: 'legacy-device',
+            lastSync: '2026-07-11T00:00:01.000Z',
+            revision: 3,
+            documents: {
+                core: {
+                    stateFile: 'tasktime-yjs-core.bin',
+                    stateVersion: 1,
+                    lastCompaction: '2026-07-11T00:00:00.000Z',
+                    deltas: [{ id: 'remote', timestamp: '2026-07-11T00:00:01.000Z' }],
+                },
+            },
+        }))
+        manager.listAppDataFiles = vi.fn(async () => ([
+            { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-07-11T00:00:03.000Z' },
+            { id: 'base', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-07-11T00:00:00.000Z' },
+            { id: 'remote', name: 'tasktime-yjs-core-delta-remote.bin', modifiedTime: '2026-07-11T00:00:01.000Z' },
+            { id: 'local', name: 'tasktime-yjs-core-delta-local.bin', modifiedTime: '2026-07-11T00:00:02.000Z' },
+        ]))
+        manager.updateFile = vi.fn(async () => {
+            expect(manager.manifest.revision).toBe(4)
+            expect(manager.manifest.documents.core.deltas.map((delta) => delta.id)).toEqual(['remote', 'local'])
+            return '2026-07-11T00:00:04.000Z'
+        })
+
+        await manager.save()
+
+        expect(manager.downloadFileAsJson).toHaveBeenCalledWith('manifest-id')
+        expect(manager.listAppDataFiles).toHaveBeenCalledTimes(1)
+        expect(manager.updateFile).toHaveBeenCalledTimes(1)
+        expect(manager.isDirty()).toBe(false)
     })
 
     it('retries rate-limited Drive requests using Retry-After before succeeding', async () => {

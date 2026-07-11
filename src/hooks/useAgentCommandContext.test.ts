@@ -7,6 +7,7 @@ const yjsMocks = vi.hoisted(() => ({
     isReady: true,
     driveSessionId: 'drive-session-1',
     clearAllData: vi.fn(async () => undefined),
+    restoreBackupData: vi.fn(async () => undefined),
 }));
 
 const googleAuthMocks = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ describe('useAgentCommandContext', () => {
         yjsMocks.isReady = true;
         yjsMocks.driveSessionId = 'drive-session-1';
         yjsMocks.clearAllData.mockClear();
+        yjsMocks.restoreBackupData.mockClear();
         googleAuthMocks.revokeAccess.mockClear();
         window.history.pushState({}, '', '/account?section=agent');
     });
@@ -38,6 +40,7 @@ describe('useAgentCommandContext', () => {
             store: yjsMocks.store,
             isReady: true,
             clearAllData: yjsMocks.clearAllData,
+            restoreBackupData: yjsMocks.restoreBackupData,
             revokeDriveAccess: googleAuthMocks.revokeAccess,
             driveSessionId: 'drive-session-1',
         }));

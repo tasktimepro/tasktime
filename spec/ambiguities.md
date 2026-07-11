@@ -33,10 +33,6 @@ The backlog does not yet decide whether alerts belong to a timer session, projec
 
 The repository validates tolerant historical shapes, but there is no single documented minimum supported backup/app version. Do not remove compatibility code until a support policy and migration evidence exist.
 
-### Time and currency precision policy
-
-Implementation stores millisecond time intervals and multiple billing/currency snapshots, but a single human-readable policy for display rounding, billing increments, exchange-rate provenance, and cross-report rounding precedence should be verified during critical-path assurance.
-
 ### Dedicated agent evals
 
 Agent commands are deterministic and currently use tests/smoke flows. If future integrations add model-authored planning or interpretation inside this repository, define eval fixtures and thresholds before shipping that behavior.

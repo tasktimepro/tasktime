@@ -124,7 +124,7 @@ export class YjsDriveProvider {
     private syncMode: DriveSyncMode = 'sync';
     private pendingChanges: boolean = false;
     private pendingChangeListeners: Set<(hasPending: boolean) => void> = new Set();
-    private onSyncCompleteCallback: (() => void) | null = null;
+    private onSyncCompleteCallback: (() => void | Promise<void>) | null = null;
 
     private pendingDeltas: Map<DocName, Uint8Array[]> = new Map();
     private docUpdateHandlers: Map<DocName, DocUpdateHandler> = new Map();
@@ -134,6 +134,7 @@ export class YjsDriveProvider {
     private forceFullStateDocs: Set<DocName> = new Set();
     private verifyFullStateDocs: Set<DocName> = new Set();
     private lifecycleListenersAttached: boolean = false;
+    private initialRemoteReconciliationPending: boolean = false;
 
     // Track which state versions and deltas we've already applied locally
     private appliedStateVersions: Map<DocName, number> = new Map();
@@ -157,6 +158,28 @@ export class YjsDriveProvider {
             this.log('sync: queued full-state upload for reconnect docs', { docs: docNames });
             this.updatePendingState();
         }
+    }
+
+    getPendingDocNames(): DocName[] {
+        const pendingDocs = new Set<DocName>();
+
+        for (const docName of this.docManager.getLoadedDocs()) {
+            if (
+                this.forceFullStateDocs.has(docName)
+                || this.verifyFullStateDocs.has(docName)
+                || (this.pendingDeltas.get(docName)?.length ?? 0) > 0
+            ) {
+                pendingDocs.add(docName);
+            }
+        }
+
+        // Persisted sync flags do not retain per-document identity. Conservatively
+        // keep every loaded document dirty so reconnect can verify full state.
+        if (hasPersistedPendingChanges() || wasSyncInterrupted()) {
+            this.docManager.getLoadedDocs().forEach((docName) => pendingDocs.add(docName));
+        }
+
+        return Array.from(pendingDocs);
     }
 
     private markDocsForFullStateVerification(docNames: DocName[]): void {
@@ -189,7 +212,12 @@ export class YjsDriveProvider {
             this.subscribeToDoc(docName);
         }
 
-        this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
+        // Completing a first connection while offline must not turn every local
+        // document into an upload candidate. Backup mode may already have Drive
+        // state that must be pulled before any genuine local work is uploaded.
+        // Keep explicitly queued dirty docs and live deltas intact, and expose a
+        // separate pending-reconciliation signal so the online handler runs.
+        this.initialRemoteReconciliationPending = true;
         this.connected = true;
         this.updateSyncInterval();
         this.setState('offline');
@@ -451,7 +479,7 @@ export class YjsDriveProvider {
     /**
      * Register a callback to run after each successful sync
      */
-    onSyncComplete(callback: () => void): void {
+    onSyncComplete(callback: () => void | Promise<void>): void {
         this.onSyncCompleteCallback = callback;
     }
 
@@ -584,9 +612,11 @@ export class YjsDriveProvider {
                         this.subscribeToDoc(docName);
                     }
 
-                    if (this.manifest.isDirty()) {
-                        await this.manifest.save();
-                    }
+                    // A pristine manual-mode bootstrap is pull-only. Manifest
+                    // recovery may enrich the in-memory snapshot while loading,
+                    // but persisting that housekeeping would violate Manual
+                    // mode's zero-write connect contract. The next explicit
+                    // Sync Now safely persists it.
                 } else {
                     for (const docName of this.docManager.getLoadedDocs()) {
                         this.subscribeToDoc(docName);
@@ -652,8 +682,9 @@ export class YjsDriveProvider {
 
         this.connected = false;
         this.pendingDeltas.clear();
-        this.forceFullStateDocs = new Set(this.docManager.getLoadedDocs());
+        this.forceFullStateDocs.clear();
         this.verifyFullStateDocs.clear();
+        this.initialRemoteReconciliationPending = false;
         this.appliedStateVersions.clear();
         this.appliedDeltaIds.clear();
         this.setState('idle');
@@ -842,6 +873,7 @@ export class YjsDriveProvider {
         this.updatePendingState();
 
         const hasPendingLocal = this.hasLocalChangesToPush();
+        const hasActualLocalChanges = this.hasActualLocalChangesToPush();
         const timeSinceLastPull = Date.now() - this.lastPullAt;
 
         if (!allowPull && !hasPendingLocal && !force) {
@@ -872,9 +904,23 @@ export class YjsDriveProvider {
         this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal, allowPull });
 
         try {
+            // An offline first connection has not inspected Drive yet. Complete
+            // the same one-time reconciliation an online connect would perform
+            // before honoring Backup mode's normal push-only trigger behavior.
+            const completingInitialRemoteReconciliation = this.initialRemoteReconciliationPending;
+            let initialRemoteDataAvailable = false;
+
             // Check if manifest has changed before doing full reload
             let manifestChanged = false;
-            if (allowPull) {
+            if (completingInitialRemoteReconciliation) {
+                this.setPhase('checking');
+                await this.manifest.load();
+                this.lastPullAt = Date.now();
+                const remoteManifest = this.manifest.getManifest();
+                initialRemoteDataAvailable = Boolean(remoteManifest && Object.keys(remoteManifest.documents).length > 0);
+                manifestChanged = initialRemoteDataAvailable;
+                this.log('sync: completed deferred initial manifest load', { hasRemoteData: initialRemoteDataAvailable });
+            } else if (allowPull) {
                 this.setPhase('checking');
                 manifestChanged = await this.manifest.hasManifestChanged();
                 
@@ -890,12 +936,12 @@ export class YjsDriveProvider {
                 }
             }
 
-            if (!allowPull && !this.manifest.getManifest()) {
+            if (!completingInitialRemoteReconciliation && !allowPull && !this.manifest.getManifest()) {
                 await this.manifest.load();
                 this.log('sync: manifest loaded (push-only)');
             }
 
-            if (!allowPull && this.syncMode === 'backup' && hasPendingLocal && this.manifest.canCheckRemoteManifestChanges()) {
+            if (!completingInitialRemoteReconciliation && !allowPull && this.syncMode === 'backup' && hasPendingLocal && this.manifest.canCheckRemoteManifestChanges()) {
                 this.setPhase('checking');
                 const remoteManifestChanged = await this.manifest.hasManifestChanged();
 
@@ -904,15 +950,21 @@ export class YjsDriveProvider {
                 }
             }
 
-            const shouldPull = allowPull && (manifestChanged || force);
+            const shouldPull = completingInitialRemoteReconciliation
+                ? initialRemoteDataAvailable
+                : allowPull && (manifestChanged || force);
 
             if (force && options.forceFullState === true) {
                 this.markDocsForFullStateVerification(loadedDocs);
             }
 
-            // Sync each loaded document (pull if manifest changed, always push pending)
-            for (const docName of loadedDocs) {
-                await this.syncDoc(docName, shouldPull);
+            // Sync each loaded document when Drive has something to reconcile or
+            // genuine local work exists. Avoid creating empty remote documents
+            // merely to clear the deferred-connect marker.
+            if (!completingInitialRemoteReconciliation || initialRemoteDataAvailable || hasActualLocalChanges) {
+                for (const docName of loadedDocs) {
+                    await this.syncDoc(docName, shouldPull);
+                }
             }
 
             // Only save manifest if it was modified during this sync
@@ -923,18 +975,32 @@ export class YjsDriveProvider {
                 this.log('sync: no manifest changes, skipping save');
             }
 
+            // Reconciliation may span several Yjs documents and automatic
+            // backup creation may load lazy documents. Await both so a forced
+            // Sync Now never reports completion while that work is still
+            // generating local deltas.
+            await this.onSyncCompleteCallback?.();
+
+            // A pulled operation journal can require deterministic writes to
+            // already-synced documents. Flush those callback-generated deltas
+            // in the same user-visible sync instead of leaving a surprise
+            // second "Sync changes" action.
+            const postSyncPendingDocs = this.getInMemoryPendingDocNames();
+            for (const docName of postSyncPendingDocs) {
+                await this.syncDoc(docName, false);
+            }
+
+            if (this.manifest.isDirty()) {
+                await this.manifest.save();
+                this.log('sync: post-reconciliation manifest saved', this.manifest.getLastSync());
+            }
+
+            this.initialRemoteReconciliationPending = false;
             this.setState('idle');
             const hasRemainingLocalChanges = this.hasInMemoryLocalChangesToPush();
             markSyncCompleted(); // Persist successful sync completion
             if (hasRemainingLocalChanges) {
                 markPendingChanges();
-            }
-
-            // Trigger post-sync callback (e.g., backup)
-            try {
-                this.onSyncCompleteCallback?.();
-            } catch (cbErr) {
-                console.error('[YjsDriveProvider] onSyncComplete callback error:', cbErr);
             }
 
         } catch (error) {
@@ -998,21 +1064,28 @@ export class YjsDriveProvider {
             || this.hasPendingDeltas();
     }
 
+    private getInMemoryPendingDocNames(): DocName[] {
+        return this.docManager.getLoadedDocs().filter((docName) => {
+            return this.forceFullStateDocs.has(docName)
+                || this.verifyFullStateDocs.has(docName)
+                || (this.pendingDeltas.get(docName)?.length ?? 0) > 0;
+        });
+    }
+
+    private hasActualLocalChangesToPush(): boolean {
+        if (this.hasInMemoryLocalChangesToPush()) {
+            return true;
+        }
+
+        return hasPersistedPendingChanges() || wasSyncInterrupted();
+    }
+
     /**
      * Check if there are local changes that need to be pushed
      * This includes in-memory pending deltas and persisted state from previous sessions
      */
     hasLocalChangesToPush(): boolean {
-        if (this.forceFullStateDocs.size > 0 || this.verifyFullStateDocs.size > 0) {
-            return true;
-        }
-
-        if (this.hasPendingDeltas()) {
-            return true;
-        }
-
-        // Also check persisted state for changes from previous sessions
-        return hasPersistedPendingChanges() || wasSyncInterrupted();
+        return this.initialRemoteReconciliationPending || this.hasActualLocalChangesToPush();
     }
 
     /**
@@ -1113,38 +1186,34 @@ export class YjsDriveProvider {
                 try {
                     const stateBuffer = await this.downloadFileWithRecovery(docManifest.stateFile, stateFileId);
                     if (!stateBuffer) {
-                        console.warn(`[YjsDriveProvider] State file not found for ${docName}: ${docManifest.stateFile}`);
-                    } else {
-                        const stateArray = new Uint8Array(stateBuffer);
-                        let applied = true;
-
-                        if (stateArray.length > 0) {
-                            applied = this.applyValidatedRemoteUpdate(docName, doc, stateArray, `base state v${docManifest.stateVersion}`);
-
-                            if (applied) {
-                                this.log(`pull: applied base state v${docManifest.stateVersion} for ${docName}`, { bytes: stateArray.length });
-                            }
-                        }
-
-                        if (applied) {
-                            // Mark as applied and clear old deltas (they're included in the new state)
-                            this.appliedStateVersions.set(docName, docManifest.stateVersion);
-                            appliedDeltas.clear();
-                            this.appliedDeltaIds.set(docName, appliedDeltas);
-                        }
+                        throw new Error(`Remote base state is missing for ${docName}: ${docManifest.stateFile}`);
                     }
+
+                    const stateArray = new Uint8Array(stateBuffer);
+                    if (stateArray.length === 0) {
+                        throw new Error(`Remote base state is empty for ${docName}: ${docManifest.stateFile}`);
+                    }
+
+                    const applied = this.applyValidatedRemoteUpdate(docName, doc, stateArray, `base state v${docManifest.stateVersion}`);
+                    if (!applied) {
+                        throw new Error(`Remote base state is corrupt for ${docName}: ${docManifest.stateFile}`);
+                    }
+
+                    this.log(`pull: applied base state v${docManifest.stateVersion} for ${docName}`, { bytes: stateArray.length });
+                    // Mark as applied and clear old deltas (they're included in the new state)
+                    this.appliedStateVersions.set(docName, docManifest.stateVersion);
+                    appliedDeltas.clear();
+                    this.appliedDeltaIds.set(docName, appliedDeltas);
                 } catch (error) {
                     console.warn(`[YjsDriveProvider] Could not pull base state for ${docName}:`, error);
+                    throw error;
                 }
             } else {
-                console.warn(`[YjsDriveProvider] State file not found for ${docName}: ${docManifest.stateFile}`);
+                throw new Error(`Remote base state file is unavailable for ${docName}: ${docManifest.stateFile}`);
             }
         }
 
         // Pull only new deltas (not already applied)
-        // Track orphaned deltas that need to be pruned from manifest
-        const orphanedDeltaIds: string[] = [];
-
         for (const delta of docManifest.deltas) {
             if (appliedDeltas.has(delta.id)) {
                 continue; // Already applied
@@ -1162,44 +1231,30 @@ export class YjsDriveProvider {
                 try {
                     const deltaBuffer = await this.downloadFileWithRecovery(deltaFileName, deltaFileId);
                     if (!deltaBuffer) {
-                        console.warn(`[YjsDriveProvider] Delta file orphaned after recovery, pruning: ${deltaFileName}`);
-                        orphanedDeltaIds.push(delta.id);
-                        continue;
+                        throw new Error(`Remote delta is missing for ${docName}: ${deltaFileName}`);
                     }
 
                     const deltaArray = new Uint8Array(deltaBuffer);
-
-                    if (deltaArray.length > 0) {
-                        const applied = this.applyValidatedRemoteUpdate(docName, doc, deltaArray, `delta ${delta.id}`);
-
-                        if (!applied) {
-                            continue;
-                        }
-
-                        this.log(`pull: applied delta ${delta.id} for ${docName}`);
+                    if (deltaArray.length === 0) {
+                        throw new Error(`Remote delta is empty for ${docName}: ${deltaFileName}`);
                     }
 
+                    const applied = this.applyValidatedRemoteUpdate(docName, doc, deltaArray, `delta ${delta.id}`);
+                    if (!applied) {
+                        throw new Error(`Remote delta is corrupt for ${docName}: ${deltaFileName}`);
+                    }
+
+                    this.log(`pull: applied delta ${delta.id} for ${docName}`);
                     // Mark as applied
                     appliedDeltas.add(delta.id);
                     this.appliedDeltaIds.set(docName, appliedDeltas);
                 } catch (error) {
                     console.warn(`[YjsDriveProvider] Could not pull delta ${delta.id}:`, error);
+                    throw error;
                 }
             } else {
-                // Delta file referenced in manifest but not found on Drive - it's orphaned
-                // Mark for pruning from manifest (file was deleted but manifest wasn't updated)
-                console.warn(`[YjsDriveProvider] Delta file orphaned (not in Drive), pruning: ${deltaFileName}`);
-                orphanedDeltaIds.push(delta.id);
+                throw new Error(`Remote delta file is unavailable for ${docName}: ${deltaFileName}`);
             }
-        }
-
-        // Prune orphaned deltas from manifest
-        if (orphanedDeltaIds.length > 0) {
-            for (const deltaId of orphanedDeltaIds) {
-                this.manifest.removeDelta(docName, deltaId);
-            }
-            // Manifest is now dirty and will be saved by the parent sync() call
-            this.log(`pull: pruned ${orphanedDeltaIds.length} orphaned deltas for ${docName}`);
         }
     }
 

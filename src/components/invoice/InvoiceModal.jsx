@@ -1,5 +1,5 @@
 import { toDisplayDate, getTodayString } from '../../utils/dateUtils.ts';
-import { getPreferredCurrency } from '../../utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY } from '../../utils/currencyUtils.ts';
 import CustomCheckbox from '../CustomCheckbox';
 import Modal from '../Modal';
 import { useState, useEffect, useCallback } from 'react';
@@ -27,6 +27,7 @@ const InvoiceModal = ({
     canUndoInvoice = false,
     handleUndoInvoice = null,
     mode = 'invoice',
+    preferredCurrency = null,
     openedFromProjectContext = false,
     allowAdditionalProjectsSelection = false,
     isProjectContextFixed,
@@ -154,7 +155,7 @@ const InvoiceModal = ({
 
     // Helper function to get the currency to use (client currency or user preference)
     const getInvoiceCurrency = () => {
-        return selectedClient?.defaultCurrency || getPreferredCurrency();
+        return selectedClient?.defaultCurrency || preferredCurrency || DEFAULT_CURRENCY;
     };
 
     const [activeSection, setActiveSection] = useState(getDefaultSection());

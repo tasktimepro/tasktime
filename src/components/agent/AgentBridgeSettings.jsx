@@ -24,6 +24,7 @@ const AGENT_BRIDGE_LAUNCH_PARAMS = {
     pairingCode: 'agentBridgePairingCode',
     agentId: 'agentBridgeAgentId',
     agentLabel: 'agentBridgeAgentLabel',
+    scopes: 'agentBridgeScopes',
 };
 const TRUST_DURATION_UNTIL_REVOKED = 'until-revoked';
 const TRUST_DURATION_30_DAYS = '30-days';
@@ -61,6 +62,10 @@ function readAgentBridgeLaunchPairingFields(search = typeof window === 'undefine
         pairingCode: params.get(AGENT_BRIDGE_LAUNCH_PARAMS.pairingCode)?.trim() || '',
         agentId: params.get(AGENT_BRIDGE_LAUNCH_PARAMS.agentId)?.trim() || '',
         agentLabel: params.get(AGENT_BRIDGE_LAUNCH_PARAMS.agentLabel)?.trim() || '',
+        scopes: (params.get(AGENT_BRIDGE_LAUNCH_PARAMS.scopes) || '')
+            .split(',')
+            .map((scope) => scope.trim())
+            .filter(Boolean),
     };
 }
 
@@ -218,6 +223,7 @@ export default function AgentBridgeSettings() {
     const hasLaunchPairing = Boolean(launchPairingFields);
     const connectButtonLabel = hasLaunchPairing ? 'Approve & Connect' : 'Connect';
     const launchAgentLabel = launchPairingFields?.agentLabel || 'A local agent';
+    const requestedLaunchScopes = launchPairingFields?.scopes || [];
     const scopes = session ? Array.from(session.scopes) : [];
     const expiresAt = session ? new Date(session.expiresAt).toLocaleString() : 'None';
     const now = Date.now();
@@ -273,7 +279,7 @@ export default function AgentBridgeSettings() {
                         {hasLaunchPairing && !session && (
                             <Notice
                                 title="Local agent request"
-                                description={`${launchAgentLabel} is requesting access through this bridge process. Approving connects this browser session to the local agent bridge.`}
+                                description={`${launchAgentLabel} is requesting these scopes: ${requestedLaunchScopes.length > 0 ? requestedLaunchScopes.join(', ') : 'none disclosed'}. Approving connects this browser session to the local agent bridge.`}
                                 variant="default"
                                 compact
                             />

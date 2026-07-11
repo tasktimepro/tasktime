@@ -17,7 +17,7 @@ import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useToast } from '@/hooks/useToast';
 import { formatRecurringLabel } from '@/utils/recurringUtils';
 import { formatDurationWithSeconds, getTodayString, millisecondsToHours, toDisplayDate } from '@/utils/dateUtils';
-import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
+import { DEFAULT_CURRENCY, formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
 import { differenceInCalendarDays, endOfDay, parseISO, startOfDay } from 'date-fns';
 import TimerControls from '../TimerControls';
 import TaskActionsMenu from '../task/TaskActionsMenu';
@@ -62,7 +62,8 @@ const TaskViewModal = ({
     onArchive,
     onNavigateToProject,
     onOpenTimeEntries,
-    onOpenPlannerOptions
+    onOpenPlannerOptions,
+    preferredCurrency = DEFAULT_CURRENCY,
 }) => {
     const { showSuccess } = useToast();
     const { projects } = useProjects();
@@ -287,10 +288,10 @@ const TaskViewModal = ({
             ?? client?.hourlyRate
             ?? 0;
 
-        const currency = project ? getProjectCurrency(project, clients) : null;
+        const currency = project ? getProjectCurrency(project, clients, preferredCurrency) : null;
 
         return { rate, currency };
-    }, [clients, currentTask, project, projectClient]);
+    }, [clients, currentTask, preferredCurrency, project, projectClient]);
 
     const billableTimeMs = useMemo(() => {
         if (!currentTask) return 0;
@@ -360,8 +361,8 @@ const TaskViewModal = ({
             return null;
         }
 
-        return getProjectCurrency(project, clients);
-    }, [clients, project]);
+        return getProjectCurrency(project, clients, preferredCurrency);
+    }, [clients, preferredCurrency, project]);
 
     const handleToggleComplete = useCallback(() => {
         if (!currentTask) return;

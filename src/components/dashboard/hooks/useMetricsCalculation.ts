@@ -3,6 +3,7 @@ import { getLastMonthRange, getThisMonthRange, millisecondsToHours, parseStoredD
 import { formatCurrency, getProjectCurrency } from '../../../utils/currencyUtils';
 import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoiceOverdue, isInvoicePaid } from '../../../utils/invoiceUtils';
 import { getBillableDurationMs } from '../../../utils/timeEntryDurationUtils';
+import { isTimestampStartWithinRange } from '../../../utils/reportDateBoundary';
 
 type TimeEntry = {
     taskId: string;
@@ -79,7 +80,7 @@ const useMetricsCalculation = ({
      */
     const calculateMetrics = useCallback((startTime: number, endTime: number) => {
         const entriesInRange = timeEntries.filter(entry =>
-            entry.start >= startTime && entry.end <= endTime && !entry.deletedAt
+            isTimestampStartWithinRange(entry.start, startTime, endTime) && !entry.deletedAt
         );
 
         const totalTime = entriesInRange.reduce((total, entry) => {
@@ -108,7 +109,7 @@ const useMetricsCalculation = ({
                 taskTimeMap[taskKey] = {
                     totalTime: 0,
                     project: project,
-                    currency: getProjectCurrency(project, clients)
+                    currency: getProjectCurrency(project, clients, preferredCurrency)
                 };
             }
             taskTimeMap[taskKey].totalTime += getBillableDurationMs(entry);
@@ -300,7 +301,7 @@ const useMetricsCalculation = ({
     const thisMonthBillableHours = useMemo(() => {
         // Re-calculate the hours from the time entries for this month
         const entriesInRange = timeEntries.filter(entry =>
-            entry.start >= thisMonthRange.start && entry.end <= thisMonthRange.end
+            isTimestampStartWithinRange(entry.start, thisMonthRange.start, thisMonthRange.end)
         );
 
         // Group by task and calculate billable hours using the same rounding logic

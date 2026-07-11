@@ -4,14 +4,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const STORAGE_KEY = 'tasktime-disconnected-dirty-docs'
 const SYNC_STATE_STORAGE_KEY = 'tasktime-sync-state'
 
-const { docs, providerInstances, storage, providerMockState, deletedDatabaseCalls } = vi.hoisted(() => ({
+const { docs, providerInstances, storage, providerMockState, deletedDatabaseCalls, restoreJournalState } = vi.hoisted(() => ({
     docs: new Map(),
     providerInstances: [],
     storage: new Map(),
     deletedDatabaseCalls: [],
     providerMockState: {
         hasLocalChangesToPush: false,
+        pendingDocNames: [],
     },
+    restoreJournalState: {
+        record: null,
+    },
+}))
+
+vi.mock('./restoreJournal', () => ({
+    readRestoreJournal: vi.fn(async () => restoreJournalState.record),
+    writeRestoreJournal: vi.fn(async (record) => {
+        restoreJournalState.record = structuredClone(record)
+    }),
+    clearRestoreJournal: vi.fn(async () => {
+        restoreJournalState.record = null
+    }),
 }))
 
 vi.mock('./YjsDocManager', async () => {
@@ -51,6 +65,8 @@ vi.mock('./YjsDocManager', async () => {
             async deleteDatabases(docNames) {
                 deletedDatabaseCalls.push(docNames)
             }
+
+            async flushPersistence() {}
         }
     }
 })
@@ -67,6 +83,7 @@ vi.mock('./providers/GoogleDriveProvider', () => ({
             this.isConnected = vi.fn(() => true)
             this.getState = vi.fn(() => 'idle')
             this.hasLocalChangesToPush = vi.fn(() => providerMockState.hasLocalChangesToPush)
+            this.getPendingDocNames = vi.fn(() => providerMockState.pendingDocNames)
             this.sync = vi.fn(async () => {})
             this.syncAndSubscribeDoc = vi.fn(async () => {})
             this.getEntryYears = vi.fn(() => [])
@@ -93,6 +110,21 @@ function objectToYMap(data) {
     return map
 }
 
+function readStored(map, id) {
+    const value = map.get(id)
+    return value instanceof Y.Map ? Object.fromEntries(value.entries()) : value
+}
+
+const BILLING_OPERATION_PHASES = [
+    'prepared',
+    'entries-applied',
+    'expenses-applied',
+    'tasks-applied',
+    'core-links-applied',
+    'invoice-applied',
+    'complete',
+]
+
 describe('YjsStore reconnect sync tracking', () => {
     beforeEach(() => {
         storage.clear()
@@ -114,7 +146,265 @@ describe('YjsStore reconnect sync tracking', () => {
         providerInstances.length = 0
         deletedDatabaseCalls.length = 0
         providerMockState.hasLocalChangesToPush = false
+        providerMockState.pendingDocNames = []
+        restoreJournalState.record = null
     })
+
+    it.each(BILLING_OPERATION_PHASES)(
+        'replays invoice finalization after interruption at %s',
+        async (failedPhase) => {
+            const store = new YjsStore()
+            await store.initialize()
+
+            store.projects.set('project-billing', objectToYMap({ id: 'project-billing', title: 'Billing project' }))
+            store.tasks.set('task-billing', objectToYMap({ id: 'task-billing', title: 'Billing task', lastBilledAt: null }))
+            store.expenses.set('expense-billing', objectToYMap({
+                id: 'expense-billing',
+                title: 'Billable expense',
+                date: '2026-07-10',
+                amount: 20,
+                currency: 'EUR',
+                paymentStatus: 'paid',
+                billingStatus: 'unbilled',
+                isPersonal: false,
+                billable: true,
+            }))
+            store.invoiceTemplates.set('template-billing', objectToYMap({
+                id: 'template-billing',
+                name: 'Billing template',
+                currentSequentialNumber: 1,
+                useSequentialNumbers: true,
+            }))
+            store.activeTimeEntries.set('entry-billing', objectToYMap({
+                id: 'entry-billing',
+                taskId: 'task-billing',
+                start: Date.UTC(2026, 6, 10, 8),
+                end: Date.UTC(2026, 6, 10, 9),
+            }))
+
+            const desiredInvoice = {
+                id: 'invoice-billing',
+                projectId: 'project-billing',
+                projectIds: ['project-billing'],
+                clientId: 'client-billing',
+                invoiceNumber: 'INV-1',
+                date: '2026-07-10',
+                status: 'sent',
+                items: [],
+                subtotal: 100,
+                total: 100,
+                currency: 'EUR',
+            }
+            const application = {
+                adjustmentEntryIdsToDelete: [],
+                adjustmentEntriesToUpdate: [],
+                adjustmentEntriesToCreate: [],
+                timeEntryUpdates: [{
+                    id: 'entry-billing',
+                    updates: {
+                        billedAt: 1000,
+                        billedInvoiceId: 'invoice-billing',
+                        billedHourlyRate: 100,
+                        updatedAt: 1000,
+                    },
+                }],
+                expenseUpdates: [{
+                    id: 'expense-billing',
+                    updates: { billingStatus: 'billed', invoiceId: 'invoice-billing', billedAt: 1000, updatedAt: 1000 },
+                }],
+                taskCutoffUpdates: [{ id: 'task-billing', updates: { lastBilledAt: 900, updatedAt: 1000 } }],
+                quotedTaskUpdates: [],
+                projectLinkUpdates: [{ id: 'project-billing', updates: { invoiceIds: ['invoice-billing'], updatedAt: 1000 } }],
+                invoiceTemplateSequenceUpdate: { id: 'template-billing', updates: { currentSequentialNumber: 2 } },
+                invoiceUpdates: { status: 'sent', updatedAt: 1000 },
+                billedEntryCount: 1,
+                billedExpenseCount: 1,
+                updatedTaskCount: 1,
+                updatedProjectInvoiceReferences: true,
+                advancedInvoiceSequence: true,
+            }
+
+            await expect(store.commitInvoiceFinalization({
+                operationId: `finalize-${failedPhase}`,
+                desiredInvoice,
+                application,
+                createdAt: 1000,
+                onPhase: (phase) => {
+                    if (phase === failedPhase) throw new Error(`interrupt ${phase}`)
+                },
+            })).rejects.toThrow(`interrupt ${failedPhase}`)
+
+            await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+            expect(readStored(store.invoices, 'invoice-billing')).toEqual(expect.objectContaining({ status: 'sent' }))
+            expect(readStored(store.activeTimeEntries, 'entry-billing')).toEqual(expect.objectContaining({ billedInvoiceId: 'invoice-billing' }))
+            expect(readStored(store.expenses, 'expense-billing')).toEqual(expect.objectContaining({ invoiceId: 'invoice-billing' }))
+            expect(readStored(store.tasks, 'task-billing')).toEqual(expect.objectContaining({ lastBilledAt: 900 }))
+            expect(readStored(store.projects, 'project-billing')).toEqual(expect.objectContaining({ invoiceIds: ['invoice-billing'] }))
+            expect(readStored(store.invoiceTemplates, 'template-billing')).toEqual(expect.objectContaining({ currentSequentialNumber: 2 }))
+            expect(readStored(store.invoiceBillingOperations, `finalize-${failedPhase}`)).toEqual(expect.objectContaining({ state: 'complete' }))
+
+            store.destroy()
+        }
+    )
+
+    it('does not create new Yjs updates when completed billing state already matches', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        store.projects.set('project-noop', objectToYMap({ id: 'project-noop', title: 'No-op project' }))
+
+        const desiredInvoice = {
+            id: 'invoice-noop',
+            projectId: 'project-noop',
+            clientId: 'client-noop',
+            invoiceNumber: 'INV-NOOP',
+            date: '2026-07-10',
+            status: 'sent',
+            items: [],
+            subtotal: 10,
+            total: 10,
+        }
+        const application = {
+            adjustmentEntryIdsToDelete: [],
+            adjustmentEntriesToUpdate: [],
+            adjustmentEntriesToCreate: [],
+            timeEntryUpdates: [],
+            expenseUpdates: [],
+            taskCutoffUpdates: [],
+            quotedTaskUpdates: [],
+            projectLinkUpdates: [{ id: 'project-noop', updates: { invoiceIds: ['invoice-noop'], updatedAt: 1000 } }],
+            invoiceTemplateSequenceUpdate: null,
+            invoiceUpdates: { status: 'sent', updatedAt: 1000 },
+            billedEntryCount: 0,
+            billedExpenseCount: 0,
+            updatedTaskCount: 0,
+            updatedProjectInvoiceReferences: true,
+            advancedInvoiceSequence: false,
+        }
+
+        await store.commitInvoiceFinalization({
+            operationId: 'finalize-noop',
+            desiredInvoice,
+            application,
+            createdAt: 1000,
+        })
+
+        const before = new Map(Array.from(docs.entries()).map(([name, doc]) => [
+            name,
+            Array.from(Y.encodeStateVector(doc)),
+        ]))
+
+        await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+        const after = new Map(Array.from(docs.entries()).map(([name, doc]) => [
+            name,
+            Array.from(Y.encodeStateVector(doc)),
+        ]))
+        expect(after).toEqual(before)
+
+        store.destroy()
+    })
+
+    it.each(BILLING_OPERATION_PHASES)(
+        'replays invoice undo after interruption at %s',
+        async (failedPhase) => {
+            const store = new YjsStore()
+            await store.initialize()
+
+            store.projects.set('project-undo', objectToYMap({
+                id: 'project-undo',
+                title: 'Undo project',
+                invoiceIds: ['invoice-undo'],
+            }))
+            store.tasks.set('task-undo', objectToYMap({ id: 'task-undo', title: 'Undo task', lastBilledAt: 900 }))
+            store.expenses.set('expense-undo', objectToYMap({
+                id: 'expense-undo',
+                title: 'Billed expense',
+                date: '2026-07-10',
+                amount: 20,
+                currency: 'EUR',
+                paymentStatus: 'paid',
+                billingStatus: 'billed',
+                invoiceId: 'invoice-undo',
+                billedAt: 1000,
+                isPersonal: false,
+                billable: true,
+            }))
+            store.invoiceTemplates.set('template-undo', objectToYMap({
+                id: 'template-undo',
+                name: 'Undo template',
+                currentSequentialNumber: 2,
+                useSequentialNumbers: true,
+            }))
+            store.activeTimeEntries.set('entry-undo', objectToYMap({
+                id: 'entry-undo',
+                taskId: 'task-undo',
+                start: Date.UTC(2026, 6, 10, 8),
+                end: Date.UTC(2026, 6, 10, 9),
+                billedAt: 1000,
+                billedInvoiceId: 'invoice-undo',
+                billedHourlyRate: 100,
+            }))
+            const invoice = {
+                id: 'invoice-undo',
+                projectId: 'project-undo',
+                clientId: 'client-undo',
+                invoiceNumber: 'INV-1',
+                date: '2026-07-10',
+                status: 'sent',
+                items: [],
+                subtotal: 100,
+                total: 100,
+                currency: 'EUR',
+            }
+            store.invoices.set(invoice.id, objectToYMap(invoice))
+            const application = {
+                entriesToDelete: [],
+                entriesToClear: [{
+                    entry: readStored(store.activeTimeEntries, 'entry-undo'),
+                    updates: { billedAt: null, billedInvoiceId: null, billedHourlyRate: null, updatedAt: 2000 },
+                }],
+                expenseUpdatesToUnbill: [{
+                    id: 'expense-undo',
+                    updates: { billingStatus: 'unbilled', invoiceId: null, billedAt: null, updatedAt: 2000 },
+                }],
+                quotedTaskUpdates: [],
+                taskCutoffUpdates: [{
+                    id: 'task-undo',
+                    expectedLastBilledAt: 900,
+                    updates: { lastBilledAt: null, updatedAt: 2000 },
+                }],
+                projectUnlinkUpdates: [{ id: 'project-undo', updates: { invoiceIds: [], updatedAt: 2000 } }],
+                invoiceTemplateSequenceUpdate: { id: 'template-undo', updates: { currentSequentialNumber: 1, updatedAt: 2000 } },
+                clearedTimeEntryCount: 1,
+                deletedAdjustmentCount: 0,
+                unbilledExpenseCount: 1,
+                rewoundSequence: true,
+            }
+
+            await expect(store.commitInvoiceUndo({
+                operationId: `undo-${failedPhase}`,
+                invoice,
+                application,
+                createdAt: 2000,
+                onPhase: (phase) => {
+                    if (phase === failedPhase) throw new Error(`interrupt ${phase}`)
+                },
+            })).rejects.toThrow(`interrupt ${failedPhase}`)
+
+            await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+            expect(store.invoices.has('invoice-undo')).toBe(false)
+            expect(readStored(store.activeTimeEntries, 'entry-undo')).toEqual(expect.objectContaining({ billedInvoiceId: null }))
+            expect(readStored(store.expenses, 'expense-undo')).toEqual(expect.objectContaining({ invoiceId: null, billingStatus: 'unbilled' }))
+            expect(readStored(store.tasks, 'task-undo')).toEqual(expect.objectContaining({ lastBilledAt: null }))
+            expect(readStored(store.projects, 'project-undo')).toEqual(expect.objectContaining({ invoiceIds: [] }))
+            expect(readStored(store.invoiceTemplates, 'template-undo')).toEqual(expect.objectContaining({ currentSequentialNumber: 1 }))
+            expect(readStored(store.invoiceBillingOperations, `undo-${failedPhase}`)).toEqual(expect.objectContaining({ state: 'complete' }))
+
+            store.destroy()
+        }
+    )
 
     it('hands disconnected local edits to Drive on reconnect', async () => {
         const store = new YjsStore()
@@ -242,6 +532,23 @@ describe('YjsStore reconnect sync tracking', () => {
 
         expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['core'])
         expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
+
+        store.destroy()
+    })
+
+    it('persists provider pending documents before disconnect clears its in-memory queue', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+        providerMockState.pendingDocNames = ['core', 'entries-active']
+
+        store.disconnectDrive()
+
+        expect(provider.getPendingDocNames).toHaveBeenCalledTimes(1)
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core', 'entries-active'])
+        expect(provider.disconnect).toHaveBeenCalledTimes(1)
 
         store.destroy()
     })
@@ -450,6 +757,75 @@ describe('YjsStore timer reconciliation', () => {
         providerInstances.length = 0
         deletedDatabaseCalls.length = 0
         providerMockState.hasLocalChangesToPush = false
+        restoreJournalState.record = null
+    })
+
+    it('filters malformed persisted time entries from calculations and exports', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        docs.get('entries-active').getMap('timeEntries').set('entry-valid', objectToYMap({
+            id: 'entry-valid',
+            taskId: 'task-1',
+            start: 100,
+            end: 200,
+        }))
+        docs.get('entries-active').getMap('timeEntries').set('entry-invalid', objectToYMap({
+            id: 'entry-invalid',
+            taskId: 'task-1',
+            start: 300,
+            end: 200,
+        }))
+
+        expect(store.getAllTimeEntries().map((entry) => entry.id)).toEqual(['entry-valid'])
+        expect((await store.loadAllTimeEntries()).map((entry) => entry.id)).toEqual(['entry-valid'])
+
+        store.destroy()
+    })
+
+    it('normalizes a supported legacy persisted invoice before validated readers can hide it', async () => {
+        const coreDoc = new Y.Doc()
+        coreDoc.getMap('invoices').set('invoice-legacy', objectToYMap({
+            id: 'invoice-legacy',
+            project: { id: 'project-1' },
+            client: { id: 'client-1' },
+            invoiceNumber: 'INV-LEGACY',
+            date: '2026-07-01',
+            status: 'sent',
+            subtotal: 200,
+            totalAmount: 200,
+            paymentProcessed: false,
+            tasks: [{
+                id: 'task-1',
+                title: 'Legacy work',
+                hours: 2,
+                hourlyRate: 100,
+            }],
+        }))
+        docs.set('core', coreDoc)
+        docs.set('entries-active', new Y.Doc())
+
+        const store = new YjsStore()
+        await store.initialize()
+
+        const normalized = store.invoices.get('invoice-legacy').toJSON()
+
+        expect(normalized).toEqual(expect.objectContaining({
+            id: 'invoice-legacy',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            total: 200,
+            items: [expect.objectContaining({
+                taskId: 'task-1',
+                quantity: 2,
+                rate: 100,
+                amount: 200,
+            })],
+        }))
+        expect(normalized).not.toHaveProperty('totalAmount')
+        expect(normalized).not.toHaveProperty('paymentProcessed')
+
+        store.destroy()
     })
 
     it('deletes orphaned timers that have a matching stopped timer instance', async () => {
@@ -843,6 +1219,144 @@ describe('YjsStore timer reconciliation', () => {
         store.destroy()
     })
 
+    it('recovers the previous workspace and active timers when restore application fails', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        store.projects.set('project-original', objectToYMap({
+            id: 'project-original',
+            title: 'Original project',
+        }))
+        store.tasks.set('task-original', objectToYMap({
+            id: 'task-original',
+            title: 'Original task',
+            projectId: 'project-original',
+        }))
+        store.timers.set('project-original', objectToYMap({
+            projectId: 'project-original',
+            taskId: 'task-original',
+            timerInstanceId: 'timer-original',
+            startTime: Date.UTC(2026, 6, 10, 8),
+            paused: true,
+            pausedElapsedTime: 60_000,
+            note: 'Protected timer',
+            lastActive: Date.UTC(2026, 6, 10, 9),
+        }))
+
+        const originalImport = store.importBackupData.bind(store)
+        vi.spyOn(store, 'importBackupData')
+            .mockImplementationOnce(async () => {
+                store.projects.set('project-partial', objectToYMap({
+                    id: 'project-partial',
+                    title: 'Partially imported project',
+                }))
+                throw new Error('simulated persistence failure')
+            })
+            .mockImplementation(originalImport)
+
+        await expect(store.replaceAllDataWithBackup({
+            projects: [{ id: 'project-replacement', title: 'Replacement project' }],
+        })).rejects.toThrow('the previous workspace was recovered')
+
+        expect(store.projects.has('project-original')).toBe(true)
+        expect(store.projects.has('project-partial')).toBe(false)
+        expect(store.projects.has('project-replacement')).toBe(false)
+        expect(store.timers.has('project-original')).toBe(true)
+
+        store.destroy()
+    })
+
+    it('rejects an invalid replacement before mutating the current workspace', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        store.projects.set('project-protected', objectToYMap({
+            id: 'project-protected',
+            title: 'Protected project',
+        }))
+        store.tasks.set('task-protected', objectToYMap({
+            id: 'task-protected',
+            title: 'Protected task',
+            projectId: 'project-protected',
+        }))
+
+        const coreBefore = Array.from(Y.encodeStateVector(store.coreDoc))
+
+        await expect(store.replaceAllDataWithBackup({
+            projects: [{ id: 'project-invalid', title: 'Invalid replacement' }],
+            tasks: [{ id: 'task-invalid', title: 'Broken reference', projectId: 'missing-project' }],
+        })).rejects.toThrow('references non-existent project')
+
+        expect(Array.from(Y.encodeStateVector(store.coreDoc))).toEqual(coreBefore)
+        expect(readStored(store.projects, 'project-protected')).toEqual(expect.objectContaining({
+            title: 'Protected project',
+        }))
+        expect(readStored(store.tasks, 'task-protected')).toEqual(expect.objectContaining({
+            projectId: 'project-protected',
+        }))
+        expect(restoreJournalState.record).toBeNull()
+
+        store.destroy()
+    })
+
+    it('recovers a durably journaled workspace after the browser stopped mid-restore', async () => {
+        const partialCore = new Y.Doc()
+        partialCore.getMap('projects').set('project-partial', objectToYMap({
+            id: 'project-partial',
+            title: 'Partial replacement',
+        }))
+        docs.set('core', partialCore)
+        docs.set('entries-active', new Y.Doc())
+
+        restoreJournalState.record = {
+            version: 1,
+            operationId: 'restore-interrupted',
+            createdAt: Date.now(),
+            rollback: {
+                version: '1.4',
+                exportDate: new Date().toISOString(),
+                backupType: 'manual',
+                projects: [{ id: 'project-original', title: 'Original project' }],
+                tasks: [{ id: 'task-original', title: 'Original task', projectId: 'project-original' }],
+                timeEntries: [],
+                invoices: [],
+                paymentMethods: [],
+                expenseCategories: [],
+                taxReturnPeriods: [],
+                businessInfos: [],
+                businessBrandAssets: [],
+                clients: [],
+                invoiceTemplates: [],
+                emailTemplates: [],
+                expenses: [],
+                expenseRecurrences: [],
+                dailyGoals: [],
+                plannerAttachments: [],
+                preferences: {},
+            },
+            rollbackTimers: [{
+                projectId: 'project-original',
+                taskId: 'task-original',
+                timerInstanceId: 'timer-original',
+                startTime: Date.UTC(2026, 6, 10, 8),
+            }],
+            replacement: {
+                projects: [{ id: 'project-replacement', title: 'Replacement project' }],
+            },
+        }
+
+        const store = new YjsStore()
+        await store.initialize()
+
+        expect(store.projects.has('project-original')).toBe(true)
+        expect(store.projects.has('project-partial')).toBe(false)
+        expect(store.projects.has('project-replacement')).toBe(false)
+        expect(store.tasks.has('task-original')).toBe(true)
+        expect(store.timers.has('project-original')).toBe(true)
+        expect(restoreJournalState.record).toBe(null)
+
+        store.destroy()
+    })
+
     it('refreshes connected cloud docs before manual export when requested', async () => {
         const store = new YjsStore()
         await store.initialize()
@@ -954,6 +1468,186 @@ describe('YjsStore task hierarchy archiving', () => {
         expect(coreDoc.getMap('tasks').has('child')).toBe(true)
         expect(coreDoc.getMap('tasks').get('parent').get('archived')).toBe(false)
         expect(coreDoc.getMap('tasks').get('child').get('parentTaskId')).toBe('parent')
+
+        store.destroy()
+    })
+
+    it('deduplicates a legacy task move that stopped after writing the archive copy', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const activeMap = docs.get('core').getMap('tasks')
+        activeMap.set('task-1', objectToYMap({
+            id: 'task-1',
+            title: 'Stale active copy',
+            archived: false,
+        }))
+
+        const archivedDoc = new Y.Doc()
+        docs.set('tasks-archived', archivedDoc)
+        archivedDoc.getMap('tasks').set('task-1', objectToYMap({
+            id: 'task-1',
+            title: 'Archived copy',
+            archived: true,
+            archivedOnDate: '2026-07-01',
+        }))
+
+        const archivedMap = await store.loadArchivedTasks()
+
+        expect(activeMap.has('task-1')).toBe(false)
+        expect(archivedMap.get('task-1').get('title')).toBe('Archived copy')
+
+        store.destroy()
+    })
+
+    it('finishes the newest task unarchive transition after a stale archive replay', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const activeMap = docs.get('core').getMap('tasks')
+        activeMap.set('task-1', objectToYMap({
+            id: 'task-1',
+            title: 'Restored task',
+            archived: false,
+            _archiveTransition: {
+                operationId: 'unarchive-new',
+                targetDoc: 'core',
+                changedAt: 200,
+            },
+        }))
+
+        const archivedDoc = new Y.Doc()
+        docs.set('tasks-archived', archivedDoc)
+        archivedDoc.getMap('tasks').set('task-1', objectToYMap({
+            id: 'task-1',
+            title: 'Old archived copy',
+            archived: true,
+            _archiveTransition: {
+                operationId: 'archive-old',
+                targetDoc: 'tasks-archived',
+                changedAt: 100,
+            },
+        }))
+
+        const archivedMap = await store.loadArchivedTasks()
+
+        expect(archivedMap.has('task-1')).toBe(false)
+        expect(activeMap.get('task-1').get('title')).toBe('Restored task')
+        expect(activeMap.get('task-1').get('archived')).toBe(false)
+
+        store.destroy()
+    })
+
+    it('deduplicates partial historical entry archival without losing the fresher record', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const activeMap = docs.get('entries-active').getMap('timeEntries')
+        activeMap.set('entry-1', objectToYMap({
+            id: 'entry-1',
+            taskId: 'task-1',
+            start: Date.UTC(2020, 0, 2),
+            end: Date.UTC(2020, 0, 2, 1),
+            note: 'stale',
+            updatedAt: 100,
+        }))
+
+        const yearDoc = new Y.Doc()
+        docs.set('entries-2020', yearDoc)
+        yearDoc.getMap('timeEntries').set('entry-1', objectToYMap({
+            id: 'entry-1',
+            taskId: 'task-1',
+            start: Date.UTC(2020, 0, 2),
+            end: Date.UTC(2020, 0, 2, 2),
+            note: 'fresh',
+            updatedAt: 200,
+        }))
+
+        const yearEntries = await store.loadEntriesForYear(2020)
+
+        expect(activeMap.has('entry-1')).toBe(false)
+        expect(yearEntries.get('entry-1').get('note')).toBe('fresh')
+        expect(yearEntries.get('entry-1').get('_archiveTransition').targetDoc).toBe('entries-2020')
+
+        store.destroy()
+    })
+
+    it('keeps a fresher unarchived invoice active after a stale paid copy replays', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const activeMap = docs.get('core').getMap('invoices')
+        activeMap.set('invoice-1', objectToYMap({
+            id: 'invoice-1',
+            projectId: null,
+            clientId: 'client-1',
+            invoiceNumber: 'INV-1',
+            date: '2020-01-02',
+            status: 'sent',
+            items: [],
+            subtotal: 0,
+            total: 0,
+            updatedAt: 200,
+        }))
+
+        const archivedDoc = new Y.Doc()
+        docs.set('invoices-archived', archivedDoc)
+        archivedDoc.getMap('invoices').set('invoice-1', objectToYMap({
+            id: 'invoice-1',
+            projectId: null,
+            clientId: 'client-1',
+            invoiceNumber: 'INV-1',
+            date: '2020-01-02',
+            status: 'paid',
+            paidAt: Date.UTC(2020, 0, 10),
+            items: [],
+            subtotal: 0,
+            total: 0,
+            updatedAt: 100,
+        }))
+
+        const archivedMap = await store.loadArchivedInvoices()
+
+        expect(archivedMap.has('invoice-1')).toBe(false)
+        expect(activeMap.get('invoice-1').get('status')).toBe('sent')
+        expect(activeMap.get('invoice-1').get('_archiveTransition').targetDoc).toBe('core')
+
+        store.destroy()
+    })
+
+    it('deduplicates a partial old-expense archival into the archive document', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const expense = {
+            id: 'expense-1',
+            title: 'Old paid expense',
+            date: '2020-01-02',
+            currency: 'EUR',
+            amount: 20,
+            paymentStatus: 'paid',
+            isPersonal: false,
+            billable: false,
+            billingStatus: 'unbilled',
+            isRecurring: false,
+            isTaxExempt: false,
+        }
+        const activeMap = docs.get('core').getMap('expenses')
+        activeMap.set('expense-1', objectToYMap({ ...expense, updatedAt: 100 }))
+
+        const archivedDoc = new Y.Doc()
+        docs.set('expenses-archived', archivedDoc)
+        archivedDoc.getMap('expenses').set('expense-1', objectToYMap({
+            ...expense,
+            note: 'preserved archived details',
+            updatedAt: 200,
+        }))
+
+        const archivedMap = await store.loadArchivedExpenses()
+
+        expect(activeMap.has('expense-1')).toBe(false)
+        expect(archivedMap.get('expense-1').get('note')).toBe('preserved archived details')
+        expect(archivedMap.get('expense-1').get('_archiveTransition').targetDoc).toBe('expenses-archived')
 
         store.destroy()
     })

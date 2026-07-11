@@ -33,7 +33,7 @@ TaskTime Pro pairing must be smooth for managed agent platforms:
 - Managed bundles should pass `--status-file` so agents can discover the active endpoint and launch URL without scraping stderr.
 - Agents should use `get_pairing_status` before giving setup instructions, and `refresh_pairing` when a pairing code expired or was consumed.
 - Agents must not ask users to run a separate `tasktime-agent-bridge` terminal process when the installed MCP server already owns a bridge.
-- Current TaskTime Pro app builds show scopes after connection; do not document user-selectable scopes unless the app gains a visible scope picker.
+- Current TaskTime Pro app builds show requested scopes in the launch approval notice before connection and confirmed scopes after connection; do not document user-selectable scopes unless the app gains a visible scope picker.
 - Task-and-time-management validation must include the long-running flow: inspect/create task, start timer, let the user work, later stop the same timer and verify the created time entry.
 
 ## Credentials

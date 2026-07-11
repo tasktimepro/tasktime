@@ -13,7 +13,6 @@ import {
     getProjectCurrency,
     normalizeCurrencyCode,
     DEFAULT_CURRENCY,
-    setPreferredCurrency,
     getPreferredCurrency,
     EXCHANGE_RATES_API_URL,
     fetchExchangeRates,
@@ -245,29 +244,14 @@ describe('currencyUtils', () => {
         })
     })
 
-    describe('setPreferredCurrency', () => {
-
-        it('stores normalized currency code', () => {
-
-            const getItemMock = localStorage.getItem
-            const setItemMock = localStorage.setItem
-            getItemMock.mockReturnValue(JSON.stringify({ currency: 'usd' }))
-
-            setPreferredCurrency(' gbp ')
-
-            expect(setItemMock).toHaveBeenCalled()
-            const saved = JSON.parse(setItemMock.mock.calls[0][1])
-            expect(saved.currency).toBe('GBP')
-        })
-    })
-
     describe('getPreferredCurrency', () => {
 
-        it('returns default for unknown code', () => {
+        it('returns the non-persisted compatibility default', () => {
 
             const getItemMock = localStorage.getItem
-            getItemMock.mockReturnValue(JSON.stringify({ currency: 'xyz' }))
+            getItemMock.mockReturnValue(JSON.stringify({ currency: 'GBP' }))
             expect(getPreferredCurrency()).toBe(DEFAULT_CURRENCY)
+            expect(getItemMock).not.toHaveBeenCalled()
         })
     })
 

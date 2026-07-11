@@ -4,7 +4,7 @@ import { ArrowDownTrayIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
-import { getCurrencySymbol, getPreferredCurrency } from '../../utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY, getCurrencySymbol } from '../../utils/currencyUtils.ts';
 import { getInvoiceTotal } from '../../utils/invoiceUtils.ts';
 
 const A4_PREVIEW_WIDTH_PX = 794;
@@ -202,7 +202,7 @@ const InvoicePreviewModal = ({
                                 <p>{invoice?.project?.title || 'Unknown Project'}</p>
                                 {invoice?.project?.hourlyRate && (
                                     <p>
-                                        <span className="sensitive-data">Rate: {getCurrencySymbol(invoice?.currency || getPreferredCurrency())}{invoice.project.hourlyRate}/{invoice?.currency || getPreferredCurrency()} per hour</span>
+                                        <span className="sensitive-data">Rate: {getCurrencySymbol(invoice?.currency || DEFAULT_CURRENCY)}{invoice.project.hourlyRate}/{invoice?.currency || DEFAULT_CURRENCY} per hour</span>
                                     </p>
                                 )}
                             </div>
@@ -224,7 +224,7 @@ const InvoicePreviewModal = ({
                     <div className="border-t pt-2">
                         <div className="flex justify-between text-sm font-medium">
                             <span>Total: {invoice?.totalHours?.toFixed(2) || 0} hours</span>
-                            <span className="sensitive-data">{getCurrencySymbol(invoice?.currency || getPreferredCurrency())}{getInvoiceTotal(invoice).toFixed(2)}</span>
+                            <span className="sensitive-data">{getCurrencySymbol(invoice?.currency || DEFAULT_CURRENCY)}{getInvoiceTotal(invoice).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>

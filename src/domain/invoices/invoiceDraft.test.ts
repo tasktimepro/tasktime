@@ -20,6 +20,9 @@ describe('invoiceDraft', () => {
                 unpricedHours: 0,
                 selectedExpenseCount: 1,
                 excludedExpenseCount: 0,
+                entrySelections: [],
+                taskSelections: [],
+                expenseSelections: [],
             }
         );
 
@@ -59,6 +62,8 @@ describe('invoiceDraft', () => {
 
         expect(() => normalizeDraftInvoiceItems([{ description: '', quantity: 1, rate: 1, amount: 1 }]))
             .toThrow(InvoiceDraftValidationError);
+        expect(() => normalizeDraftInvoiceItems([{ description: 'Mismatch', quantity: 2, rate: 75, amount: 149 }]))
+            .toThrow(/quantity multiplied by rate/);
     });
 
     it('recalculates subtotal and total when draft items change', () => {
@@ -86,10 +91,29 @@ describe('invoiceDraft', () => {
 
         expect(updates).toEqual(expect.objectContaining({
             subtotal: 200,
-            tax: 10,
-            total: 190,
+            tax: 40,
+            total: 220,
             updatedAt: 1234,
         }));
+    });
+
+    it('rejects an explicit subtotal that disagrees with canonical item amounts', () => {
+        const existing = {
+            id: 'invoice-1',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            invoiceNumber: 'INV-001',
+            date: '2026-06-01',
+            status: 'draft',
+            items: [],
+            subtotal: 0,
+            total: 0,
+        } satisfies Invoice;
+
+        expect(() => buildDraftInvoiceUpdates(existing, {
+            items: [{ description: 'Build', quantity: 2, rate: 100, amount: 200 }],
+            subtotal: 199,
+        }, 1234)).toThrow(/subtotal must equal/);
     });
 
     it('deduplicates project IDs and reports invalid project ID payloads', () => {

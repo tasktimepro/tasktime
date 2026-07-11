@@ -17,13 +17,13 @@ This roadmap describes the current production project rather than pretending it 
 - Browser command layer, local bridge, MCP tools, scopes/approvals, bundles, public docs, registry artifacts
 - Remaining success evidence: real installed OpenClaw long-running task/timer flow and remaining directory validation/publication
 
-## Phase 3 — Agent-kit foundation reconciliation (current)
+## Phase 3 — Agent-kit foundation reconciliation (completed)
 
 - Add normalized specs, contracts, rules, architecture maps, environment examples, status, reusable skills, and prompts
 - Cross-check these documents against code/tests and resolve recorded drift
 - Success: all required foundation files exist, links/metadata validate, and no production source-of-truth was overwritten
 
-## Phase 4 — Critical-path assurance (next)
+## Phase 4 — Critical-path assurance (completed)
 
 Thin review/remediation slices:
 
@@ -35,6 +35,8 @@ Thin review/remediation slices:
 6. Import preview/restore safety
 
 Each slice requires reconstructed contracts, representative historical fixtures, focused red/green regression coverage for findings, relevant Docker gates, and doc/status reconciliation.
+
+The detailed finding-by-finding execution checklist and validation state live in `status/critical-path-assurance.md`. Remediation order is data-loss prevention first, then restore safety, billing exactness, report/export parity, and agent/security hardening.
 
 ## Phase 5 — Maintainability evolution
 

@@ -205,6 +205,81 @@ export const getInvoiceProjectTitle = (invoice: any, projects?: any[] | Map<stri
 const roundCurrencyAmount = (value: number) => Math.round(value * 100) / 100;
 const roundExchangeRate = (value: number) => Math.round(value * 1000000) / 1000000;
 
+const allocateMinorUnits = (total: number, weights: number[]): number[] => {
+    const totalMinor = Math.round(total * 100);
+    const normalizedWeights = weights.map((weight) => Math.max(0, getFiniteNumber(weight, 0)));
+    const weightTotal = normalizedWeights.reduce((sum, weight) => sum + weight, 0);
+
+    if (normalizedWeights.length === 0 || weightTotal <= 0) {
+        return normalizedWeights.map(() => 0);
+    }
+
+    const rawShares = normalizedWeights.map((weight) => totalMinor * (weight / weightTotal));
+    const shares = rawShares.map((share) => totalMinor >= 0 ? Math.floor(share) : Math.ceil(share));
+    let remainder = totalMinor - shares.reduce((sum, share) => sum + share, 0);
+    const direction = remainder >= 0 ? 1 : -1;
+    const order = rawShares
+        .map((share, index) => ({
+            index,
+            fraction: share - shares[index],
+        }))
+        .sort((left, right) => direction > 0
+            ? right.fraction - left.fraction || left.index - right.index
+            : left.fraction - right.fraction || left.index - right.index);
+
+    for (let cursor = 0; remainder !== 0; cursor += 1) {
+        shares[order[cursor % order.length].index] += direction;
+        remainder -= direction;
+    }
+
+    return shares.map((share) => share / 100);
+};
+
+export const allocateInvoiceProjectBreakdowns = <T extends { subtotal: number }>(
+    breakdowns: T[],
+    pricing: {
+        subtotal: number;
+        discount?: number;
+        shipping?: number;
+        tax?: number;
+        total?: number;
+    },
+): Array<T & {
+    allocatedDiscount: number;
+    allocatedShipping: number;
+    allocatedTax: number;
+    allocatedTotal: number;
+}> => {
+    if (breakdowns.length === 0) return [];
+
+    const weights = breakdowns.map((breakdown) => roundCurrencyAmount(getFiniteNumber(breakdown.subtotal, 0)));
+    const coveredSubtotal = roundCurrencyAmount(weights.reduce((sum, subtotal) => sum + subtotal, 0));
+    const invoiceSubtotal = roundCurrencyAmount(getFiniteNumber(pricing.subtotal, 0));
+    const coverageRatio = invoiceSubtotal > 0 ? Math.min(1, coveredSubtotal / invoiceSubtotal) : 0;
+    const fullyCovered = Math.round(coveredSubtotal * 100) === Math.round(invoiceSubtotal * 100);
+    const discountTarget = roundCurrencyAmount(getFiniteNumber(pricing.discount, 0) * coverageRatio);
+    const shippingTarget = roundCurrencyAmount(getFiniteNumber(pricing.shipping, 0) * coverageRatio);
+    let taxTarget = roundCurrencyAmount(getFiniteNumber(pricing.tax, 0) * coverageRatio);
+
+    if (fullyCovered && typeof pricing.total === 'number' && Number.isFinite(pricing.total)) {
+        taxTarget = roundCurrencyAmount(pricing.total - coveredSubtotal + discountTarget - shippingTarget);
+    }
+
+    const discounts = allocateMinorUnits(discountTarget, weights);
+    const shipping = allocateMinorUnits(shippingTarget, weights);
+    const taxes = allocateMinorUnits(taxTarget, weights);
+
+    return breakdowns.map((breakdown, index) => ({
+        ...breakdown,
+        allocatedDiscount: discounts[index],
+        allocatedShipping: shipping[index],
+        allocatedTax: taxes[index],
+        allocatedTotal: roundCurrencyAmount(
+            weights[index] - discounts[index] + shipping[index] + taxes[index]
+        ),
+    }));
+};
+
 export const getInvoiceProjectRevenueBreakdown = (invoice: any) => {
     const projectIds = getInvoiceProjectIds(invoice);
     const invoiceSubtotal = getInvoiceSubtotal(invoice);
@@ -216,32 +291,22 @@ export const getInvoiceProjectRevenueBreakdown = (invoice: any) => {
     const normalizedBreakdowns = getNormalizedProjectBreakdowns(invoice);
 
     if (normalizedBreakdowns && normalizedBreakdowns.length > 0) {
-        return normalizedBreakdowns.map((breakdown) => {
-            const ratio = invoiceSubtotal > 0 ? breakdown.subtotal / invoiceSubtotal : 0;
-            const allocatedDiscount = typeof breakdown.allocatedDiscount === 'number'
-                ? breakdown.allocatedDiscount
-                : roundCurrencyAmount(invoiceDiscount * ratio);
-            const allocatedShipping = typeof breakdown.allocatedShipping === 'number'
-                ? breakdown.allocatedShipping
-                : roundCurrencyAmount(invoiceShipping * ratio);
-            const allocatedTax = typeof breakdown.allocatedTax === 'number'
-                ? breakdown.allocatedTax
-                : roundCurrencyAmount(invoiceTax * ratio);
-            const allocatedTotal = typeof breakdown.allocatedTotal === 'number'
-                ? breakdown.allocatedTotal
-                : roundCurrencyAmount(breakdown.subtotal - allocatedDiscount + allocatedShipping + allocatedTax);
-
-            return {
+        return allocateInvoiceProjectBreakdowns(normalizedBreakdowns, {
+            subtotal: invoiceSubtotal,
+            discount: invoiceDiscount,
+            shipping: invoiceShipping,
+            tax: invoiceTax,
+            total: invoiceTotal,
+        }).map((breakdown) => ({
                 projectId: breakdown.projectId,
                 projectTitle: breakdown.projectTitle || '',
                 subtotal: breakdown.subtotal,
                 totalHours: breakdown.totalHours,
-                allocatedDiscount,
-                allocatedShipping,
-                allocatedTax,
-                allocatedTotal,
-            };
-        });
+                allocatedDiscount: breakdown.allocatedDiscount,
+                allocatedShipping: breakdown.allocatedShipping,
+                allocatedTax: breakdown.allocatedTax,
+                allocatedTotal: breakdown.allocatedTotal,
+            }));
     }
 
     if (projectIds.length === 0) {
@@ -492,6 +557,10 @@ export const createInvoicePaymentCurrencySnapshot = ({
     const normalizedRates = getFiniteRecord(exchangeRates);
 
     const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
+
+    if (!result.success) {
+        throw new Error(result.error || `Unable to convert ${sourceCurrency} payment amount to ${targetCurrency}`);
+    }
 
     return createInvoicePaymentCurrencySnapshotFromAmounts({
         sourceCurrency,

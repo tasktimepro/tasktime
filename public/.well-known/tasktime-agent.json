@@ -77,7 +77,8 @@
         "pairingId": "agentBridgePairingId",
         "pairingCode": "agentBridgePairingCode",
         "agentId": "agentBridgeAgentId",
-        "agentLabel": "agentBridgeAgentLabel"
+        "agentLabel": "agentBridgeAgentLabel",
+        "scopes": "agentBridgeScopes"
       }
     },
     "recovery": {

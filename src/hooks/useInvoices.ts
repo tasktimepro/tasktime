@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useYjsCollection } from './useYjsCollection';
-import type { Expense, Invoice, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Expense, Invoice, Task } from '@/stores/yjs/types';
 import { collectEntities, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
 import {
@@ -26,6 +26,8 @@ import {
     buildInvoiceUndoApplication,
     buildReleasedQuotedTaskUpdates,
 } from '@/domain/invoices/invoiceUndoApplication';
+import { generateId } from '@/utils/idUtils';
+import type { InvoiceFinalizationApplicationPlan } from '@/domain/invoices/invoiceFinalizationApplication';
 
 const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredCurrency: string) => {
     return normalizeCurrencyCode(invoice.currency || preferredCurrency) !== preferredCurrency;
@@ -190,17 +192,28 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
     // Status update helpers
     const markAsSent = useCallback((id: string) => {
+        const invoice = get(id);
+        if (!invoice) {
+            return undefined;
+        }
+        if (invoice.status === 'draft') {
+            throw new Error('Finalize this draft before marking it sent.');
+        }
+
         return update(id, {
             status: 'sent',
             paidAt: null,
             paymentCurrencySnapshot: undefined,
         });
-    }, [update]);
+    }, [get, update]);
 
     const markAsPaid = useCallback(async (id: string, options: MarkInvoicePaidOptions = {}) => {
         const invoice = get(id);
         if (!invoice) {
             return undefined;
+        }
+        if (invoice.status === 'draft') {
+            throw new Error('Finalize this draft before marking it paid.');
         }
 
         const paidAt = typeof options.paidAt === 'number' && Number.isFinite(options.paidAt)
@@ -219,6 +232,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const invoice = get(id);
         if (!invoice) {
             return undefined;
+        }
+        if (invoice.status === 'draft') {
+            throw new Error('Finalize this draft before updating payment details.');
         }
 
         const paidAt = typeof options.paidAt === 'number' && Number.isFinite(options.paidAt)
@@ -320,12 +336,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         ]);
 
         const availableYears = await getAvailableYears();
-        const yearEntryMaps = new Map<number, any>();
-
-        await Promise.all(availableYears.map(async (year) => {
-            const yearMap = await loadEntriesForYear(year);
-            yearEntryMaps.set(year, yearMap);
-        }));
+        await Promise.all(availableYears.map((year) => loadEntriesForYear(year)));
 
         const undoTimestamp = Date.now();
         const loadedEntries = store.getAllTimeEntries();
@@ -346,163 +357,12 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             templateId: template?.id,
             undoneAt: undoTimestamp,
         }).application;
-        const entriesByMap = new Map<any, {
-            toDelete: TimeEntry[];
-            toClear: Array<{ entry: TimeEntry; updates: Partial<TimeEntry> }>;
-        }>();
-        const queueEntryMutation = (
-            entryMap: any,
-            action: 'delete' | 'clear',
-            entry: TimeEntry,
-            updates?: Partial<TimeEntry>
-        ) => {
-            if (!entryMap) {
-                return;
-            }
-
-            const existing = entriesByMap.get(entryMap) || { toDelete: [], toClear: [] };
-
-            if (action === 'delete') {
-                existing.toDelete.push(entry);
-            } else {
-                existing.toClear.push({
-                    entry,
-                    updates: updates || {},
-                });
-            }
-
-            entriesByMap.set(entryMap, existing);
-        };
-
-        undoApplication.entriesToDelete.forEach((entry) => {
-            const entryMap = store.activeTimeEntries.has(entry.id)
-                ? store.activeTimeEntries
-                : yearEntryMaps.get(new Date(entry.start).getFullYear());
-
-            queueEntryMutation(entryMap, 'delete', entry);
+        await store.commitInvoiceUndo({
+            operationId: generateId(),
+            invoice: invoice as Invoice,
+            application: undoApplication,
+            createdAt: undoTimestamp,
         });
-
-        undoApplication.entriesToClear.forEach(({ entry, updates }) => {
-            const entryMap = store.activeTimeEntries.has(entry.id)
-                ? store.activeTimeEntries
-                : yearEntryMaps.get(new Date(entry.start).getFullYear());
-
-            queueEntryMutation(entryMap, 'clear', entry, updates);
-        });
-
-        entriesByMap.forEach((mutation, entryMap) => {
-            const parentDoc = entryMap?.doc;
-
-            const applyChanges = () => {
-                mutation.toDelete.forEach((entry) => {
-                    entryMap.delete(entry.id);
-                });
-
-                mutation.toClear.forEach(({ entry, updates }) => {
-                    updateEntityFields(entryMap as any, entry.id, updates);
-                });
-            };
-
-            if (parentDoc?.transact) {
-                parentDoc.transact(applyChanges);
-                return;
-            }
-
-            applyChanges();
-        });
-
-        const expenseUpdatesToUnbill = new Map(
-            undoApplication.expenseUpdatesToUnbill.map(({ id: expenseId, updates }) => [expenseId, updates])
-        );
-
-        allExpenseMaps.forEach((expenseMap) => {
-            const parentDoc = (expenseMap as any)?.doc;
-
-            const applyChanges = () => {
-                (expenseMap as any).forEach((value: unknown, expenseId: string) => {
-                    const expense = readEntity<any>(value);
-
-                    const updates = expenseUpdatesToUnbill.get(expenseId);
-
-                    if (!expense || !updates) {
-                        return;
-                    }
-
-                    updateEntityFields(expenseMap as any, expenseId, updates);
-                });
-            };
-
-            if (parentDoc?.transact) {
-                parentDoc.transact(applyChanges);
-                return;
-            }
-
-            applyChanges();
-        });
-
-        const quotedTaskUpdates = new Map(
-            undoApplication.quotedTaskUpdates.map(({ id: taskId, updates }) => [taskId, updates])
-        );
-        const taskCutoffUpdates = new Map(
-            undoApplication.taskCutoffUpdates.map(({ id: taskId, updates }) => [taskId, updates])
-        );
-
-        taskMaps.forEach((taskMap) => {
-            const parentDoc = (taskMap as any)?.doc;
-
-            const applyChanges = () => {
-                quotedTaskUpdates.forEach((updates, taskId) => {
-                    if (!(taskMap as any).has(taskId)) {
-                        return;
-                    }
-
-                    updateEntityFields(taskMap as any, taskId, updates);
-                });
-
-                taskCutoffUpdates.forEach((updates, taskId) => {
-                    if (!(taskMap as any).has(taskId)) {
-                        return;
-                    }
-
-                    updateEntityFields(taskMap as any, taskId, updates);
-                });
-            };
-
-            if (parentDoc?.transact) {
-                parentDoc.transact(applyChanges);
-                return;
-            }
-
-            applyChanges();
-        });
-
-        store.coreDoc.transact(() => {
-            undoApplication.projectUnlinkUpdates.forEach(({ id: projectId, updates }) => {
-                if (!store.projects.has(projectId)) {
-                    return;
-                }
-
-                updateEntityFields(store.projects as any, projectId, updates);
-            });
-
-            if (undoApplication.invoiceTemplateSequenceUpdate) {
-                updateEntityFields(
-                    store.invoiceTemplates as any,
-                    undoApplication.invoiceTemplateSequenceUpdate.id,
-                    undoApplication.invoiceTemplateSequenceUpdate.updates
-                );
-            }
-        });
-
-        const removed = store.invoices.has(id);
-
-        if (removed) {
-            store.invoices.delete(id);
-        }
-
-        if (!removed) {
-            throw new Error('Invoice could not be removed.');
-        }
 
         return {
             invoiceNumber: invoice?.invoiceNumber || id,
@@ -520,6 +380,19 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         loadEntriesForYear,
         store,
     ]);
+
+    const finalizeInvoice = useCallback(async (
+        desiredInvoice: Invoice,
+        application: InvoiceFinalizationApplicationPlan,
+        finalizedAt: number,
+    ) => {
+        return store.commitInvoiceFinalization({
+            operationId: generateId(),
+            desiredInvoice,
+            application,
+            createdAt: finalizedAt,
+        });
+    }, [store]);
 
     // Get total amounts
     const totals = useMemo(() => {
@@ -541,7 +414,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         sentInvoices,
         paidInvoices,
         overdueInvoices,
-        isLoading: activeLoading || archivedLoading,
+        isLoading: activeLoading || archivedLoading || Boolean(options.includeArchived && !archivedLoaded),
         archivedLoaded,
         totals,
         
@@ -550,6 +423,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         createInvoice: create,
         updateInvoice: update,
         deleteInvoice,
+        finalizeInvoice,
         undoLatestInvoice,
 
         // Status helpers

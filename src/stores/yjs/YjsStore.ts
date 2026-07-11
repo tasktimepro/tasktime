@@ -17,12 +17,19 @@ import { YjsDriveProvider } from './providers/GoogleDriveProvider';
 import { BackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
-import { createBackupPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
+import { createBackupPayload, validateBackupImportPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
 import { parseStoredDate } from '@/utils/dateUtils';
 import { getTaskIdsWithDescendants } from '@/utils/taskUtils';
-import { readEntity, objectToYMap, collectEntities, forEachEntity } from './entityUtils';
-import { validateCollectionEntity } from './validation';
+import { generateId } from '@/utils/idUtils';
+import { readEntity, objectToYMap, collectEntities, forEachEntity, updateEntityFields } from './entityUtils';
+import { collectValidatedEntities, validateCollectionEntity } from './validation';
 import { clearSyncPersistence } from '@/utils/syncPersistence';
+import {
+    clearRestoreJournal,
+    readRestoreJournal,
+    writeRestoreJournal,
+    type RestoreJournalRecord,
+} from './restoreJournal';
 import type {
     BusinessBrandAsset,
     DocName,
@@ -47,12 +54,62 @@ import type {
     TaxReturnPeriod,
     PlannerAttachment,
     DailyGoal,
+    ArchiveTransition,
 } from './types';
+import type { InvoiceFinalizationApplicationPlan } from '@/domain/invoices/invoiceFinalizationApplication';
+import type { InvoiceUndoApplicationPlan } from '@/domain/invoices/invoiceUndoApplication';
+import {
+    createInvoiceFinalizationOperation,
+    createInvoiceUndoOperation,
+    isInvoiceBillingOperation,
+    type InvoiceBillingOperation,
+    type InvoiceBillingOperationPhase,
+} from '@/domain/invoices/invoiceBillingOperation';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const DISCONNECTED_DIRTY_DOCS_STORAGE_KEY = 'tasktime-disconnected-dirty-docs';
 
 type DocUpdateHandler = (...args: unknown[]) => void;
+type ArchiveEntity = Task | TimeEntry | Invoice | Expense;
+
+function readArchiveTransition(entity: ArchiveEntity | null): ArchiveTransition | null {
+    const transition = entity?._archiveTransition;
+
+    if (
+        !transition
+        || typeof transition.operationId !== 'string'
+        || typeof transition.targetDoc !== 'string'
+        || !Number.isFinite(transition.changedAt)
+    ) {
+        return null;
+    }
+
+    return transition;
+}
+
+function compareArchiveTransitions(left: ArchiveTransition, right: ArchiveTransition): number {
+    if (left.changedAt !== right.changedAt) {
+        return left.changedAt - right.changedAt;
+    }
+
+    return left.operationId.localeCompare(right.operationId);
+}
+
+function entityFreshness(entity: ArchiveEntity | null): number {
+    if (!entity) return Number.NEGATIVE_INFINITY;
+
+    const timestamps = entity as ArchiveEntity & { updatedAt?: number; createdAt?: number };
+
+    return Math.max(
+        Number.isFinite(timestamps.updatedAt) ? timestamps.updatedAt! : Number.NEGATIVE_INFINITY,
+        Number.isFinite(timestamps.createdAt) ? timestamps.createdAt! : Number.NEGATIVE_INFINITY,
+        readArchiveTransition(entity)?.changedAt ?? Number.NEGATIVE_INFINITY,
+    );
+}
+
+function chooseFreshestEntity<T extends ArchiveEntity>(active: T, archived: T): T {
+    return entityFreshness(active) > entityFreshness(archived) ? active : archived;
+}
 
 export class YjsStore {
 
@@ -88,8 +145,17 @@ export class YjsStore {
     /**
      * Initialize core documents (must be called on app start)
      */
-    async initialize(): Promise<void> {
+    async initialize(options: { skipRestoreRecovery?: boolean } = {}): Promise<void> {
         console.log('[YjsStore] Initializing...');
+
+        if (!options.skipRestoreRecovery) {
+            const restoreJournal = await readRestoreJournal();
+
+            if (restoreJournal) {
+                await this.recoverInterruptedRestore(restoreJournal);
+                return;
+            }
+        }
 
         // Load always-needed documents
         this._coreDoc = await this.docManager.getDoc('core');
@@ -97,6 +163,8 @@ export class YjsStore {
 
         this.trackDocForDisconnectedChanges('core', this._coreDoc);
         this.trackDocForDisconnectedChanges('entries-active', this._activeEntriesDoc);
+
+        this.normalizePersistedInvoiceMap(this._coreDoc.getMap('invoices'));
 
         // Run automatic archival of old data
         await this.archiveOldEntries();
@@ -107,6 +175,13 @@ export class YjsStore {
         this.cleanupOrphanedPlannerAttachments();
 
         this._isReady = true;
+
+        try {
+            await this.reconcileInvoiceBillingOperations({ includeCompleted: false });
+        } catch (error) {
+            console.error('[YjsStore] Pending invoice billing reconciliation error:', error);
+        }
+
         console.log('[YjsStore] Initialized');
     }
 
@@ -225,6 +300,12 @@ export class YjsStore {
         return this._coreDoc!.getMap('invoices');
     }
 
+    /** Durable cross-document invoice finalization and undo journal. */
+    get invoiceBillingOperations(): Y.Map<string, InvoiceBillingOperation> {
+        this.assertReady();
+        return this._coreDoc!.getMap('invoiceBillingOperations');
+    }
+
     /**
      * Active time entries (last 90 days) - always loaded
      */
@@ -267,7 +348,10 @@ export class YjsStore {
                 }
             }
         }
-        return this._archivedTasksDoc.getMap('tasks');
+
+        const archivedMap = this._archivedTasksDoc.getMap<string>('tasks') as Y.Map<string, Task>;
+        this.reconcileTaskArchiveTransitions(archivedMap);
+        return archivedMap;
     }
 
     /**
@@ -356,7 +440,10 @@ export class YjsStore {
             }
 
         }
-        return this._archivedExpensesDoc.getMap('expenses');
+
+        const archivedMap = this._archivedExpensesDoc.getMap<string>('expenses') as Y.Map<string, Expense>;
+        this.reconcileExpenseArchives(archivedMap);
+        return archivedMap;
     }
 
     /**
@@ -385,6 +472,11 @@ export class YjsStore {
         if (taskIdsToArchive.length === 0) return;
 
         const archivedOnDate = new Date().toISOString().slice(0, 10);
+        const transition: ArchiveTransition = {
+            operationId: generateId(),
+            targetDoc: 'tasks-archived',
+            changedAt: Date.now(),
+        };
 
         taskIdsToArchive.forEach((candidateTaskId) => {
             const task = readEntity<Task>(this.tasks.get(candidateTaskId));
@@ -394,6 +486,7 @@ export class YjsStore {
                 ...task,
                 archived: true,
                 archivedOnDate,
+                _archiveTransition: transition,
             } as unknown as Record<string, unknown>);
             (archivedMap as any).set(candidateTaskId, entityMap);
             this.tasks.delete(candidateTaskId);
@@ -413,6 +506,12 @@ export class YjsStore {
 
         if (taskIdsToUnarchive.length === 0) return;
 
+        const transition: ArchiveTransition = {
+            operationId: generateId(),
+            targetDoc: 'core',
+            changedAt: Date.now(),
+        };
+
         taskIdsToUnarchive.forEach((candidateTaskId) => {
             const task = readEntity<Task>(archivedMap.get(candidateTaskId));
             if (!task) return;
@@ -421,6 +520,7 @@ export class YjsStore {
                 ...task,
                 archived: false,
                 archivedOnDate: null,
+                _archiveTransition: transition,
             } as unknown as Record<string, unknown>);
             (this.tasks as any).set(candidateTaskId, entityMap);
             archivedMap.delete(candidateTaskId);
@@ -441,7 +541,7 @@ export class YjsStore {
         const entries: TimeEntry[] = [];
 
         // Active entries
-        entries.push(...collectEntities<TimeEntry>(this.activeTimeEntries as any));
+        entries.push(...collectValidatedEntities<TimeEntry>('timeEntries', this.activeTimeEntries as any, 'loaded active time entries'));
 
         // Archived entries (from loaded year docs)
         for (const docName of this.docManager.getLoadedDocs()) {
@@ -449,7 +549,7 @@ export class YjsStore {
                 const doc = this.docManager.getDocSync(docName);
                 if (doc) {
                     const yearEntries = doc.getMap('timeEntries');
-                    entries.push(...collectEntities<TimeEntry>(yearEntries as any));
+                    entries.push(...collectValidatedEntities<TimeEntry>('timeEntries', yearEntries as any, `loaded ${docName} time entries`));
                 }
             }
         }
@@ -482,7 +582,9 @@ export class YjsStore {
             }
         }
 
-        return doc.getMap('timeEntries');
+        const yearEntries = doc.getMap<string>('timeEntries') as Y.Map<string, TimeEntry>;
+        this.reconcileEntryArchives(year, yearEntries);
+        return yearEntries;
     }
 
     /**
@@ -499,14 +601,14 @@ export class YjsStore {
         const entries: TimeEntry[] = [];
 
         // Active entries
-        entries.push(...collectEntities<TimeEntry>(this.activeTimeEntries as any));
+        entries.push(...collectValidatedEntities<TimeEntry>('timeEntries', this.activeTimeEntries as any, 'all active time entries'));
 
         const years = await this.getAvailableYears();
 
         // Load each year's entries
         for (const year of years) {
             const yearEntries = await this.loadEntriesForYear(year, options);
-            entries.push(...collectEntities<TimeEntry>(yearEntries as any));
+            entries.push(...collectValidatedEntities<TimeEntry>('timeEntries', yearEntries as any, `all entries-${year} time entries`));
         }
 
         return entries;
@@ -561,7 +663,11 @@ export class YjsStore {
                 }
             }
         }
-        return this._archivedInvoicesDoc.getMap('invoices');
+
+        const archivedMap = this._archivedInvoicesDoc.getMap<string>('invoices') as Y.Map<string, Invoice>;
+        this.normalizePersistedInvoiceMap(archivedMap);
+        this.reconcileInvoiceArchives(archivedMap);
+        return archivedMap;
     }
 
     /**
@@ -634,6 +740,221 @@ export class YjsStore {
         }
     }
 
+    /**
+     * Finish task archive/unarchive moves after an interrupted write or stale
+     * cross-device replay. A transition on either copy is authoritative; for
+     * legacy duplicates without metadata, the archived copy wins because all
+     * historical moves wrote the destination before deleting the source.
+     */
+    private reconcileTaskArchiveTransitions(archivedMap: Y.Map<string, Task>): void {
+        const activeMap = this._coreDoc!.getMap('tasks') as Y.Map<string, Task>;
+        const ids = new Set([...activeMap.keys(), ...archivedMap.keys()]);
+
+        for (const id of ids) {
+            const active = readEntity<Task>(activeMap.get(id));
+            const archived = readEntity<Task>(archivedMap.get(id));
+            const activeTransition = readArchiveTransition(active);
+            const archivedTransition = readArchiveTransition(archived);
+
+            let transition: ArchiveTransition | null = null;
+
+            if (activeTransition && archivedTransition) {
+                transition = compareArchiveTransitions(activeTransition, archivedTransition) >= 0
+                    ? activeTransition
+                    : archivedTransition;
+            } else {
+                transition = activeTransition ?? archivedTransition;
+            }
+
+            if (!transition && !(active && archived)) {
+                continue;
+            }
+
+            const targetDoc = transition?.targetDoc === 'core' ? 'core' : 'tasks-archived';
+            const source = transition
+                ? (active && archived ? chooseFreshestEntity(active, archived) : active ?? archived)
+                : archived;
+
+            if (!source) continue;
+
+            const reconciled = {
+                ...source,
+                archived: targetDoc === 'tasks-archived',
+                archivedOnDate: targetDoc === 'tasks-archived'
+                    ? source.archivedOnDate ?? new Date().toISOString().slice(0, 10)
+                    : null,
+                ...(transition ? { _archiveTransition: transition } : {}),
+            };
+
+            if (targetDoc === 'core') {
+                (activeMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
+                archivedMap.delete(id);
+            } else {
+                (archivedMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
+                activeMap.delete(id);
+            }
+        }
+    }
+
+    /**
+     * Resolve a duplicate one-way archive using the freshest complete record
+     * and the current archival predicate. This preserves a later undo/edit on
+     * another device instead of blindly preferring one document forever.
+     */
+    private reconcileOneWayArchive<T extends TimeEntry | Invoice | Expense>(
+        activeMap: Y.Map<string, T>,
+        archivedMap: Y.Map<string, T>,
+        activeDoc: DocName,
+        archivedDoc: DocName,
+        shouldArchive: (entity: T) => boolean,
+    ): void {
+        for (const id of archivedMap.keys()) {
+            const active = readEntity<T>(activeMap.get(id));
+            const archived = readEntity<T>(archivedMap.get(id));
+
+            if (!active || !archived) continue;
+
+            const source = chooseFreshestEntity(active, archived);
+            const targetDoc = shouldArchive(source) ? archivedDoc : activeDoc;
+            const transition: ArchiveTransition = {
+                operationId: generateId(),
+                targetDoc,
+                changedAt: Date.now(),
+            };
+            const reconciled = {
+                ...source,
+                _archiveTransition: transition,
+            };
+
+            if (targetDoc === archivedDoc) {
+                (archivedMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
+                activeMap.delete(id);
+            } else {
+                (activeMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
+                archivedMap.delete(id);
+            }
+        }
+    }
+
+    private reconcileEntryArchives(year: number, archivedMap: Y.Map<string, TimeEntry>): void {
+        const cutoff = Date.now() - NINETY_DAYS_MS;
+        const activeMap = this._activeEntriesDoc!.getMap('timeEntries') as Y.Map<string, TimeEntry>;
+
+        this.reconcileOneWayArchive(
+            activeMap,
+            archivedMap,
+            'entries-active',
+            `entries-${year}` as DocName,
+            (entry) => entry.start < cutoff && new Date(entry.start).getFullYear() === year,
+        );
+    }
+
+    private reconcileInvoiceArchives(archivedMap: Y.Map<string, Invoice>): void {
+        const currentYear = new Date().getFullYear();
+        const activeMap = this._coreDoc!.getMap('invoices') as Y.Map<string, Invoice>;
+
+        this.reconcileOneWayArchive(
+            activeMap,
+            archivedMap,
+            'core',
+            'invoices-archived',
+            (invoice) => Boolean(
+                invoice.status === 'paid'
+                && invoice.paidAt
+                && new Date(invoice.paidAt).getFullYear() < currentYear
+            ),
+        );
+    }
+
+    private reconcileExpenseArchives(archivedMap: Y.Map<string, Expense>): void {
+        const cutoff = Date.now() - NINETY_DAYS_MS;
+        const activeMap = this._coreDoc!.getMap('expenses') as Y.Map<string, Expense>;
+
+        this.reconcileOneWayArchive(
+            activeMap,
+            archivedMap,
+            'core',
+            'expenses-archived',
+            (expense) => {
+                const date = parseStoredDate(expense.date);
+
+                return Boolean(
+                    date
+                    && date.getTime() < cutoff
+                    && expense.paymentStatus === 'paid'
+                    && !(expense.billable && expense.billingStatus === 'unbilled')
+                );
+            },
+        );
+    }
+
+    private reconcileLoadedArchiveTransitions(): void {
+        this.normalizePersistedInvoiceMap(this._coreDoc!.getMap('invoices'));
+
+        if (this._archivedTasksDoc) {
+            this.reconcileTaskArchiveTransitions(this._archivedTasksDoc.getMap('tasks') as Y.Map<string, Task>);
+        }
+
+        if (this._archivedInvoicesDoc) {
+            const archivedInvoices = this._archivedInvoicesDoc.getMap('invoices') as Y.Map<string, Invoice>;
+            this.normalizePersistedInvoiceMap(archivedInvoices);
+            this.reconcileInvoiceArchives(archivedInvoices);
+        }
+
+        if (this._archivedExpensesDoc) {
+            this.reconcileExpenseArchives(this._archivedExpensesDoc.getMap('expenses') as Y.Map<string, Expense>);
+        }
+
+        for (const docName of this.docManager.getLoadedDocs()) {
+            const match = docName.match(/^entries-(\d{4})$/);
+            const doc = match ? this.docManager.getDocSync(docName as DocName) : null;
+
+            if (match && doc) {
+                this.reconcileEntryArchives(
+                    Number(match[1]),
+                    doc.getMap('timeEntries') as Y.Map<string, TimeEntry>,
+                );
+            }
+        }
+    }
+
+    /**
+     * Upgrade only recognized legacy invoice shapes before validated readers
+     * can hide them. Unsupported/corrupt records remain untouched for raw CRDT
+     * convergence and diagnostics.
+     */
+    private normalizePersistedInvoiceMap(invoiceMap: Y.Map<string, Invoice>): void {
+        for (const [id, value] of invoiceMap.entries()) {
+            const invoice = readEntity<Invoice & Record<string, unknown>>(value);
+
+            if (!invoice) continue;
+
+            const isLegacy = !Array.isArray(invoice.items)
+                || typeof invoice.total !== 'number'
+                || 'totalAmount' in invoice
+                || 'paymentProcessed' in invoice
+                || 'project' in invoice
+                || 'client' in invoice
+                || 'businessInfo' in invoice
+                || 'paymentMethod' in invoice;
+
+            if (!isLegacy) continue;
+
+            const normalized = normalizeInvoiceRecord(invoice);
+
+            try {
+                const validated = validateCollectionEntity<Invoice>(
+                    'invoices',
+                    normalized,
+                    `normalize persisted invoice ${id}`,
+                );
+                (invoiceMap as any).set(id, objectToYMap(validated as unknown as Record<string, unknown>));
+            } catch (error) {
+                console.warn(`[YjsStore] Unable to normalize legacy invoice ${id}:`, error);
+            }
+        }
+    }
+
     // =========================================================================
     // Automatic Archival
     // =========================================================================
@@ -671,9 +992,17 @@ export class YjsStore {
             const yearDoc = await this.docManager.getDoc(`entries-${year}` as DocName);
             this.trackDocForDisconnectedChanges(`entries-${year}` as DocName, yearDoc);
             const yearEntries = yearDoc.getMap('timeEntries');
+            const transition: ArchiveTransition = {
+                operationId: generateId(),
+                targetDoc: `entries-${year}` as DocName,
+                changedAt: Date.now(),
+            };
 
             for (const entry of entries) {
-                const entityMap = objectToYMap(entry as unknown as Record<string, unknown>);
+                const entityMap = objectToYMap({
+                    ...entry,
+                    _archiveTransition: transition,
+                } as unknown as Record<string, unknown>);
                 (yearEntries as any).set(entry.id, entityMap);
                 activeEntries.delete(entry.id);
             }
@@ -713,9 +1042,17 @@ export class YjsStore {
 
         // Move to archived document
         const archivedMap = await this.loadArchivedInvoices();
+        const transition: ArchiveTransition = {
+            operationId: generateId(),
+            targetDoc: 'invoices-archived',
+            changedAt: Date.now(),
+        };
 
         for (const invoice of toArchive) {
-            const entityMap = objectToYMap(invoice as unknown as Record<string, unknown>);
+            const entityMap = objectToYMap({
+                ...invoice,
+                _archiveTransition: transition,
+            } as unknown as Record<string, unknown>);
             (archivedMap as any).set(invoice.id, entityMap);
             invoicesMap.delete(invoice.id);
         }
@@ -759,9 +1096,17 @@ export class YjsStore {
         if (toArchive.length === 0) return;
 
         const archivedMap = await this.loadArchivedExpenses();
+        const transition: ArchiveTransition = {
+            operationId: generateId(),
+            targetDoc: 'expenses-archived',
+            changedAt: Date.now(),
+        };
 
         for (const expense of toArchive) {
-            const entityMap = objectToYMap(expense as unknown as Record<string, unknown>);
+            const entityMap = objectToYMap({
+                ...expense,
+                _archiveTransition: transition,
+            } as unknown as Record<string, unknown>);
             (archivedMap as any).set(expense.id, entityMap);
             expensesMap.delete(expense.id);
         }
@@ -801,20 +1146,27 @@ export class YjsStore {
         // Set up backup manager with access to the provider's manifest
         this.backupManager = new BackupManager(this.driveProvider.getManifest(), this);
 
-        // After each successful sync, reconcile orphaned timers and maybe create a backup
-        this.driveProvider.onSyncComplete(() => {
-            // Clean up timers whose stop-entry arrived from another device
+        // After each successful sync, reconcile cross-document operations and maybe create a backup
+        this.driveProvider.onSyncComplete(async () => {
             try {
+                this.reconcileLoadedArchiveTransitions();
+                // Clean up timers whose stop-entry arrived from another device
                 this.reconcileOrphanedTimers();
             } catch (err) {
-                console.error('[YjsStore] Timer reconciliation error:', err);
+                console.error('[YjsStore] Cross-document reconciliation error:', err);
             }
 
             const enabled = this.preferences.get('backupEnabled') ?? true;
+            // A pulled billing journal record is part of sync consistency. If
+            // replay cannot load or reconcile a required document, let the
+            // provider retain its error/pending state instead of claiming that
+            // the workspace is fully synchronized.
+            await this.reconcileInvoiceBillingOperations({ includeCompleted: true });
+
             if (!enabled || !this.backupManager) return;
 
             const frequencyHours = (this.preferences.get('backupFrequencyHours') as number) ?? 24;
-            this.backupManager.maybeCreateBackup(frequencyHours).catch(console.error);
+            await this.backupManager.maybeCreateBackup(frequencyHours);
         });
 
         await this.driveProvider.connect(this.driveSyncMode, {
@@ -835,7 +1187,17 @@ export class YjsStore {
      * Disconnect from Google Drive
      */
     disconnectDrive(): void {
-        this.driveProvider?.disconnect();
+        if (this.driveProvider) {
+            // Provider disconnect clears its in-memory queue and generic sync
+            // flags. Persist document identity first so authentication expiry,
+            // explicit disconnect, or reconnect cannot strand IndexedDB-only
+            // edits without a future full-state upload signal.
+            for (const docName of this.driveProvider.getPendingDocNames()) {
+                this.markDisconnectedDirtyDoc(docName);
+            }
+
+            this.driveProvider.disconnect();
+        }
         this.driveProvider = null;
         this.backupManager = null;
     }
@@ -1012,9 +1374,427 @@ export class YjsStore {
         return Array.from(allYears).sort((a, b) => b - a);
     }
 
-    async exportBackupData(options: { backupType?: 'automatic' | 'manual'; exportDate?: string; refreshFromCloud?: boolean } = {}): Promise<BackupPayload> {
+    /**
+     * Persist and apply one deterministic invoice finalization plan. The
+     * journal write happens first so startup or post-sync reconciliation can
+     * finish every later phase after an interruption.
+     */
+    async commitInvoiceFinalization({
+        operationId,
+        desiredInvoice,
+        application,
+        createdAt = Date.now(),
+        onPhase,
+    }: {
+        operationId: string;
+        desiredInvoice: Invoice;
+        application: InvoiceFinalizationApplicationPlan;
+        createdAt?: number;
+        onPhase?: (phase: InvoiceBillingOperationPhase) => void;
+    }): Promise<Invoice> {
+        const operation = createInvoiceFinalizationOperation({
+            operationId,
+            desiredInvoice,
+            application,
+            createdAt,
+        });
+
+        this.persistInvoiceBillingOperation(operation);
+        onPhase?.('prepared');
+        await this.applyInvoiceBillingOperation(operation, onPhase);
+
+        const invoice = readEntity<Invoice>(this.invoices.get(desiredInvoice.id));
+
+        if (!invoice) {
+            throw new Error(`Invoice ${desiredInvoice.id} was not persisted after finalization.`);
+        }
+
+        return invoice;
+    }
+
+    /** Persist and apply one deterministic undo plan before deleting its invoice. */
+    async commitInvoiceUndo({
+        operationId,
+        invoice,
+        application,
+        createdAt = Date.now(),
+        onPhase,
+    }: {
+        operationId: string;
+        invoice: Invoice;
+        application: InvoiceUndoApplicationPlan;
+        createdAt?: number;
+        onPhase?: (phase: InvoiceBillingOperationPhase) => void;
+    }): Promise<void> {
+        const operation = createInvoiceUndoOperation({
+            operationId,
+            invoice,
+            application,
+            createdAt,
+        });
+
+        this.persistInvoiceBillingOperation(operation);
+        onPhase?.('prepared');
+        await this.applyInvoiceBillingOperation(operation, onPhase);
+    }
+
+    /**
+     * Replay journaled billing operations in deterministic order. Completed
+     * records are included after cloud sync because another document's update
+     * can arrive later than the core journal record.
+     */
+    async reconcileInvoiceBillingOperations({
+        includeCompleted = true,
+    }: {
+        includeCompleted?: boolean;
+    } = {}): Promise<void> {
+        const operationMap = this.getExistingInvoiceBillingOperations();
+        if (!operationMap) return;
+
+        const operations = collectEntities<InvoiceBillingOperation>(operationMap as any)
+            .filter(isInvoiceBillingOperation)
+            .filter((operation) => includeCompleted || operation.state !== 'complete')
+            .sort((left, right) => {
+                if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
+                return left.operationId.localeCompare(right.operationId);
+            });
+
+        for (const operation of operations) {
+            await this.applyInvoiceBillingOperation(operation);
+        }
+    }
+
+    private getExistingInvoiceBillingOperations(): Y.Map<string, InvoiceBillingOperation> | null {
+        if (!this._coreDoc?.share.has('invoiceBillingOperations')) {
+            return null;
+        }
+
+        return this._coreDoc.getMap('invoiceBillingOperations');
+    }
+
+    private persistInvoiceBillingOperation(operation: InvoiceBillingOperation): void {
+        const existing = readEntity<InvoiceBillingOperation>(
+            this.invoiceBillingOperations.get(operation.operationId)
+        );
+
+        if (existing) {
+            if (existing.invoiceId !== operation.invoiceId || existing.kind !== operation.kind) {
+                throw new Error(`Invoice billing operation ${operation.operationId} has conflicting persisted input.`);
+            }
+
+            return;
+        }
+
+        this.coreDoc.transact(() => {
+            (this.invoiceBillingOperations as any).set(
+                operation.operationId,
+                objectToYMap(operation as unknown as Record<string, unknown>)
+            );
+        });
+    }
+
+    private updateInvoiceBillingOperationPhase(
+        operation: InvoiceBillingOperation,
+        phase: InvoiceBillingOperationPhase,
+        state: 'prepared' | 'complete' = 'prepared',
+    ): void {
+        const current = readEntity<InvoiceBillingOperation>(
+            this.invoiceBillingOperations.get(operation.operationId)
+        );
+
+        if (!current || current.state === 'complete'
+            || (current.lastCompletedPhase === phase && current.state === state)) {
+            return;
+        }
+
+        this.coreDoc.transact(() => {
+            this.updateEntityFieldsIfChanged(
+                this.invoiceBillingOperations as any,
+                operation.operationId,
+                {
+                    lastCompletedPhase: phase,
+                    state,
+                    updatedAt: Date.now(),
+                }
+            );
+        });
+    }
+
+    private updateEntityFieldsIfChanged<T extends Record<string, unknown>>(
+        map: Y.Map<string, unknown>,
+        id: string,
+        updates: Partial<T>,
+    ): T | undefined {
+        const current = readEntity<T>(map.get(id));
+        if (!current) return undefined;
+
+        const changed = Object.entries(updates).some(([key, value]) => {
+            return JSON.stringify(current[key]) !== JSON.stringify(value);
+        });
+
+        return changed ? updateEntityFields(map, id, updates) : current;
+    }
+
+    private async applyInvoiceBillingOperation(
+        operation: InvoiceBillingOperation,
+        onPhase?: (phase: InvoiceBillingOperationPhase) => void,
+    ): Promise<void> {
+        const taskMaps = [this.tasks, await this.loadArchivedTasks()].filter(Boolean) as Array<Y.Map<string, Task>>;
+        const expenseMaps = [this.expenses, await this.loadArchivedExpenses()].filter(Boolean) as Array<Y.Map<string, Expense>>;
+        const entryMaps = [this.activeTimeEntries] as Array<Y.Map<string, TimeEntry>>;
+        const years = await this.getAvailableYears();
+
+        for (const year of years) {
+            entryMaps.push(await this.loadEntriesForYear(year));
+        }
+
+        if (operation.kind === 'finalize') {
+            this.applyFinalizationEntryPhase(operation, entryMaps);
+        } else {
+            this.applyUndoEntryPhase(operation, entryMaps);
+        }
+        this.updateInvoiceBillingOperationPhase(operation, 'entries-applied');
+        onPhase?.('entries-applied');
+
+        if (operation.kind === 'finalize') {
+            this.applyFinalizationExpensePhase(operation, expenseMaps);
+        } else {
+            this.applyUndoExpensePhase(operation, expenseMaps);
+        }
+        this.updateInvoiceBillingOperationPhase(operation, 'expenses-applied');
+        onPhase?.('expenses-applied');
+
+        if (operation.kind === 'finalize') {
+            this.applyFinalizationTaskPhase(operation, taskMaps);
+        } else {
+            this.applyUndoTaskPhase(operation, taskMaps);
+        }
+        this.updateInvoiceBillingOperationPhase(operation, 'tasks-applied');
+        onPhase?.('tasks-applied');
+
+        this.applyInvoiceBillingCorePhase(operation);
+        this.updateInvoiceBillingOperationPhase(operation, 'core-links-applied');
+        onPhase?.('core-links-applied');
+
+        this.applyInvoiceBillingInvoicePhase(operation);
+        this.updateInvoiceBillingOperationPhase(operation, 'invoice-applied');
+        onPhase?.('invoice-applied');
+
+        this.updateInvoiceBillingOperationPhase(operation, 'complete', 'complete');
+        onPhase?.('complete');
+    }
+
+    private applyFinalizationEntryPhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'finalize' }>,
+        entryMaps: Array<Y.Map<string, TimeEntry>>,
+    ): void {
+        const { application } = operation;
+        const locate = (id: string) => entryMaps.find((entryMap) => entryMap.has(id));
+
+        application.adjustmentEntryIdsToDelete.forEach((id) => locate(id)?.delete(id));
+        application.adjustmentEntriesToUpdate.forEach(({ id, updates }) => {
+            const map = locate(id);
+            if (map) this.updateEntityFieldsIfChanged(map as any, id, updates);
+        });
+        application.adjustmentEntriesToCreate.forEach(({ id, entry }) => {
+            if (!locate(id)) {
+                (this.activeTimeEntries as any).set(id, objectToYMap({ id, ...entry }));
+            }
+        });
+        application.timeEntryUpdates.forEach(({ id, updates }) => {
+            const map = locate(id);
+            const current = map ? readEntity<TimeEntry>(map.get(id)) : null;
+
+            if (map && (!current?.billedInvoiceId || current.billedInvoiceId === operation.invoiceId)) {
+                this.updateEntityFieldsIfChanged(map as any, id, updates);
+            }
+        });
+    }
+
+    private applyUndoEntryPhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'undo' }>,
+        entryMaps: Array<Y.Map<string, TimeEntry>>,
+    ): void {
+        const locate = (id: string) => entryMaps.find((entryMap) => entryMap.has(id));
+
+        operation.application.entriesToDelete.forEach((entry) => {
+            const map = locate(entry.id);
+            const current = map ? readEntity<TimeEntry>(map.get(entry.id)) : null;
+
+            if (map && current?.billedInvoiceId === operation.invoiceId) map.delete(entry.id);
+        });
+        operation.application.entriesToClear.forEach(({ entry, updates }) => {
+            const map = locate(entry.id);
+            const current = map ? readEntity<TimeEntry>(map.get(entry.id)) : null;
+
+            if (map && current?.billedInvoiceId === operation.invoiceId) {
+                this.updateEntityFieldsIfChanged(map as any, entry.id, updates);
+            }
+        });
+    }
+
+    private applyFinalizationExpensePhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'finalize' }>,
+        expenseMaps: Array<Y.Map<string, Expense>>,
+    ): void {
+        operation.application.expenseUpdates.forEach(({ id, updates }) => {
+            const map = expenseMaps.find((expenseMap) => expenseMap.has(id));
+            const current = map ? readEntity<Expense>(map.get(id)) : null;
+
+            if (map && (!current?.invoiceId || current.invoiceId === operation.invoiceId)) {
+                this.updateEntityFieldsIfChanged(map as any, id, updates);
+            }
+        });
+    }
+
+    private applyUndoExpensePhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'undo' }>,
+        expenseMaps: Array<Y.Map<string, Expense>>,
+    ): void {
+        operation.application.expenseUpdatesToUnbill.forEach(({ id, updates }) => {
+            const map = expenseMaps.find((expenseMap) => expenseMap.has(id));
+            const current = map ? readEntity<Expense>(map.get(id)) : null;
+
+            if (map && current?.invoiceId === operation.invoiceId) {
+                this.updateEntityFieldsIfChanged(map as any, id, updates);
+            }
+        });
+    }
+
+    private applyFinalizationTaskPhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'finalize' }>,
+        taskMaps: Array<Y.Map<string, Task>>,
+    ): void {
+        operation.application.taskCutoffUpdates.forEach(({ id, updates }) => {
+            const map = taskMaps.find((taskMap) => taskMap.has(id));
+            const current = map ? readEntity<Task>(map.get(id)) : null;
+            const target = updates.lastBilledAt;
+
+            if (map && typeof target === 'number'
+                && (current?.lastBilledAt ?? Number.NEGATIVE_INFINITY) < target) {
+                this.updateEntityFieldsIfChanged(map as any, id, updates);
+            }
+        });
+        operation.application.quotedTaskUpdates.forEach(({ id, updates }) => {
+            const map = taskMaps.find((taskMap) => taskMap.has(id));
+            const current = map ? readEntity<Task>(map.get(id)) : null;
+
+            if (map && (!current?.quotedAmountBilling?.invoiceId
+                || current.quotedAmountBilling.invoiceId === operation.invoiceId)) {
+                this.updateEntityFieldsIfChanged(map as any, id, updates);
+            }
+        });
+    }
+
+    private applyUndoTaskPhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'undo' }>,
+        taskMaps: Array<Y.Map<string, Task>>,
+    ): void {
+        operation.application.quotedTaskUpdates.forEach(({ id, updates }) => {
+            const map = taskMaps.find((taskMap) => taskMap.has(id));
+            const current = map ? readEntity<Task>(map.get(id)) : null;
+
+            if (map && current?.quotedAmountBilling?.invoiceId === operation.invoiceId) {
+                this.updateEntityFieldsIfChanged(map as any, id, updates);
+            }
+        });
+        operation.application.taskCutoffUpdates.forEach(({ id, expectedLastBilledAt, updates }) => {
+            const map = taskMaps.find((taskMap) => taskMap.has(id));
+            const current = map ? readEntity<Task>(map.get(id)) : null;
+
+            if (map && (current?.lastBilledAt ?? null) === expectedLastBilledAt) {
+                this.updateEntityFieldsIfChanged(map as any, id, updates);
+            }
+        });
+    }
+
+    private applyInvoiceBillingCorePhase(operation: InvoiceBillingOperation): void {
+        this.coreDoc.transact(() => {
+            if (operation.kind === 'finalize') {
+                operation.application.projectLinkUpdates.forEach(({ id, updates }) => {
+                    const project = readEntity<Project>(this.projects.get(id));
+                    if (!project) return;
+
+                    this.updateEntityFieldsIfChanged(this.projects as any, id, {
+                        invoiceIds: Array.from(new Set([...(project.invoiceIds ?? []), operation.invoiceId])),
+                        updatedAt: Math.max(project.updatedAt ?? 0, updates.updatedAt ?? 0),
+                    });
+                });
+
+                const sequenceUpdate = operation.application.invoiceTemplateSequenceUpdate;
+                if (sequenceUpdate) {
+                    const template = readEntity<InvoiceTemplate>(this.invoiceTemplates.get(sequenceUpdate.id));
+                    const target = sequenceUpdate.updates.currentSequentialNumber;
+
+                    if (template && typeof target === 'number'
+                        && (template.currentSequentialNumber ?? 0) < target) {
+                        this.updateEntityFieldsIfChanged(this.invoiceTemplates as any, sequenceUpdate.id, sequenceUpdate.updates);
+                    }
+                }
+                return;
+            }
+
+            operation.application.projectUnlinkUpdates.forEach(({ id, updates }) => {
+                const project = readEntity<Project>(this.projects.get(id));
+                if (!project) return;
+
+                this.updateEntityFieldsIfChanged(this.projects as any, id, {
+                    invoiceIds: (project.invoiceIds ?? []).filter((invoiceId) => invoiceId !== operation.invoiceId),
+                    updatedAt: Math.max(project.updatedAt ?? 0, updates.updatedAt ?? 0),
+                });
+            });
+
+            const sequenceUpdate = operation.application.invoiceTemplateSequenceUpdate;
+            if (sequenceUpdate) {
+                const template = readEntity<InvoiceTemplate>(this.invoiceTemplates.get(sequenceUpdate.id));
+                const target = sequenceUpdate.updates.currentSequentialNumber;
+
+                if (template && typeof target === 'number'
+                    && template.currentSequentialNumber === target + 1) {
+                    this.updateEntityFieldsIfChanged(this.invoiceTemplates as any, sequenceUpdate.id, sequenceUpdate.updates);
+                }
+            }
+        });
+    }
+
+    private applyInvoiceBillingInvoicePhase(operation: InvoiceBillingOperation): void {
+        if (operation.kind === 'undo') {
+            this.invoices.delete(operation.invoiceId);
+            return;
+        }
+
+        const current = readEntity<Invoice>(this.invoices.get(operation.invoiceId));
+
+        if (!current) {
+            (this.invoices as any).set(
+                operation.invoiceId,
+                objectToYMap(operation.desiredInvoice as unknown as Record<string, unknown>)
+            );
+            return;
+        }
+
+        if (current.status === 'draft') {
+            this.updateEntityFieldsIfChanged(this.invoices as any, operation.invoiceId, {
+                ...operation.application.invoiceUpdates,
+                billingSelectionSnapshot: operation.desiredInvoice.billingSelectionSnapshot,
+            });
+        }
+    }
+
+    async exportBackupData(options: {
+        backupType?: 'automatic' | 'manual';
+        exportDate?: string;
+        refreshFromCloud?: boolean;
+        refreshLazyDocsFromCloud?: boolean;
+    } = {}): Promise<BackupPayload> {
+        // Portable backups omit the internal operation journal, so pending
+        // operations must first reach a consistent product-data state.
+        await this.reconcileInvoiceBillingOperations({ includeCompleted: false });
+
         const shouldRefreshFromCloud = options.refreshFromCloud === true && this.driveProvider?.isConnected();
-        const loadOptions = shouldRefreshFromCloud ? { allowPullFromDrive: true } : undefined;
+        const shouldRefreshLazyDocs = (shouldRefreshFromCloud || options.refreshLazyDocsFromCloud === true)
+            && this.driveProvider?.isConnected();
+        const loadOptions = shouldRefreshLazyDocs ? { allowPullFromDrive: true } : undefined;
 
         if (shouldRefreshFromCloud) {
             try {
@@ -1060,6 +1840,11 @@ export class YjsStore {
     }
 
     async importBackupData(data: BackupImportPayload): Promise<void> {
+        // Direct callers receive the same complete boundary validation as JSON
+        // restores. All validation finishes before archive docs are loaded or any
+        // collection is mutated.
+        data = validateBackupImportPayload(data);
+
         const archivedTaskMapPromise = (data.tasks || []).some((task) => task.archived || task.archivedOnDate)
             ? this.loadArchivedTasks()
             : null;
@@ -1185,6 +1970,106 @@ export class YjsStore {
             this.preferences.set(key, value as Preferences[keyof Preferences]);
         }
 
+    }
+
+    /**
+     * Replace the local workspace with a validated backup and restore the
+     * previous workspace if applying the replacement fails. Active timers are
+     * intentionally absent from portable backups, but must survive a failed
+     * restore attempt.
+     */
+    async replaceAllDataWithBackup(data: BackupImportPayload): Promise<void> {
+        const validatedData = validateBackupImportPayload(data);
+        const rollbackPayload = await this.exportBackupData({
+            backupType: 'manual',
+        });
+        const rollbackTimers = collectValidatedEntities<MultiTimerState>(
+            'timers',
+            this.timers as any,
+            'prepare restore rollback'
+        );
+
+        const restoreJournal: RestoreJournalRecord = {
+            version: 1,
+            operationId: generateId(),
+            createdAt: Date.now(),
+            rollback: rollbackPayload,
+            rollbackTimers,
+            replacement: validatedData,
+        };
+
+        // This transaction must commit before the existing workspace is
+        // touched. A browser close at any later point can recover the rollback.
+        await writeRestoreJournal(restoreJournal);
+
+        const resetWorkspace = async () => {
+            await this.clearAllData();
+            await this.initialize({ skipRestoreRecovery: true });
+        };
+
+        try {
+            await resetWorkspace();
+            await this.importBackupData(validatedData);
+            await this.docManager.flushPersistence();
+            await clearRestoreJournal();
+        } catch (restoreFailure) {
+            try {
+                await resetWorkspace();
+                await this.importBackupData(rollbackPayload);
+                this.restoreTimers(rollbackTimers);
+                await this.docManager.flushPersistence();
+                await clearRestoreJournal();
+            } catch (rollbackFailure) {
+                const rollbackMessage = rollbackFailure instanceof Error
+                    ? rollbackFailure.message
+                    : String(rollbackFailure);
+
+                throw new Error(
+                    `Restore failed and the previous workspace could not be recovered automatically: ${rollbackMessage}`
+                );
+            }
+
+            const restoreMessage = restoreFailure instanceof Error
+                ? restoreFailure.message
+                : String(restoreFailure);
+
+            throw new Error(`Restore failed; the previous workspace was recovered. ${restoreMessage}`);
+        }
+    }
+
+    /**
+     * A journal only remains when a restore did not reach its durable commit
+     * barrier. Recover the pre-restore workspace before normal startup so a
+     * crash can never expose a partially replaced collection set.
+     */
+    private async recoverInterruptedRestore(journal: RestoreJournalRecord): Promise<void> {
+        try {
+            await this.clearAllData();
+            await this.initialize({ skipRestoreRecovery: true });
+            await this.importBackupData(journal.rollback);
+            this.restoreTimers(journal.rollbackTimers);
+            await this.docManager.flushPersistence();
+            await clearRestoreJournal();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`An interrupted restore was detected, but the previous workspace could not be recovered: ${message}`);
+        }
+    }
+
+    private restoreTimers(timers: MultiTimerState[]): void {
+        this.coreDoc.transact(() => {
+            for (const timer of timers) {
+                const validatedTimer = validateCollectionEntity<MultiTimerState>(
+                    'timers',
+                    timer,
+                    `restore rollback timer ${timer.projectId}`
+                );
+                this.timers.set(
+                    validatedTimer.projectId,
+                    objectToYMap(validatedTimer as unknown as Record<string, unknown>) as any
+                );
+            }
+        });
     }
 
     // =========================================================================
@@ -1474,7 +2359,9 @@ export class YjsStore {
                 'plannerAttachments',
                 'dailyGoals',
                 'invoices',
-            ].some((mapName) => doc.getMap(mapName).size > 0);
+            ].some((mapName) => doc.getMap(mapName).size > 0)
+                || (doc.share.has('invoiceBillingOperations')
+                    && doc.getMap('invoiceBillingOperations').size > 0);
         }
 
         if (docName === 'entries-active' || /^entries-\d{4}$/.test(docName)) {

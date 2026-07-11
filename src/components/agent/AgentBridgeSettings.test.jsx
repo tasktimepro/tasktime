@@ -157,7 +157,7 @@ describe('AgentBridgeSettings', () => {
     });
 
     it('prefills launch pairing details and scrubs them from the URL before connecting', async () => {
-        window.history.pushState({}, '', `/account?section=agent&keep=1&agentBridgeEndpoint=${encodeURIComponent('ws://127.0.0.1:39123/tasktime-agent')}&agentBridgePairingId=pairing-1&agentBridgePairingCode=123456`);
+        window.history.pushState({}, '', `/account?section=agent&keep=1&agentBridgeEndpoint=${encodeURIComponent('ws://127.0.0.1:39123/tasktime-agent')}&agentBridgePairingId=pairing-1&agentBridgePairingCode=123456&agentBridgeScopes=read%2Cwrite%2Cbilling`);
 
         renderAgentBridgeSettings();
 
@@ -165,6 +165,7 @@ describe('AgentBridgeSettings', () => {
         expect(screen.getByLabelText('Pairing ID')).toHaveValue('pairing-1');
         expect(screen.getByLabelText('Pairing code')).toHaveValue('123456');
         expect(screen.getByText('Local agent request')).toBeInTheDocument();
+        expect(screen.getByText(/requesting these scopes: read, write, billing/i)).toBeInTheDocument();
 
         await waitFor(() => {
             const params = new URLSearchParams(window.location.search);
@@ -173,6 +174,7 @@ describe('AgentBridgeSettings', () => {
             expect(params.has('agentBridgeEndpoint')).toBe(false);
             expect(params.has('agentBridgePairingId')).toBe(false);
             expect(params.has('agentBridgePairingCode')).toBe(false);
+            expect(params.has('agentBridgeScopes')).toBe(false);
         });
 
         await userEvent.click(screen.getByRole('button', { name: 'Approve & Connect' }));

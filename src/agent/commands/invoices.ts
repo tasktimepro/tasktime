@@ -1,5 +1,5 @@
 import { collectValidatedEntities } from '@/stores/yjs/validation';
-import { collectEntities, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
+import { collectEntities, readEntity } from '@/stores/yjs/entityUtils';
 import type { BusinessBrandAsset, BusinessInfo, Client, EmailTemplate, Expense, Invoice, InvoiceTemplate, PaymentMethod, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { getProjectInvoicePreview, type ProjectInvoicePreview } from '@/utils/invoicePreviewUtils';
 import { toStorageDate } from '@/utils/dateUtils';
@@ -21,6 +21,11 @@ import {
 import {
     buildInvoiceFinalizationApplication,
 } from '@/domain/invoices/invoiceFinalizationApplication';
+import { buildInvoiceBillingSelectionSnapshot } from '@/domain/invoices/invoiceBillingSelection';
+import {
+    isInvoiceBillingOperation,
+    type InvoiceBillingOperation,
+} from '@/domain/invoices/invoiceBillingOperation';
 import {
     buildDraftInvoiceItems,
     buildDraftInvoiceUpdates,
@@ -340,6 +345,7 @@ const BLOCKED_DRAFT_UPDATE_KEYS = new Set([
     'sentAt',
     'sentToEmail',
     'billingStateSnapshot',
+    'billingSelectionSnapshot',
     'agentDraft',
 ]);
 
@@ -435,19 +441,26 @@ export function listInvoicesCommand(context: AgentCommandContext, input: ListInv
         .map(summarizeInvoice);
 }
 
-export function previewInvoiceFromUnbilledWorkCommand(
+export async function previewInvoiceFromUnbilledWorkCommand(
     context: AgentCommandContext,
     input: PreviewInvoiceFromUnbilledWorkInput
-): InvoiceUnbilledWorkPreview {
+): Promise<InvoiceUnbilledWorkPreview> {
     assertReady(context);
     assertPermission(context, 'read');
 
     const project = readRequiredEntity<Project>(context.store.projects as any, input.projectId, 'Project');
     const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent invoice preview clients');
-    const tasks = collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent invoice preview tasks');
-    const expenses = collectValidatedEntities<Expense>('expenses', context.store.expenses as any, 'agent invoice preview expenses');
-    const timeEntries = context.store.getAllTimeEntries()
-        .filter((entry): entry is TimeEntry => !!entry && typeof entry.id === 'string' && typeof entry.taskId === 'string');
+    const [tasks, expenses, timeEntries] = await Promise.all([
+        typeof context.store.getAllTasks === 'function'
+            ? context.store.getAllTasks()
+            : Promise.resolve(collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent invoice preview tasks')),
+        typeof context.store.getAllExpenses === 'function'
+            ? context.store.getAllExpenses()
+            : Promise.resolve(collectValidatedEntities<Expense>('expenses', context.store.expenses as any, 'agent invoice preview expenses')),
+        typeof context.store.loadAllTimeEntries === 'function'
+            ? context.store.loadAllTimeEntries()
+            : Promise.resolve(context.store.getAllTimeEntries()),
+    ]);
     const preview = getProjectInvoicePreview(project, {
         clients,
         tasks,
@@ -457,6 +470,7 @@ export function previewInvoiceFromUnbilledWorkCommand(
         billingPeriodStart: input.billingPeriodStart,
         billingPeriodEnd: input.billingPeriodEnd,
         includeClientLevelExpenses: input.includeClientLevelExpenses === true,
+        preferredCurrency: context.store.preferences.get('currency') as string | undefined,
     });
 
     return {
@@ -477,15 +491,15 @@ export function previewInvoiceFromUnbilledWorkCommand(
     };
 }
 
-export function createInvoiceDraftFromUnbilledWorkCommand(
+export async function createInvoiceDraftFromUnbilledWorkCommand(
     context: AgentCommandContext,
     input: CreateInvoiceDraftFromUnbilledWorkInput
-): InvoiceDraftFromUnbilledWork {
+): Promise<InvoiceDraftFromUnbilledWork> {
     assertReady(context);
     assertPermission(context, 'read');
     assertPermission(context, 'write');
 
-    return withIdempotency(context, input.idempotencyKey, () => {
+    return withIdempotency(context, input.idempotencyKey, async () => {
         const projectId = requireString(input.projectId, 'projectId');
         const project = readRequiredEntity<Project>(context.store.projects as any, projectId, 'Project');
         const clientId = input.clientId || project.preferredClientId;
@@ -496,7 +510,7 @@ export function createInvoiceDraftFromUnbilledWorkCommand(
 
         readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
 
-        const previewResult = previewInvoiceFromUnbilledWorkCommand(context, {
+        const previewResult = await previewInvoiceFromUnbilledWorkCommand(context, {
             projectId,
             billingPeriodStart: input.billingPeriodStart,
             billingPeriodEnd: input.billingPeriodEnd,
@@ -569,6 +583,10 @@ export function createInvoiceDraftFromUnbilledWorkCommand(
             billingPeriodStart: input.billingPeriodStart ?? null,
             billingPeriodEnd: input.billingPeriodEnd ?? null,
             currency: preview.currency,
+            billingSelectionSnapshot: buildInvoiceBillingSelectionSnapshot({
+                preview,
+                capturedAt: now,
+            }),
             template: resolvedTemplate ? { ...resolvedTemplate } : null,
             templateId: resolvedTemplate?.id || null,
             agentDraft: {
@@ -682,6 +700,37 @@ export function finalizeInvoiceCommand(
         }
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');
+        const persistedOperation = input.idempotencyKey
+            ? readEntity<InvoiceBillingOperation>(context.store.invoiceBillingOperations.get(input.idempotencyKey))
+            : null;
+        const replayedOperation = isInvoiceBillingOperation(persistedOperation) ? persistedOperation : null;
+
+        if (persistedOperation && !replayedOperation) {
+            throw new AgentCommandError('CONFLICT', 'The persisted billing operation is invalid and cannot be replayed safely.', {
+                idempotencyKey: input.idempotencyKey,
+            });
+        }
+
+        if (replayedOperation) {
+            if (replayedOperation.kind !== 'finalize' || replayedOperation.invoiceId !== invoiceId) {
+                throw new AgentCommandError('CONFLICT', 'The idempotency key belongs to a different billing operation.', {
+                    idempotencyKey: input.idempotencyKey,
+                });
+            }
+
+            await context.store.reconcileInvoiceBillingOperations({ includeCompleted: true });
+            const replayedInvoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
+
+            return {
+                invoice: replayedInvoice,
+                billedEntryCount: replayedOperation.application.billedEntryCount,
+                billedExpenseCount: replayedOperation.application.billedExpenseCount,
+                updatedTaskCount: replayedOperation.application.updatedTaskCount,
+                updatedProjectInvoiceReferences: replayedOperation.application.updatedProjectInvoiceReferences,
+                advancedInvoiceSequence: replayedOperation.application.advancedInvoiceSequence,
+            };
+        }
+
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
 
         if (invoice.status !== 'draft') {
@@ -704,9 +753,6 @@ export function finalizeInvoiceCommand(
         ));
         const expenseMaps = await collectExpenseMapsForInvoiceFinalization(context);
         const expenses = expenseMaps.flatMap((expenseMap) => collectValidatedEntities<Expense>('expenses', expenseMap as any, 'agent invoice finalize expenses'));
-        const taskMapById = mapEntitiesToSource(taskMaps);
-        const entryMapById = mapEntitiesToSource(entryMaps);
-        const expenseMapById = mapEntitiesToSource(expenseMaps);
         const invoiceTemplates = collectValidatedEntities<InvoiceTemplate & Record<string, unknown>>(
             'invoiceTemplates',
             context.store.invoiceTemplates as any,
@@ -739,113 +785,19 @@ export function finalizeInvoiceCommand(
             });
         }
 
-        applyEntryMutations(entryMaps, () => {
-            finalizationApplication.adjustmentEntryIdsToDelete.forEach((entryId) => {
-                const entryMap = entryMapById.get(entryId);
-                entryMap?.delete(entryId);
-            });
-
-            finalizationApplication.adjustmentEntriesToUpdate.forEach((adjustment) => {
-                const entryMap = entryMapById.get(adjustment.id);
-                if (!entryMap) return;
-
-                updateValidatedEntity<TimeEntry>(entryMap as any, 'timeEntries', adjustment.id, adjustment.updates, `agent update invoice adjustment ${adjustment.id}`);
-            });
-
-            finalizationApplication.adjustmentEntriesToCreate.forEach((adjustment) => {
-                createValidatedEntity<TimeEntry>(context.store.activeTimeEntries as any, 'timeEntries', {
-                    id: adjustment.id,
-                    ...adjustment.entry,
-                }, `agent create invoice adjustment ${adjustment.id}`);
-            });
-
-            finalizationApplication.timeEntryUpdates.forEach(({ id, updates }) => {
-                const entryMap = entryMapById.get(id);
-                if (!entryMap) return;
-
-                updateValidatedEntity<TimeEntry>(
-                    entryMap as any,
-                    'timeEntries',
-                    id,
-                    updates,
-                    `agent finalize invoice entry ${id}`
-                );
-            });
-        });
-
-        let finalizedInvoice: Invoice | undefined;
-
-        context.store.coreDoc.transact(() => {
-            finalizationApplication.expenseUpdates.forEach(({ id, updates }) => {
-                const expenseMap = expenseMapById.get(id);
-                if (!expenseMap) return;
-
-                updateValidatedEntity<Expense>(
-                    expenseMap as any,
-                    'expenses',
-                    id,
-                    updates,
-                    `agent finalize invoice expense ${id}`
-                );
-            });
-
-            finalizationApplication.taskCutoffUpdates.forEach(({ id, updates }) => {
-                const taskMap = taskMapById.get(id);
-                if (!taskMap) return;
-
-                updateValidatedEntity<Task>(
-                    taskMap as any,
-                    'tasks',
-                    id,
-                    updates,
-                    `agent finalize invoice task ${id}`
-                );
-            });
-
-            finalizationApplication.quotedTaskUpdates.forEach(({ id, updates }) => {
-                const taskMap = taskMapById.get(id);
-                if (!taskMap) return;
-
-                updateValidatedEntity<Task>(
-                    taskMap as any,
-                    'tasks',
-                    id,
-                    updates,
-                    `agent finalize invoice quoted task ${id}`
-                );
-            });
-
-            finalizationApplication.projectLinkUpdates.forEach(({ id, updates }) => {
-                updateValidatedEntity<Project>(
-                    context.store.projects as any,
-                    'projects',
-                    id,
-                    updates,
-                    `agent finalize invoice project ${id}`
-                );
-            });
-
-            if (finalizationApplication.invoiceTemplateSequenceUpdate) {
-                updateValidatedEntity<InvoiceTemplate>(
-                    context.store.invoiceTemplates as any,
-                    'invoiceTemplates',
-                    finalizationApplication.invoiceTemplateSequenceUpdate.id,
-                    finalizationApplication.invoiceTemplateSequenceUpdate.updates,
-                    `agent finalize invoice template ${finalizationApplication.invoiceTemplateSequenceUpdate.id}`
-                );
-            }
-
-            finalizedInvoice = updateValidatedEntity<Invoice>(
-                context.store.invoices as any,
-                'invoices',
-                invoice.id,
-                finalizationApplication.invoiceUpdates,
-                `agent finalize invoice ${invoice.id}`
-            );
+        const desiredInvoice: Invoice = {
+            ...invoice,
+            ...finalizationApplication.invoiceUpdates,
+        };
+        const finalizedInvoice = await context.store.commitInvoiceFinalization({
+            operationId: input.idempotencyKey || getId(context),
+            desiredInvoice,
+            application: finalizationApplication,
+            createdAt: finalizedAt,
         });
 
         return {
-            invoice: finalizedInvoice!,
+            invoice: finalizedInvoice,
             billedEntryCount: finalizationApplication.billedEntryCount,
             billedExpenseCount: finalizationApplication.billedExpenseCount,
             updatedTaskCount: finalizationApplication.updatedTaskCount,
@@ -871,6 +823,11 @@ export function markInvoicePaidCommand(
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
+        if (invoice.status === 'draft') {
+            throw new AgentCommandError('CONFLICT', 'Draft invoices must be finalized before they can be marked paid.', {
+                invoiceId,
+            });
+        }
         const paidAt = input.paidAt ?? getNow(context);
         const preferredCurrency = normalizeCurrencyCode(
             typeof context.store.preferences?.get('currency') === 'string'
@@ -953,6 +910,44 @@ export function undoLatestInvoiceCommand(
         }
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');
+        const persistedOperation = input.idempotencyKey
+            ? readEntity<InvoiceBillingOperation>(context.store.invoiceBillingOperations.get(input.idempotencyKey))
+            : null;
+        const replayedOperation = isInvoiceBillingOperation(persistedOperation) ? persistedOperation : null;
+
+        if (persistedOperation && !replayedOperation) {
+            throw new AgentCommandError('CONFLICT', 'The persisted billing operation is invalid and cannot be replayed safely.', {
+                idempotencyKey: input.idempotencyKey,
+            });
+        }
+
+        if (replayedOperation) {
+            if (replayedOperation.kind !== 'undo' || replayedOperation.invoiceId !== invoiceId) {
+                throw new AgentCommandError('CONFLICT', 'The idempotency key belongs to a different billing operation.', {
+                    idempotencyKey: input.idempotencyKey,
+                });
+            }
+
+            const expectedReplayConfirmation = replayedOperation.invoice.invoiceNumber || '';
+            if (input.confirmationText?.trim() !== expectedReplayConfirmation) {
+                throw new AgentCommandError(
+                    'INVALID_INPUT',
+                    `confirmationText must match invoice number ${expectedReplayConfirmation}.`,
+                    { invoiceId }
+                );
+            }
+
+            await context.store.reconcileInvoiceBillingOperations({ includeCompleted: true });
+
+            return {
+                invoiceNumber: replayedOperation.invoice.invoiceNumber || invoiceId,
+                clearedTimeEntryCount: replayedOperation.application.clearedTimeEntryCount,
+                deletedAdjustmentCount: replayedOperation.application.deletedAdjustmentCount,
+                unbilledExpenseCount: replayedOperation.application.unbilledExpenseCount,
+                rewoundSequence: replayedOperation.application.rewoundSequence,
+            };
+        }
+
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
         const expectedConfirmation = invoice.invoiceNumber || '';
 
@@ -973,7 +968,6 @@ export function undoLatestInvoiceCommand(
         const taskMaps = await collectTaskMapsForInvoiceFinalization(context);
         const expenseMaps = await collectExpenseMapsForInvoiceFinalization(context);
         const entryMaps = await collectEntryMapsForInvoiceFinalization(context);
-        const entryMapById = mapEntitiesToSource(entryMaps);
         const entries = entryMaps
             .flatMap((entryMap) => collectValidatedEntities<TimeEntry>('timeEntries', entryMap as any, 'agent invoice undo time entries'));
         const tasks = taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any));
@@ -992,148 +986,12 @@ export function undoLatestInvoiceCommand(
             undoneAt,
         }).application;
 
-        const entriesByMap = new Map<any, {
-            toDelete: TimeEntry[];
-            toClear: Array<{ entry: TimeEntry; updates: Partial<TimeEntry> }>;
-        }>();
-        const queueEntryMutation = (
-            entryMap: any,
-            action: 'delete' | 'clear',
-            entry: TimeEntry,
-            updates?: Partial<TimeEntry>
-        ) => {
-            if (!entryMap) return;
-
-            const existing = entriesByMap.get(entryMap) || { toDelete: [], toClear: [] };
-
-            if (action === 'delete') {
-                existing.toDelete.push(entry);
-            } else {
-                existing.toClear.push({
-                    entry,
-                    updates: updates || {},
-                });
-            }
-
-            entriesByMap.set(entryMap, existing);
-        };
-
-        undoApplication.entriesToDelete.forEach((entry) => {
-            const entryMap = entryMapById.get(entry.id);
-            queueEntryMutation(entryMap, 'delete', entry);
+        await context.store.commitInvoiceUndo({
+            operationId: input.idempotencyKey || getId(context),
+            invoice,
+            application: undoApplication,
+            createdAt: undoneAt,
         });
-
-        undoApplication.entriesToClear.forEach(({ entry, updates }) => {
-            const entryMap = entryMapById.get(entry.id);
-            queueEntryMutation(entryMap, 'clear', entry, updates);
-        });
-
-        entriesByMap.forEach((mutation, entryMap) => {
-            const applyChanges = () => {
-                mutation.toDelete.forEach((entry) => {
-                    entryMap.delete(entry.id);
-                });
-
-                mutation.toClear.forEach(({ entry, updates }) => {
-                    updateEntityFields(entryMap as any, entry.id, updates);
-                });
-            };
-
-            if (entryMap?.doc?.transact) {
-                entryMap.doc.transact(applyChanges);
-                return;
-            }
-
-            applyChanges();
-        });
-
-        const expenseUpdatesToUnbill = new Map(
-            undoApplication.expenseUpdatesToUnbill.map(({ id: expenseId, updates }) => [expenseId, updates])
-        );
-
-        expenseMaps.forEach((expenseMap) => {
-            const applyChanges = () => {
-                expenseMap?.forEach?.((value: unknown, expenseId: string) => {
-                    const expense = readEntity<Expense>(value);
-                    const updates = expenseUpdatesToUnbill.get(expenseId);
-
-                    if (!expense || !updates) {
-                        return;
-                    }
-
-                    updateEntityFields(expenseMap as any, expenseId, updates);
-                });
-            };
-
-            if (expenseMap?.doc?.transact) {
-                expenseMap.doc.transact(applyChanges);
-                return;
-            }
-
-            applyChanges();
-        });
-
-        const quotedTaskUpdates = new Map(
-            undoApplication.quotedTaskUpdates.map(({ id: taskId, updates }) => [taskId, updates])
-        );
-        const taskCutoffUpdates = new Map(
-            undoApplication.taskCutoffUpdates.map(({ id: taskId, updates }) => [taskId, updates])
-        );
-
-        taskMaps.forEach((taskMap) => {
-            const applyChanges = () => {
-                quotedTaskUpdates.forEach((updates, taskId) => {
-                    if (!taskMap?.has?.(taskId)) {
-                        return;
-                    }
-
-                    updateEntityFields(taskMap as any, taskId, updates);
-                });
-
-                taskCutoffUpdates.forEach((updates, taskId) => {
-                    if (!taskMap?.has?.(taskId)) {
-                        return;
-                    }
-
-                    updateEntityFields(taskMap as any, taskId, updates);
-                });
-            };
-
-            if (taskMap?.doc?.transact) {
-                taskMap.doc.transact(applyChanges);
-                return;
-            }
-
-            applyChanges();
-        });
-
-        context.store.coreDoc.transact(() => {
-            undoApplication.projectUnlinkUpdates.forEach(({ id: projectId, updates }) => {
-                if (!context.store.projects.has(projectId)) {
-                    return;
-                }
-
-                updateEntityFields(context.store.projects as any, projectId, updates);
-            });
-
-            if (undoApplication.invoiceTemplateSequenceUpdate) {
-                updateEntityFields(
-                    context.store.invoiceTemplates as any,
-                    undoApplication.invoiceTemplateSequenceUpdate.id,
-                    undoApplication.invoiceTemplateSequenceUpdate.updates
-                );
-            }
-        });
-
-        const removed = context.store.invoices.has(invoiceId);
-
-        if (removed) {
-            context.store.invoices.delete(invoiceId);
-        }
-
-        if (!removed) {
-            throw new AgentCommandError('CONFLICT', 'Invoice could not be removed.', { invoiceId });
-        }
 
         return {
             invoiceNumber: invoice.invoiceNumber || invoiceId,
@@ -1231,6 +1089,7 @@ function buildProjectQuoteDocument(
             additionalTasks: input.additionalTasks ? normalizeProjectQuoteTasks(input.additionalTasks, 'additionalTasks') : undefined,
             quoteDate,
             quoteTimestamp,
+            preferredCurrency: context.store.preferences.get('currency') as string | undefined,
         }) as Record<string, unknown>;
         const clientId = requireString(quote.clientId, 'quote.clientId');
         const invoiceNumber = requireString(quote.invoiceNumber, 'quote.invoiceNumber');
@@ -1493,6 +1352,12 @@ export function sendInvoiceEmailCommand(
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
         const draft = buildInvoiceEmailDraft(context, invoice, input);
 
+        if (draft.sendType !== 'quote' && invoice.status === 'draft') {
+            throw new AgentCommandError('CONFLICT', 'Draft invoices must be finalized before they can be emailed.', {
+                invoiceId,
+            });
+        }
+
         if (!draft.to.trim()) {
             throw new AgentCommandError('INVALID_INPUT', 'Recipient email is required.');
         }
@@ -1541,11 +1406,6 @@ export function sendInvoiceEmailCommand(
                 sentToEmail: draft.to,
             };
 
-            if (draft.sendType === 'invoice' && invoice.status === 'draft') {
-                updates.status = 'sent';
-                status = 'sent';
-            }
-
             updateValidatedEntity<Invoice>(
                 context.store.invoices as any,
                 'invoices',
@@ -1584,6 +1444,7 @@ function buildInvoiceEmailDraft(
         emailTemplates: collectValidatedEntities<EmailTemplate>('emailTemplates', context.store.emailTemplates as any, 'agent invoice email templates'),
         sendType: normalizeEmailSendType(input.sendType),
         overrides: input,
+        preferredCurrency: getAgentPreferredCurrency(context),
     });
 }
 
@@ -1598,11 +1459,17 @@ function buildProjectQuoteEmailDraft(
         businessInfo: resolveInvoiceBusinessInfo(context, quote),
         emailTemplates: collectValidatedEntities<EmailTemplate>('emailTemplates', context.store.emailTemplates as any, 'agent project quote email templates'),
         sendType: 'quote',
+        preferredCurrency: getAgentPreferredCurrency(context),
         overrides: {
             ...input,
             templateId: input.emailTemplateId ?? null,
         },
     });
+}
+
+function getAgentPreferredCurrency(context: AgentCommandContext): string {
+    const value = context.store.preferences.get('currency');
+    return normalizeCurrencyCode(typeof value === 'string' ? value : undefined);
 }
 
 function normalizeEmailSendType(sendType: EmailSendType | undefined): EmailSendType {
@@ -1688,33 +1555,4 @@ async function collectEntryMapsForInvoiceFinalization(context: AgentCommandConte
     }));
 
     return maps;
-}
-
-function mapEntitiesToSource(maps: Array<any>): Map<string, any> {
-    const sourceById = new Map<string, any>();
-
-    maps.forEach((map) => {
-        map?.forEach?.((value: unknown, id: string) => {
-            if (sourceById.has(id)) {
-                return;
-            }
-
-            if (readEntity(value)) {
-                sourceById.set(id, map);
-            }
-        });
-    });
-
-    return sourceById;
-}
-
-function applyEntryMutations(entryMaps: Array<any>, mutate: () => void): void {
-    const docs = Array.from(new Set(entryMaps.map((entryMap) => entryMap?.doc).filter(Boolean)));
-
-    if (docs.length === 1 && typeof docs[0].transact === 'function') {
-        docs[0].transact(mutate);
-        return;
-    }
-
-    mutate();
 }

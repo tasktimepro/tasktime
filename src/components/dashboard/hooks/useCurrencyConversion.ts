@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { convertCurrency, fetchExchangeRates, getPreferredCurrency, getProjectCurrency, hasAllRequiredRates } from '../../../utils/currencyUtils';
+import { convertCurrency, fetchExchangeRates, getProjectCurrency, hasAllRequiredRates, normalizeCurrencyCode } from '../../../utils/currencyUtils';
 import { useToast } from '../../../hooks/useToast';
+import { usePreferences } from '../../../hooks/usePreferences';
 
 type ProjectItem = {
     id: string;
@@ -37,36 +38,16 @@ type ConversionResult = {
  */
 const useCurrencyConversion = ({ projects, invoices, clients }: CurrencyConversionParams) => {
     const { showWarning } = useToast();
-    const [preferredCurrency, setPreferredCurrency] = useState(getPreferredCurrency());
+    const { preferences } = usePreferences();
+    const preferredCurrency = normalizeCurrencyCode(preferences.currency);
     const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
     const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
     const [exchangeRatesError, setExchangeRatesError] = useState<string | null>(null);
     const lastRatesFetchKeyRef = useRef<string | null>(null);
 
-    // Listen for storage changes to update preferred currency
-    useEffect(() => {
-        const handleStorageChange = () => {
-            setPreferredCurrency(getPreferredCurrency());
-        };
-
-        window.addEventListener('storage', handleStorageChange);
-
-        // Also listen for custom events in case changes happen within the same tab
-        const handlePreferenceChange = () => {
-            setPreferredCurrency(getPreferredCurrency());
-        };
-
-        window.addEventListener('preferenceChanged', handlePreferenceChange);
-
-        return () => {
-            window.removeEventListener('storage', handleStorageChange);
-            window.removeEventListener('preferenceChanged', handlePreferenceChange);
-        };
-    }, []);
-
     // Track currencies in use across projects and invoices
     const currenciesInUse = useMemo(() => {
-        const projectCurrencies = Array.from(new Set(projects.map(p => getProjectCurrency(p, clients))));
+        const projectCurrencies = Array.from(new Set(projects.map(p => getProjectCurrency(p, clients, preferredCurrency))));
         const invoiceCurrencies = Array.from(new Set(invoices.map(i => i.currency || preferredCurrency)));
         return Array.from(new Set([...projectCurrencies, ...invoiceCurrencies]));
     }, [projects, invoices, preferredCurrency, clients]);

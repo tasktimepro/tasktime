@@ -102,6 +102,87 @@ describe('YjsDriveProvider', () => {
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
     })
 
+    it('does not persist manifest recovery during a pristine manual bootstrap', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            isDirty: vi.fn(() => true),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+        provider.subscribeToDoc = vi.fn()
+
+        await provider.connect('manual', { bootstrapPullIfPristine: true })
+
+        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.manifest.save).not.toHaveBeenCalled()
+    })
+
+    it('awaits post-sync reconciliation and flushes the deltas it creates', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        let callbackCompleted = false
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+
+        await provider.connect('manual', { bootstrapPullIfPristine: false })
+
+        provider.syncDoc = vi.fn(async (docName) => {
+            provider.pendingDeltas.set(docName, [])
+        })
+        provider.onSyncComplete(async () => {
+            await Promise.resolve()
+            liveDoc.getMap('projects').set('reconciled-project', objectToYMap({
+                id: 'reconciled-project',
+                title: 'Reconciled project',
+            }))
+            callbackCompleted = true
+        })
+
+        await provider.sync(true, { allowPull: false })
+
+        expect(callbackCompleted).toBe(true)
+        expect(provider.syncDoc).toHaveBeenCalledTimes(2)
+        expect(provider.getPendingDocNames()).toEqual([])
+    })
+
+    it('keeps sync in an error state when post-sync consistency replay fails', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+
+        await provider.connect('manual', { bootstrapPullIfPristine: false })
+
+        provider.syncDoc = vi.fn(async () => {})
+        provider.onSyncComplete(async () => {
+            throw new Error('archived billing document unavailable')
+        })
+
+        await provider.sync(true, { allowPull: false })
+
+        expect(provider.getState()).toBe('error')
+        expect(JSON.parse(localStorage.getItem('tasktime-sync-state')).hasPendingChanges).toBe(true)
+    })
+
     it('does not create missing remote docs during manual-mode bootstrap pull', async () => {
         const coreDoc = new Y.Doc()
         const archivedExpensesDoc = new Y.Doc()
@@ -131,6 +212,43 @@ describe('YjsDriveProvider', () => {
         expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('expenses-archived')
+    })
+
+    it('reconciles existing Drive data before a Backup-mode upload after connecting offline', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        let online = false
+
+        provider.isOnline = () => online
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({
+                documents: {
+                    core: {
+                        stateVersion: 4,
+                        stateFile: 'tasktime-yjs-core.bin',
+                        deltas: [{ id: 'remote-delta', timestamp: '2026-07-10T00:00:00.000Z' }],
+                    },
+                },
+            })),
+            canCheckRemoteManifestChanges: vi.fn(() => true),
+            hasManifestChanged: vi.fn(async () => false),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+
+        await provider.connect('backup')
+
+        expect(provider.hasLocalChangesToPush()).toBe(true)
+        expect(provider.forceFullStateDocs.has('core')).toBe(false)
+
+        online = true
+        await provider.sync(false, { allowPull: false })
+
+        expect(provider.manifest.load).toHaveBeenCalledTimes(1)
+        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.hasLocalChangesToPush()).toBe(false)
     })
 
     it('flushes pending local changes on pagehide in backup mode', async () => {
@@ -350,6 +468,21 @@ describe('YjsDriveProvider', () => {
                 queuedUpdates: 1,
             }),
         }))
+    })
+
+    it('reports every document that still needs a local upload', () => {
+        const coreDoc = new Y.Doc()
+        const entriesDoc = new Y.Doc()
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => ['core', 'entries-active', 'tasks-archived'],
+            getDocSync: (name) => name === 'core' ? coreDoc : entriesDoc,
+        }, 'playwright-access-token')
+
+        provider.pendingDeltas.set('core', [new Uint8Array([1])])
+        provider.forceFullStateDocs.add('entries-active')
+        provider.verifyFullStateDocs.add('tasks-archived')
+
+        expect(provider.getPendingDocNames()).toEqual(['core', 'entries-active', 'tasks-archived'])
     })
 
     it('keeps durable pending state when a queued delta upload fails during sync', async () => {
@@ -897,6 +1030,53 @@ describe('YjsDriveProvider', () => {
         expect(applied).toBe(false)
         expect(warnSpy).toHaveBeenCalled()
         warnSpy.mockRestore()
+    })
+
+    it('fails a document pull when a referenced remote delta is corrupt', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        provider.manifest = {
+            getDocManifest: vi.fn(() => ({
+                stateVersion: 0,
+                stateFile: 'tasktime-yjs-core.bin',
+                deltas: [{ id: 'corrupt-delta', timestamp: '2026-07-11T00:00:00.000Z' }],
+            })),
+            getFileIdWithFallback: vi.fn(async () => 'corrupt-delta-file-id'),
+            refreshFileCache: vi.fn(async () => {}),
+            downloadFileAsArrayBuffer: vi.fn(async () => (
+                new Uint8Array([0xFF, 0xFE, 0x00, 0x01, 0x02]).buffer
+            )),
+        }
+
+        await expect(provider.pullDoc('core', liveDoc)).rejects.toThrow('Remote delta is corrupt')
+        expect(provider.appliedDeltaIds.get('core')?.has('corrupt-delta') ?? false).toBe(false)
+        warnSpy.mockRestore()
+    })
+
+    it('keeps sync in an error state when any remote pull is incomplete', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        provider.manifest = {
+            hasManifestChanged: vi.fn(async () => true),
+            reload: vi.fn(async () => {}),
+            isDirty: vi.fn(() => false),
+            getLastSync: vi.fn(() => null),
+        }
+        provider.syncDoc = vi.fn(async () => {
+            throw new Error('Remote base state is missing')
+        })
+
+        await provider.syncInner(true, { allowPull: true })
+
+        expect(provider.getState()).toBe('error')
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'drive.sync_failed',
+        }))
+        errorSpy.mockRestore()
     })
 
     it('applies remote updates that keep the projected state valid', () => {

@@ -7,13 +7,14 @@ import {
     formatDuration,
     millisecondsToHours
 } from '../utils/dateUtils.ts';
-import { getCurrencySymbol, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY, getCurrencySymbol } from '../utils/currencyUtils.ts';
 import { ClockIcon, CurrencyDollarIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePreferences } from '@/hooks/usePreferences';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
+import { isTimestampStartWithinRange } from '../utils/reportDateBoundary.ts';
 
 /**
  * MetricsDisplay component - Shows time and earnings metrics for different periods
@@ -29,10 +30,10 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
         
         if (project && project.preferredClientId && clients.length > 0) {
             const client = clients.find(c => c.id === project.preferredClientId);
-            return client?.defaultCurrency || getPreferredCurrency();
+            return client?.defaultCurrency || preferences.currency || DEFAULT_CURRENCY;
         }
         
-        return getPreferredCurrency();
+        return preferences.currency || DEFAULT_CURRENCY;
     };
 
     const displayCurrency = getDisplayCurrency();
@@ -40,8 +41,8 @@ const MetricsDisplay = ({ project, timeEntries, clients = [], currency, showTitl
      * Calculate metrics for a given date range
      */
     const calculateMetrics = (startTime, endTime) => {
-        const entriesInRange = timeEntries.filter(entry => 
-            entry.start >= startTime && entry.end <= endTime
+        const entriesInRange = timeEntries.filter(entry =>
+            isTimestampStartWithinRange(entry.start, startTime, endTime)
         );
 
         const totalTime = entriesInRange.reduce((total, entry) => {

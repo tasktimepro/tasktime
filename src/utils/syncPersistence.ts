@@ -111,7 +111,10 @@ export function markSyncFailed(): void {
     updateSyncPersistenceState({
         syncInterrupted: false,
         syncStartedAt: null,
-        // hasPendingChanges stays true
+        // A pull or post-sync consistency phase can fail even when there was
+        // no local delta before the attempt. Persist retry evidence in every
+        // failure case so reload/reconnect cannot silently forget it.
+        hasPendingChanges: true,
     });
 }
 

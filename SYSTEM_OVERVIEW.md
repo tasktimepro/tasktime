@@ -20,7 +20,7 @@ The Yjs store is split into documents so current work stays loaded and historica
 
 | Document | Responsibility |
 |---|---|
-| `core` | Projects, active tasks, clients, settings/templates, current invoices and other core collections |
+| `core` | Projects, active tasks, clients, settings/templates, current invoices, and the internal replay-safe invoice billing-operation journal |
 | `entries-active` | Recent time entries |
 | `entries-{year}` | Historical time entries by year |
 | `tasks-archived` | Archived tasks |

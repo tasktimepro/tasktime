@@ -177,6 +177,7 @@ describe('invoice undo application builders', () => {
         }]);
         expect(plan.taskCutoffUpdates).toEqual([{
             id: 'task-1',
+            expectedLastBilledAt: null,
             updates: {
                 lastBilledAt: 90,
                 updatedAt: 100,

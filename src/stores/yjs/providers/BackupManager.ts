@@ -94,7 +94,10 @@ export class BackupManager {
      * Create a full backup snapshot
      */
     async createBackup(): Promise<string> {
-        const data = await this.store.exportBackupData({ backupType: 'automatic' });
+        const data = await this.store.exportBackupData({
+            backupType: 'automatic',
+            refreshLazyDocsFromCloud: true,
+        });
         const json = JSON.stringify(data, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
 
@@ -137,13 +140,28 @@ export class BackupManager {
      */
     async deleteAllBackups(): Promise<void> {
         const backups = await this.listBackups();
+        const failures: Array<{ backup: BackupInfo; error: unknown }> = [];
 
         for (const backup of backups) {
             try {
                 await this.manifest.deleteFileById(backup.id);
             } catch (error) {
-                console.warn(`[BackupManager] Failed to delete ${backup.name}:`, error);
+                failures.push({ backup, error });
             }
+        }
+
+        const remainingBackups = await this.listBackups();
+
+        if (failures.length > 0 || remainingBackups.length > 0) {
+            const failedNames = new Set([
+                ...failures.map(({ backup }) => backup.name),
+                ...remainingBackups.map((backup) => backup.name),
+            ]);
+
+            throw new Error(
+                `Could not delete ${failedNames.size} Drive backup${failedNames.size === 1 ? '' : 's'}. `
+                + 'Your account data was not fully deleted. Check your connection and retry before disconnecting Drive.'
+            );
         }
 
         console.log(`[BackupManager] Deleted ${backups.length} backups`);

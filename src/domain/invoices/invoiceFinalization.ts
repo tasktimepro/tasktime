@@ -1,6 +1,7 @@
-import type { Client, Expense, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Client, Expense, Invoice, InvoiceBillingSelectionSnapshot, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { isStoredDateWithinBillingRange } from '@/utils/billingPeriodUtils';
 import { getClientHourlyRate } from '@/utils/projectPlanningUtils';
+import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 
 export interface InvoiceFinalizationEntryMutation {
     entry: TimeEntry;
@@ -23,6 +24,7 @@ export interface InvoiceQuotedTaskClaim {
 }
 
 export interface InvoiceFinalizationPlan {
+    selectedTaskIds: Set<string>;
     entriesToBill: InvoiceFinalizationEntryMutation[];
     adjustmentEntriesToCreate: InvoiceAdjustmentCreate[];
     adjustmentEntriesToUpdate: InvoiceAdjustmentUpdate[];
@@ -62,14 +64,23 @@ export function planInvoiceFinalization({
         expenseItems?: Array<Record<string, unknown>>;
     };
     const agentDraft = normalizeAgentDraft(invoiceRecord.agentDraft);
+    const billingSelection = getBillingSelectionSnapshot(invoice.billingSelectionSnapshot);
+    if (billingSelection) {
+        assertInvoiceMatchesBillingSelection(invoice, billingSelection);
+    }
     const projectById = new Map(projects.map((project) => [project.id, project]));
     const clientById = new Map(clients.map((client) => [client.id, client]));
     const taskById = new Map(tasks.map((task) => [task.id, task]));
     const invoiceTasks = collectInvoiceTasks(invoiceRecord);
     const invoiceTaskIds = collectInvoiceTaskIds(invoiceTasks);
-    const selectedTaskIds = invoiceTaskIds.size > 0
-        ? invoiceTaskIds
-        : collectFallbackAgentDraftTaskIds({ agentDraft, invoice, projects, tasks });
+    const selectedTaskIds = billingSelection
+        ? new Set([
+            ...billingSelection.tasks.map((task) => task.taskId),
+            ...billingSelection.entries.map((entry) => entry.taskId),
+        ])
+        : (invoiceTaskIds.size > 0
+            ? invoiceTaskIds
+            : collectFallbackAgentDraftTaskIds({ agentDraft, invoice, projects, tasks }));
     const taskLastBilledAt: Record<string, number | null> = {};
     const previousBillingCutoffs = new Map<string, number>();
     const nextTaskCutoffs = new Map<string, number>();
@@ -81,6 +92,9 @@ export function planInvoiceFinalization({
         clientById,
         invoice,
     });
+    const selectedEntryById = billingSelection
+        ? new Map(billingSelection.entries.map((selection) => [selection.entryId, selection]))
+        : null;
 
     selectedTaskIds.forEach((taskId) => {
         const task = taskById.get(taskId);
@@ -94,22 +108,38 @@ export function planInvoiceFinalization({
     const entriesToBill: InvoiceFinalizationEntryMutation[] = [];
 
     entries.forEach((entry) => {
+        const selectedEntry = selectedEntryById?.get(entry.id);
+        if (selectedEntryById && !selectedEntry) return;
         if (!selectedTaskIds.has(entry.taskId)) return;
         if (entry.source === 'invoice-adjustment') return;
         if (entry.billedInvoiceId || entry.billedAt) return;
         if (!entry.end || entry.end <= entry.start) return;
-        if (entry.start > finalizedAt) return;
+
+        if (selectedEntry) {
+            assertSelectedEntryUnchanged(entry, selectedEntry);
+        } else if (entry.start > finalizedAt) {
+            return;
+        }
 
         const cutoff = previousBillingCutoffs.get(entry.taskId) || 0;
-        if (entry.start <= cutoff) return;
-        if (!isStoredDateWithinBillingRange(entry.start, invoice.billingPeriodStart || undefined, invoice.billingPeriodEnd || undefined)) return;
+        if (!selectedEntry && entry.start <= cutoff) return;
+        if (!selectedEntry && !isStoredDateWithinBillingRange(entry.start, invoice.billingPeriodStart || undefined, invoice.billingPeriodEnd || undefined)) return;
 
         entriesToBill.push({
             entry,
-            billedHourlyRate: billedRateByTaskId.get(entry.taskId) ?? null,
+            billedHourlyRate: selectedEntry?.billedHourlyRate ?? billedRateByTaskId.get(entry.taskId) ?? null,
         });
         nextTaskCutoffs.set(entry.taskId, Math.max(nextTaskCutoffs.get(entry.taskId) || 0, entry.end));
     });
+
+    if (selectedEntryById) {
+        const foundEntryIds = new Set(entriesToBill.map(({ entry }) => entry.id));
+        const missingEntry = billingSelection!.entries.find((selection) => !foundEntryIds.has(selection.entryId));
+
+        if (missingEntry) {
+            throw new Error(`Selected time entry "${missingEntry.entryId}" is missing, changed, or already billed. Refresh the draft before finalizing.`);
+        }
+    }
 
     const updatedTaskIds = new Set<string>();
     selectedTaskIds.forEach((taskId) => {
@@ -121,28 +151,130 @@ export function planInvoiceFinalization({
         }
     });
 
-    const selectedExpenseIds = collectInvoiceExpenseIds(invoiceRecord);
+    const selectedExpenseIds = billingSelection
+        ? new Set(billingSelection.expenses.map((expense) => expense.expenseId))
+        : collectInvoiceExpenseIds(invoiceRecord);
     const projectIdsToLink = collectInvoiceProjectIds(invoiceRecord, agentDraft);
     const expensesToBill = expenses.filter((expense) => {
         if (!expense || expense.billingStatus === 'billed') return false;
-        if (selectedExpenseIds.has(expense.id)) return true;
+        if (selectedExpenseIds.has(expense.id)) {
+            const selection = billingSelection?.expenses.find((candidate) => candidate.expenseId === expense.id);
+            if (selection) {
+                assertSelectedExpenseUnchanged(expense, selection);
+            }
+            return true;
+        }
 
         return selectedExpenseIds.size === 0
             && Boolean(agentDraft)
             && isExpenseSelectedForAgentDraft(expense, projectIdsToLink, agentDraft);
     });
 
+    if (billingSelection) {
+        const foundExpenseIds = new Set(expensesToBill.map((expense) => expense.id));
+        const missingExpense = billingSelection.expenses.find((selection) => !foundExpenseIds.has(selection.expenseId));
+
+        if (missingExpense) {
+            throw new Error(`Selected expense "${missingExpense.expenseId}" is missing, changed, or already billed. Refresh the draft before finalizing.`);
+        }
+    }
+
     return {
+        selectedTaskIds,
         entriesToBill,
         ...planInvoiceAdjustments({ invoice, invoiceTasks, entries, finalizedAt, createAdjustmentId }),
         expensesToBill,
         taskLastBilledAt,
         nextTaskCutoffs,
         updatedTaskIds,
-        quotedTaskClaims: collectQuotedTaskClaims(invoiceTasks, taskById),
+        quotedTaskClaims: billingSelection
+            ? collectSnapshotQuotedTaskClaims(billingSelection, taskById)
+            : collectQuotedTaskClaims(invoiceTasks, taskById),
         projectIdsToLink,
         agentDraft,
     };
+}
+
+function getBillingSelectionSnapshot(value: unknown): InvoiceBillingSelectionSnapshot | null {
+    if (!isRecord(value) || value.version !== 1) {
+        return null;
+    }
+
+    if (!Array.isArray(value.entries) || !Array.isArray(value.tasks) || !Array.isArray(value.expenses)) {
+        return null;
+    }
+
+    return value as unknown as InvoiceBillingSelectionSnapshot;
+}
+
+function assertInvoiceMatchesBillingSelection(invoice: Invoice, snapshot: InvoiceBillingSelectionSnapshot) {
+    const itemRecords = Array.isArray(invoice.items) ? invoice.items : [];
+
+    snapshot.tasks.forEach((selection) => {
+        const item = itemRecords.find((candidate) => candidate.taskId === selection.taskId);
+        if (
+            !item
+            || Math.abs(item.quantity - selection.quantity) >= 0.000001
+            || Math.abs(item.rate - selection.rate) >= 0.005
+            || Math.abs(item.amount - selection.amount) >= 0.005
+        ) {
+            throw new Error(`Invoice line for selected task "${selection.taskId}" changed after preview. Refresh the draft before finalizing.`);
+        }
+    });
+
+    snapshot.expenses.forEach((selection) => {
+        const item = itemRecords.find((candidate) => candidate.expenseId === selection.expenseId);
+        if (!item || Math.abs(item.amount - selection.invoiceAmount) >= 0.005) {
+            throw new Error(`Invoice line for selected expense "${selection.expenseId}" changed after preview. Refresh the draft before finalizing.`);
+        }
+    });
+}
+
+function assertSelectedEntryUnchanged(
+    entry: TimeEntry,
+    selection: InvoiceBillingSelectionSnapshot['entries'][number]
+) {
+    if (
+        entry.taskId !== selection.taskId
+        || entry.start !== selection.start
+        || entry.end !== selection.end
+        || getBillableDurationMs(entry) !== selection.billableDurationMs
+    ) {
+        throw new Error(`Selected time entry "${selection.entryId}" changed after preview. Refresh the draft before finalizing.`);
+    }
+}
+
+function assertSelectedExpenseUnchanged(
+    expense: Expense,
+    selection: InvoiceBillingSelectionSnapshot['expenses'][number]
+) {
+    const sourceCurrency = typeof expense.currency === 'string' ? expense.currency.trim().toUpperCase() : '';
+
+    if (Math.abs(expense.amount - selection.sourceAmount) >= 0.005 || sourceCurrency !== selection.sourceCurrency) {
+        throw new Error(`Selected expense "${selection.expenseId}" changed after preview. Refresh the draft before finalizing.`);
+    }
+}
+
+function collectSnapshotQuotedTaskClaims(
+    snapshot: InvoiceBillingSelectionSnapshot,
+    taskById: Map<string, Task>
+): InvoiceQuotedTaskClaim[] {
+    return snapshot.tasks.flatMap((selection) => {
+        if (selection.pricingMode !== 'flat' || !selection.quotedAmount) {
+            return [];
+        }
+
+        const task = taskById.get(selection.taskId);
+        if (!task || task.quotedAmountBilling?.invoiceId) {
+            throw new Error(`Selected quoted task "${selection.taskId}" is missing or already billed. Refresh the draft before finalizing.`);
+        }
+
+        if (typeof task.estimatedFlatAmount !== 'number' || Math.abs(task.estimatedFlatAmount - selection.quotedAmount) >= 0.005) {
+            throw new Error(`Selected quoted amount for task "${selection.taskId}" changed after preview. Refresh the draft before finalizing.`);
+        }
+
+        return [{ taskId: selection.taskId, total: selection.quotedAmount }];
+    });
 }
 
 function collectInvoiceTasks(invoice: { tasks?: Array<Record<string, unknown>>; projectBreakdowns?: Array<Record<string, unknown>> }) {
@@ -299,6 +431,13 @@ function planInvoiceAdjustments({
         const desiredMs = (getFiniteNumber(task.hours) ?? 0) * 3_600_000;
         const deltaMs = desiredMs - originalMs;
         const existingEntry = existingByTaskId.get(taskId);
+
+        if (deltaMs < -1) {
+            throw new Error(
+                `Invoice hours for task "${taskId}" are lower than the selected recorded time. `
+                + 'Split or edit the source time entries before finalizing so unbilled time is not consumed.'
+            );
+        }
 
         if (deltaMs <= 0) {
             if (existingEntry) {

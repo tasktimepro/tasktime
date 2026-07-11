@@ -84,12 +84,12 @@ const ProjectList = ({
                 return false;
             }
 
-            const projectCurrency = normalizeCurrencyCode(getProjectCurrency(expenseProject, clients));
+            const projectCurrency = normalizeCurrencyCode(getProjectCurrency(expenseProject, clients, preferences.currency));
             const expenseCurrency = normalizeCurrencyCode(expense.currency || projectCurrency);
 
             return expenseCurrency !== projectCurrency;
         });
-    }, [clients, expenses, projects]);
+    }, [clients, expenses, preferences.currency, projects]);
 
     useEffect(() => {
         if (!needsExchangeRatesForProjectExpenses) {
@@ -327,6 +327,7 @@ const ProjectList = ({
             timeEntries,
             expenses,
             exchangeRates,
+            preferredCurrency: preferences.currency,
         });
         const previewTitle = invoicePreview.excludedExpenseCount > 0
             ? `${invoicePreview.excludedExpenseCount} expense${invoicePreview.excludedExpenseCount === 1 ? '' : 's'} excluded until exchange rates are available`
@@ -428,7 +429,7 @@ const ProjectList = ({
                             {project.hourlyRate && !project.flatRate && (
                                 <p className="mt-1 text-sm text-muted-foreground">
                                     <span className="sensitive-data">
-                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                        {`${getCurrencySymbol(getProjectCurrency(project, clients, preferences.currency))}${project.hourlyRate}/${getProjectCurrency(project, clients, preferences.currency)} per hour`}
                                     </span>
                                 </p>
                             )}

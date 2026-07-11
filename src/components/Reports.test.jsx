@@ -121,6 +121,10 @@ const mockTaxReturnPeriods = [
 ];
 let mockSection = null;
 let mockLoadingHistoricalEntries = false;
+let mockLoadingInvoices = false;
+let mockLoadingExpenses = false;
+let mockLoadingTasks = false;
+let mockLoadingTimeEntries = false;
 const mockBusinessBrandAssets = [];
 
 vi.mock('@/hooks/useUrlState.ts', () => ({
@@ -135,6 +139,7 @@ vi.mock('@/hooks/useUrlState.ts', () => ({
 vi.mock('@/hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: mockInvoices,
+        isLoading: mockLoadingInvoices,
     }),
 }));
 
@@ -147,6 +152,7 @@ vi.mock('@/hooks/useBusinessBrandAssets.ts', () => ({
 vi.mock('@/hooks/useExpenses.ts', () => ({
     useExpenses: () => ({
         expenses: mockExpenses,
+        isLoading: mockLoadingExpenses,
         markManyAsClaimed: vi.fn(),
         markManyAsUnclaimed: vi.fn(),
     }),
@@ -163,6 +169,7 @@ vi.mock('@/hooks/useTimeEntries.ts', () => ({
                 billedInvoiceId: null,
             },
         ],
+        isLoading: mockLoadingTimeEntries,
         isLoadingMore: mockLoadingHistoricalEntries,
     }),
 }));
@@ -178,6 +185,7 @@ vi.mock('@/hooks/useTasks.ts', () => ({
             },
         ],
         archivedTasks: [],
+        isLoading: mockLoadingTasks,
     }),
 }));
 
@@ -327,6 +335,10 @@ describe('Reports', () => {
             status: 'draft',
         });
         mockLoadingHistoricalEntries = false;
+        mockLoadingInvoices = false;
+        mockLoadingExpenses = false;
+        mockLoadingTasks = false;
+        mockLoadingTimeEntries = false;
         mockSection = null;
     });
 
@@ -334,7 +346,7 @@ describe('Reports', () => {
         global.Date = RealDate;
     });
 
-    it('keeps a centered loader visible until historical entries finish loading and the report content has painted', async () => {
+    it('keeps a centered loader visible until every report data source finishes loading and the content has painted', async () => {
         vi.useFakeTimers();
 
         const onReadyChange = vi.fn();
@@ -347,12 +359,20 @@ describe('Reports', () => {
 
         try {
             mockLoadingHistoricalEntries = true;
+            mockLoadingInvoices = true;
+            mockLoadingExpenses = true;
+            mockLoadingTasks = true;
+            mockLoadingTimeEntries = true;
 
             const { rerender } = render(<Reports onReadyChange={onReadyChange} />);
 
             expect(onReadyChange).toHaveBeenLastCalledWith(false);
 
             mockLoadingHistoricalEntries = false;
+            mockLoadingInvoices = false;
+            mockLoadingExpenses = false;
+            mockLoadingTasks = false;
+            mockLoadingTimeEntries = false;
             rerender(<Reports onReadyChange={onReadyChange} />);
 
             expect(onReadyChange).toHaveBeenLastCalledWith(false);

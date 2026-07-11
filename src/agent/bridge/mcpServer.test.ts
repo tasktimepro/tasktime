@@ -412,6 +412,45 @@ describe('McpBridgeJsonRpcServer', () => {
         });
     });
 
+    it('rejects payloads that violate the advertised tool schema before bridge execution', async () => {
+        const { bridge, calls } = createBridge();
+        const server = new McpBridgeJsonRpcServer({
+            bridge,
+            scopes: ['read', 'write'],
+        });
+
+        const response = await server.handleMessage({
+            jsonrpc: '2.0',
+            id: 'invalid-schema-call',
+            method: 'tools/call',
+            params: {
+                name: 'create_project',
+                arguments: {
+                    title: 42,
+                    unadvertisedField: true,
+                },
+            },
+        });
+
+        expect(calls).toEqual([]);
+        expect(response).toEqual(expect.objectContaining({
+            result: expect.objectContaining({
+                isError: true,
+                structuredContent: expect.objectContaining({
+                    error: expect.objectContaining({
+                        code: 'INVALID_INPUT',
+                        details: expect.objectContaining({
+                            validationErrors: expect.arrayContaining([
+                                '$.title must be string, received number',
+                                '$.unadvertisedField is not allowed',
+                            ]),
+                        }),
+                    }),
+                }),
+            }),
+        }));
+    });
+
     it('forwards chat-mediated approval metadata separately from tool arguments', async () => {
         const { bridge, calls } = createBridge();
         const server = new McpBridgeJsonRpcServer({

@@ -703,7 +703,7 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     stop_timer: {
         name: 'stop_timer',
-        description: 'Stop a timer and create the corresponding time entry.',
+        description: 'Stop a timer and create the corresponding time entry with replay-safe operation recovery.',
         scopes: ['write'],
         handler: stopTimerCommand,
     },

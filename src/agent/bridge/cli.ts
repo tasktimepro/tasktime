@@ -312,6 +312,7 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
                     pairingCode: 'agentBridgePairingCode',
                     agentId: 'agentBridgeAgentId',
                     agentLabel: 'agentBridgeAgentLabel',
+                    scopes: 'agentBridgeScopes',
                 },
             },
             recovery: {
@@ -333,6 +334,7 @@ export function buildTaskTimeAgentBridgeLaunchUrl(challenge: BridgePairingChalle
     url.searchParams.set('agentBridgeEndpoint', challenge.endpoint);
     url.searchParams.set('agentBridgePairingId', challenge.id);
     url.searchParams.set('agentBridgePairingCode', challenge.code);
+    url.searchParams.set('agentBridgeScopes', challenge.scopes.join(','));
     if (challenge.agentId) {
         url.searchParams.set('agentBridgeAgentId', challenge.agentId);
     }
@@ -412,6 +414,7 @@ export async function startTaskTimeAgentBridgeCli(
         host: options.host,
         port: options.port,
         path: options.path,
+        agentId: options.agentId,
         allowedOrigins: options.allowedOrigins,
         sessionTtlMs: options.sessionTtlMs,
         onAudit: handleAudit,

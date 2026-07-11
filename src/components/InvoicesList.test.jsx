@@ -87,6 +87,10 @@ vi.mock('../hooks/useBusinessBrandAssets.ts', () => ({
     })
 }))
 
+vi.mock('../hooks/usePreferences.ts', () => ({
+    usePreferences: () => ({ preferences: { currency: 'EUR' } })
+}))
+
 describe('InvoicesList', () => {
 
     let user
@@ -607,7 +611,7 @@ describe('InvoicesList', () => {
         })
     })
 
-    it('warns before editing paid invoices', async () => {
+    it('blocks direct editing of paid invoices and requires an auditable reversal', async () => {
 
         const onEditInvoice = vi.fn()
         const paidInvoice = { ...baseInvoice, id: 'inv-paid', status: 'paid' }
@@ -628,11 +632,8 @@ describe('InvoicesList', () => {
         await user.click(screen.getByRole('button', { name: 'More actions' }))
         await user.click(screen.getByRole('menuitem', { name: 'Edit invoice' }))
 
-        expect(screen.getByText('Edit paid invoice?')).toBeInTheDocument()
-
-        await user.click(screen.getByRole('button', { name: 'Continue' }))
-
-        expect(onEditInvoice).toHaveBeenCalledWith(paidInvoice)
+        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining('cannot be edited directly'))
+        expect(onEditInvoice).not.toHaveBeenCalled()
     })
 
     it('paginates outstanding invoices', async () => {

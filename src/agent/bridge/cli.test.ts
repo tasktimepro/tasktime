@@ -132,6 +132,7 @@ describe('TaskTime Pro agent bridge CLI', () => {
                         pairingCode: 'agentBridgePairingCode',
                         agentId: 'agentBridgeAgentId',
                         agentLabel: 'agentBridgeAgentLabel',
+                        scopes: 'agentBridgeScopes',
                     },
                 }),
             }),
@@ -161,7 +162,7 @@ describe('TaskTime Pro agent bridge CLI', () => {
             agentId: 'tasktime.agent.openclaw',
             agentLabel: 'OpenClaw on this device',
         }, 'https://tasktime.pro/');
-        expect(launchUrl).toBe('https://tasktime.pro/account?section=agent&agentBridgeEndpoint=ws%3A%2F%2F127.0.0.1%3A3900%2Ftasktime-agent&agentBridgePairingId=pairing-1&agentBridgePairingCode=123456&agentBridgeAgentId=tasktime.agent.openclaw&agentBridgeAgentLabel=OpenClaw+on+this+device');
+        expect(launchUrl).toBe('https://tasktime.pro/account?section=agent&agentBridgeEndpoint=ws%3A%2F%2F127.0.0.1%3A3900%2Ftasktime-agent&agentBridgePairingId=pairing-1&agentBridgePairingCode=123456&agentBridgeScopes=read%2Cwrite&agentBridgeAgentId=tasktime.agent.openclaw&agentBridgeAgentLabel=OpenClaw+on+this+device');
 
         expect(formatPairingInstructions({
             id: 'pairing-1',

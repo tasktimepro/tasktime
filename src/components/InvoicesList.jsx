@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
 import { Send, Bell, MoreHorizontal, RotateCcw } from 'lucide-react';
 import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
-import { getCurrencySymbol, getPreferredCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
+import { getCurrencySymbol, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import { useBusinessBrandAssets } from '../hooks/useBusinessBrandAssets.ts';
@@ -33,6 +33,7 @@ import InvoicePreviewModal from './invoice/InvoicePreviewModal';
 import InvoicePaymentDetailsModal from './invoice/InvoicePaymentDetailsModal';
 import EmailPreviewModal from './invoice/EmailPreviewModal';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
+import { usePreferences } from '../hooks/usePreferences.ts';
 import { cn } from '@/lib/utils';
 
 /**
@@ -74,7 +75,8 @@ const InvoicesList = ({
         undoLatestInvoice,
         canUndoInvoice,
     } = useInvoices();
-    const preferredCurrency = normalizeCurrencyCode(getPreferredCurrency());
+    const { preferences } = usePreferences();
+    const preferredCurrency = normalizeCurrencyCode(preferences.currency);
 
     // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
@@ -281,12 +283,11 @@ const InvoicesList = ({
      */
     const handleEdit = (invoice) => {
         if (onEditInvoice) {
-            // Show warning for paid invoices
-            if (isInvoicePaid(invoice)) {
-                setPendingPaidEditInvoice(invoice);
+            if (getInvoiceStatus(invoice) !== 'draft') {
+                showError('Finalized invoices cannot be edited directly. Undo the latest invoice first, then create a corrected invoice.');
                 return;
             }
-            
+
             onEditInvoice(invoice);
         } else {
             alert('Edit functionality requires integration with the parent component.');
@@ -465,7 +466,7 @@ const InvoicesList = ({
             <>
                 <div className="space-y-4">
                     {currentInvoices.map((invoice) => {
-                        const invoiceCurrency = invoice.currency || getPreferredCurrency();
+                        const invoiceCurrency = invoice.currency || preferredCurrency;
                         const invoiceTotalValue = getInvoiceTotal(invoice);
                         const invoiceTotal = `${getCurrencySymbol(invoiceCurrency)}${invoiceTotalValue.toFixed(2)}`;
                         const clientForColor = invoice.clientId
@@ -540,7 +541,7 @@ const InvoicesList = ({
                                             )}
                                             <span className="mx-1">•</span>
                                             <span className="sensitive-data">
-                                                {getCurrencySymbol(invoice.currency || getPreferredCurrency())}{invoiceTotalValue.toFixed(2)}
+                                                {getCurrencySymbol(invoice.currency || preferredCurrency)}{invoiceTotalValue.toFixed(2)}
                                             </span>
                                         </p>
                                         {invoice.dueDate && !invoiceIsPaid && (
@@ -952,7 +953,7 @@ const InvoicesList = ({
                                 </p>
                                 <p>
                                     Total: <span className="font-medium text-foreground sensitive-data">
-                                        {getCurrencySymbol(pendingUndoInvoice.currency || getPreferredCurrency())}{getInvoiceTotal(pendingUndoInvoice).toFixed(2)}
+                                        {getCurrencySymbol(pendingUndoInvoice.currency || preferredCurrency)}{getInvoiceTotal(pendingUndoInvoice).toFixed(2)}
                                     </span>
                                 </p>
                                 <p>

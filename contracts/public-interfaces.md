@@ -52,6 +52,11 @@ preferences: Preferences
 
 Imports validate version, container types, unique identifiers, time ranges, task hierarchy/project references, time-entry task references, and project invoice references before mutation. Missing collections supported by historical versions normalize to empty arrays/default objects. Credentials and Drive/agent sessions are never exported.
 
+Replacement restore is journaled outside the managed Yjs databases before any
+destructive mutation. The journal includes the prior workspace and active
+timers, is cleared only after a persistence barrier, and is recovered on the
+next startup if the restore was interrupted.
+
 ## Sync Worker HTTP boundary
 
 Configured by `VITE_SYNC_WORKER_URL`. Public client endpoint families are:
@@ -75,6 +80,8 @@ Failure: { ok: false, command: string, error: { code, message, details? } }
 Error codes: `APP_NOT_READY`, `NOT_FOUND`, `INVALID_INPUT`, `CONFLICT`, `PERMISSION_DENIED`, `RATE_LIMITED`, `UNAVAILABLE`.
 
 Permission scopes: `read`, `write`, `billing`, `export`, `email`, `navigation`.
+
+Pairing launch URLs carry the requested scopes so TaskTime Pro can display them before the user approves the connection. Persistent approval grants are keyed to the configured stable agent ID and must not authorize a bridge process presenting a different agent identity, even when the requested scopes otherwise match.
 
 Command groups include:
 

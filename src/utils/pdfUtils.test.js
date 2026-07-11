@@ -579,6 +579,40 @@ describe('createInvoiceHTML', () => {
         expect(html).toContain('Invoice: #INV-0160')
     })
 
+    it('renders canonical invoice items when legacy composer fields are absent', () => {
+        const html = buildInvoiceHtmlContent({
+            invoiceNumber: 'INV-CANONICAL',
+            client: { name: 'Client' },
+            tasks: [],
+            items: [
+                {
+                    description: 'Canonical consulting',
+                    quantity: 2,
+                    rate: 75,
+                    amount: 150,
+                    taskId: 'task-canonical',
+                    lineType: 'task',
+                    pricingMode: 'hourly',
+                },
+                {
+                    description: 'Canonical hosting',
+                    quantity: 1,
+                    rate: 25,
+                    amount: 25,
+                    expenseId: 'expense-canonical',
+                    lineType: 'expense',
+                },
+            ],
+            subtotal: 175,
+            total: 175,
+            currency: 'USD',
+        })
+
+        expect(html).toContain('Canonical consulting')
+        expect(html).toContain('Canonical hosting')
+        expect(html).toContain('$175.00')
+    })
+
     it('hydrates client details from clientId when rebuilding stored invoice html', () => {
 
         const html = buildInvoiceHtmlContent({

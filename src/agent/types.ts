@@ -1,5 +1,6 @@
 import type * as Y from 'yjs';
 import type { YjsStore } from '@/stores/yjs/YjsStore';
+import type { BackupImportPayload } from '@/utils/backupData';
 
 export type AgentPermissionScope =
     | 'read'
@@ -39,6 +40,7 @@ export interface AgentCommandContext {
     store: YjsStore;
     isReady?: boolean;
     clearAllData?: () => Promise<void>;
+    restoreBackupData?: (data: BackupImportPayload) => Promise<void>;
     revokeDriveAccess?: () => Promise<void>;
     now?: () => number;
     generateId?: () => string;

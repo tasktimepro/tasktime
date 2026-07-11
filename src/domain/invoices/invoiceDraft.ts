@@ -13,6 +13,33 @@ export class InvoiceDraftValidationError extends Error {
 }
 
 export function buildDraftInvoiceItems(project: Project, preview: ProjectInvoicePreview): InvoiceItem[] {
+    const taskItems = preview.taskSelections.map((selection) => ({
+        description: selection.title,
+        quantity: selection.quantity,
+        rate: selection.rate,
+        amount: selection.amount,
+        projectId: project.id,
+        taskId: selection.taskId,
+        lineType: 'task' as const,
+        pricingMode: selection.pricingMode,
+    }));
+    const expenseItems = preview.expenseSelections.map((selection) => ({
+        description: selection.title,
+        quantity: 1,
+        rate: selection.invoiceAmount,
+        amount: selection.invoiceAmount,
+        projectId: project.id,
+        expenseId: selection.expenseId,
+        originalAmount: selection.sourceAmount,
+        originalCurrency: selection.sourceCurrency,
+        exchangeRate: selection.exchangeRate,
+        lineType: 'expense' as const,
+    }));
+
+    if (taskItems.length > 0 || expenseItems.length > 0) {
+        return [...taskItems, ...expenseItems];
+    }
+
     const items: InvoiceItem[] = [];
 
     if (preview.taskAmount > 0) {
@@ -64,10 +91,23 @@ export function buildDraftInvoiceUpdates(
     }
 
     const items = (updates.items as InvoiceItem[] | undefined) || existing.items || [];
+    const itemSubtotal = roundMinorUnits(items.reduce((sum, item) => sum + item.amount, 0));
     const shouldRecalculateSubtotal = Object.prototype.hasOwnProperty.call(updates, 'items') && !Object.prototype.hasOwnProperty.call(updates, 'subtotal');
     const subtotal = shouldRecalculateSubtotal
-        ? items.reduce((sum, item) => sum + item.amount, 0)
+        ? itemSubtotal
         : numberFromUpdate(updates, existing, 'subtotal', 0);
+
+    if (
+        Object.prototype.hasOwnProperty.call(updates, 'items')
+        && Object.prototype.hasOwnProperty.call(updates, 'subtotal')
+        && !sameMinorUnit(subtotal, itemSubtotal)
+    ) {
+        throw new InvoiceDraftValidationError('Invoice subtotal must equal the sum of item amounts.', {
+            field: 'subtotal',
+            expected: itemSubtotal,
+            received: subtotal,
+        });
+    }
 
     if (shouldRecalculateSubtotal) {
         updates.subtotal = subtotal;
@@ -76,12 +116,14 @@ export function buildDraftInvoiceUpdates(
     const taxRate = numberFromUpdate(updates, existing, 'taxRate', 0);
     const tax = Object.prototype.hasOwnProperty.call(updates, 'tax')
         ? numberFromUpdate(updates, existing, 'tax', 0)
-        : (Object.prototype.hasOwnProperty.call(updates, 'taxRate') ? subtotal * (taxRate / 100) : numberFromUpdate(updates, existing, 'tax', 0));
+        : (Object.prototype.hasOwnProperty.call(updates, 'taxRate') || shouldRecalculateSubtotal
+            ? subtotal * (taxRate / 100)
+            : numberFromUpdate(updates, existing, 'tax', 0));
     const discount = numberFromUpdate(updates, existing, 'discount', 0);
     const shipping = numberFromUpdate(updates, existing, 'shipping', 0);
 
     if (!Object.prototype.hasOwnProperty.call(updates, 'tax') && (Object.prototype.hasOwnProperty.call(updates, 'taxRate') || shouldRecalculateSubtotal)) {
-        updates.tax = tax;
+        updates.tax = roundMinorUnits(tax);
     }
 
     if (
@@ -95,7 +137,7 @@ export function buildDraftInvoiceUpdates(
             || Object.prototype.hasOwnProperty.call(updates, 'shipping')
         )
     ) {
-        updates.total = subtotal - discount + shipping + tax;
+        updates.total = roundMinorUnits(subtotal - discount + shipping + tax);
     }
 
     updates.updatedAt = now;
@@ -130,14 +172,31 @@ export function normalizeDraftInvoiceItems(items: unknown): InvoiceItem[] {
             throw new InvoiceDraftValidationError('Invoice item amount must be a number.', { field: `items[${index}].amount` });
         }
 
+        const expectedAmount = roundMinorUnits(quantity * rate);
+        if (!sameMinorUnit(amount, expectedAmount)) {
+            throw new InvoiceDraftValidationError('Invoice item amount must equal quantity multiplied by rate.', {
+                field: `items[${index}].amount`,
+                expected: expectedAmount,
+                received: amount,
+            });
+        }
+
         return {
             ...candidate,
             description,
             quantity,
             rate,
-            amount,
+            amount: expectedAmount,
         } as InvoiceItem;
     });
+}
+
+function roundMinorUnits(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function sameMinorUnit(left: number, right: number): boolean {
+    return Math.abs(roundMinorUnits(left) - roundMinorUnits(right)) < 0.005;
 }
 
 function numberFromUpdate(updates: Record<string, unknown>, existing: Record<string, unknown>, key: string, fallback = 0) {

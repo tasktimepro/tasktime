@@ -340,6 +340,42 @@ const invoiceBillingStateSnapshotSchema = z.object({
     taskLastBilledAt: z.record(z.string(), finiteNumberSchema.nullable()),
 }).passthrough();
 
+const invoiceBillingSelectionSnapshotSchema = z.object({
+    version: z.literal(1),
+    capturedAt: finiteNumberSchema,
+    invoiceCurrency: nonEmptyStringSchema,
+    entries: z.array(z.object({
+        entryId: nonEmptyStringSchema,
+        taskId: nonEmptyStringSchema,
+        start: finiteNumberSchema,
+        end: finiteNumberSchema,
+        actualDurationMs: finiteNumberSchema.nonnegative(),
+        billableDurationMs: finiteNumberSchema.nonnegative(),
+        billedHourlyRate: finiteNumberSchema.nullable(),
+    }).refine((entry) => entry.end >= entry.start, {
+        message: 'end must be greater than or equal to start',
+        path: ['end'],
+    })),
+    tasks: z.array(z.object({
+        taskId: nonEmptyStringSchema,
+        title: nonEmptyStringSchema,
+        pricingMode: z.enum(['hourly', 'flat']),
+        quantity: finiteNumberSchema.nonnegative(),
+        rate: finiteNumberSchema,
+        amount: finiteNumberSchema,
+        quotedAmount: finiteNumberSchema.nullable(),
+    })),
+    expenses: z.array(z.object({
+        expenseId: nonEmptyStringSchema,
+        title: nonEmptyStringSchema,
+        sourceAmount: finiteNumberSchema,
+        sourceCurrency: nonEmptyStringSchema,
+        invoiceAmount: finiteNumberSchema,
+        invoiceCurrency: nonEmptyStringSchema,
+        exchangeRate: finiteNumberSchema.positive(),
+    })),
+}).passthrough();
+
 const invoiceSchema = z.object({
     id: nonEmptyStringSchema,
     projectId: nullableIdWithLegacyUndefinedSchema,
@@ -369,6 +405,7 @@ const invoiceSchema = z.object({
     sentAt: finiteNumberSchema.nullable().optional(),
     sentToEmail: z.string().nullable().optional(),
     billingStateSnapshot: invoiceBillingStateSnapshotSchema.nullable().optional(),
+    billingSelectionSnapshot: invoiceBillingSelectionSnapshotSchema.nullable().optional(),
     brandingSnapshot: z.object({
         businessInfoId: optionalNullableIdSchema,
         templateId: optionalNullableIdSchema,

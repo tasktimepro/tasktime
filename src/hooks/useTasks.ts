@@ -514,7 +514,7 @@ export function useTasks(options: UseTasksOptions = {}) {
         tasks: filteredTasks,
         activeTasks: projectActiveTasks,
         archivedTasks: projectArchivedTasks,
-        isLoading: activeLoading || archivedLoading,
+        isLoading: activeLoading || archivedLoading || Boolean(options.includeArchived && !archivedLoaded),
         archivedLoading,
         archivedLoaded,
         

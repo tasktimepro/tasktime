@@ -92,7 +92,18 @@ describe('backupData', () => {
             projects: [{ id: 'project-1', title: 'Project' }],
             tasks: [{ id: 'task-1', title: 'Task', projectId: 'project-1' }],
             timeEntries: [{ id: 'entry-1', taskId: 'task-1', start: 10, end: 20 }],
-            invoices: [{ id: 'invoice-1' }],
+            invoices: [{
+                id: 'invoice-1',
+                projectId: 'project-1',
+                clientId: 'client-1',
+                invoiceNumber: 'INV-1',
+                date: '2026-04-22',
+                status: 'draft',
+                items: [],
+                subtotal: 0,
+                total: 0,
+            }],
+            clients: [{ id: 'client-1', title: 'Client' }],
             preferences: { theme: 'dark' },
         }));
 
@@ -104,8 +115,41 @@ describe('backupData', () => {
             tasks: [{ id: 'task-1', title: 'Task', projectId: 'project-1' }],
             preferences: { theme: 'dark' },
         }));
-        expect(parsed.clients).toEqual([]);
+        expect(parsed.clients).toEqual([{ id: 'client-1', title: 'Client' }]);
         expect(parsed.expenseCategories).toEqual([]);
+    });
+
+    it.each(['1.0', '1.1', '1.3', '1.4'])('imports advertised backup version %s', (version) => {
+        const parsed = parseBackupImportJson(JSON.stringify({
+            version,
+            exportDate: '2024-01-02T00:00:00.000Z',
+            projects: [{ id: 'project-legacy', title: 'Legacy project' }],
+            tasks: [{ id: 'task-legacy', title: 'Legacy task', projectId: 'project-legacy' }],
+            timeEntries: [{ id: 'entry-legacy', taskId: 'task-legacy', start: 10, end: 20 }],
+            clients: [{ id: 'client-legacy', title: 'Legacy client' }],
+            invoices: [{
+                id: 'invoice-legacy',
+                project: { id: 'project-legacy' },
+                client: { id: 'client-legacy' },
+                invoiceNumber: 'INV-LEGACY',
+                date: '2024-01-02',
+                status: 'sent',
+                subtotal: 100,
+                totalAmount: 100,
+                tasks: [{ id: 'task-legacy', title: 'Legacy task', hours: 1, hourlyRate: 100 }],
+            }],
+        }));
+
+        expect(parsed.version).toBe(version);
+        expect(parsed.invoices).toEqual([
+            expect.objectContaining({
+                id: 'invoice-legacy',
+                projectId: 'project-legacy',
+                clientId: 'client-legacy',
+                total: 100,
+                items: [expect.objectContaining({ taskId: 'task-legacy', amount: 100 })],
+            }),
+        ]);
     });
 
     it('rejects malformed import JSON and unsupported versions', () => {
@@ -174,6 +218,13 @@ describe('backupData', () => {
             projects: [{ id: 'project-1', title: 'Project' }],
             preferences: [],
         }))).toThrow('preferences must be an object');
+    });
+
+    it('rejects schema-invalid invoice data during preview validation', () => {
+        expect(() => parseBackupImportJson(JSON.stringify({
+            projects: [],
+            invoices: [{ id: 'invoice-1' }],
+        }))).toThrow('Invalid invoices entity in backup invoice invoice-1');
     });
 
     it('counts imported collections with missing arrays treated as empty', () => {

@@ -125,6 +125,7 @@ describe('invoice finalization application builders', () => {
 
     it('builds a complete finalization application plan from the pure finalization plan', () => {
         const finalizationPlan: InvoiceFinalizationPlan = {
+            selectedTaskIds: new Set(['task-1', 'task-quoted']),
             adjustmentEntryIdsToDelete: ['adjustment-delete'],
             adjustmentEntriesToUpdate: [{
                 id: 'adjustment-update',

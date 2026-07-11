@@ -26,6 +26,7 @@ const invoiceHookMocks = vi.hoisted(() => ({
 
     invoices: [],
     createInvoice: vi.fn((data) => ({ ...data, id: 'new-invoice-id' })),
+    finalizeInvoice: vi.fn(),
     updateInvoice: vi.fn(),
     undoLatestInvoice: vi.fn(),
     canUndoInvoice: vi.fn(() => false),
@@ -90,6 +91,7 @@ vi.mock('../hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: invoiceHookMocks.invoices,
         createInvoice: invoiceHookMocks.createInvoice,
+        finalizeInvoice: invoiceHookMocks.finalizeInvoice,
         updateInvoice: invoiceHookMocks.updateInvoice,
         undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
         canUndoInvoice: invoiceHookMocks.canUndoInvoice,
@@ -145,6 +147,10 @@ vi.mock('../hooks/useTimers.ts', () => ({
         getTimerForProject: () => null,
         getTimerForTask: () => null
     })
+}))
+
+vi.mock('../hooks/usePreferences.ts', () => ({
+    usePreferences: () => ({ preferences: { currency: 'EUR' } })
 }))
 
 vi.mock('../hooks/useToast.ts', () => ({
@@ -423,6 +429,25 @@ describe('InvoiceGenerator', () => {
         toastMocks.showWarning.mockClear()
         invoiceHookMocks.invoices = []
         invoiceHookMocks.createInvoice.mockClear()
+        invoiceHookMocks.finalizeInvoice.mockReset()
+        invoiceHookMocks.finalizeInvoice.mockImplementation(async (invoice, application) => {
+            invoiceHookMocks.createInvoice(invoice)
+            application.adjustmentEntryIdsToDelete.forEach((id) => timeEntryHookMocks.deleteEntry(id))
+            application.adjustmentEntriesToUpdate.forEach(({ id, updates }) => timeEntryHookMocks.updateEntry(id, updates))
+            application.adjustmentEntriesToCreate.forEach(({ id, entry }) => timeEntryHookMocks.createEntry({ id, ...entry }))
+            application.timeEntryUpdates.forEach(({ id, updates }) => timeEntryHookMocks.updateEntry(id, updates))
+            application.expenseUpdates.forEach(({ id, updates }) => expenseHookMocks.updateExpense(id, updates))
+            application.taskCutoffUpdates.forEach(({ id, updates }) => taskHookMocks.updateTask(id, updates))
+            application.quotedTaskUpdates.forEach(({ id, updates }) => taskHookMocks.updateTask(id, updates))
+            application.projectLinkUpdates.forEach(({ id, updates }) => projectHookMocks.updateProject(id, updates))
+            if (application.invoiceTemplateSequenceUpdate) {
+                templateHookMocks.updateInvoiceTemplate(
+                    application.invoiceTemplateSequenceUpdate.id,
+                    application.invoiceTemplateSequenceUpdate.updates
+                )
+            }
+            return invoice
+        })
         invoiceHookMocks.updateInvoice.mockClear()
         projectHookMocks.updateProject.mockClear()
         templateHookMocks.updateInvoiceTemplate.mockClear()
@@ -718,7 +743,7 @@ describe('InvoiceGenerator', () => {
             tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
             date: '2026-02-01',
             createdAt: 111,
-            status: 'sent',
+            status: 'draft',
             template: { id: 'tpl-1', name: 'Template One' }
         }
         const secondInvoice = {
@@ -729,7 +754,7 @@ describe('InvoiceGenerator', () => {
             tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
             date: '2026-02-02',
             createdAt: 222,
-            status: 'sent',
+            status: 'draft',
             template: { id: 'tpl-1', name: 'Template One' }
         }
 
@@ -1063,6 +1088,25 @@ describe('InvoiceGenerator', () => {
         dateNowSpy.mockRestore()
     })
 
+    it('refuses to consume recorded time when invoice hours are reduced', async () => {
+
+        modalConfig.billingPeriodPreset = 'all-time'
+        modalConfig.adjustTaskHours = { taskId: 'task-1', hours: 0.5 }
+        const user = userEvent.setup()
+
+        renderGenerator()
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining(
+            'Split or edit the source time entries before finalizing'
+        ))
+        expect(invoiceHookMocks.createInvoice).not.toHaveBeenCalled()
+        expect(timeEntryHookMocks.updateEntry).not.toHaveBeenCalled()
+        expect(taskHookMocks.updateTask).not.toHaveBeenCalled()
+    })
+
     it('updates an existing invoice without changing id or number', async () => {
 
         invoiceHookMocks.updateInvoice.mockClear()
@@ -1075,7 +1119,7 @@ describe('InvoiceGenerator', () => {
             tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
             date: '2026-01-05',
             createdAt: 111,
-            status: 'sent',
+            status: 'draft',
             template: { id: 'tpl-1', name: 'Template One' }
         }
 
@@ -1093,7 +1137,7 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.invoiceNumber).toBe('INV-OLD')
     })
 
-    it('applies edited invoice expense and quoted-task side effects through shared edit planning', async () => {
+    it('blocks finalized invoice edits before changing billing side effects', async () => {
 
         const fixedNow = Date.parse('2026-01-20T10:00:00Z')
         const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow)
@@ -1168,23 +1212,12 @@ describe('InvoiceGenerator', () => {
             await new Promise((resolve) => setTimeout(resolve, 0))
             await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
 
-            expect(expenseHookMocks.updateExpense).toHaveBeenCalledWith('expense-selected', {
-                billingStatus: 'billed',
-                invoiceId: 'inv-edit',
-                billedAt: fixedNow,
-                updatedAt: fixedNow
-            })
-            expect(expenseHookMocks.updateExpense).toHaveBeenCalledWith('expense-deselected', {
-                billingStatus: 'unbilled',
-                invoiceId: null,
-                billedAt: null,
-                updatedAt: fixedNow
-            })
-            expect(taskHookMocks.updateTask).toHaveBeenCalledWith('task-removed-quoted', {
-                estimatedFlatAmount: 300,
-                quotedAmountBilling: null,
-                updatedAt: fixedNow
-            })
+            expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining(
+                'Finalized invoices cannot be edited directly'
+            ))
+            expect(invoiceHookMocks.updateInvoice).not.toHaveBeenCalled()
+            expect(expenseHookMocks.updateExpense).not.toHaveBeenCalled()
+            expect(taskHookMocks.updateTask).not.toHaveBeenCalled()
             expect(expenseHookMocks.markAsBilled).not.toHaveBeenCalled()
             expect(expenseHookMocks.markAsUnbilled).not.toHaveBeenCalled()
         } finally {
@@ -1255,6 +1288,7 @@ describe('InvoiceGenerator', () => {
             tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
             date: '2026-01-05',
             createdAt: 222,
+            status: 'draft',
             paymentMethod: {
                 id: 'pm-1',
                 title: 'Old Method',
@@ -1293,6 +1327,7 @@ describe('InvoiceGenerator', () => {
             tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
             date: '2026-01-05',
             createdAt: 333,
+            status: 'draft',
             businessInfo: {
                 id: 'bi-1',
                 name: 'Old Business'
@@ -1400,6 +1435,7 @@ describe('InvoiceGenerator', () => {
             tasks: [{ id: 'task-1', hours: 1, hourlyRate: 100 }],
             date: '2026-01-05',
             createdAt: 444,
+            status: 'draft',
             template: { id: 'tpl-1', name: 'Old Template' }
         }
 
@@ -1570,7 +1606,7 @@ describe('InvoiceGenerator', () => {
         expect(invoiceData.htmlContent).toBeNull()
     })
 
-    it('keeps saved invoice task snapshots editable when the live task is now unbillable', async () => {
+    it('keeps finalized invoice task snapshots immutable when the live task changes', async () => {
 
         taskHookMocks.tasks = [
             {
@@ -1636,16 +1672,11 @@ describe('InvoiceGenerator', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
         await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
 
-        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
-        const invoiceData = invoiceHookMocks.updateInvoice.mock.calls[0][1]
-        expect(invoiceData.tasks).toEqual([
-            expect.objectContaining({
-                id: 'task-1',
-                flatRate: 500,
-                useFlatRate: true
-            })
-        ])
-        expect(invoiceData.total).toBe(500)
+        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining(
+            'Finalized invoices cannot be edited directly'
+        ))
+        expect(invoiceHookMocks.updateInvoice).not.toHaveBeenCalled()
+        expect(taskHookMocks.updateTask).not.toHaveBeenCalled()
     })
 
     it('shows a warning and skips invoice generation when total is zero', async () => {

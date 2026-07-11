@@ -15,6 +15,7 @@ const invoiceHookMocks = vi.hoisted(() => ({
 
     invoices: [],
     createInvoice: vi.fn(),
+    finalizeInvoice: vi.fn(),
     updateInvoice: vi.fn(),
     undoLatestInvoice: vi.fn(),
     canUndoInvoice: vi.fn(() => false),
@@ -71,6 +72,7 @@ vi.mock('../../hooks/useInvoices.ts', () => ({
     useInvoices: () => ({
         invoices: invoiceHookMocks.invoices,
         createInvoice: invoiceHookMocks.createInvoice,
+        finalizeInvoice: invoiceHookMocks.finalizeInvoice,
         updateInvoice: invoiceHookMocks.updateInvoice,
         undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
         canUndoInvoice: invoiceHookMocks.canUndoInvoice,
@@ -134,6 +136,10 @@ vi.mock('../../hooks/useTimers.ts', () => ({
         getTimerForProject: () => null,
         getTimerForTask: () => null
     })
+}))
+
+vi.mock('../../hooks/usePreferences.ts', () => ({
+    usePreferences: () => ({ preferences: { currency: 'EUR' } })
 }))
 
 vi.mock('../invoice/InvoiceGeneratorButton', () => ({
@@ -248,6 +254,19 @@ describe('invoice expenses integration', () => {
 
     beforeEach(() => {
         invoiceHookMocks.createInvoice.mockClear()
+        invoiceHookMocks.finalizeInvoice.mockReset()
+        invoiceHookMocks.finalizeInvoice.mockImplementation(async (invoice, application) => {
+            invoiceHookMocks.createInvoice(invoice)
+            application.expenseUpdates.forEach(({ id, updates }) => expenseHookMocks.updateExpense(id, updates))
+            application.projectLinkUpdates.forEach(({ id, updates }) => projectHookMocks.updateProject(id, updates))
+            if (application.invoiceTemplateSequenceUpdate) {
+                templateHookMocks.updateInvoiceTemplate(
+                    application.invoiceTemplateSequenceUpdate.id,
+                    application.invoiceTemplateSequenceUpdate.updates
+                )
+            }
+            return invoice
+        })
         projectHookMocks.updateProject.mockClear()
         expenseHookMocks.updateExpense.mockClear()
         expenseHookMocks.markAsBilled.mockClear()

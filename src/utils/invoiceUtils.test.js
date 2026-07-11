@@ -317,6 +317,29 @@ describe('invoiceUtils', () => {
         ])
     })
 
+    it('reconciles multi-project minor-unit remainders to the exact invoice total', () => {
+
+        const breakdown = getInvoiceProjectRevenueBreakdown({
+            id: 'inv-rounding',
+            projectId: 'project-1',
+            projectIds: ['project-1', 'project-2', 'project-3'],
+            projectBreakdowns: [
+                { projectId: 'project-1', projectTitle: 'One', subtotal: 0.01, totalHours: 0 },
+                { projectId: 'project-2', projectTitle: 'Two', subtotal: 0.01, totalHours: 0 },
+                { projectId: 'project-3', projectTitle: 'Three', subtotal: 0.01, totalHours: 0 },
+            ],
+            subtotal: 0.03,
+            discount: 0,
+            shipping: 0.01,
+            tax: 0,
+            total: 0.04,
+        })
+
+        expect(breakdown.reduce((sum, item) => sum + item.allocatedShipping, 0)).toBe(0.01)
+        expect(breakdown.reduce((sum, item) => sum + item.allocatedTotal, 0)).toBe(0.04)
+        expect(breakdown.map((item) => item.allocatedTotal)).toEqual([0.02, 0.01, 0.01])
+    })
+
     it('normalizes legacy invoices without items into canonical invoice items', () => {
 
         const normalized = normalizeInvoiceRecord({
@@ -480,6 +503,19 @@ describe('invoiceUtils', () => {
             exchangeRates: { USD: 1, EUR: 0.8 },
             capturedAt: 123,
         })).toBeNull()
+    })
+
+    it('rejects cross-currency payment snapshots when conversion cannot be completed', () => {
+
+        expect(() => createInvoicePaymentCurrencySnapshot({
+            invoice: {
+                currency: 'EUR',
+                total: 100,
+            },
+            preferredCurrency: 'USD',
+            exchangeRates: { USD: 1 },
+            capturedAt: 123,
+        })).toThrow('Missing exchange rate for EUR')
     })
 
     it('falls back correctly when marking invoices unpaid', () => {

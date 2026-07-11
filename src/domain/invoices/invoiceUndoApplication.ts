@@ -17,6 +17,7 @@ export interface InvoiceUndoApplicationPlan {
     }>;
     taskCutoffUpdates: Array<{
         id: string;
+        expectedLastBilledAt: number | null;
         updates: Partial<Task>;
     }>;
     projectUnlinkUpdates: Array<{
@@ -130,6 +131,7 @@ export function buildInvoiceUndoApplicationPlan({
     const taskCutoffUpdates = Array.from(undoPlan.taskLastBilledAtRestorations.entries())
         .map(([taskId, restoredCutoff]) => ({
             id: taskId,
+            expectedLastBilledAt: tasks.find((task) => task.id === taskId)?.lastBilledAt ?? null,
             updates: buildRestoredTaskBillingCutoffUpdates({
                 restoredCutoff,
                 updatedAt: undoneAt,

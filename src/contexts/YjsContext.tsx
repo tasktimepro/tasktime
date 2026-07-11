@@ -13,6 +13,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { YjsStore, getYjsStore, YjsDocManager, SyncState, SyncPhase, AutoSyncMode, AuthorizationError } from '@/stores/yjs';
 /* eslint-disable react-refresh/only-export-components */
 import type { BackupInfo } from '@/stores/yjs';
+import type { BackupImportPayload } from '@/utils/backupData';
 import type { TimeEntry } from '@/stores/yjs/types';
 import type * as Y from 'yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
@@ -78,6 +79,8 @@ export interface YjsContextValue {
     getAvailableYears: () => Promise<number[]>;
     /** Clear all data from all collections and IndexedDB databases */
     clearAllData: () => Promise<void>;
+    /** Replace all local data with a backup, rolling back on application failure */
+    restoreBackupData: (data: BackupImportPayload) => Promise<void>;
     /** List all available backups from Google Drive */
     listBackups: () => Promise<BackupInfo[]>;
     /** Create a backup on demand */
@@ -397,14 +400,19 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const forceSyncDrive = useCallback<YjsContextValue['forceSyncDrive']>(async (options) => {
         setManualSyncInProgress(true);
         try {
-            await runSyncWithAuthHandling({
-                ...options,
-                force: true,
-            });
+            try {
+                await store.forceDriveSync(options);
+            } catch (error) {
+                if (await handleAuthorizationFailure(error)) {
+                    return;
+                }
+
+                throw error;
+            }
         } finally {
             setManualSyncInProgress(false);
         }
-    }, [runSyncWithAuthHandling]);
+    }, [store, handleAuthorizationFailure]);
 
     // Trigger a sync when tab becomes visible or when network reconnects
     useEffect(() => {
@@ -568,6 +576,24 @@ export function YjsProvider({ children }: YjsProviderProps) {
         setLastSyncedAt(store.getLastSyncedAt());
     }, [store]);
 
+    const restoreBackupData = useCallback(async (data: BackupImportPayload) => {
+        setIsReady(false);
+        setHasSynced(false);
+        setManualSyncInProgress(false);
+        setLastSyncedAt(null);
+        setSyncPhase('idle');
+
+        try {
+            await store.replaceAllDataWithBackup(data);
+        } finally {
+            setIsReady(store.isReady);
+            setIsDriveConnected(store.isDriveConnected());
+            setSyncState(store.getSyncState());
+            setSyncPhase(store.getSyncPhase());
+            setLastSyncedAt(store.getLastSyncedAt());
+        }
+    }, [store]);
+
     const hasPendingSyncChanges = useCallback(() => {
         return store.hasPendingSyncChanges();
     }, [store]);
@@ -615,6 +641,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         loadArchivedExpenses,
         getAvailableYears,
         clearAllData,
+        restoreBackupData,
         listBackups,
         createBackup,
         downloadBackup,
@@ -643,6 +670,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         loadArchivedExpenses,
         getAvailableYears,
         clearAllData,
+        restoreBackupData,
         listBackups,
         createBackup,
         downloadBackup,

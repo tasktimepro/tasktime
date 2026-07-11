@@ -28,6 +28,7 @@ export interface ResumeTimerCommandInput {
 export interface StopTimerCommandInput {
     timerKey?: string;
     taskId?: string;
+    idempotencyKey?: string;
 }
 
 export interface ClearTimerCommandInput {
@@ -288,40 +289,80 @@ export function stopTimerCommand(context: AgentCommandContext, input: StopTimerC
     assertReady(context);
     assertPermission(context, 'write');
 
-    const timerKey = resolveTimerKey(context, input);
-    const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent stop timer ${timerKey}`);
+    return withIdempotency(context, input.idempotencyKey, () => {
+        const timerKey = resolveTimerKey(context, input);
+        const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent stop timer ${timerKey}`);
+        const priorOperationEntry = input.idempotencyKey
+            ? findStoppedTimerEntry(context, (entry) => entry._stoppedTimerOperationId === input.idempotencyKey)
+            : null;
 
-    if (!timer) {
-        throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
-    }
+        if (!timer) {
+            if (priorOperationEntry) {
+                return buildStopTimerResult(timerKey, priorOperationEntry);
+            }
 
-    const now = getNow(context);
-    const startTime = timer.paused
-        ? (now - (timer.pausedElapsedTime || 0))
-        : timer.startTime;
+            throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
+        }
 
-    const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
-        id: getId(context),
-        taskId: timer.taskId,
-        start: startTime,
-        end: now,
-        note: timer.note,
-        _stoppedTimerKey: timerKey,
-        _stoppedTimerInstanceId: timer.timerInstanceId,
-        createdAt: now,
-        updatedAt: now,
-    }, `agent stop timer entry ${timerKey}`);
+        const priorInstanceEntry = timer.timerInstanceId
+            ? findStoppedTimerEntry(context, (entry) => (
+                entry._stoppedTimerKey === timerKey
+                && entry._stoppedTimerInstanceId === timer.timerInstanceId
+            ))
+            : null;
 
-    context.store.activeEntriesDoc.transact(() => {
-        (context.store.activeTimeEntries as any).set(entry.id, objectToYMap(entry as unknown as Record<string, unknown>));
+        if (priorInstanceEntry) {
+            context.store.coreDoc.transact(() => {
+                context.store.timers.delete(timerKey);
+            });
+
+            markMeaningfulActivity('timer_stop');
+            return buildStopTimerResult(timerKey, priorInstanceEntry);
+        }
+
+        const now = getNow(context);
+        const startTime = timer.paused
+            ? (now - (timer.pausedElapsedTime || 0))
+            : timer.startTime;
+
+        const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
+            id: getId(context),
+            taskId: timer.taskId,
+            start: startTime,
+            end: now,
+            note: timer.note,
+            _stoppedTimerKey: timerKey,
+            _stoppedTimerInstanceId: timer.timerInstanceId,
+            _stoppedTimerOperationId: input.idempotencyKey,
+            createdAt: now,
+            updatedAt: now,
+        }, `agent stop timer entry ${timerKey}`);
+
+        context.store.activeEntriesDoc.transact(() => {
+            (context.store.activeTimeEntries as any).set(entry.id, objectToYMap(entry as unknown as Record<string, unknown>));
+        });
+
+        context.store.coreDoc.transact(() => {
+            context.store.timers.delete(timerKey);
+        });
+
+        markMeaningfulActivity('timer_stop');
+        return buildStopTimerResult(timerKey, entry);
     });
+}
 
-    context.store.coreDoc.transact(() => {
-        context.store.timers.delete(timerKey);
-    });
+function findStoppedTimerEntry(
+    context: AgentCommandContext,
+    predicate: (entry: TimeEntry) => boolean
+): TimeEntry | null {
+    return collectValidatedEntities<TimeEntry>(
+        'timeEntries',
+        context.store.activeTimeEntries as any,
+        'agent stopped timer recovery'
+    ).find(predicate) || null;
+}
 
-    markMeaningfulActivity('timer_stop');
-
+function buildStopTimerResult(timerKey: string, entry: TimeEntry) {
     return {
         timerKey,
         entry,

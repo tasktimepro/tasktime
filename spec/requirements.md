@@ -9,6 +9,7 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **DATA-3:** Make persisted schema changes additive or provide an explicit, tested migration.
 - **DATA-4:** Preserve entity relationships during normal mutations, cascade deletion, import, export, archive, and restore.
 - **DATA-5:** Reject or safely normalize malformed external data without silently discarding valid records.
+- **DATA-6:** A persisted collection or field is not complete until every applicable storage and product consumer has been reviewed: types, validation, compatibility/migration, sync/archive, backup/export, import/restore, deletion, reports, UI, agents, and historical regression fixtures. Intentional exclusions must be specified.
 
 ## Projects, clients, tasks, and planning
 
@@ -55,7 +56,7 @@ Requirement identifiers are stable references for acceptance criteria, design do
 
 - **SYNC-1:** Keep core product behavior available offline and make connectivity state visible.
 - **SYNC-2:** Preserve the manual, backup, and sync trigger matrix documented in `AGENTS.md`.
-- **SYNC-3:** Avoid unnecessary pulls using manifest metadata and throttling while never treating stale metadata as proof that local data may be discarded.
+- **SYNC-3:** Keep normal Worker/Drive requests proportional to actual work. An unchanged/no-op sync uses manifest metadata, throttling, cooldowns, and cross-tab locking and must not list all app-data files, download documents, or upload state; heavier recovery requests require a correctness justification and request-count regression coverage.
 - **SYNC-4:** Serialize cross-tab synchronization and recover disconnected dirty documents on reconnect.
 - **SYNC-5:** Never auto-sync destructive resets or conflict decisions that can undo a valid change from another device.
 
@@ -64,7 +65,7 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **AGENT-1:** Expose business actions through a loopback-only local MCP bridge; never expose raw Yjs/IndexedDB access.
 - **AGENT-2:** Require explicit short-lived pairing, session management, scoped permissions, approvals for sensitive actions, revocation, and rate limiting.
 - **AGENT-3:** Keep app-session tokens memory-only and exclude credentials from logs, files, docs, and recovery responses.
-- **AGENT-4:** Keep UI behavior, agent commands, tool schemas, generated docs, bundles, and published package metadata aligned.
+- **AGENT-4:** Every new or changed user-facing business action receives a UI/agent parity review. Supported actions use the same domain/application operation and keep behavior, validation, errors, permissions, approvals, tool schemas, generated docs, bundles, and published package metadata aligned; intentional exclusions are documented and not advertised as parity.
 - **AGENT-5:** Support the long-running task/time flow across sessions: select/create task, start timer, allow work to continue, stop the same timer, and verify the created entry.
 
 ## UX, accessibility, and operations
@@ -75,3 +76,4 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **OPS-1:** Run development and release commands through Docker-backed Make targets.
 - **OPS-2:** Keep public/private repository boundaries and environment documentation accurate.
 - **OPS-3:** Run lint, coverage, browser smoke, PWA smoke, and build checks as the broad release gate.
+- **OPS-4:** Review the persisted-data and cross-surface change impact matrix before completion; no consumer may be silently omitted.

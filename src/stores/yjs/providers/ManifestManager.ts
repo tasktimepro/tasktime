@@ -22,7 +22,7 @@ const SYNC_FILE_PREFIX = 'tasktime-yjs-';
 const SYNC_FILE_SUFFIX = '.bin';
 const DELTA_FILE_MARKER = '-delta-';
 
-interface AppDataFile {
+export interface AppDataFile {
     id: string;
     name: string;
     modifiedTime: string;
@@ -38,6 +38,8 @@ export interface DocManifest {
     stateVersion: number;
     lastCompaction: string;
     deltas: DeltaInfo[];
+    stateModifiedTime?: string;
+    compactedDeltaIds?: string[];
 }
 
 export interface Manifest {
@@ -45,7 +47,12 @@ export interface Manifest {
     deviceId: string;
     lastSync: string;
     documents: Record<string, DocManifest>;
+    revision?: number;
+    lastWriterId?: string;
+    writeId?: string;
 }
+
+const MAX_COMPACTED_DELTA_TOMBSTONES = 512;
 
 function isKnownSyncDocName(docName: string): boolean {
     return docName === 'core'
@@ -82,6 +89,114 @@ function parseSyncFileName(fileName: string): { docName: string; deltaId?: strin
     return null;
 }
 
+/**
+ * Merge a locally changed manifest with the latest remote snapshot while
+ * treating the Drive file list as authoritative evidence for uploaded deltas.
+ * Compaction tombstones prevent a concurrent stale writer from resurrecting
+ * delta references that are about to be deleted.
+ */
+export function mergeConcurrentManifests(
+    remoteManifest: Manifest,
+    localManifest: Manifest,
+    files: AppDataFile[],
+    writerId: string,
+    writeId: string
+): Manifest {
+    const merged: Manifest = {
+        version: Math.max(remoteManifest.version || 1, localManifest.version || 1),
+        deviceId: remoteManifest.deviceId || localManifest.deviceId,
+        lastSync: localManifest.lastSync,
+        revision: Math.max(remoteManifest.revision || 0, localManifest.revision || 0) + 1,
+        lastWriterId: writerId,
+        writeId,
+        documents: {},
+    };
+    const filesByName = new Map(files.map((file) => [file.name, file]));
+    const deltaFilesByDoc = new Map<string, AppDataFile[]>();
+
+    files.forEach((file) => {
+        const parsed = parseSyncFileName(file.name);
+        if (!parsed?.deltaId) return;
+        const entries = deltaFilesByDoc.get(parsed.docName) || [];
+        entries.push(file);
+        deltaFilesByDoc.set(parsed.docName, entries);
+    });
+
+    const docNames = new Set([
+        ...Object.keys(remoteManifest.documents || {}),
+        ...Object.keys(localManifest.documents || {}),
+        ...Array.from(deltaFilesByDoc.keys()),
+    ]);
+
+    docNames.forEach((docName) => {
+        const remoteDoc = remoteManifest.documents?.[docName];
+        const localDoc = localManifest.documents?.[docName];
+        const fallbackStateFile = `tasktime-yjs-${docName}.bin`;
+        const stateFile = localDoc?.stateFile || remoteDoc?.stateFile || fallbackStateFile;
+        const stateFileMeta = filesByName.get(stateFile);
+        const localVersion = localDoc?.stateVersion || 0;
+        const remoteVersion = remoteDoc?.stateVersion || 0;
+        let stateVersion = Math.max(localVersion, remoteVersion);
+        const knownStateModifiedTime = localVersion >= remoteVersion
+            ? localDoc?.stateModifiedTime
+            : remoteDoc?.stateModifiedTime;
+
+        if (stateFileMeta && knownStateModifiedTime && knownStateModifiedTime !== stateFileMeta.modifiedTime) {
+            stateVersion += 1;
+        } else if (stateFileMeta && stateVersion === 0) {
+            stateVersion = 1;
+        }
+
+        const compactedDeltaIds = uniqueStrings([
+            ...(remoteDoc?.compactedDeltaIds || []),
+            ...(localDoc?.compactedDeltaIds || []),
+        ]).slice(-MAX_COMPACTED_DELTA_TOMBSTONES);
+        const compactedSet = new Set(compactedDeltaIds);
+        const deltas = new Map<string, DeltaInfo>();
+        const addDelta = (delta: DeltaInfo) => {
+            if (!delta?.id || compactedSet.has(delta.id)) return;
+            const existing = deltas.get(delta.id);
+            if (!existing || delta.timestamp < existing.timestamp) {
+                deltas.set(delta.id, delta);
+            }
+        };
+
+        remoteDoc?.deltas?.forEach(addDelta);
+        localDoc?.deltas?.forEach(addDelta);
+        deltaFilesByDoc.get(docName)?.forEach((file) => {
+            const parsed = parseSyncFileName(file.name);
+            if (parsed?.deltaId) addDelta({ id: parsed.deltaId, timestamp: file.modifiedTime });
+        });
+
+        const preferredDoc = localVersion >= remoteVersion ? localDoc : remoteDoc;
+        merged.documents[docName] = {
+            stateFile,
+            stateVersion,
+            lastCompaction: preferredDoc?.lastCompaction
+                || remoteDoc?.lastCompaction
+                || localDoc?.lastCompaction
+                || new Date(0).toISOString(),
+            deltas: Array.from(deltas.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp) || a.id.localeCompare(b.id)),
+            ...(stateFileMeta ? { stateModifiedTime: stateFileMeta.modifiedTime } : {}),
+            ...(compactedDeltaIds.length > 0 ? { compactedDeltaIds } : {}),
+        };
+    });
+
+    return merged;
+}
+
+function uniqueStrings(values: string[]): string[] {
+    return Array.from(new Set(values.filter((value) => typeof value === 'string' && value.length > 0)));
+}
+
+function isManifest(value: unknown): value is Manifest {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const candidate = value as Partial<Manifest>;
+    return typeof candidate.version === 'number'
+        && typeof candidate.deviceId === 'string'
+        && Boolean(candidate.documents && typeof candidate.documents === 'object' && !Array.isArray(candidate.documents));
+}
+
 export function isDriveFileNotFoundError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     const lowerMessage = message.toLowerCase();
@@ -112,6 +227,7 @@ export class ManifestManager {
     private fileIdCache: Map<string, string> = new Map();
     private lastManifestModifiedTime: string | null = null;
     private _dirty: boolean = false;
+    private readonly localWriterId = crypto.randomUUID();
 
     constructor(accessToken: string, sessionId?: string | null) {
         this.accessToken = accessToken;
@@ -180,6 +296,7 @@ export class ManifestManager {
                 deviceId: crypto.randomUUID(),
                 lastSync: new Date().toISOString(),
                 documents: {},
+                revision: 0,
             };
             console.log('[ManifestManager] Created new manifest');
         }
@@ -202,6 +319,29 @@ export class ManifestManager {
         if (!this.manifest) return;
 
         this.manifest.lastSync = new Date().toISOString();
+
+        if (this.manifestFileId) {
+            const localSnapshot = structuredClone(this.manifest);
+            const [remoteContent, files] = await Promise.all([
+                this.downloadFileAsJson(this.manifestFileId),
+                this.listAppDataFiles(),
+            ]);
+            const remoteManifest = isManifest(remoteContent) ? remoteContent : localSnapshot;
+
+            this.manifest = mergeConcurrentManifests(
+                remoteManifest,
+                localSnapshot,
+                files,
+                this.localWriterId,
+                crypto.randomUUID()
+            );
+            this.fileIdCache.clear();
+            files.forEach((file) => this.fileIdCache.set(file.name, file.id));
+        } else {
+            this.manifest.revision = (this.manifest.revision || 0) + 1;
+            this.manifest.lastWriterId = this.localWriterId;
+            this.manifest.writeId = crypto.randomUUID();
+        }
 
         console.log('[ManifestManager] Saving manifest snapshot:', {
             docs: this.manifest.documents,
@@ -362,7 +502,22 @@ export class ManifestManager {
             deltas: [],
         };
 
-        this.manifest.documents[docName] = { ...existing, ...update };
+        const removedDeltaIds = Array.isArray(update.deltas)
+            ? existing.deltas
+                .filter((delta) => !update.deltas!.some((nextDelta) => nextDelta.id === delta.id))
+                .map((delta) => delta.id)
+            : [];
+        const compactedDeltaIds = uniqueStrings([
+            ...(existing.compactedDeltaIds || []),
+            ...removedDeltaIds,
+            ...(update.compactedDeltaIds || []),
+        ]).slice(-MAX_COMPACTED_DELTA_TOMBSTONES);
+
+        this.manifest.documents[docName] = {
+            ...existing,
+            ...update,
+            ...(compactedDeltaIds.length > 0 ? { compactedDeltaIds } : {}),
+        };
         this._dirty = true;
     }
 
@@ -392,6 +547,10 @@ export class ManifestManager {
      */
     addDelta(docName: string, deltaId: string): void {
         const doc = this.ensureDocManifest(docName);
+        doc.compactedDeltaIds = (doc.compactedDeltaIds || []).filter((id) => id !== deltaId);
+        if (doc.deltas.some((delta) => delta.id === deltaId)) {
+            return;
+        }
         doc.deltas.push({
             id: deltaId,
             timestamp: new Date().toISOString(),
@@ -406,6 +565,10 @@ export class ManifestManager {
         const doc = this.manifest?.documents[docName];
         if (doc) {
             doc.deltas = doc.deltas.filter(d => d.id !== deltaId);
+            doc.compactedDeltaIds = uniqueStrings([
+                ...(doc.compactedDeltaIds || []),
+                deltaId,
+            ]).slice(-MAX_COMPACTED_DELTA_TOMBSTONES);
             this._dirty = true;
         }
     }
@@ -416,6 +579,10 @@ export class ManifestManager {
     clearDeltas(docName: string): void {
         const doc = this.manifest?.documents[docName];
         if (doc) {
+            doc.compactedDeltaIds = uniqueStrings([
+                ...(doc.compactedDeltaIds || []),
+                ...doc.deltas.map((delta) => delta.id),
+            ]).slice(-MAX_COMPACTED_DELTA_TOMBSTONES);
             doc.deltas = [];
             doc.lastCompaction = new Date().toISOString();
             doc.stateVersion++;
@@ -551,8 +718,11 @@ export class ManifestManager {
                     this._dirty = true;
                 }
 
-                if (doc.stateVersion === 0) {
-                    doc.stateVersion = 1;
+                if (doc.stateModifiedTime !== file.modifiedTime) {
+                    doc.stateVersion = doc.stateModifiedTime
+                        ? Math.max(1, doc.stateVersion + 1)
+                        : Math.max(1, doc.stateVersion);
+                    doc.stateModifiedTime = file.modifiedTime;
                     doc.lastCompaction = file.modifiedTime;
                     recoveredDocCount++;
                     this._dirty = true;
@@ -561,7 +731,10 @@ export class ManifestManager {
                 continue;
             }
 
-            if (doc.deltas.some((delta) => delta.id === parsed.deltaId)) {
+            if (
+                doc.deltas.some((delta) => delta.id === parsed.deltaId)
+                || doc.compactedDeltaIds?.includes(parsed.deltaId)
+            ) {
                 continue;
             }
 

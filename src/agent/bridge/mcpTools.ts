@@ -1111,6 +1111,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
             properties: {
                 timerKey: optionalString,
                 taskId: optionalString,
+                idempotencyKey: optionalString,
             },
             additionalProperties: false,
         },

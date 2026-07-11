@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as Y from 'yjs';
-import { objectToYMap, readEntity } from '@/stores/yjs/entityUtils';
+import { objectToYMap, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
 import {
@@ -247,6 +247,7 @@ function createContext(): AgentCommandContext & {
     const clients = coreDoc.getMap('clients');
     const preferences = coreDoc.getMap('preferences');
     const invoices = coreDoc.getMap('invoices');
+    const invoiceBillingOperations = coreDoc.getMap('invoiceBillingOperations');
     const invoiceTemplates = coreDoc.getMap('invoiceTemplates');
     const businessInfos = coreDoc.getMap('businessInfos');
     const businessBrandAssets = coreDoc.getMap('businessBrandAssets');
@@ -298,6 +299,8 @@ function createContext(): AgentCommandContext & {
         clients,
         preferences,
         invoices,
+        invoiceBillingOperations,
+        reconcileInvoiceBillingOperations: vi.fn(async () => undefined),
         invoiceTemplates,
         businessInfos,
         businessBrandAssets,
@@ -309,7 +312,105 @@ function createContext(): AgentCommandContext & {
         dailyGoals,
         taxReturnPeriods,
         activeTimeEntries: entries,
+        commitInvoiceFinalization: vi.fn(async ({ operationId, desiredInvoice, application }: any) => {
+            const entryMaps: Array<Y.Map<string, unknown>> = [entries];
+            const years = typeof (store as any).getAvailableYears === 'function'
+                ? await (store as any).getAvailableYears()
+                : [];
+            for (const year of years) {
+                const map = await (store as any).loadEntriesForYear(year);
+                if (map && !entryMaps.includes(map)) entryMaps.push(map);
+            }
+            const locateEntry = (id: string) => entryMaps.find((map) => map.has(id));
+
+            invoiceBillingOperations.set(operationId, objectToYMap({
+                version: 1,
+                operationId,
+                invoiceId: desiredInvoice.id,
+                kind: 'finalize',
+                state: 'complete',
+                desiredInvoice,
+                application,
+                createdAt: 1,
+                updatedAt: 1,
+                lastCompletedPhase: 'complete',
+            }));
+            application.adjustmentEntryIdsToDelete.forEach((id: string) => locateEntry(id)?.delete(id));
+            application.adjustmentEntriesToUpdate.forEach(({ id, updates }: any) => {
+                const map = locateEntry(id);
+                if (map) updateEntityFields(map as any, id, updates);
+            });
+            application.adjustmentEntriesToCreate.forEach(({ id, entry }: any) => entries.set(id, objectToYMap({ id, ...entry })));
+            application.timeEntryUpdates.forEach(({ id, updates }: any) => {
+                const map = locateEntry(id);
+                if (map) updateEntityFields(map as any, id, updates);
+            });
+            application.expenseUpdates.forEach(({ id, updates }: any) => updateEntityFields(expenses as any, id, updates));
+            [...application.taskCutoffUpdates, ...application.quotedTaskUpdates].forEach(({ id, updates }: any) => {
+                const map = tasks.has(id) ? tasks : archivedTasks;
+                updateEntityFields(map as any, id, updates);
+            });
+            application.projectLinkUpdates.forEach(({ id, updates }: any) => updateEntityFields(projects as any, id, updates));
+            if (application.invoiceTemplateSequenceUpdate) {
+                updateEntityFields(
+                    invoiceTemplates as any,
+                    application.invoiceTemplateSequenceUpdate.id,
+                    application.invoiceTemplateSequenceUpdate.updates
+                );
+            }
+            invoices.set(desiredInvoice.id, objectToYMap(desiredInvoice));
+            return desiredInvoice;
+        }),
+        commitInvoiceUndo: vi.fn(async ({ operationId, invoice, application }: any) => {
+            const entryMaps: Array<Y.Map<string, unknown>> = [entries];
+            const years = typeof (store as any).getAvailableYears === 'function'
+                ? await (store as any).getAvailableYears()
+                : [];
+            for (const year of years) {
+                const map = await (store as any).loadEntriesForYear(year);
+                if (map && !entryMaps.includes(map)) entryMaps.push(map);
+            }
+            const locateEntry = (id: string) => entryMaps.find((map) => map.has(id));
+
+            invoiceBillingOperations.set(operationId, objectToYMap({
+                version: 1,
+                operationId,
+                invoiceId: invoice.id,
+                kind: 'undo',
+                state: 'complete',
+                invoice,
+                application,
+                createdAt: 1,
+                updatedAt: 1,
+                lastCompletedPhase: 'complete',
+            }));
+            application.entriesToDelete.forEach((entry: any) => locateEntry(entry.id)?.delete(entry.id));
+            application.entriesToClear.forEach(({ entry, updates }: any) => {
+                const map = locateEntry(entry.id);
+                if (map) updateEntityFields(map as any, entry.id, updates);
+            });
+            application.expenseUpdatesToUnbill.forEach(({ id, updates }: any) => updateEntityFields(expenses as any, id, updates));
+            [...application.quotedTaskUpdates, ...application.taskCutoffUpdates].forEach(({ id, updates }: any) => {
+                const map = tasks.has(id) ? tasks : archivedTasks;
+                updateEntityFields(map as any, id, updates);
+            });
+            application.projectUnlinkUpdates.forEach(({ id, updates }: any) => updateEntityFields(projects as any, id, updates));
+            if (application.invoiceTemplateSequenceUpdate) {
+                updateEntityFields(
+                    invoiceTemplates as any,
+                    application.invoiceTemplateSequenceUpdate.id,
+                    application.invoiceTemplateSequenceUpdate.updates
+                );
+            }
+            invoices.delete(invoice.id);
+        }),
         getAllTimeEntries: () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean),
+        getAllTasks: vi.fn(async () => [
+            ...Array.from(tasks.values()).map((value) => readEntity(value)).filter(Boolean),
+            ...Array.from(archivedTasks.values()).map((value) => readEntity(value)).filter(Boolean),
+        ]),
+        getAllExpenses: vi.fn(async () => Array.from(expenses.values()).map((value) => readEntity(value)).filter(Boolean)),
+        loadAllTimeEntries: vi.fn(async () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean)),
         exportBackupData: vi.fn(async (options: Record<string, unknown> = {}) => ({
             version: '1.4',
             exportDate: options.exportDate || '2026-06-25T12:00:00.000Z',
@@ -3079,6 +3180,54 @@ describe('agent commands', () => {
         }));
     });
 
+    it('reuses a timer-instance entry after entry creation succeeded but timer cleanup did not', () => {
+        const context = createContext();
+        createTaskCommand(context, {
+            id: 'task-1',
+            title: 'Timed task',
+            projectId: 'project-1',
+        });
+        const timer = startTimerCommand(context, { taskId: 'task-1' });
+        const recoveredEntry = {
+            id: 'existing-stop-entry',
+            taskId: 'task-1',
+            start: timer.startTime,
+            end: timer.startTime + 1_000,
+            _stoppedTimerKey: 'project-1',
+            _stoppedTimerInstanceId: timer.timerInstanceId,
+        };
+        context.maps.entries.set(recoveredEntry.id, objectToYMap(recoveredEntry));
+
+        const result = stopTimerCommand(context, { timerKey: 'project-1' });
+
+        expect(result.entry.id).toBe('existing-stop-entry');
+        expect(context.maps.entries.size).toBe(1);
+        expect(context.maps.timers.has('project-1')).toBe(false);
+    });
+
+    it('replays a completed timer stop by durable operation identity after session state is lost', () => {
+        const context = createContext();
+        createTaskCommand(context, {
+            id: 'task-1',
+            title: 'Timed task',
+            projectId: 'project-1',
+        });
+        startTimerCommand(context, { taskId: 'task-1' });
+
+        const first = stopTimerCommand(context, {
+            timerKey: 'project-1',
+            idempotencyKey: 'stop-operation-1',
+        });
+        context.idempotency = new Map();
+        const replay = stopTimerCommand(context, {
+            timerKey: 'project-1',
+            idempotencyKey: 'stop-operation-1',
+        });
+
+        expect(replay).toEqual(first);
+        expect(context.maps.entries.size).toBe(1);
+    });
+
     it('resumes, updates, and approval-confirms timer clearing', async () => {
         const context = createContext();
         let now = 100_000;
@@ -4119,11 +4268,16 @@ describe('agent commands', () => {
         context.maps.entries.set('entry-report', objectToYMap({
             id: 'entry-report',
             taskId: task.id,
-            start: Date.parse('2026-06-10T10:00:00Z'),
-            end: Date.parse('2026-06-10T12:00:00Z'),
+            start: Date.parse('2026-06-30T23:00:00Z'),
+            end: Date.parse('2026-07-01T01:00:00Z'),
         }));
+        context.maps.archivedTasks.set(task.id, objectToYMap({
+            ...task,
+            archived: true,
+        }));
+        context.maps.tasks.delete(task.id);
 
-        const report = getReportSummaryCommand(context, {
+        const report = await getReportSummaryCommand(context, {
             period: 'custom',
             customStart: '2026-06-01',
             customEnd: '2026-06-30',
@@ -4215,6 +4369,20 @@ describe('agent commands', () => {
             total: 100,
             currency: 'USD',
         }));
+        context.maps.invoices.set('invoice-report-export-2', objectToYMap({
+            id: 'invoice-report-export-2',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-EXPORT-2',
+            date: '2026-06-16',
+            status: 'sent',
+            items: [],
+            subtotal: 50,
+            tax: 0,
+            total: 50,
+            currency: 'USD',
+        }));
         context.maps.entries.set('entry-report-export', objectToYMap({
             id: 'entry-report-export',
             taskId: task.id,
@@ -4229,12 +4397,15 @@ describe('agent commands', () => {
             customStart: '2026-06-01',
             customEnd: '2026-06-30',
             filename: 'agent-invoices',
+            rowLimit: 1,
         });
 
         expect(exported).toEqual({
             section: 'invoices',
             filename: 'agent-invoices.csv',
             rowCount: 1,
+            totalRowCount: 2,
+            truncated: true,
             downloadStarted: true,
         });
         expect(csvMocks.buildCsvContent).toHaveBeenCalledWith(
@@ -4400,6 +4571,7 @@ describe('agent commands', () => {
             csvFileCount: 6,
             reportPdfCount: 1,
             invoicePdfCount: 1,
+            truncatedSections: [],
             downloadStarted: true,
         });
         expect(reportPdfMocks.buildMonthlyReportHtml).toHaveBeenCalled();
@@ -4756,7 +4928,7 @@ describe('agent commands', () => {
             projectId: 'project-1',
         }));
 
-        const preview = previewInvoiceFromUnbilledWorkCommand(context, {
+        const preview = await previewInvoiceFromUnbilledWorkCommand(context, {
             projectId: 'project-1',
             billingPeriodStart: '2026-06-01',
             billingPeriodEnd: '2026-06-30',
@@ -4798,6 +4970,37 @@ describe('agent commands', () => {
         }));
     });
 
+    it('includes archived tasks and complete time-entry history in agent invoice preview', async () => {
+        const context = createContext();
+        context.maps.archivedTasks.set('task-archived-preview', objectToYMap({
+            id: 'task-archived-preview',
+            title: 'Archived preview work',
+            projectId: 'project-1',
+            billable: true,
+            archived: true,
+            lastBilledAt: Date.parse('2026-06-20T00:00:00Z'),
+        }));
+        context.maps.entries.set('entry-late-preview', objectToYMap({
+            id: 'entry-late-preview',
+            taskId: 'task-archived-preview',
+            start: Date.parse('2026-06-10T10:00:00Z'),
+            end: Date.parse('2026-06-10T11:00:00Z'),
+        }));
+
+        const preview = await previewInvoiceFromUnbilledWorkCommand(context, {
+            projectId: 'project-1',
+            billingPeriodStart: '2026-06-01',
+            billingPeriodEnd: '2026-06-30',
+        });
+
+        expect((context.store as any).getAllTasks).toHaveBeenCalled();
+        expect((context.store as any).loadAllTimeEntries).toHaveBeenCalled();
+        expect(preview.preview.entrySelections).toEqual([
+            expect.objectContaining({ entryId: 'entry-late-preview', taskId: 'task-archived-preview' }),
+        ]);
+        expect(preview.preview.total).toBe(100);
+    });
+
     it('creates an invoice draft from unbilled work without billing side effects', async () => {
         const context = createContext();
         createTaskCommand(context, {
@@ -4835,14 +5038,14 @@ describe('agent commands', () => {
             projectId: 'project-1',
         }));
 
-        const draft = createInvoiceDraftFromUnbilledWorkCommand(context, {
+        const draft = await createInvoiceDraftFromUnbilledWorkCommand(context, {
             projectId: 'project-1',
             invoiceDate: '2026-06-25',
             billingPeriodStart: '2026-06-01',
             billingPeriodEnd: '2026-06-30',
             idempotencyKey: 'draft-1',
         });
-        const repeated = createInvoiceDraftFromUnbilledWorkCommand(context, {
+        const repeated = await createInvoiceDraftFromUnbilledWorkCommand(context, {
             projectId: 'project-1',
             invoiceDate: '2026-06-25',
             billingPeriodStart: '2026-06-01',
@@ -4874,6 +5077,12 @@ describe('agent commands', () => {
             subtotal: 240,
             total: 240,
             currency: 'EUR',
+            billingSelectionSnapshot: expect.objectContaining({
+                version: 1,
+                entries: [expect.objectContaining({ entryId: 'entry-draft', taskId: 'task-draft' })],
+                tasks: [expect.objectContaining({ taskId: 'task-draft', rate: 100, amount: 200 })],
+                expenses: [expect.objectContaining({ expenseId: 'expense-draft', invoiceAmount: 40 })],
+            }),
             agentDraft: expect.objectContaining({
                 version: 1,
                 source: 'tasktime-agent',
@@ -5450,12 +5659,19 @@ describe('agent commands', () => {
             projectId: 'project-1',
         }));
 
-        const draft = createInvoiceDraftFromUnbilledWorkCommand(context, {
+        const draft = await createInvoiceDraftFromUnbilledWorkCommand(context, {
             projectId: 'project-1',
             invoiceDate: '2026-06-25',
             billingPeriodStart: '2026-06-01',
             billingPeriodEnd: '2026-06-30',
         });
+
+        context.maps.entries.set('entry-after-preview', objectToYMap({
+            id: 'entry-after-preview',
+            taskId: 'task-finalize',
+            start: Date.parse('2026-06-13T10:00:00Z'),
+            end: Date.parse('2026-06-13T11:00:00Z'),
+        }));
 
         await expect(finalizeInvoiceCommand(context, {
             invoiceId: draft.invoice.id,
@@ -5474,6 +5690,13 @@ describe('agent commands', () => {
         });
 
         expect(repeated).toBe(finalized);
+        context.idempotency?.clear();
+        const replayedAfterSessionLoss = await finalizeInvoiceCommand(context, {
+            invoiceId: draft.invoice.id,
+            confirmFinalize: true,
+            idempotencyKey: 'finalize-1',
+        });
+        expect(replayedAfterSessionLoss).toEqual(finalized);
         expect(finalized).toEqual(expect.objectContaining({
             billedEntryCount: 1,
             billedExpenseCount: 1,
@@ -5499,6 +5722,7 @@ describe('agent commands', () => {
             billedInvoiceId: draft.invoice.id,
             billedHourlyRate: 100,
         }));
+        expect(readStored<Record<string, unknown>>(context.maps.entries, 'entry-after-preview')).not.toHaveProperty('billedInvoiceId');
         expect(readStored<Record<string, unknown>>(context.maps.expenses, 'expense-finalize')).toEqual(expect.objectContaining({
             billingStatus: 'billed',
             invoiceId: draft.invoice.id,
@@ -5524,6 +5748,45 @@ describe('agent commands', () => {
                 code: 'CONFLICT',
             }),
         }));
+    });
+
+    it('rejects finalization without billing side effects when a selected source record changed after preview', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'billing']);
+        context.now = () => Date.parse('2026-06-25T12:00:00Z');
+        createTaskCommand(context, {
+            id: 'task-selection-conflict',
+            title: 'Selection conflict task',
+            projectId: 'project-1',
+            billable: true,
+        });
+        context.maps.entries.set('entry-selection-conflict', objectToYMap({
+            id: 'entry-selection-conflict',
+            taskId: 'task-selection-conflict',
+            start: Date.parse('2026-06-10T10:00:00Z'),
+            end: Date.parse('2026-06-10T11:00:00Z'),
+        }));
+
+        const draft = await createInvoiceDraftFromUnbilledWorkCommand(context, {
+            projectId: 'project-1',
+            billingPeriodStart: '2026-06-01',
+            billingPeriodEnd: '2026-06-30',
+        });
+        updateEntityFields(context.maps.entries as any, 'entry-selection-conflict', {
+            end: Date.parse('2026-06-10T12:00:00Z'),
+        });
+
+        await expect(finalizeInvoiceCommand(context, {
+            invoiceId: draft.invoice.id,
+            confirmFinalize: true,
+        })).rejects.toMatchObject({
+            code: 'CONFLICT',
+            details: expect.objectContaining({ reason: expect.stringMatching(/changed after preview/) }),
+        });
+
+        expect(readStored<Record<string, unknown>>(context.maps.entries, 'entry-selection-conflict')).not.toHaveProperty('billedInvoiceId');
+        expect(readStored<Record<string, unknown>>(context.maps.invoices, draft.invoice.id)).toEqual(expect.objectContaining({ status: 'draft' }));
+        expect(readStored<Record<string, unknown>>(context.maps.projects, 'project-1')).not.toHaveProperty('invoiceIds');
     });
 
     it('finalizes UI-shaped draft invoices with adjustments, quoted tasks, expenses, and historical entries', async () => {
@@ -6018,6 +6281,14 @@ describe('agent commands', () => {
         });
 
         expect(repeated).toBe(result);
+        context.idempotency?.clear();
+        const replayedAfterSessionLoss = await undoLatestInvoiceCommand(context, {
+            invoiceId: 'invoice-undo',
+            confirmUndo: true,
+            confirmationText: 'INV-7',
+            idempotencyKey: 'undo-1',
+        });
+        expect(replayedAfterSessionLoss).toEqual(result);
         expect(result).toEqual({
             invoiceNumber: 'INV-7',
             clearedTimeEntryCount: 2,
@@ -6179,7 +6450,7 @@ describe('agent commands', () => {
             invoiceNumber: 'INV-EMAIL',
             date: '2026-06-25',
             dueDate: '2026-07-09',
-            status: 'draft',
+            status: 'sent',
             currency: 'USD',
             items: [],
             subtotal: 125,

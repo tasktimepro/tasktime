@@ -112,6 +112,7 @@ vi.mock('@/utils/pdfUtils.ts', () => ({
 vi.mock('@/utils/currencyUtils.ts', () => ({
     getCurrencySymbol: () => '$',
     getPreferredCurrency: () => 'USD',
+    normalizeCurrencyCode: (currency) => currency || 'USD',
 }));
 
 vi.mock('@/utils/invoiceUtils.ts', () => ({
@@ -120,6 +121,10 @@ vi.mock('@/utils/invoiceUtils.ts', () => ({
 
 vi.mock('@/utils/dateUtils.ts', () => ({
     toDisplayDate: (d) => d,
+}));
+
+vi.mock('@/hooks/usePreferences.ts', () => ({
+    usePreferences: () => ({ preferences: { currency: 'USD' } }),
 }));
 
 // ---- Test data ----
@@ -131,7 +136,7 @@ const invoice = {
     clientId: 'client-1',
     date: '2026-04-01',
     dueDate: '2026-04-30',
-    status: 'draft',
+    status: 'sent',
     items: [],
     subtotal: 500,
     total: 500,
@@ -368,7 +373,6 @@ describe('EmailPreviewModal', () => {
         await waitFor(() => {
             expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', expect.objectContaining({
                 sentToEmail: 'billing@acme.com',
-                status: 'sent',
             }));
         });
 
@@ -476,7 +480,6 @@ describe('EmailPreviewModal', () => {
         );
         expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', expect.objectContaining({
             sentToEmail: 'billing@acme.com',
-            status: 'sent',
         }));
         expect(mockOnClose).toHaveBeenCalledOnce();
     });
@@ -755,5 +758,18 @@ describe('EmailPreviewModal', () => {
                 expect.not.objectContaining({ status: 'sent' })
             );
         });
+    });
+
+    it('rejects emailing an unfinalized draft before PDF generation or sending', async () => {
+        const user = userEvent.setup();
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} invoice={{ ...invoice, status: 'draft' }} />);
+
+        await user.click(screen.getByRole('button', { name: /Send Invoice/i }));
+
+        expect(await screen.findByText(/Finalize this draft/)).toBeTruthy();
+        expect(mockGeneratePDFBase64).not.toHaveBeenCalled();
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
     });
 });

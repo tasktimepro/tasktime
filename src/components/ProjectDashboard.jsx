@@ -7,7 +7,7 @@ import TaskTree from './TaskTree';
 import MetricsDisplay from './MetricsDisplay';
 import InvoiceGenerator from './InvoiceGenerator';
 import InvoicesList from './InvoicesList';
-import { formatCurrency, getCurrencySymbol, getProjectCurrency, getPreferredCurrency } from '../utils/currencyUtils.ts';
+import { DEFAULT_CURRENCY, formatCurrency, getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getInvoiceTotal, getPaidInvoiceConvertedAmount, getInvoicesForProject, isInvoicePaid, isMultiProjectInvoice } from '../utils/invoiceUtils.ts';
@@ -94,7 +94,10 @@ const ProjectDashboard = ({
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences } = usePreferences();
     const projectTimer = getTimerForProject(project.id);
-    const projectCurrency = useMemo(() => getProjectCurrency(project, clients), [clients, project]);
+    const projectCurrency = useMemo(
+        () => getProjectCurrency(project, clients, preferences.currency),
+        [clients, preferences.currency, project]
+    );
     
     // Get invoices for this project
     const projectInvoices = getInvoicesForProject(invoices, project.id);
@@ -108,7 +111,7 @@ const ProjectDashboard = ({
 
     const expenseTotalsByCurrency = useMemo(() => {
         return projectExpenses.reduce((acc, expense) => {
-            const currency = expense.currency || preferences.currency || getPreferredCurrency();
+            const currency = expense.currency || preferences.currency || DEFAULT_CURRENCY;
             acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
             return acc;
         }, {});
@@ -118,7 +121,7 @@ const ProjectDashboard = ({
         return projectExpenses
             .filter((expense) => expense.billable && expense.billingStatus === 'unbilled')
             .reduce((acc, expense) => {
-                const currency = expense.currency || preferences.currency || getPreferredCurrency();
+                const currency = expense.currency || preferences.currency || DEFAULT_CURRENCY;
                 acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
                 return acc;
             }, {});
@@ -372,7 +375,7 @@ const ProjectDashboard = ({
             tasks,
             timeEntries,
             clients,
-            preferences.currency || getPreferredCurrency()
+            preferences.currency || DEFAULT_CURRENCY
         );
     }, [clients, preferences.currency, project, tasks, timeEntries]);
 
@@ -452,7 +455,7 @@ const ProjectDashboard = ({
                                 )}
                                 {project.hourlyRate && !project.flatRate && (
                                     <span className="sensitive-data">
-                                        {`${getCurrencySymbol(getProjectCurrency(project, clients))}${project.hourlyRate}/${getProjectCurrency(project, clients)} per hour`}
+                                        {`${getCurrencySymbol(projectCurrency)}${project.hourlyRate}/${projectCurrency} per hour`}
                                     </span>
                                 )}
                             </p>
@@ -600,7 +603,7 @@ const ProjectDashboard = ({
                                         <div className="flex items-center text-sm text-muted-foreground">
                                             <CurrencyDollarIcon className="h-4 w-4 mr-2" />
                                             <span className="sensitive-data text-foreground font-semibold">
-                                                {formatCurrency(projectMetrics.potentialRevenue, getProjectCurrency(project, clients))}
+                                                {formatCurrency(projectMetrics.potentialRevenue, projectCurrency)}
                                             </span>
                                         </div>
                                         {projectExpenses.length > 0 && (
@@ -628,7 +631,7 @@ const ProjectDashboard = ({
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Pending</dt>
                                         <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                             <span className="sensitive-data">
-                                                {formatCurrency(projectMetrics.pendingAmount, getProjectCurrency(project, clients))}
+                                                {formatCurrency(projectMetrics.pendingAmount, projectCurrency)}
                                             </span>
                                         </dd>
                                     </dl>
@@ -670,7 +673,7 @@ const ProjectDashboard = ({
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Paid Revenue</dt>
                                         <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
                                             <span className="sensitive-data">
-                                                {formatCurrency(projectMetrics.totalRevenue, getProjectCurrency(project, clients))}
+                                                {formatCurrency(projectMetrics.totalRevenue, projectCurrency)}
                                             </span>
                                         </dd>
                                     </dl>

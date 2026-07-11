@@ -636,6 +636,31 @@ describe('agent bridge websocket helpers', () => {
         }
     });
 
+    it('rejects a persistent approval grant issued to a different agent identity', () => {
+        const bridge = new LocalAgentBridge({
+            host: '127.0.0.1',
+            port: 0,
+            agentId: 'tasktime.agent.expected',
+        });
+
+        (bridge as any).approvalGrants.set('grant-other-agent', {
+            id: 'grant-other-agent',
+            clientId: 'tasktime.agent.other',
+            label: 'Other agent',
+            scopes: ['read', 'billing'],
+            secretKeyBase64Url: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+            createdAt: 1_700_000_000_000,
+            expiresAt: null,
+        });
+
+        expect(() => bridge.createApprovalToken({
+            grantId: 'grant-other-agent',
+            command: 'mark_invoice_paid',
+            inputHash: 'sha256:paid',
+            scopes: ['read', 'billing'],
+        })).toThrow(/different agent identity/);
+    });
+
     it('stores approval grants delivered by an authenticated paired app session', async () => {
         const bridge = new LocalAgentBridge({
             host: '127.0.0.1',

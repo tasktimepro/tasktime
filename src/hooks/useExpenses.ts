@@ -500,7 +500,7 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         paidExpenses,
         unbilledExpenses,
         billedExpenses,
-        isLoading: isLoading || (options.includeArchived && archivedLoading),
+        isLoading: isLoading || Boolean(options.includeArchived && (archivedLoading || !archivedLoaded)),
         totals,
 
         getExpense,

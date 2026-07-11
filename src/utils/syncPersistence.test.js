@@ -102,6 +102,18 @@ describe('syncPersistence', () => {
         expect(state.syncStartedAt).toBeNull();
     });
 
+    it('creates durable retry evidence when a pull-only sync fails', () => {
+        markSyncStarted();
+        markSyncFailed();
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            syncInterrupted: false,
+            syncStartedAt: null,
+        }));
+        expect(shouldSyncOnLoad()).toBe(true);
+    });
+
     it('detects when sync should run on load', () => {
         expect(shouldSyncOnLoad()).toBe(false);
 

@@ -92,18 +92,12 @@ export const formatCurrency = (amount: number, currencyCode: string | null | und
 };
 
 /**
- * Get the user's preferred currency from localStorage
- * @returns {string} The preferred currency code (default: 'EUR')
+ * Compatibility fallback for callers without preference context. Persisted
+ * preference ownership belongs to the Yjs preferences hook; finance paths
+ * must pass that value explicitly instead of consulting legacy localStorage.
  */
 export const getPreferredCurrency = (): string => {
-    try {
-        const preferences = JSON.parse(localStorage.getItem('preferences') || '{}') as Preferences;
-        const saved = normalizeCurrencyCode(preferences.currency);
-        return saved && CURRENCY_SYMBOLS[saved] ? saved : DEFAULT_CURRENCY;
-    } catch (error) {
-        console.warn('Error parsing preferences from localStorage:', error);
-        return DEFAULT_CURRENCY;
-    }
+    return DEFAULT_CURRENCY;
 };
 
 /**
@@ -115,30 +109,22 @@ export const getPreferredCurrency = (): string => {
  */
 export const getProjectCurrency = (
     project: { preferredClientId?: string | null },
-    clients: Array<{ id: string; defaultCurrency?: string | null }> | null | undefined
+    clients: Array<{ id: string; defaultCurrency?: string | null }> | null | undefined,
+    fallbackCurrency?: string
 ): string => {
+    const normalizedFallback = normalizeCurrencyCode(fallbackCurrency || getPreferredCurrency());
+    const resolvedFallback = normalizedFallback && CURRENCY_SYMBOLS[normalizedFallback]
+        ? normalizedFallback
+        : DEFAULT_CURRENCY;
+
     if (project.preferredClientId && clients && clients.length > 0) {
         const client = clients.find(c => c.id === project.preferredClientId);
         const clientCurrency = normalizeCurrencyCode(client?.defaultCurrency);
         return clientCurrency && CURRENCY_SYMBOLS[clientCurrency]
             ? clientCurrency
-            : getPreferredCurrency();
+            : resolvedFallback;
     }
-    return getPreferredCurrency();
-};
-
-/**
- * Set the user's preferred currency in localStorage
- * @param {string} currencyCode - The currency code to save
- */
-export const setPreferredCurrency = (currencyCode: string): void => {
-    try {
-        const preferences = JSON.parse(localStorage.getItem('preferences') || '{}') as Preferences;
-        preferences.currency = normalizeCurrencyCode(currencyCode);
-        localStorage.setItem('preferences', JSON.stringify(preferences));
-    } catch (error) {
-        console.warn('Error saving preferences to localStorage:', error);
-    }
+    return resolvedFallback;
 };
 
 /**
