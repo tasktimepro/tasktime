@@ -137,12 +137,19 @@ describe('Account', () => {
     it('renders persistent GitHub, privacy, and terms links', () => {
         renderAccount();
 
+        const xLink = screen.getByRole('link', { name: 'TaskTime Pro on X' });
         const githubLink = screen.getByRole('link', { name: 'TaskTime Pro on GitHub' });
         const privacyLink = screen.getByRole('link', { name: 'Privacy Policy' });
         const termsLink = screen.getByRole('link', { name: 'Terms & Conditions' });
 
         expect(githubLink.getAttribute('href')).toBe('https://github.com/tasktimepro/tasktime');
         expect(githubLink.getAttribute('target')).toBe('_blank');
+        expect(xLink).toHaveClass('text-muted-foreground');
+        expect(githubLink).toHaveClass('text-foreground');
+        expect(xLink).not.toHaveClass('hover:text-primary');
+        expect(githubLink).not.toHaveClass('hover:text-primary');
+        expect(privacyLink).toHaveClass('text-muted-foreground', 'hover:text-foreground');
+        expect(privacyLink).not.toHaveClass('underline');
         expect(privacyLink.getAttribute('href')).toBe('/privacy/');
         expect(termsLink.getAttribute('href')).toBe('/terms/');
         expect(privacyLink.getAttribute('target')).toBe('_blank');

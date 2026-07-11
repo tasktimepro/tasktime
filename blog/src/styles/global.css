@@ -170,14 +170,19 @@ img {
     justify-content: center;
 }
 
-.footer-icon-link img {
+.footer-icon-link img,
+.footer-icon-link svg {
     display: block;
     height: 1.5rem;
     width: 1.5rem;
 }
 
+.footer-links .footer-icon-link--github {
+    color: var(--foreground);
+}
+
 .site-nav a:hover,
-.footer-links a:hover,
+.footer-links a:not(.footer-icon-link):hover,
 .post-card:hover h2,
 .article-content a:hover {
     color: var(--foreground);

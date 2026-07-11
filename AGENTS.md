@@ -1,7 +1,7 @@
 # Agent Instructions for TaskTime Pro
 
 > **Purpose:** Guidelines and context for AI agents working on this codebase  
-> **Last Updated:** July 10, 2026
+> **Last Updated:** July 12, 2026
 
 ---
 
@@ -18,6 +18,7 @@
 5. **No automatic destructive sync actions** — Resets, claim states, archive moves, and billing mutations must be explicit and reversible where practical
 6. **Legacy code can be removed only after migration** — Delete old implementations after the replacement safely handles existing data
 7. **Per-file test coverage ≥ 70%** — For `src/hooks/**` and `src/utils/**`, each file must meet at least 75% coverage
+8. **Repository writes require explicit user approval** — Leave changes uncommitted for review. Do not commit, push, tag, create GitHub releases, publish packages, or invoke production deployment workflows unless the user explicitly asks for that specific action.
 
 ---
 

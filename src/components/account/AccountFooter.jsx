@@ -15,27 +15,27 @@ const AccountFooter = ({ className }) => {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
                 <a
                     href="https://x.com/tasktimepro"
-                    className="inline-flex items-center justify-center text-foreground hover:text-primary"
+                    className="inline-flex items-center justify-center text-muted-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
                     aria-label="TaskTime Pro on X"
                 >
-                    <img src="/x.svg" alt="" aria-hidden="true" className="h-6 w-6" />
+                    <img src="/x.svg" alt="" aria-hidden="true" className="h-5 w-5" />
                 </a>
                 <a
                     href="https://github.com/tasktimepro/tasktime"
-                    className="inline-flex items-center justify-center text-foreground hover:text-primary"
+                    className="inline-flex items-center justify-center text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
                     aria-label="TaskTime Pro on GitHub"
                 >
-                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="h-6 w-6">
-                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+                    <svg viewBox="0 0 25 25" fill="currentColor" aria-hidden="true" className="h-6 w-6">
+                        <path d="M12 2C6.477 2 2 6.596 2 12.265c0 4.535 2.865 8.382 6.839 9.74.5.095.682-.223.682-.495 0-.245-.008-.894-.013-1.754-2.782.617-3.369-1.387-3.369-1.387-.455-1.184-1.11-1.5-1.11-1.5-.908-.637.068-.624.068-.624 1.004.072 1.531 1.056 1.531 1.056.892 1.568 2.341 1.115 2.91.853.091-.665.35-1.116.636-1.373-2.22-.259-4.555-1.14-4.555-5.074 0-1.12.389-2.036 1.028-2.753-.103-.259-.446-1.301.098-2.711 0 0 .839-.276 2.75 1.052A9.325 9.325 0 0 1 12 6.836a9.29 9.29 0 0 1 2.504.349c1.91-1.328 2.747-1.052 2.747-1.052.546 1.41.203 2.452.1 2.711.64.717 1.026 1.633 1.026 2.753 0 3.944-2.339 4.812-4.566 5.066.359.317.679.943.679 1.9 0 1.371-.012 2.476-.012 2.813 0 .274.18.594.688.493A10.291 10.291 0 0 0 22 12.265C22 6.596 17.523 2 12 2Z" />
                     </svg>
                 </a>
                 <a
                     href="/blog/"
-                    className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                    className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
                 >
@@ -43,7 +43,7 @@ const AccountFooter = ({ className }) => {
                 </a>
                 <a
                     href="/contact/"
-                    className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                    className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
                 >
@@ -51,7 +51,7 @@ const AccountFooter = ({ className }) => {
                 </a>
                 <a
                     href="/privacy/"
-                    className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                    className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
                 >
@@ -59,7 +59,7 @@ const AccountFooter = ({ className }) => {
                 </a>
                 <a
                     href="/terms/"
-                    className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                    className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
                 >
