@@ -49,14 +49,18 @@ Mode rules:
 Sync must stay fast and Worker-friendly.
 
 - Normal sync checks manifest `modifiedTime` first.
+- A clean foreground event inside the cooldown makes zero Worker/Drive requests.
+- After the cooldown, a clean unchanged check makes at most one manifest-metadata request. A successful no-op check advances the local cooldown timestamp.
 - If the manifest is unchanged, do not download document files.
+- An unchanged check must not upload documents, save the manifest, list backups, or list the full appDataFolder.
 - Do not call full appDataFolder listing on unchanged/no-op syncs. A manifest write may list files once to merge concurrent writer evidence safely.
 - `listAppDataFiles()` is for connect/load, backup listing, wipe, and stale-file recovery.
 - Keep periodic sync at 15 minutes unless there is a measured reason to change it.
 - Keep foreground sync cooldowns so focus/online events do not spam the Worker.
 - Use Web Locks to avoid duplicate cross-tab sync.
 - Use one merged delta per queued doc batch instead of uploading every Yjs update separately.
-- Only run full-state upload when required: initial state, disconnected dirty docs, interrupted sync recovery, or compaction.
+- Only run full-state upload when required: initial state, the exact disconnected dirty docs, legacy boolean-only dirty recovery, explicit verification, or compaction. A pull/consistency retry alone is not local dirty evidence.
+- Page hide or exit during an active sync must not enqueue another forced sync; the active pass and durable recovery state already own the work.
 
 Reliability can add checks, but heavy checks must stay off the normal no-change path.
 
@@ -66,6 +70,7 @@ Reliability can add checks, but heavy checks must stay off the normal no-change 
 - Remote updates should be rejected only if the binary update is corrupt.
 - Reference-integrity validation warnings must not block CRDT convergence.
 - Invalid entities should be filtered or normalized at read/import boundaries.
+- Persisted-data normalization and cross-document reconciliation must be idempotent and emit no Yjs update once data is settled.
 - Cross-document references can be temporarily incomplete while lazy docs load.
 - Do not add non-CRDT overwrite behavior for normal sync.
 
@@ -84,8 +89,9 @@ Reliability can add checks, but heavy checks must stay off the normal no-change 
 ## Pending Local Changes
 
 - Local Yjs updates are queued as pending deltas while connected.
-- Local edits made while Drive is disconnected are tracked as disconnected dirty docs in localStorage.
+- Local edits made while Drive is disconnected are tracked by document name as disconnected dirty docs in localStorage.
 - Dirty docs must be marked for full-state upload on reconnect.
+- Failed pull/consistency work uses retry evidence separate from dirty-document evidence.
 - Dirty markers may clear only after Drive is not `offline` or `error` and the provider reports no local changes left to push.
 - Failed sync must not make UI flows behave as if sync succeeded.
 

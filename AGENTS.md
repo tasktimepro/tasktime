@@ -201,8 +201,11 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 - **Manual = user-controlled.** Only "Sync Now" triggers sync after setup. Page reload and reconnect normally only establish the Drive connection without pulling or pushing, except a pristine first device may do one bootstrap pull so existing Drive data appears immediately.
 - **Pull efficiency:** Before downloading, a lightweight `modifiedTime` metadata check determines if the manifest changed. No download if unchanged.
 - **Pull throttle:** 30 seconds — skips manifest reload if no local changes and last pull was recent.
+- **Foreground request budget:** A clean focus/online event inside the 60-second cooldown makes zero Worker/Drive requests. Once stale, an unchanged clean check makes one manifest-metadata request, advances the local cooldown, and performs no document transfer, manifest save, backup listing, or full app-data listing.
 - **Cross-tab lock:** Web Locks API prevents duplicate syncs across tabs.
-- **Reconnect push:** Dirty docs tracked in localStorage; pushed as full-state on next connect regardless of mode.
+- **Page-exit serialization:** Hiding or exiting during an active sync does not enqueue a second forced pass.
+- **Reconnect push:** Dirty docs are tracked by document name in localStorage and only those docs are pushed as full-state on next connect regardless of mode. Pull/consistency retries remain separate from local-dirty evidence; legacy boolean-only markers are conservatively supported.
+- **Idempotent reconciliation:** Archive and persisted-record reconciliation emits no Yjs update after records are already settled.
 - **Never auto-sync destructive resets across devices** — e.g., `resetExpiredSkips` must not undo a valid skip from another device.
 
 ### 🔐 Google Drive Auth - Cloudflare Worker
@@ -312,8 +315,6 @@ docker compose run --rm app npm run <script>
 
 | Document | Purpose |
 |----------|---------|
-| Private project overview | Full technical documentation, available only in the private infra/docs checkout |
-| Private Yjs sync plan | Yjs sync architecture notes, available only in the private infra/docs checkout |
 | `docs/agent-release-runbook.md` | Local MCP bridge, ClawHub skill, OpenClaw bundle, and Claude plugin publishing workflow |
 | `_implan.md` | Original project plan and preferences |
 | `README.md` | User-facing documentation |
@@ -329,14 +330,12 @@ docker compose run --rm app npm run <script>
 
 ## 💡 Tips for Future Sessions
 
-1. **Read the private project overview first when it exists locally** — It has the full architecture
-2. **Check this file for rules** — Especially the "no legacy code" rule
-3. **App.jsx uses Yjs hooks** — All state is managed by Yjs
-4. **Keep tests updated** — Add or adjust tests whenever behavior changes
-5. **Use Yjs hooks directly** — `useProjects()`, `useTasks()`, etc. from `src/hooks/`
-6. **Review the private Yjs sync plan when it exists locally** — Understand the CRDT-based sync system
-7. **Subtasks cannot be recurring** — The project UI disallows recurring subtasks; avoid adding recurring-specific logic to subtask components.
-8. **Keep the context layer current** — Update specifications, contracts, overview/map, and status when their governed behavior changes.
+1. **Check this file for rules** — Especially the "no legacy code" rule
+2. **App.jsx uses Yjs hooks** — All state is managed by Yjs
+3. **Keep tests updated** — Add or adjust tests whenever behavior changes
+4. **Use Yjs hooks directly** — `useProjects()`, `useTasks()`, etc. from `src/hooks/`
+5. **Subtasks cannot be recurring** — The project UI disallows recurring subtasks; avoid adding recurring-specific logic to subtask components.
+6. **Keep the context layer current** — Update specifications, contracts, overview/map, and status when their governed behavior changes.
 
 ---
 

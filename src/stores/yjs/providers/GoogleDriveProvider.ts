@@ -24,9 +24,10 @@ import {
     markSyncCompleted,
     markSyncFailed,
     hasPersistedPendingChanges,
-    wasSyncInterrupted,
     clearSyncPersistence,
     getSyncPersistenceState,
+    getPersistedPendingDocNames,
+    shouldSyncOnLoad,
 } from '@/utils/syncPersistence';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { PROJECT_NOTES_LOCAL_SAVE_ORIGIN } from '@/constants/syncOrigins';
@@ -173,11 +174,8 @@ export class YjsDriveProvider {
             }
         }
 
-        // Persisted sync flags do not retain per-document identity. Conservatively
-        // keep every loaded document dirty so reconnect can verify full state.
-        if (hasPersistedPendingChanges() || wasSyncInterrupted()) {
-            this.docManager.getLoadedDocs().forEach((docName) => pendingDocs.add(docName));
-        }
+        this.getPersistedLocalChangeDocNames(this.docManager.getLoadedDocs())
+            .forEach((docName) => pendingDocs.add(docName));
 
         return Array.from(pendingDocs);
     }
@@ -194,7 +192,7 @@ export class YjsDriveProvider {
 
         if (added) {
             this.log('sync: queued full-state verification upload', { docs: docNames });
-            markPendingChanges();
+            docNames.forEach((docName) => markPendingChanges(docName));
             this.updatePendingState();
         }
     }
@@ -269,6 +267,14 @@ export class YjsDriveProvider {
 
     private flushPendingChangesForPageExit(trigger: 'pagehide' | 'visibilitychange'): void {
         if (!this.connected || this.syncMode === 'manual') {
+            return;
+        }
+
+        // The active pass preserves updates that arrive while it is running and
+        // leaves durable interrupted/dirty evidence if the page actually exits.
+        // Starting another forced pass here creates a visibility feedback loop.
+        if (this.isSyncing) {
+            this.log('page exit: active sync already owns pending changes', { trigger, mode: this.syncMode });
             return;
         }
 
@@ -388,8 +394,9 @@ export class YjsDriveProvider {
 
     private updatePendingState(): void {
         const hasPendingInMemory = this.hasLocalChangesToPush();
-        // Also check persisted state for changes from previous sessions
-        const hasPersisted = hasPersistedPendingChanges() || wasSyncInterrupted();
+        // Pull/consistency retries remain visible without pretending they are
+        // unsynced local documents.
+        const hasPersisted = shouldSyncOnLoad();
         const hasPending = hasPendingInMemory || hasPersisted;
         
         if (hasPending === this.pendingChanges) {
@@ -403,15 +410,22 @@ export class YjsDriveProvider {
     }
 
     private promotePersistedLocalChangesToFullState(loadedDocs: DocName[]): void {
-        const hasOnlyPersistedLocalChanges = (hasPersistedPendingChanges() || wasSyncInterrupted()) && !this.hasPendingDeltas();
+        const persistedDocNames = this.getPersistedLocalChangeDocNames(loadedDocs);
 
-        if (!hasOnlyPersistedLocalChanges || loadedDocs.length === 0) {
+        if (persistedDocNames.length === 0) {
             return;
         }
 
         let added = false;
 
-        for (const docName of loadedDocs) {
+        for (const docName of persistedDocNames) {
+            // A live delta queue already contains every update from this
+            // in-memory session. Full state is only needed when that queue was
+            // lost across reload/reconnect.
+            if ((this.pendingDeltas.get(docName)?.length ?? 0) > 0) {
+                continue;
+            }
+
             if (!this.forceFullStateDocs.has(docName)) {
                 this.forceFullStateDocs.add(docName);
                 added = true;
@@ -419,8 +433,30 @@ export class YjsDriveProvider {
         }
 
         if (added) {
-            this.log('sync: promoting persisted local changes to full-state upload', { docs: loadedDocs });
+            this.log('sync: promoting persisted local changes to full-state upload', { docs: persistedDocNames });
         }
+    }
+
+    private getPersistedLocalChangeDocNames(loadedDocs: DocName[]): DocName[] {
+        if (!hasPersistedPendingChanges()) {
+            return [];
+        }
+
+        const loadedDocSet = new Set(loadedDocs);
+        const persistedDocNames = getPersistedPendingDocNames();
+        const loadedPersistedDocNames = persistedDocNames
+            .filter((docName): docName is DocName => loadedDocSet.has(docName as DocName));
+
+        if (persistedDocNames.length > 0) {
+            // Exact identity may currently point only to lazy, unloaded docs.
+            // Keep those names persisted without promoting unrelated loaded docs.
+            return Array.from(new Set(loadedPersistedDocNames));
+        }
+
+        // Backwards compatibility for the previous boolean-only recovery
+        // record. Upgrade it conservatively once, then future writes retain
+        // exact document identity.
+        return [...loadedDocs];
     }
 
     /**
@@ -783,14 +819,16 @@ export class YjsDriveProvider {
         }, SYNC_INTERVAL_MS);
     }
 
-    /**
-     * Get last synced timestamp from manifest (ms since epoch)
-     */
+    /** Get the latest successful local check or manifest write timestamp. */
     getLastSyncedAt(): number | null {
         const lastSync = this.manifest.getLastSync();
-        if (!lastSync) return null;
-        const parsed = Date.parse(lastSync);
-        return Number.isNaN(parsed) ? null : parsed;
+        const parsedManifestTime = lastSync ? Date.parse(lastSync) : Number.NaN;
+        const manifestTime = Number.isNaN(parsedManifestTime) ? null : parsedManifestTime;
+        const localCompletedAt = getSyncPersistenceState().lastSyncCompletedAt;
+
+        if (manifestTime == null) return localCompletedAt;
+        if (localCompletedAt == null) return manifestTime;
+        return Math.max(manifestTime, localCompletedAt);
     }
 
     // =========================================================================
@@ -997,11 +1035,11 @@ export class YjsDriveProvider {
 
             this.initialRemoteReconciliationPending = false;
             this.setState('idle');
-            const hasRemainingLocalChanges = this.hasInMemoryLocalChangesToPush();
-            markSyncCompleted(); // Persist successful sync completion
-            if (hasRemainingLocalChanges) {
-                markPendingChanges();
-            }
+            const remainingInMemoryDocs = this.getInMemoryPendingDocNames();
+            const loadedDocSet = new Set(loadedDocs);
+            const unloadedPersistedDocs = getPersistedPendingDocNames()
+                .filter((docName) => !loadedDocSet.has(docName as DocName));
+            markSyncCompleted([...remainingInMemoryDocs, ...unloadedPersistedDocs]);
 
         } catch (error) {
             console.error('[YjsDriveProvider] Sync failed:', error);
@@ -1077,7 +1115,7 @@ export class YjsDriveProvider {
             return true;
         }
 
-        return hasPersistedPendingChanges() || wasSyncInterrupted();
+        return hasPersistedPendingChanges();
     }
 
     /**
@@ -1463,7 +1501,7 @@ export class YjsDriveProvider {
             this.log('doc update queued', { docName, pending: this.pendingDeltas.get(docName)?.length });
 
             // Persist that we have pending changes (survives page refresh)
-            markPendingChanges();
+            markPendingChanges(docName);
 
             this.updatePendingState();
 

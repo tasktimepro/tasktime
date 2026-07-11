@@ -111,6 +111,22 @@ function chooseFreshestEntity<T extends ArchiveEntity>(active: T, archived: T): 
     return entityFreshness(active) > entityFreshness(archived) ? active : archived;
 }
 
+function areRecordsEquivalent(
+    left: Record<string, unknown> | null | undefined,
+    right: Record<string, unknown> | null | undefined,
+): boolean {
+    if (!left || !right) return left === right;
+
+    const leftKeys = Object.keys(left).filter((key) => left[key] !== undefined);
+    const rightKeys = Object.keys(right).filter((key) => right[key] !== undefined);
+
+    return leftKeys.length === rightKeys.length
+        && leftKeys.every((key) => (
+            Object.prototype.hasOwnProperty.call(right, key)
+            && JSON.stringify(left[key]) === JSON.stringify(right[key])
+        ));
+}
+
 export class YjsStore {
 
     private docManager: YjsDocManager;
@@ -787,11 +803,15 @@ export class YjsStore {
             };
 
             if (targetDoc === 'core') {
-                (activeMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
-                archivedMap.delete(id);
+                if (!areRecordsEquivalent(active as unknown as Record<string, unknown>, reconciled as unknown as Record<string, unknown>)) {
+                    (activeMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
+                }
+                if (archived) archivedMap.delete(id);
             } else {
-                (archivedMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
-                activeMap.delete(id);
+                if (!areRecordsEquivalent(archived as unknown as Record<string, unknown>, reconciled as unknown as Record<string, unknown>)) {
+                    (archivedMap as any).set(id, objectToYMap(reconciled as unknown as Record<string, unknown>));
+                }
+                if (active) activeMap.delete(id);
             }
         }
     }
@@ -948,7 +968,12 @@ export class YjsStore {
                     normalized,
                     `normalize persisted invoice ${id}`,
                 );
-                (invoiceMap as any).set(id, objectToYMap(validated as unknown as Record<string, unknown>));
+                if (!areRecordsEquivalent(
+                    invoice as unknown as Record<string, unknown>,
+                    validated as unknown as Record<string, unknown>,
+                )) {
+                    (invoiceMap as any).set(id, objectToYMap(validated as unknown as Record<string, unknown>));
+                }
             } catch (error) {
                 console.warn(`[YjsStore] Unable to normalize legacy invoice ${id}:`, error);
             }

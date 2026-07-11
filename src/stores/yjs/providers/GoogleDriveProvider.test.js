@@ -180,7 +180,10 @@ describe('YjsDriveProvider', () => {
         await provider.sync(true, { allowPull: false })
 
         expect(provider.getState()).toBe('error')
-        expect(JSON.parse(localStorage.getItem('tasktime-sync-state')).hasPendingChanges).toBe(true)
+        expect(JSON.parse(localStorage.getItem('tasktime-sync-state'))).toEqual(expect.objectContaining({
+            hasPendingChanges: false,
+            needsRetry: true,
+        }))
     })
 
     it('does not create missing remote docs during manual-mode bootstrap pull', async () => {
@@ -288,7 +291,7 @@ describe('YjsDriveProvider', () => {
         }
     })
 
-    it('flushes pending changes on pagehide even while a sync is already running', async () => {
+    it('does not enqueue another pagehide flush while a sync is already running', async () => {
         const liveDoc = new Y.Doc()
         const provider = createProviderWithCoreDoc(liveDoc)
 
@@ -310,7 +313,7 @@ describe('YjsDriveProvider', () => {
 
         window.dispatchEvent(new Event('pagehide'))
 
-        expect(syncSpy).toHaveBeenCalledWith(true, { allowPull: false })
+        expect(syncSpy).not.toHaveBeenCalled()
 
         provider.disconnect()
     })
@@ -483,6 +486,132 @@ describe('YjsDriveProvider', () => {
         provider.verifyFullStateDocs.add('tasks-archived')
 
         expect(provider.getPendingDocNames()).toEqual(['core', 'entries-active', 'tasks-archived'])
+    })
+
+    it('recovers only the persisted documents that actually changed', () => {
+        const coreDoc = new Y.Doc()
+        const entriesDoc = new Y.Doc()
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => ['core', 'entries-active', 'tasks-archived'],
+            getDocSync: (name) => name === 'core' ? coreDoc : entriesDoc,
+        }, 'playwright-access-token')
+
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: true,
+            pendingDocNames: ['entries-active'],
+            needsRetry: false,
+            syncInterrupted: false,
+            syncStartedAt: null,
+            lastSyncCompletedAt: null,
+        }))
+
+        expect(provider.getPendingDocNames()).toEqual(['entries-active'])
+
+        provider.promotePersistedLocalChangesToFullState(['core', 'entries-active', 'tasks-archived'])
+
+        expect(Array.from(provider.forceFullStateDocs)).toEqual(['entries-active'])
+    })
+
+    it('does not promote loaded documents when exact dirty identity belongs to an unloaded lazy document', () => {
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => ['core', 'entries-active'],
+            getDocSync: () => new Y.Doc(),
+        }, 'playwright-access-token')
+
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: true,
+            pendingDocNames: ['entries-2024'],
+            needsRetry: false,
+            syncInterrupted: false,
+            syncStartedAt: null,
+            lastSyncCompletedAt: null,
+        }))
+
+        provider.promotePersistedLocalChangesToFullState(['core', 'entries-active'])
+
+        expect(provider.getPendingDocNames()).toEqual([])
+        expect(Array.from(provider.forceFullStateDocs)).toEqual([])
+    })
+
+    it('does not treat an interrupted pull-only check as unsynced local data', () => {
+        const coreDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(coreDoc)
+
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+            needsRetry: false,
+            syncInterrupted: true,
+            syncStartedAt: Date.now(),
+            lastSyncCompletedAt: null,
+        }))
+
+        expect(provider.hasLocalChangesToPush()).toBe(false)
+        expect(provider.getPendingDocNames()).toEqual([])
+    })
+
+    it('uses the latest successful local check for the foreground cooldown timestamp', () => {
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+        const localCompletedAt = Date.parse('2026-07-11T17:10:00.000Z')
+
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+            needsRetry: false,
+            syncInterrupted: false,
+            syncStartedAt: null,
+            lastSyncCompletedAt: localCompletedAt,
+        }))
+        provider.manifest = {
+            getLastSync: vi.fn(() => '2026-07-11T16:00:00.000Z'),
+        }
+
+        expect(provider.getLastSyncedAt()).toBe(localCompletedAt)
+    })
+
+    it('uses zero Drive requests inside the cooldown and one metadata request for a stale clean check', async () => {
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+        const hasManifestChanged = vi.fn(async () => false)
+        const saveManifest = vi.fn(async () => {})
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.manifest = {
+            hasManifestChanged,
+            isDirty: vi.fn(() => false),
+            save: saveManifest,
+        }
+        provider.syncDoc = vi.fn(async () => {})
+
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+            needsRetry: false,
+            syncInterrupted: false,
+            syncStartedAt: null,
+            lastSyncCompletedAt: Date.now(),
+        }))
+
+        await provider.sync(false, { allowPull: true })
+
+        expect(hasManifestChanged).not.toHaveBeenCalled()
+        expect(provider.syncDoc).not.toHaveBeenCalled()
+
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+            needsRetry: false,
+            syncInterrupted: false,
+            syncStartedAt: null,
+            lastSyncCompletedAt: Date.now() - 61_000,
+        }))
+
+        await provider.sync(false, { allowPull: true })
+        await provider.sync(false, { allowPull: true })
+
+        expect(hasManifestChanged).toHaveBeenCalledTimes(1)
+        expect(provider.syncDoc).toHaveBeenCalledTimes(1)
+        expect(saveManifest).not.toHaveBeenCalled()
     })
 
     it('keeps durable pending state when a queued delta upload fails during sync', async () => {

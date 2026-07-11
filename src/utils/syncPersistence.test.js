@@ -8,6 +8,8 @@ import {
     markSyncFailed,
     shouldSyncOnLoad,
     hasPersistedPendingChanges,
+    getPersistedPendingDocNames,
+    hasPersistedRetryNeeded,
     wasSyncInterrupted,
     clearSyncPersistence,
 } from './syncPersistence';
@@ -19,6 +21,8 @@ describe('syncPersistence', () => {
         syncInterrupted: false,
         syncStartedAt: null,
         lastSyncCompletedAt: null,
+        pendingDocNames: [],
+        needsRetry: false,
     };
 
     const originalLocalStorage = global.localStorage;
@@ -63,15 +67,21 @@ describe('syncPersistence', () => {
             syncInterrupted: false,
             syncStartedAt: null,
             lastSyncCompletedAt: null,
+            pendingDocNames: [],
+            needsRetry: false,
         });
     });
 
     it('marks and clears pending changes', () => {
-        markPendingChanges();
+        markPendingChanges('core');
+        markPendingChanges('entries-active');
+        markPendingChanges('core');
         expect(getSyncPersistenceState().hasPendingChanges).toBe(true);
+        expect(getPersistedPendingDocNames()).toEqual(['core', 'entries-active']);
 
         clearPendingChanges();
         expect(getSyncPersistenceState().hasPendingChanges).toBe(false);
+        expect(getPersistedPendingDocNames()).toEqual([]);
     });
 
     it('marks sync started and completed', () => {
@@ -89,6 +99,8 @@ describe('syncPersistence', () => {
         expect(completedState.syncStartedAt).toBeNull();
         expect(completedState.lastSyncCompletedAt).toBe(new Date('2026-01-20T10:05:00Z').getTime());
         expect(completedState.hasPendingChanges).toBe(false);
+        expect(completedState.pendingDocNames).toEqual([]);
+        expect(completedState.needsRetry).toBe(false);
     });
 
     it('keeps pending changes when sync fails', () => {
@@ -107,10 +119,13 @@ describe('syncPersistence', () => {
         markSyncFailed();
 
         expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
-            hasPendingChanges: true,
+            hasPendingChanges: false,
             syncInterrupted: false,
             syncStartedAt: null,
+            pendingDocNames: [],
+            needsRetry: true,
         }));
+        expect(hasPersistedRetryNeeded()).toBe(true);
         expect(shouldSyncOnLoad()).toBe(true);
     });
 

@@ -56,8 +56,8 @@ Requirement identifiers are stable references for acceptance criteria, design do
 
 - **SYNC-1:** Keep core product behavior available offline and make connectivity state visible.
 - **SYNC-2:** Preserve the manual, backup, and sync trigger matrix documented in `AGENTS.md`.
-- **SYNC-3:** Keep normal Worker/Drive requests proportional to actual work. An unchanged/no-op sync uses manifest metadata, throttling, cooldowns, and cross-tab locking and must not list all app-data files, download documents, or upload state; heavier recovery requests require a correctness justification and request-count regression coverage.
-- **SYNC-4:** Serialize cross-tab synchronization and recover disconnected dirty documents on reconnect.
+- **SYNC-3:** Keep normal Worker/Drive requests proportional to actual work. A clean foreground event inside the cooldown makes zero requests. After the cooldown, a clean unchanged check makes at most one manifest-metadata request, records that successful check for the next cooldown, and performs no document download, upload, manifest save, backup listing, or full app-data listing. Heavier recovery requests require a correctness justification and request-count regression coverage.
+- **SYNC-4:** Serialize cross-tab synchronization, do not queue a second page-exit pass while one is active, persist dirty identity per document, and recover only affected disconnected documents on reconnect. Pull/consistency retries remain distinct from unsynced local data.
 - **SYNC-5:** Never auto-sync destructive resets or conflict decisions that can undo a valid change from another device.
 
 ## Agent access

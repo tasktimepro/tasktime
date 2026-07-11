@@ -19,6 +19,10 @@ export interface SyncPersistenceState {
     syncStartedAt: number | null;
     /** Timestamp of last successful sync completion */
     lastSyncCompletedAt: number | null;
+    /** Documents with local changes that may need full-state recovery after reload */
+    pendingDocNames: string[];
+    /** A pull or consistency failure that must retry even when no local upload is pending */
+    needsRetry: boolean;
 }
 
 const DEFAULT_STATE: SyncPersistenceState = {
@@ -26,7 +30,19 @@ const DEFAULT_STATE: SyncPersistenceState = {
     syncInterrupted: false,
     syncStartedAt: null,
     lastSyncCompletedAt: null,
+    pendingDocNames: [],
+    needsRetry: false,
 };
+
+function normalizeDocNames(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return Array.from(new Set(value.filter((item): item is string => (
+        typeof item === 'string' && item.length > 0
+    ))));
+}
 
 /**
  * Read the persisted sync state from localStorage
@@ -44,6 +60,8 @@ export function getSyncPersistenceState(): SyncPersistenceState {
             syncInterrupted: parsed.syncInterrupted ?? false,
             syncStartedAt: parsed.syncStartedAt ?? null,
             lastSyncCompletedAt: parsed.lastSyncCompletedAt ?? null,
+            pendingDocNames: normalizeDocNames(parsed.pendingDocNames),
+            needsRetry: parsed.needsRetry ?? false,
         };
     } catch (error) {
         console.warn('[syncPersistence] Error reading state:', error);
@@ -68,15 +86,26 @@ function updateSyncPersistenceState(updates: Partial<SyncPersistenceState>): voi
  * Mark that local changes exist and need to be synced
  * Call this when a Yjs doc update is queued
  */
-export function markPendingChanges(): void {
-    updateSyncPersistenceState({ hasPendingChanges: true });
+export function markPendingChanges(docName?: string): void {
+    const current = getSyncPersistenceState();
+    const pendingDocNames = docName
+        ? normalizeDocNames([...current.pendingDocNames, docName])
+        : current.pendingDocNames;
+
+    updateSyncPersistenceState({
+        hasPendingChanges: true,
+        pendingDocNames,
+    });
 }
 
 /**
  * Clear the pending changes flag after successful sync
  */
 export function clearPendingChanges(): void {
-    updateSyncPersistenceState({ hasPendingChanges: false });
+    updateSyncPersistenceState({
+        hasPendingChanges: false,
+        pendingDocNames: [],
+    });
 }
 
 /**
@@ -94,27 +123,30 @@ export function markSyncStarted(): void {
  * Mark that a sync has completed successfully
  * Call this at the end of a successful sync
  */
-export function markSyncCompleted(): void {
+export function markSyncCompleted(pendingDocNames: string[] = []): void {
+    const normalizedPendingDocNames = normalizeDocNames(pendingDocNames);
+
     updateSyncPersistenceState({
         syncInterrupted: false,
         syncStartedAt: null,
         lastSyncCompletedAt: Date.now(),
-        hasPendingChanges: false, // Sync completed means no pending changes
+        hasPendingChanges: normalizedPendingDocNames.length > 0,
+        pendingDocNames: normalizedPendingDocNames,
+        needsRetry: false,
     });
 }
 
 /**
- * Mark that a sync has failed (but we're still tracking state)
- * The pending changes flag remains true so we know to retry
+ * Mark that a sync has failed while preserving any existing local dirty docs.
+ * Pull-only and consistency failures use a separate retry flag.
  */
 export function markSyncFailed(): void {
     updateSyncPersistenceState({
         syncInterrupted: false,
         syncStartedAt: null,
-        // A pull or post-sync consistency phase can fail even when there was
-        // no local delta before the attempt. Persist retry evidence in every
-        // failure case so reload/reconnect cannot silently forget it.
-        hasPendingChanges: true,
+        // Keep local dirty evidence unchanged and separately retain pull or
+        // post-sync consistency failures that need another attempt.
+        needsRetry: true,
     });
 }
 
@@ -126,7 +158,7 @@ export function markSyncFailed(): void {
  */
 export function shouldSyncOnLoad(): boolean {
     const state = getSyncPersistenceState();
-    return state.syncInterrupted || state.hasPendingChanges;
+    return state.syncInterrupted || state.hasPendingChanges || state.needsRetry;
 }
 
 /**
@@ -134,6 +166,16 @@ export function shouldSyncOnLoad(): boolean {
  */
 export function hasPersistedPendingChanges(): boolean {
     return getSyncPersistenceState().hasPendingChanges;
+}
+
+/** Get the documents that contain local changes from a prior in-memory session. */
+export function getPersistedPendingDocNames(): string[] {
+    return getSyncPersistenceState().pendingDocNames;
+}
+
+/** Check whether a failed pull or consistency phase requires a retry. */
+export function hasPersistedRetryNeeded(): boolean {
+    return getSyncPersistenceState().needsRetry;
 }
 
 /**

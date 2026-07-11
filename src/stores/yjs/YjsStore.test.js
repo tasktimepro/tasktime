@@ -1538,6 +1538,67 @@ describe('YjsStore task hierarchy archiving', () => {
         store.destroy()
     })
 
+    it('does not rewrite an already reconciled task archive transition', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const activeMap = docs.get('core').getMap('tasks')
+        const archivedDoc = new Y.Doc()
+        docs.set('tasks-archived', archivedDoc)
+        const archivedMap = archivedDoc.getMap('tasks')
+
+        activeMap.set('task-1', objectToYMap({
+            id: 'task-1',
+            title: 'Already restored',
+            archived: false,
+            archivedOnDate: null,
+            _archiveTransition: {
+                operationId: 'unarchive-stable',
+                targetDoc: 'core',
+                changedAt: 200,
+            },
+        }))
+
+        const updates = []
+        docs.get('core').on('update', (update) => updates.push(update))
+
+        store.reconcileTaskArchiveTransitions(archivedMap)
+
+        expect(updates).toEqual([])
+        expect(activeMap.has('task-1')).toBe(true)
+        expect(archivedMap.has('task-1')).toBe(false)
+
+        store.destroy()
+    })
+
+    it('normalizes a legacy invoice only once', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        const invoiceMap = docs.get('core').getMap('invoices')
+        invoiceMap.set('invoice-legacy', objectToYMap({
+            id: 'invoice-legacy',
+            invoiceNumber: 'INV-LEGACY',
+            date: '2026-07-01',
+            project: { id: 'project-1', title: 'Legacy project' },
+            client: { id: 'client-1', title: 'Legacy client' },
+            status: 'sent',
+            tasks: [],
+            subtotal: 0,
+            totalAmount: 0,
+        }))
+
+        store.normalizePersistedInvoiceMap(invoiceMap)
+
+        const updates = []
+        docs.get('core').on('update', (update) => updates.push(update))
+        store.normalizePersistedInvoiceMap(invoiceMap)
+
+        expect(updates).toEqual([])
+
+        store.destroy()
+    })
+
     it('deduplicates partial historical entry archival without losing the fresher record', async () => {
         const store = new YjsStore()
         await store.initialize()

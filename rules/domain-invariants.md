@@ -1,6 +1,6 @@
 # TaskTime Pro Domain Invariants
 
-These invariants summarize critical production contracts. They supplement the detailed behavior in `AGENTS.md`, tests, code comments, public docs, and the private architecture material when available.
+These invariants summarize critical production contracts. They supplement the detailed behavior in `AGENTS.md`, tests, code comments, and public documentation.
 
 ## Persistence and sync
 
@@ -8,8 +8,11 @@ These invariants summarize critical production contracts. They supplement the de
 - Persisted schema changes are additive or migrated; readers tolerate supported historical shapes.
 - Old remote or backup state can return after a local upgrade, so compatibility belongs in validation, import, migration, and sync paths.
 - Manual, backup, and sync modes retain the trigger behavior documented in `AGENTS.md`.
-- Normal unchanged sync must remain Worker-efficient: use manifest metadata, throttles, cooldowns, and the cross-tab lock; do not list the full app-data folder, download documents, or upload state on a no-op path. Any additional normal-path request requires a correctness or measured reliability justification plus request-count regression coverage.
+- Normal unchanged sync must remain Worker-efficient. A foreground event inside the cooldown makes zero Worker/Drive requests. Once the cooldown expires, a clean unchanged check makes at most one lightweight manifest-metadata request, advances the local successful-check timestamp, and performs no document download, upload, manifest save, backup listing, or full app-data-folder listing. Any additional normal-path request requires a correctness or measured reliability justification plus request-count regression coverage.
+- Persist unsynced local identity per document. An interrupted pull or consistency retry is not evidence that every loaded document changed, and recovery must never promote unrelated documents to full-state upload. Boolean-only legacy recovery markers remain conservatively readable.
+- Page hide or exit while a sync is active must not enqueue a duplicate forced pass. The active pass owns updates produced during that pass, while durable per-document recovery owns genuinely interrupted local work.
 - A sync cannot report success until required cross-document reconciliation has completed and any deltas it creates have been flushed; failures retain durable retry evidence.
+- Reconciliation and persisted-data normalization are idempotent: once records are settled, another pass emits no Yjs changes and therefore schedules no upload.
 - Destructive resets, claims, archive moves, and conflict recovery must not auto-propagate in ways that undo valid work on another device.
 - Every persisted user-data collection must be represented in complete backup/export paths and in equivalent UI/agent reads where that capability is advertised.
 

@@ -31,6 +31,7 @@
     [ ] Glama
     [ ] MCP.so
 
+[ ] If we can't edit invoices after they were generated, then there's not point showing the edit in the dropdown - In my opinion if an invoices hasn't been marked as sent or paid, we should allow editing, but if you think that is not safe and might break history billing or other things, then let's just disable editing for all types altogether. Undo invoice remains available only to the latest invoice
 
 ---
 
