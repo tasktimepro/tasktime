@@ -699,13 +699,15 @@ const InvoicesList = ({
                                                         <span>Edit payment details</span>
                                                     </DropdownMenuItem>
                                                 )}
-                                                <DropdownMenuItem
-                                                    onClick={() => handleEdit(invoice)}
-                                                    className="cursor-pointer hover:bg-accent focus:bg-accent"
-                                                >
-                                                    <PencilIcon className="h-4 w-4 mr-2" />
-                                                    <span>Edit invoice</span>
-                                                </DropdownMenuItem>
+                                                {invoiceStatus === 'draft' && (
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleEdit(invoice)}
+                                                        className="cursor-pointer hover:bg-accent focus:bg-accent"
+                                                    >
+                                                        <PencilIcon className="h-4 w-4 mr-2" />
+                                                        <span>Edit invoice</span>
+                                                    </DropdownMenuItem>
+                                                )}
                                                 {invoiceCanBeUndone && (
                                                     <DropdownMenuItem
                                                         onClick={() => handleOpenUndoModal(invoice)}

@@ -116,6 +116,22 @@ describe('YjsSyncStatus', () => {
         expect(forceSyncDriveMock.mock.calls[0]).toEqual([])
     })
 
+    it('opens Cloud Sync settings when the status is clicked while Drive is connecting', async () => {
+        yjsState.isDriveConnected = false
+        yjsState.isConnecting = true
+
+        render(<YjsSyncStatus />)
+
+        const statusButton = screen.getByRole('button', { name: /syncing/i })
+
+        expect(statusButton).toBeEnabled()
+        await userEvent.click(statusButton)
+
+        expect(navigateToAccountMock).toHaveBeenCalledWith({ section: 'sync' })
+        expect(forceSyncDriveMock).not.toHaveBeenCalled()
+        expect(signInMock).not.toHaveBeenCalled()
+    })
+
     it('clears stale hover state when status changes to synced in compact mode', async () => {
         const user = userEvent.setup()
 

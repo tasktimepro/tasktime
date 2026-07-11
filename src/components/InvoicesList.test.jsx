@@ -611,7 +611,7 @@ describe('InvoicesList', () => {
         })
     })
 
-    it('blocks direct editing of paid invoices and requires an auditable reversal', async () => {
+    it('hides direct invoice editing for paid invoices', async () => {
 
         const onEditInvoice = vi.fn()
         const paidInvoice = { ...baseInvoice, id: 'inv-paid', status: 'paid' }
@@ -630,10 +630,34 @@ describe('InvoicesList', () => {
         )
 
         await user.click(screen.getByRole('button', { name: 'More actions' }))
+        expect(screen.queryByRole('menuitem', { name: 'Edit invoice' })).not.toBeInTheDocument()
+
+        expect(onEditInvoice).not.toHaveBeenCalled()
+        expect(toastMocks.showError).not.toHaveBeenCalled()
+    })
+
+    it('offers invoice editing for drafts', async () => {
+
+        const onEditInvoice = vi.fn()
+        const draftInvoice = { ...baseInvoice, id: 'inv-draft', status: 'draft' }
+
+        render(
+            <InvoicesList
+                projectInvoices={[draftInvoice]}
+                onEditInvoice={onEditInvoice}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="outstanding"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
         await user.click(screen.getByRole('menuitem', { name: 'Edit invoice' }))
 
-        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining('cannot be edited directly'))
-        expect(onEditInvoice).not.toHaveBeenCalled()
+        expect(onEditInvoice).toHaveBeenCalledWith(draftInvoice)
+        expect(toastMocks.showError).not.toHaveBeenCalled()
     })
 
     it('paginates outstanding invoices', async () => {

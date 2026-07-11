@@ -64,6 +64,8 @@ Sync must stay fast and Worker-friendly.
 
 Reliability can add checks, but heavy checks must stay off the normal no-change path.
 
+The visible sync-status control remains navigable to Account > Cloud Sync during loading, connecting, checking, downloading, uploading, and syncing. That navigation must not start another sync pass.
+
 ## Merge And Validation Rules
 
 - Yjs CRDT updates are the authority for normal concurrent edits/deletes.

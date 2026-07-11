@@ -252,7 +252,7 @@ test.describe('Invoices smoke', () => {
         await expect(timeEntriesDialog.getByText('Billed Time Entries')).toHaveCount(0);
     });
 
-    test('does not expose undo for paid invoices', async ({ page }) => {
+    test('does not expose undo or direct editing for paid invoices', async ({ page }) => {
         const now = Date.now();
         const projectTitle = `Playwright Paid Guard Invoice Project ${now}`;
         const clientTitle = `Playwright Paid Guard Invoice Client ${now}`;
@@ -280,7 +280,7 @@ test.describe('Invoices smoke', () => {
 
         await openInvoiceActionMenu(paidInvoiceCard);
         await expect(page.getByRole('menuitem', { name: 'Download' })).toBeVisible();
-        await expect(page.getByRole('menuitem', { name: 'Edit' })).toBeVisible();
+        await expect(page.getByRole('menuitem', { name: 'Edit' })).toHaveCount(0);
         await expect(page.getByRole('menuitem', { name: 'Undo' })).toHaveCount(0);
     });
 

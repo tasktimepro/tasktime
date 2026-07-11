@@ -614,6 +614,56 @@ describe('YjsDriveProvider', () => {
         expect(saveManifest).not.toHaveBeenCalled()
     })
 
+    it('does not report lock contention after a completed non-forced sync', async () => {
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.manifest = {
+            hasManifestChanged: vi.fn(async () => false),
+            isDirty: vi.fn(() => false),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+
+        const logSpy = vi.spyOn(provider, 'log')
+
+        await provider.sync(false, { allowPull: true })
+
+        expect(provider.syncDoc).toHaveBeenCalledTimes(1)
+        expect(logSpy).not.toHaveBeenCalledWith('sync: skipped, sync lock is currently held')
+    })
+
+    it('reports lock contention only when the Web Lock is actually unavailable', async () => {
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+        const originalLocksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
+        const request = vi.fn(async (_name, _options, callback) => callback(null))
+
+        Object.defineProperty(navigator, 'locks', {
+            configurable: true,
+            value: { request },
+        })
+
+        try {
+            provider.connected = true
+            provider.isOnline = () => true
+            provider.syncDoc = vi.fn(async () => {})
+
+            const logSpy = vi.spyOn(provider, 'log')
+
+            await provider.sync(false, { allowPull: true })
+
+            expect(request).toHaveBeenCalledTimes(1)
+            expect(provider.syncDoc).not.toHaveBeenCalled()
+            expect(logSpy).toHaveBeenCalledWith('sync: skipped, sync lock is currently held')
+        } finally {
+            if (originalLocksDescriptor) {
+                Object.defineProperty(navigator, 'locks', originalLocksDescriptor)
+            } else {
+                delete navigator.locks
+            }
+        }
+    })
+
     it('keeps durable pending state when a queued delta upload fails during sync', async () => {
         const liveDoc = new Y.Doc()
         const provider = createProviderWithCoreDoc(liveDoc)

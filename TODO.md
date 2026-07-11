@@ -4,24 +4,15 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
-[x] Add explicit UI-versus-agent timer parity tests for start, pause, resume, stop, and resulting time-entry data
-
 [ ] Centralize remaining shared UI/agent operations in separate controlled updates
     [ ] Timer lifecycle and stop recovery — the highest-priority shared operation
     [ ] Manual time-entry validation — overlaps, billing cutoff, duration fields, updates, and deletion
     [ ] Task completion and recurring-task state — completion dates, skipping, and stale-skip reconciliation
     [ ] Task/project/client creation and updates where relationship invariants apply
 
-[x] docs/todo/local-agent-bridge-proposal.md
-    [x] Make sure this is full-parity with UI and that the agent can really do anything a user can do currently
-    [x] Add public Astro agent docs at `/agents/` with `llms.txt`, generated MCP tool JSON, and Skill/OpenClaw pointers
-    [x] Prepare final MCP/OpenClaw skill and plugin for publishing package metadata and so on
-    [x] Publish everything under the new github org /tasktimepro in clawhub
-        [x] Canonical ClawHub skill: @tasktimepro/tasktime-agent (legacy @tasktimepro/tasktime and @tasktimepro/tasktime-pro redirect here)
-
-    [ ] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
-        - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
-        - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
+[ ] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
+    - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
+    - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
 
 [ ] Publish in more places:
     [ ] PulseMCP - VERIFY AUTO LISTING
@@ -30,8 +21,6 @@
         [ ] MCP
     [ ] Glama
     [ ] MCP.so
-
-[ ] If we can't edit invoices after they were generated, then there's not point showing the edit in the dropdown - In my opinion if an invoices hasn't been marked as sent or paid, we should allow editing, but if you think that is not safe and might break history billing or other things, then let's just disable editing for all types altogether. Undo invoice remains available only to the latest invoice
 
 ---
 

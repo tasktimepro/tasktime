@@ -81,9 +81,13 @@ function captureDriveIncident({
  * - ifAvailable=false: wait for lock (for force/manual syncs)
  * Falls back to no-op on browsers without Web Locks API.
  */
-async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Promise<T | undefined> {
+type SyncLockResult<T> =
+    | { acquired: true; value: T }
+    | { acquired: false };
+
+async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Promise<SyncLockResult<T>> {
     if (typeof navigator === 'undefined' || !navigator.locks) {
-        return fn();
+        return { acquired: true, value: await fn() };
     }
 
     return navigator.locks.request(
@@ -91,10 +95,10 @@ async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Pro
         { ifAvailable: !wait },
         async (lock) => {
             if (!lock) {
-                return undefined; // Another tab holds the lock
+                return { acquired: false } as const;
             }
 
-            return fn();
+            return { acquired: true, value: await fn() } as const;
         },
     );
 }
@@ -883,10 +887,10 @@ export class YjsDriveProvider {
         }
 
         // Acquire cross-tab lock (skip if another tab is syncing, unless force)
-        const result = await withSyncLock(() => this.syncInner(force, options), force);
+        const lockResult = await withSyncLock(() => this.syncInner(force, options), force);
 
-        if (result === undefined && !force) {
-            this.log('sync: skipped, another tab holds the sync lock');
+        if (!lockResult.acquired && !force) {
+            this.log('sync: skipped, sync lock is currently held');
         }
     }
 

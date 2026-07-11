@@ -21,4 +21,5 @@ Keep every primary work area reachable while preserving context for running time
 - Back/forward and deep links update content through `useUrlState`.
 - Missing project/client deep links return to their collection rather than rendering stale detail.
 - Offline and sync status remain visible without blocking local work.
+- The visible sync-status control remains actionable during loading and active sync states, opening Account > Cloud Sync for progress and recovery details without starting another sync.
 - Public Astro/static routes must never be swallowed by the SPA shell.

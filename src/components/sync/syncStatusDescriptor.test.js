@@ -32,6 +32,7 @@ describe('getYjsSyncStatusDescriptor', () => {
         })
 
         expect(result.kind).toBe(SYNC_STATUS_KIND.LOADING)
+        expect(result.onClick).toBe(baseArgs.onCloudOptions)
     })
 
     it('skips loading gate when auth is loading but Drive is already connected', () => {
@@ -53,6 +54,7 @@ describe('getYjsSyncStatusDescriptor', () => {
         })
 
         expect(result.kind).toBe(SYNC_STATUS_KIND.CONNECTING)
+        expect(result.onClick).toBe(baseArgs.onCloudOptions)
     })
 
     it('shows LOADING when auth is loading and Drive is not connected or connecting', () => {
@@ -64,6 +66,7 @@ describe('getYjsSyncStatusDescriptor', () => {
         })
 
         expect(result.kind).toBe(SYNC_STATUS_KIND.LOADING)
+        expect(result.onClick).toBe(baseArgs.onCloudOptions)
     })
 
     it('returns SYNCED when fully synced', () => {

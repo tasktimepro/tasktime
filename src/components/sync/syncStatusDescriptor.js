@@ -56,6 +56,7 @@ export function getYjsSyncStatusDescriptor({
             text: 'Loading...',
             icon: CloudSyncIcon,
             tone: 'text-muted-foreground',
+            onClick: onCloudOptions,
         };
     }
 
@@ -85,6 +86,7 @@ export function getYjsSyncStatusDescriptor({
                 text: 'Loading...',
                 icon: CloudSyncIcon,
                 tone: 'text-muted-foreground',
+                onClick: onCloudOptions,
             };
         }
 
@@ -93,6 +95,7 @@ export function getYjsSyncStatusDescriptor({
             text: 'Syncing...',
             icon: CloudSyncIcon,
             tone: 'status-warning-text-strong',
+            onClick: onCloudOptions,
         };
     }
 

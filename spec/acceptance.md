@@ -38,6 +38,7 @@
 - Backup mode automatically pushes pending local changes and does not automatically pull normal remote changes on focus/online triggers.
 - Sync mode performs bidirectional work on documented triggers with cooldown and cross-tab locking.
 - “Sync Now” forces a full pull/push in every mode.
+- The visible sync-status control remains keyboard-operable while loading, connecting, checking, downloading, uploading, or syncing and opens Account > Cloud Sync without starting a duplicate sync.
 
 ## Agent bridge
 
