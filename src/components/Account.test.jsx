@@ -134,12 +134,15 @@ afterEach(() => {
 });
 
 describe('Account', () => {
-    it('renders a persistent footer with privacy and terms links', () => {
+    it('renders persistent GitHub Releases, privacy, and terms links', () => {
         renderAccount();
 
+        const githubReleasesLink = screen.getByRole('link', { name: 'TaskTime Pro releases on GitHub' });
         const privacyLink = screen.getByRole('link', { name: 'Privacy Policy' });
         const termsLink = screen.getByRole('link', { name: 'Terms & Conditions' });
 
+        expect(githubReleasesLink.getAttribute('href')).toBe('https://github.com/tasktimepro/tasktime/releases');
+        expect(githubReleasesLink.getAttribute('target')).toBe('_blank');
         expect(privacyLink.getAttribute('href')).toBe('/privacy/');
         expect(termsLink.getAttribute('href')).toBe('/terms/');
         expect(privacyLink.getAttribute('target')).toBe('_blank');
