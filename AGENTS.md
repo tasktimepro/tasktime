@@ -19,6 +19,7 @@
 6. **Legacy code can be removed only after migration** — Delete old implementations after the replacement safely handles existing data
 7. **Per-file test coverage ≥ 70%** — For `src/hooks/**` and `src/utils/**`, each file must meet at least 75% coverage
 8. **Repository writes require explicit user approval** — Leave changes uncommitted for review. Do not commit, push, tag, create GitHub releases, publish packages, or invoke production deployment workflows unless the user explicitly asks for that specific action.
+9. **Assess release scope before every requested commit or push** — Determine whether the change warrants a core app SemVer release/tag and whether it changed a published agent artifact (bridge, MCP Registry manifest, OpenClaw bundle, Claude plugin, or ClawHub skill). Report the required release train and publish only the artifacts whose shipped contents or metadata actually changed.
 
 ---
 

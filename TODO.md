@@ -4,8 +4,6 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
-[ ] Include github link
-
 [ ] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
