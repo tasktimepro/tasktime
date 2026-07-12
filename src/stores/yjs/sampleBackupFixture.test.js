@@ -153,6 +153,33 @@ const fixtures = [
             archivedExpenses: ['expense-filing-2025'],
         },
     },
+    {
+        fileName: 'tasktime-legacy-billing-parity-v1.4.json',
+        label: 'legacy billing parity fixture',
+        version: '1.4',
+        exportDate: '2026-07-12T08:00:00.000Z',
+        expected: {
+            preferences: { currency: 'CHF' },
+            projects: ['project-synthetic'],
+            clients: ['client-synthetic'],
+            businessInfos: [],
+            recurrences: [],
+            attachments: [],
+            activeTasks: ['task-implementation', 'task-review'],
+            archivedTasks: [],
+            activeEntries: [
+                'entry-implementation-linked',
+                'entry-implementation-legacy-markerless',
+                'entry-review-linked',
+                'entry-review-legacy-markerless',
+            ],
+            historicalEntries: [],
+            activeInvoices: ['invoice-legacy'],
+            archivedInvoices: [],
+            activeExpenses: [],
+            archivedExpenses: [],
+        },
+    },
 ]
 
 describe('backup fixtures', () => {
@@ -176,8 +203,8 @@ describe('backup fixtures', () => {
 
             const { version, exportDate, backupType, ...importPayload } = readFixture(fixture.fileName)
 
-            expect(version).toBe('1.3')
-            expect(exportDate).toBe('2026-05-21T12:00:00.000Z')
+            expect(version).toBe(fixture.version || '1.3')
+            expect(exportDate).toBe(fixture.exportDate || '2026-05-21T12:00:00.000Z')
             expect(backupType).toBe('manual')
 
             await store.importBackupData(importPayload)

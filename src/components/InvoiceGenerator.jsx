@@ -289,6 +289,7 @@ const InvoiceGenerator = ({
     }, [activeBillingPeriodEnd, activeBillingPeriodStart]);
     // Yjs hooks for data access
     const { invoices, createInvoice, updateInvoice, finalizeInvoice, undoLatestInvoice, canUndoInvoice } = useInvoices();
+    const { invoices: billingInvoices, isLoading: billingInvoicesLoading } = useInvoices({ includeArchived: true });
     const { projects } = useProjects();
     const { tasks, updateTask, isLoading: billingTasksLoading } = useTasks({ includeArchived: true });
     const { createEntry, updateEntry, deleteEntry } = useTimeEntries();
@@ -310,6 +311,7 @@ const InvoiceGenerator = ({
         : providedTimeEntries;
     const billingCandidatesLoading = Boolean(
         billingTasksLoading
+        || billingInvoicesLoading
         || billingExpensesLoading
         || billingTimeEntriesLoading
         || billingHistoricalEntriesLoading
@@ -1457,11 +1459,12 @@ const InvoiceGenerator = ({
             selectedProject,
             tasks,
             timeEntries,
+            invoices: billingInvoices,
             editableHours: {},
             billingPeriodStart: activeBillingPeriodStart,
             billingPeriodEnd: activeBillingPeriodEnd,
         });
-    }, [activeBillingPeriodEnd, activeBillingPeriodStart, selectedProject, timeEntries, tasks]);
+    }, [activeBillingPeriodEnd, activeBillingPeriodStart, billingInvoices, selectedProject, timeEntries, tasks]);
 
     const prepareInvoiceDataForProjects = useCallback((projectsForData = []) => {
         return projectsForData.flatMap((projectForData) => {
@@ -2898,6 +2901,7 @@ const InvoiceGenerator = ({
             clients,
             tasks,
             timeEntries,
+            invoices: billingInvoices,
             expenses,
             exchangeRates,
             preferredCurrency: preferences.currency,

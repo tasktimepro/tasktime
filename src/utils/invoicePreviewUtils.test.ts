@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { getProjectInvoicePreview } from './invoicePreviewUtils';
+
+const loadLegacyBillingParityFixture = () => JSON.parse(readFileSync(
+    path.resolve(process.cwd(), 'test-data/backups/tasktime-legacy-billing-parity-v1.4.json'),
+    'utf8'
+));
 
 describe('invoicePreviewUtils', () => {
     it('calculates hourly unbilled task amounts with project-specific expenses', () => {
@@ -193,5 +200,23 @@ describe('invoicePreviewUtils', () => {
         expect(preview.entrySelections.map((entry) => entry.entryId)).toEqual(['entry-late']);
         expect(preview.unbilledHours).toBe(1);
         expect(preview.total).toBe(100);
+    });
+
+    it('does not re-offer markerless entries exactly accounted for by a finalized legacy invoice', () => {
+        const fixture = loadLegacyBillingParityFixture();
+        const project = fixture.projects[0];
+        const preview = getProjectInvoicePreview(project, {
+            clients: fixture.clients,
+            tasks: fixture.tasks,
+            timeEntries: fixture.timeEntries,
+            invoices: fixture.invoices,
+            preferredCurrency: fixture.preferences.currency,
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31',
+        });
+
+        expect(preview.entrySelections).toEqual([]);
+        expect(preview.unbilledHours).toBe(0);
+        expect(preview.total).toBe(0);
     });
 });

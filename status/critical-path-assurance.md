@@ -41,6 +41,7 @@ Do not mark this assurance phase complete while a Critical or High finding remai
 - [x] Finalize only the exact immutable selection shown and approved; never discover additional hidden work during commit.
 - [x] Decide and implement edited-down hours semantics without silently consuming unexplained time.
 - [x] Make late-synced unbilled entries eligible based on explicit billing allocation rather than only `lastBilledAt` cutoffs.
+- [x] Reconcile legacy markerless entries only from exact finalized-invoice evidence, with shared UI/agent eligibility and a privacy-safe backup regression fixture.
 - [x] Preserve or explicitly release archived-task work that is still unbilled.
 - [x] Recompute or reject inconsistent item quantity/rate/amount/subtotal/tax/total input using deterministic minor-unit rounding.
 - [x] Reconcile multi-project rounding remainders so allocated totals equal the invoice total exactly.
@@ -134,3 +135,11 @@ Do not mark this assurance phase complete while a Critical or High finding remai
 - Reconciled the human-readable millisecond timing, billing-increment, two-decimal accounting, exchange snapshot, and report precedence policy.
 - Passed 1,789 unit/integration tests across 206 files, coverage (94.22% statements overall; all governed hook/utility files above threshold), lint, production app/public-site build, 34 browser smoke tests, 2 production PWA/offline smoke tests, and the packaged bridge/bundle/live-agent release flow.
 - Final pre-ship review found no unresolved Critical or High issue in the remediated scope. Remaining `spec/ambiguities.md` entries concern future product features or compatibility-policy evolution.
+
+### 2026-07-12 — Legacy billing parity follow-up
+
+- Reproduced a production badge/composer mismatch with a new synthetic backup containing no customer data.
+- Centralized invoice eligibility for project/client badges, UI composition, and agent preview/draft paths.
+- Preserved late-sync safety: only an exact finalized legacy invoice period/task-duration match suppresses markerless historical entries; ambiguous and later-created entries remain eligible.
+- Added focused domain, UI-calculation, agent-parity, preview, and real backup-import regressions.
+- Passed the full Docker release gate: lint, 1,812 tests across 208 files with 94.28% statement coverage, 34 browser smoke tests, 2 production PWA/offline smoke tests, and production app/public-site builds. The packaged bridge/bundle/live MCP release flow also passed, including invoice preview, draft, finalization, and post-finalization eligibility.

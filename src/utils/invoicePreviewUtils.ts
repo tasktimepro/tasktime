@@ -1,4 +1,5 @@
-import type { Client, Expense, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Client, Expense, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import { getInvoiceEligibleTimeEntries } from '@/domain/invoices/invoiceEligibility';
 import { getBillingPeriodRange, isStoredDateWithinBillingRange } from './billingPeriodUtils';
 import { convertCurrency, getProjectCurrency, normalizeCurrencyCode } from './currencyUtils';
 import { millisecondsToHours } from './dateUtils';
@@ -9,6 +10,7 @@ type InvoicePreviewOptions = {
     clients?: Client[];
     tasks?: Task[];
     timeEntries?: TimeEntry[];
+    invoices?: Invoice[];
     expenses?: Expense[];
     exchangeRates?: Record<string, number> | null;
     billingPeriodStart?: string;
@@ -122,6 +124,7 @@ export const getProjectInvoicePreview = (
         clients = [],
         tasks = [],
         timeEntries = [],
+        invoices = [],
         expenses = [],
         exchangeRates = null,
         billingPeriodStart,
@@ -140,14 +143,18 @@ export const getProjectInvoicePreview = (
     const taskTimeMap = new Map<string, number>();
     const entrySelections: ProjectInvoiceEntrySelection[] = [];
 
-    timeEntries.forEach((entry) => {
+    const eligibleTimeEntries = getInvoiceEligibleTimeEntries({
+        tasks: projectTasks,
+        timeEntries,
+        invoices,
+        billingPeriodStart: activeBillingPeriodStart,
+        billingPeriodEnd: activeBillingPeriodEnd,
+    });
+
+    eligibleTimeEntries.forEach((entry) => {
         const task = projectTaskMap.get(entry.taskId);
 
-        if (!task || task.billable !== true) return;
-        if (!entry.end || entry.end <= entry.start) return;
-        if (entry.source === 'invoice-adjustment') return;
-        if (entry.billedInvoiceId || entry.billedAt) return;
-        if (!isStoredDateWithinBillingRange(entry.start, activeBillingPeriodStart, activeBillingPeriodEnd)) return;
+        if (!task) return;
 
         const billableDurationMs = getBillableDurationMs(entry);
         taskTimeMap.set(task.id, (taskTimeMap.get(task.id) || 0) + billableDurationMs);

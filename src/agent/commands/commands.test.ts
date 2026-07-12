@@ -411,6 +411,7 @@ function createContext(): AgentCommandContext & {
         ]),
         getAllExpenses: vi.fn(async () => Array.from(expenses.values()).map((value) => readEntity(value)).filter(Boolean)),
         loadAllTimeEntries: vi.fn(async () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean)),
+        getAllInvoices: vi.fn(async () => Array.from(invoices.values()).map((value) => readEntity(value)).filter(Boolean)),
         exportBackupData: vi.fn(async (options: Record<string, unknown> = {}) => ({
             version: '1.4',
             exportDate: options.exportDate || '2026-06-25T12:00:00.000Z',
@@ -4999,6 +5000,64 @@ describe('agent commands', () => {
             expect.objectContaining({ entryId: 'entry-late-preview', taskId: 'task-archived-preview' }),
         ]);
         expect(preview.preview.total).toBe(100);
+    });
+
+    it('matches the UI legacy-billing compatibility rule for markerless entries', async () => {
+        const context = createContext();
+        createTaskCommand(context, {
+            id: 'task-legacy-preview',
+            title: 'Legacy invoiced work',
+            projectId: 'project-1',
+            billable: true,
+        });
+        context.maps.entries.set('entry-legacy-linked', objectToYMap({
+            id: 'entry-legacy-linked',
+            taskId: 'task-legacy-preview',
+            start: Date.parse('2026-05-10T10:00:00Z'),
+            end: Date.parse('2026-05-10T11:00:00Z'),
+            createdAt: Date.parse('2026-05-10T11:00:00Z'),
+            billedAt: Date.parse('2026-06-01T00:00:00Z'),
+            billedInvoiceId: 'invoice-legacy-preview',
+        }));
+        context.maps.entries.set('entry-legacy-markerless', objectToYMap({
+            id: 'entry-legacy-markerless',
+            taskId: 'task-legacy-preview',
+            start: Date.parse('2026-05-11T10:00:00Z'),
+            end: Date.parse('2026-05-11T12:00:00Z'),
+            createdAt: Date.parse('2026-05-11T12:00:00Z'),
+        }));
+        context.maps.invoices.set('invoice-legacy-preview', objectToYMap({
+            id: 'invoice-legacy-preview',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'SYN-001',
+            date: '2026-06-01',
+            status: 'paid',
+            currency: 'USD',
+            items: [],
+            subtotal: 300,
+            total: 300,
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31',
+            createdAt: Date.parse('2026-06-01T00:00:00Z'),
+            tasks: [{
+                id: 'task-legacy-preview',
+                originalHours: 3,
+                originalTimeMs: 3 * 60 * 60 * 1000,
+            }],
+        }));
+
+        const preview = await previewInvoiceFromUnbilledWorkCommand(context, {
+            projectId: 'project-1',
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31',
+        });
+
+        expect((context.store as any).getAllInvoices).toHaveBeenCalled();
+        expect(preview.preview.entrySelections).toEqual([]);
+        expect(preview.preview.unbilledHours).toBe(0);
+        expect(preview.preview.total).toBe(0);
     });
 
     it('creates an invoice draft from unbilled work without billing side effects', async () => {

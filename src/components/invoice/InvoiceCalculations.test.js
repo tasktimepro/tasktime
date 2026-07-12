@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { buildInvoiceTaskData } from './InvoiceCalculations'
+
+const loadLegacyBillingParityFixture = () => JSON.parse(readFileSync(
+    path.resolve(process.cwd(), 'test-data/backups/tasktime-legacy-billing-parity-v1.4.json'),
+    'utf8'
+))
 
 describe('buildInvoiceTaskData', () => {
 
@@ -18,7 +25,7 @@ describe('buildInvoiceTaskData', () => {
         expect(result).toBeNull()
     })
 
-    it('includes only billable tasks with time after lastBilledAt', () => {
+    it('uses explicit billing markers while keeping markerless backdated work eligible', () => {
 
         const tasks = [
             { id: 'task-1', projectId: 'project-1', title: 'Billable', billable: true, lastBilledAt: 1000 },
@@ -26,7 +33,7 @@ describe('buildInvoiceTaskData', () => {
         ]
 
         const timeEntries = [
-            { taskId: 'task-1', start: 900, end: 1100 },
+            { id: 'entry-billed', taskId: 'task-1', start: 900, end: 1100, billedInvoiceId: 'invoice-old' },
             { taskId: 'task-1', start: 2000, end: 2600 },
             { taskId: 'task-2', start: 2000, end: 2600 }
         ]
@@ -105,7 +112,7 @@ describe('buildInvoiceTaskData', () => {
         expect(result).toBeNull()
     })
 
-    it('excludes archived billable tasks even when they have unbilled time', () => {
+    it('includes archived billable tasks when they still have unbilled time', () => {
 
         const tasks = [
             { id: 'task-1', projectId: 'project-1', title: 'Archived Task', billable: true, archived: true }
@@ -123,7 +130,11 @@ describe('buildInvoiceTaskData', () => {
             editableHours: {}
         })
 
-        expect(result).toBeNull()
+        expect(result).toHaveLength(1)
+        expect(result[0]).toEqual(expect.objectContaining({
+            id: 'task-1',
+            originalHours: 1,
+        }))
     })
 
     it('excludes tasks toggled to non-billable', () => {
@@ -170,14 +181,14 @@ describe('buildInvoiceTaskData', () => {
         expect(result[0].id).toBe('child')
     })
 
-    it('respects per-task billing windows using lastBilledAt', () => {
+    it('excludes explicitly billed entries independently of lastBilledAt', () => {
 
         const tasks = [
             { id: 'task-1', projectId: 'project-1', title: 'Billable', billable: true, lastBilledAt: 1000 }
         ]
 
         const timeEntries = [
-            { taskId: 'task-1', start: 500, end: 900 },
+            { id: 'entry-billed', taskId: 'task-1', start: 500, end: 900, billedInvoiceId: 'invoice-old' },
             { taskId: 'task-1', start: 2000, end: 2600 }
         ]
 
@@ -191,6 +202,25 @@ describe('buildInvoiceTaskData', () => {
 
         expect(result).toHaveLength(1)
         expect(result[0].originalTimeMs).toBe(600)
+    })
+
+    it('matches the preview for markerless entries exactly accounted for by a legacy invoice', () => {
+
+        const fixture = loadLegacyBillingParityFixture()
+        const result = buildInvoiceTaskData({
+            projectForData: fixture.projects[0],
+            selectedProject: null,
+            tasks: fixture.tasks,
+            timeEntries: fixture.timeEntries,
+            invoices: fixture.invoices,
+            editableHours: {},
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31'
+        })
+
+        expect(result).toHaveLength(2)
+        expect(result.map((task) => task.originalTimeMs)).toEqual([0, 0])
+        expect(result.map((task) => task.originalHours)).toEqual([0, 0])
     })
 
     it('honors editable hours when provided', () => {

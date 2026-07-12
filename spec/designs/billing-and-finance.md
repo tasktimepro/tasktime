@@ -14,6 +14,7 @@ Let users understand exactly what will be billed, what changed after finalizatio
 ## Billing safety rules
 
 - UI and agent previews load active, historical, and archived billing candidates before selection.
+- Entry-level billing markers and immutable selection snapshots are the current allocation evidence. For a finalized legacy invoice without a selection snapshot, markerless source entries are treated as already billed only when its stored billing period and per-task source duration account for all candidates exactly; ambiguous or later-created backdated entries remain eligible.
 - A draft/final invoice captures the exact selected entries, task allocations, expense conversions, rates, durations, and quoted amounts. Finalization consumes only that snapshot; later-synced unbilled work stays eligible for a future invoice.
 - Archived tasks do not release or hide unbilled work.
 - Increasing invoice hours creates a visible invoice-adjustment entry. Reducing hours below selected recorded time is rejected until the user splits or edits the source entries, so no unexplained remainder is silently consumed.

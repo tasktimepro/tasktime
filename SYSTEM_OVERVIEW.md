@@ -43,6 +43,7 @@ The Yjs store is split into documents so current work stays loaded and historica
 
 - Local data remains usable offline; cloud features are optional.
 - Schema changes are additive or explicitly migrated and tested against historical data.
+- UI badges, invoice composition, and agent invoice commands share the same read-only eligibility operation, including conservative support for finalized legacy invoices with markerless source entries.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.
 - Destructive data, billing, deletion, and sync actions require explicit intent and safe preview/confirmation where available.
 - Agent access is loopback-only with short-lived pairing, scoped permissions, approvals, rate limits, revocation, and memory-only session credentials.

@@ -6,6 +6,7 @@ Files:
 - `tasktime-sample-backup-v1.3.json`: Broad mixed workspace covering clients, projects, tasks, time entries, invoices, expenses, recurring expenses, planner attachments, daily goals, active data, and archived data.
 - `tasktime-invoice-edge-backup-v1.3.json`: Invoice-focused fixture covering draft, sent, overdue, paid, archived, tax-enabled, tax-disabled, currency snapshot, and reimbursable-expense invoice cases.
 - `tasktime-expenses-tax-backup-v1.3.json`: Expenses-focused fixture covering claimed, unclaimed, and excluded tax states, recurring expenses, upcoming previews, unpaid expenses, active historical expenses, and archived expenses.
+- `tasktime-legacy-billing-parity-v1.4.json`: Synthetic, privacy-safe regression fixture covering a finalized legacy invoice whose stored task duration includes both explicitly linked and markerless source entries.
 
 Validation:
 - Store-level fixture tests import these backups through the real Yjs import path.
@@ -14,3 +15,4 @@ Validation:
 Recommended use:
 - Use the broad sample when testing end-to-end workspace behavior.
 - Use the focused fixtures when changing invoice logic, reports, expense filters, tax summaries, or recurring expense flows.
+- Use the legacy billing fixture when changing invoice eligibility, invoice badges, draft generation, or UI/agent billing parity.

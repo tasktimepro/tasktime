@@ -1,0 +1,149 @@
+{
+  "version": "1.4",
+  "exportDate": "2026-07-12T08:00:00.000Z",
+  "backupType": "manual",
+  "projects": [
+    {
+      "id": "project-synthetic",
+      "title": "Synthetic Retainer",
+      "hourlyRate": 100,
+      "flatRate": false,
+      "preferredClientId": "client-synthetic",
+      "isPersonal": false,
+      "invoiceIds": [
+        "invoice-legacy"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-implementation",
+      "projectId": "project-synthetic",
+      "title": "Implementation",
+      "billable": true,
+      "lastBilledAt": 1779274800000
+    },
+    {
+      "id": "task-review",
+      "projectId": "project-synthetic",
+      "title": "Review",
+      "billable": true,
+      "lastBilledAt": 1779271200000
+    }
+  ],
+  "timeEntries": [
+    {
+      "id": "entry-implementation-linked",
+      "taskId": "task-implementation",
+      "start": 1779091200000,
+      "end": 1779094800000,
+      "createdAt": 1779094800000,
+      "updatedAt": 1779094800000,
+      "billedAt": 1780300800000,
+      "billedInvoiceId": "invoice-legacy"
+    },
+    {
+      "id": "entry-implementation-legacy-markerless",
+      "taskId": "task-implementation",
+      "start": 1779181200000,
+      "end": 1779188400000,
+      "createdAt": 1779188400000,
+      "updatedAt": 1779188400000
+    },
+    {
+      "id": "entry-review-linked",
+      "taskId": "task-review",
+      "start": 1779267600000,
+      "end": 1779269400000,
+      "createdAt": 1779269400000,
+      "updatedAt": 1779269400000,
+      "billedAt": 1780300800000,
+      "billedInvoiceId": "invoice-legacy"
+    },
+    {
+      "id": "entry-review-legacy-markerless",
+      "taskId": "task-review",
+      "start": 1779265800000,
+      "end": 1779271200000,
+      "createdAt": 1779271200000,
+      "updatedAt": 1779271200000
+    }
+  ],
+  "invoices": [
+    {
+      "id": "invoice-legacy",
+      "projectId": "project-synthetic",
+      "projectIds": [
+        "project-synthetic"
+      ],
+      "clientId": "client-synthetic",
+      "invoiceNumber": "SYN-001",
+      "date": "2026-06-01",
+      "dueDate": "2026-06-15",
+      "status": "paid",
+      "items": [],
+      "subtotal": 500,
+      "tax": 0,
+      "taxRate": 0,
+      "total": 500,
+      "currency": "CHF",
+      "billingPeriodPreset": "custom",
+      "billingPeriodStart": "2026-05-01",
+      "billingPeriodEnd": "2026-05-31",
+      "createdAt": 1780300800000,
+      "updatedAt": 1780300800000,
+      "paidAt": 1780387200000,
+      "tasks": [
+        {
+          "id": "task-implementation",
+          "projectId": "project-synthetic",
+          "projectTitle": "Synthetic Retainer",
+          "title": "Implementation",
+          "originalHours": 3,
+          "originalTimeMs": 10800000,
+          "hours": 3,
+          "isEdited": false,
+          "billable": true,
+          "hourlyRate": 100,
+          "useFlatRate": false
+        },
+        {
+          "id": "task-review",
+          "projectId": "project-synthetic",
+          "projectTitle": "Synthetic Retainer",
+          "title": "Review",
+          "originalHours": 2,
+          "originalTimeMs": 7200000,
+          "hours": 2,
+          "isEdited": false,
+          "billable": true,
+          "hourlyRate": 100,
+          "useFlatRate": false
+        }
+      ]
+    }
+  ],
+  "paymentMethods": [],
+  "expenseCategories": [],
+  "taxReturnPeriods": [],
+  "businessInfos": [],
+  "businessBrandAssets": [],
+  "clients": [
+    {
+      "id": "client-synthetic",
+      "title": "Example Client",
+      "clientName": "Example Client Ltd",
+      "defaultHourlyRate": 100,
+      "defaultCurrency": "CHF"
+    }
+  ],
+  "invoiceTemplates": [],
+  "emailTemplates": [],
+  "expenses": [],
+  "expenseRecurrences": [],
+  "dailyGoals": [],
+  "plannerAttachments": [],
+  "preferences": {
+    "currency": "CHF"
+  }
+}

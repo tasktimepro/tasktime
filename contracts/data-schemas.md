@@ -46,6 +46,8 @@ Required: `id`, `title`. Optional legal/contact/address/tax/custom fields, hourl
 
 Required: `id`, `title`. Optional `projectId`, `parentTaskId`, notes, completion/archive/billable/order/activity/billing dates, start date, estimates, prompt behavior, quote billing snapshot, and recurrence state.
 
+`lastBilledAt` is retained as legacy task-level compatibility metadata; it is not sufficient by itself to claim or exclude a time entry in current billing flows.
+
 Recurrence types are weekly, monthly, or yearly with their corresponding day/date settings. Subtasks must not use recurrence even though tolerant persisted validation may accept historical data pending normalization.
 
 ### TimeEntry
@@ -74,6 +76,8 @@ Each invoice item requires description, quantity, rate, and amount and may refer
 `billingSelectionSnapshot` is additive, immutable versioned evidence captured before finalization. Version 1 records the invoice currency; exact selected entry IDs, task IDs, intervals, actual/billable durations, and billed rates; exact task pricing mode, quantity, rate, amount, and quoted allocation; and exact expense source/invoice amounts, currencies, and exchange rate. Finalization of a snapshot-backed draft must reject missing, changed, or already-consumed source records and must not discover newly arrived work during commit.
 
 Billing snapshots are immutable evidence used for reporting/undo. Historical invoices may lack newer snapshots and require compatible fallback behavior; their absence must not make old records unreadable.
+
+Supported finalized legacy invoices may retain composer `tasks[]` records with per-task `originalTimeMs` or `originalHours` and merged-subtask identity. These fields are read-only compatibility evidence for older markerless source entries: they affect eligibility only when the invoice billing period and stored source duration account for the complete candidate set. Ambiguous matches and entries created after that invoice remain unbilled candidates. No inferred marker is persisted.
 
 ### Invoice billing operation journal
 

@@ -54,6 +54,7 @@ const ProjectList = ({
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
     const { invoices, deleteInvoice } = useInvoices();
+    const { invoices: billingInvoices } = useInvoices({ includeArchived: true });
     const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { timers, clearTimer } = useTimers();
@@ -325,6 +326,7 @@ const ProjectList = ({
             clients,
             tasks,
             timeEntries,
+            invoices: billingInvoices,
             expenses,
             exchangeRates,
             preferredCurrency: preferences.currency,

@@ -73,6 +73,7 @@ const ClientDashboard = ({
     const { deleteTask } = useTasks();
     const { deleteEntry } = useTimeEntries();
     const { deleteInvoice } = useInvoices();
+    const { invoices: billingInvoices } = useInvoices({ includeArchived: true });
     const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences } = usePreferences();
@@ -423,6 +424,7 @@ const ClientDashboard = ({
             clients,
             tasks,
             timeEntries,
+            invoices: billingInvoices,
             expenses,
             exchangeRates,
             preferredCurrency: preferences.currency,

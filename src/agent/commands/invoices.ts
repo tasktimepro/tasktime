@@ -450,7 +450,7 @@ export async function previewInvoiceFromUnbilledWorkCommand(
 
     const project = readRequiredEntity<Project>(context.store.projects as any, input.projectId, 'Project');
     const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent invoice preview clients');
-    const [tasks, expenses, timeEntries] = await Promise.all([
+    const [tasks, expenses, timeEntries, invoices] = await Promise.all([
         typeof context.store.getAllTasks === 'function'
             ? context.store.getAllTasks()
             : Promise.resolve(collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent invoice preview tasks')),
@@ -460,12 +460,16 @@ export async function previewInvoiceFromUnbilledWorkCommand(
         typeof context.store.loadAllTimeEntries === 'function'
             ? context.store.loadAllTimeEntries()
             : Promise.resolve(context.store.getAllTimeEntries()),
+        typeof context.store.getAllInvoices === 'function'
+            ? context.store.getAllInvoices()
+            : Promise.resolve(collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent invoice preview invoices')),
     ]);
     const preview = getProjectInvoicePreview(project, {
         clients,
         tasks,
         expenses,
         timeEntries,
+        invoices,
         exchangeRates: input.exchangeRates ?? null,
         billingPeriodStart: input.billingPeriodStart,
         billingPeriodEnd: input.billingPeriodEnd,

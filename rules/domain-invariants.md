@@ -26,6 +26,7 @@ These invariants summarize critical production contracts. They supplement the de
 ## Invoices, expenses, and reporting
 
 - Invoice calculations, billed state, payments, undo operations, currency handling, expense inclusion, and report totals must agree on the same source records and rounding rules.
+- UI badges, invoice composition, and agent preview/draft commands share one invoice-eligibility operation. Neither a task cutoff alone nor entry markers alone may redefine legacy eligibility: exact finalized-invoice evidence may suppress markerless historical entries, while ambiguous or later-arriving work remains eligible.
 - Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval; financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
 - Billing mutations must be explicit, reversible where supported, and idempotent against retries or repeated commands.
 - Invoice references use `project.invoiceIds[]`; invoices are separate entities rather than embedded project records.
