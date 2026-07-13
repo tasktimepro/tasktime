@@ -496,7 +496,7 @@ function collectInvoiceTaskIds(invoice: Invoice): Set<string> {
     if (Array.isArray(projectBreakdowns)) {
         projectBreakdowns.forEach((breakdown) => {
             if (!breakdown || typeof breakdown !== 'object') return;
-            collect((breakdown as Record<string, unknown>).tasks);
+            collect((breakdown as unknown as Record<string, unknown>).tasks);
         });
     }
 

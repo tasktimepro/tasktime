@@ -365,7 +365,7 @@ export class YjsStore {
             }
         }
 
-        const archivedMap = this._archivedTasksDoc.getMap<string>('tasks') as Y.Map<string, Task>;
+        const archivedMap = this._archivedTasksDoc.getMap<Task>('tasks');
         this.reconcileTaskArchiveTransitions(archivedMap);
         return archivedMap;
     }
@@ -457,7 +457,7 @@ export class YjsStore {
 
         }
 
-        const archivedMap = this._archivedExpensesDoc.getMap<string>('expenses') as Y.Map<string, Expense>;
+        const archivedMap = this._archivedExpensesDoc.getMap<Expense>('expenses');
         this.reconcileExpenseArchives(archivedMap);
         return archivedMap;
     }
@@ -598,7 +598,7 @@ export class YjsStore {
             }
         }
 
-        const yearEntries = doc.getMap<string>('timeEntries') as Y.Map<string, TimeEntry>;
+        const yearEntries = doc.getMap<TimeEntry>('timeEntries');
         this.reconcileEntryArchives(year, yearEntries);
         return yearEntries;
     }
@@ -680,7 +680,7 @@ export class YjsStore {
             }
         }
 
-        const archivedMap = this._archivedInvoicesDoc.getMap<string>('invoices') as Y.Map<string, Invoice>;
+        const archivedMap = this._archivedInvoicesDoc.getMap<Invoice>('invoices');
         this.normalizePersistedInvoiceMap(archivedMap);
         this.reconcileInvoiceArchives(archivedMap);
         return archivedMap;

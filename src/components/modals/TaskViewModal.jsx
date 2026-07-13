@@ -65,12 +65,12 @@ const TaskViewModal = ({
     onOpenPlannerOptions,
     preferredCurrency = DEFAULT_CURRENCY,
 }) => {
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
     const { projects } = useProjects();
     const { clients } = useClients();
     const { tasks, updateTask, unarchiveTask, toggleRecurringCompletion, skipRecurringOccurrence, isCompletedOnDate, getRecurringStatus } = useTasks({ includeArchived: true });
-    const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { getTimerForTask, clearTimer, isTaskTimerActive } = useTimers();
+    const { entries: timeEntries } = useTimeEntries();
+    const { getTimerForTask, stopTimer, isTaskTimerActive } = useTimers();
     const { deleteAttachment } = usePlannerAttachments();
 
     const [showAddEntryModal, setShowAddEntryModal] = useState(false);
@@ -364,18 +364,16 @@ const TaskViewModal = ({
         return getProjectCurrency(project, clients, preferredCurrency);
     }, [clients, preferredCurrency, project]);
 
-    const handleToggleComplete = useCallback(() => {
+    const handleToggleComplete = useCallback(async () => {
         if (!currentTask) return;
 
         if (isTimerActive && projectTimer?.startTime) {
-            const now = Date.now();
-            createEntry({
-                taskId: currentTask.id,
-                start: projectTimer.startTime,
-                end: now,
-                note: projectTimer.note
-            });
-            clearTimer(currentTask.projectId || currentTask.id);
+            try {
+                if (!await stopTimer(currentTask.projectId || currentTask.id)) return;
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Could not stop the timer.');
+                return;
+            }
         }
 
         if (currentTask.recurring && effectiveDateStr) {
@@ -397,7 +395,7 @@ const TaskViewModal = ({
             lastActive: Date.now()
         });
         showSuccess(isCompleted ? 'Marked as incomplete' : 'Marked as done');
-    }, [currentTask, effectiveDateStr, isCompleted, recurringActionDateLabel, isTimerActive, projectTimer, createEntry, clearTimer, toggleRecurringCompletion, updateTask, showSuccess]);
+    }, [currentTask, effectiveDateStr, isCompleted, recurringActionDateLabel, isTimerActive, projectTimer, showError, stopTimer, toggleRecurringCompletion, updateTask, showSuccess]);
 
     const handleSkipRecurring = useCallback(() => {
         if (!currentTask?.recurring || !effectiveDateStr) return;

@@ -1,12 +1,17 @@
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { toStorageDate } from '@/utils/dateUtils';
 import { normalizeCurrencyCode, fetchExchangeRates } from '@/utils/currencyUtils';
-import { buildExpenseFromRecurrence, createExpensePaymentCurrencySnapshot } from '@/utils/expenseUtils';
+import {
+    buildExpenseFromRecurrence,
+    createExpensePaymentCurrencySnapshot,
+    getExpensePaymentCurrencySnapshot,
+} from '@/utils/expenseUtils';
 import { buildMarkExpensePaidUpdates, buildMarkExpenseUnpaidUpdates } from '@/domain/expenses/expenseUpdates';
-import { collectValidatedEntities } from '@/stores/yjs/validation';
+import { collectValidatedEntities, validateCollectionEntity } from '@/stores/yjs/validation';
 import type { BusinessInfo, Client, Expense, ExpenseCategory, ExpenseRecurrence, Project } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
+import { assertExpenseCanBeDeleted, ExpenseOperationError } from '@/domain/expenses/expenseOperations';
 import {
     assertPermission,
     assertReady,
@@ -170,11 +175,25 @@ export function createExpenseCommand(context: AgentCommandContext, input: Create
 
         const now = getNow(context);
         const id = input.id || getId(context);
+        const preferredCurrency = getPreferredCurrency(context);
+        const paymentStatus = input.paymentStatus ?? 'unpaid';
+
+        if (
+            paymentStatus === 'paid'
+            && shouldStorePaymentSnapshot(input, preferredCurrency)
+            && !getExpensePaymentCurrencySnapshot(input)
+        ) {
+            throw new AgentCommandError(
+                'INVALID_INPUT',
+                'A payment currency snapshot is required before creating a paid cross-currency expense.'
+            );
+        }
+
         const expense = createValidatedEntity<Expense>(context.store.expenses as any, 'expenses', {
             ...input,
             id,
             title,
-            paymentStatus: input.paymentStatus ?? 'unpaid',
+            paymentStatus,
             paymentMode: input.paymentMode ?? 'manual',
             billingStatus: input.billingStatus ?? 'unbilled',
             invoiceId: input.invoiceId ?? null,
@@ -185,7 +204,7 @@ export function createExpenseCommand(context: AgentCommandContext, input: Create
             taxClaimStatus: input.taxClaimStatus ?? 'unclaimed',
             createdAt: input.createdAt ?? now,
             updatedAt: input.updatedAt ?? now,
-        }, `agent create expense ${id}`);
+        }, `agent create expense ${id}`, [context.store.archivedExpenses as any]);
 
         markMeaningfulActivity('expense_create');
         return expense;
@@ -203,14 +222,14 @@ export function listExpenseRecurrencesCommand(context: AgentCommandContext, inpu
         .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
 }
 
-export function createExpenseRecurrenceCommand(
+export async function createExpenseRecurrenceCommand(
     context: AgentCommandContext,
     input: CreateExpenseRecurrenceCommandInput
-): { recurrence: ExpenseRecurrence; generatedExpense: Expense | null } {
+): Promise<{ recurrence: ExpenseRecurrence; generatedExpense: Expense | null }> {
     assertReady(context);
     assertPermission(context, 'write');
 
-    return withIdempotency(context, input.idempotencyKey, () => {
+    return withIdempotency(context, input.idempotencyKey, async () => {
         const title = requireString(input.title, 'title');
         validateExpenseRecurrenceInput(input);
         validateExpenseRecurrenceReferences(context, input);
@@ -219,7 +238,7 @@ export function createExpenseRecurrenceCommand(
         const id = input.id || getId(context);
         const today = toStorageDate(new Date(now));
         const shouldGenerateInitial = input.generateInitial !== false && Boolean(today && input.startDate <= today);
-        const recurrence = createValidatedEntity<ExpenseRecurrence>(context.store.expenseRecurrences as any, 'expenseRecurrences', {
+        const recurrenceData = {
             ...input,
             id,
             title,
@@ -249,21 +268,69 @@ export function createExpenseRecurrenceCommand(
             active: input.active ?? true,
             createdAt: input.createdAt ?? now,
             updatedAt: input.updatedAt ?? now,
-        }, `agent create expense recurrence ${id}`);
+        };
+        const prospectiveRecurrence = validateCollectionEntity<ExpenseRecurrence>(
+            'expenseRecurrences',
+            recurrenceData,
+            `agent prepare expense recurrence ${id}`
+        );
 
-        let generatedExpense: Expense | null = null;
+        let preparedGeneratedExpense: Expense | null = null;
 
         if (shouldGenerateInitial) {
-            generatedExpense = buildExpenseFromRecurrence(recurrence, input.startDate);
+            preparedGeneratedExpense = {
+                ...buildExpenseFromRecurrence(prospectiveRecurrence, input.startDate),
+                createdAt: now,
+                updatedAt: now,
+            };
+            const preferredCurrency = getPreferredCurrency(context);
 
-            if (!context.store.expenses.has(generatedExpense.id)) {
+            if (
+                preparedGeneratedExpense.paymentStatus === 'paid'
+                && shouldStorePaymentSnapshot(preparedGeneratedExpense, preferredCurrency)
+            ) {
+                const { rates, error } = await fetchExchangeRates();
+
+                if (!rates) {
+                    throw new AgentCommandError(
+                        'UNAVAILABLE',
+                        error || 'Unable to load exchange rates for expense payment snapshot.'
+                    );
+                }
+
+                preparedGeneratedExpense.paymentCurrencySnapshot = createExpensePaymentCurrencySnapshot({
+                    expense: preparedGeneratedExpense,
+                    preferredCurrency,
+                    exchangeRates: rates,
+                }) ?? undefined;
+            }
+
+            preparedGeneratedExpense = validateCollectionEntity<Expense>(
+                'expenses',
+                preparedGeneratedExpense,
+                `agent prepare initial recurring expense ${preparedGeneratedExpense.id}`
+            );
+        }
+
+        const recurrence = createValidatedEntity<ExpenseRecurrence>(
+            context.store.expenseRecurrences as any,
+            'expenseRecurrences',
+            recurrenceData,
+            `agent create expense recurrence ${id}`
+        );
+        let generatedExpense: Expense | null = null;
+
+        if (preparedGeneratedExpense) {
+            generatedExpense = preparedGeneratedExpense;
+
+            if (context.store.expenses.has(generatedExpense.id)) {
+                generatedExpense = readRequiredEntity<Expense>(context.store.expenses as any, generatedExpense.id, 'Generated expense');
+            } else if (context.store.archivedExpenses?.has(generatedExpense.id)) {
+                generatedExpense = readRequiredEntity<Expense>(context.store.archivedExpenses as any, generatedExpense.id, 'Generated archived expense');
+            } else {
                 generatedExpense = createValidatedEntity<Expense>(context.store.expenses as any, 'expenses', {
                     ...generatedExpense,
-                    createdAt: now,
-                    updatedAt: now,
-                }, `agent create initial recurring expense ${generatedExpense.id}`);
-            } else {
-                generatedExpense = readRequiredEntity<Expense>(context.store.expenses as any, generatedExpense.id, 'Generated expense');
+                }, `agent create initial recurring expense ${generatedExpense.id}`, [context.store.archivedExpenses as any]);
             }
         }
 
@@ -433,18 +500,14 @@ export function deleteExpenseCommand(context: AgentCommandContext, input: Delete
 
     const expense = readRequiredEntity<Expense>(context.store.expenses as any, expenseId, 'Expense');
 
-    if (expense.billingStatus === 'billed' || expense.invoiceId || expense.billedAt) {
-        throw new AgentCommandError('CONFLICT', 'Billed expenses cannot be deleted by an agent.', {
-            expenseId,
-            invoiceId: expense.invoiceId || null,
-        });
-    }
+    try {
+        assertExpenseCanBeDeleted(expense);
+    } catch (error) {
+        if (error instanceof ExpenseOperationError) {
+            throw new AgentCommandError(error.code, error.message, error.details);
+        }
 
-    if (expense.taxClaimStatus === 'claimed' || expense.taxClaimPeriodId || expense.taxClaimedAt) {
-        throw new AgentCommandError('CONFLICT', 'Tax-claimed expenses cannot be deleted by an agent.', {
-            expenseId,
-            taxClaimPeriodId: expense.taxClaimPeriodId || null,
-        });
+        throw error;
     }
 
     context.store.coreDoc.transact(() => {

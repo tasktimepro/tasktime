@@ -50,7 +50,7 @@ describe('useTimers guard paths', () => {
         expect(entriesMap.toJSON()).toEqual({});
     });
 
-    it('guards when data is missing or not in expected state', () => {
+    it('guards when data is missing or not in expected state', async () => {
         const coreDoc = new Y.Doc();
         const activeEntriesDoc = new Y.Doc();
 
@@ -84,7 +84,7 @@ describe('useTimers guard paths', () => {
             projectId: 'task-no-project'
         }));
 
-        expect(result.current.stopTimer('project-1')).toBeNull();
+        await expect(result.current.stopTimer('project-1')).resolves.toBeNull();
 
         act(() => {
             result.current.pauseTimer('project-1');

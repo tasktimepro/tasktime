@@ -115,7 +115,7 @@ function createRandomId(): string {
     return `grant-${createRandomBase64Url(16)}`;
 }
 
-function base64UrlToBytes(value: string): Uint8Array {
+function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
     const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
     const binary = globalThis.atob(padded);

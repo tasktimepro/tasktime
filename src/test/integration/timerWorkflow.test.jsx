@@ -16,15 +16,19 @@ const timerHookMocks = vi.hoisted(() => ({
     startTimer: vi.fn(),
     pauseTimer: vi.fn(),
     resumeTimer: vi.fn(),
+    stopTimer: vi.fn((timerKey) => {
+        const timer = mockTimers.find((candidate) => candidate.projectId === timerKey)
+        if (!timer) return null
+        const entry = {
+            id: 'entry-1',
+            taskId: timer.taskId,
+            start: timer.startTime,
+            end: timer.isPaused ? timer.startTime + timer.elapsedTime : Date.now(),
+        }
+        mockEntries.push(entry)
+        return entry
+    }),
     clearTimer: vi.fn()
-}))
-
-const entriesHookMocks = vi.hoisted(() => ({
-
-    createEntry: vi.fn((entry) => {
-        mockEntries.push({ ...entry, id: 'entry-1' })
-        return { ...entry, id: 'entry-1' }
-    })
 }))
 
 vi.mock('../../hooks/useTimers.ts', () => ({
@@ -39,15 +43,8 @@ vi.mock('../../hooks/useTimers.ts', () => ({
         startTimer: timerHookMocks.startTimer,
         pauseTimer: timerHookMocks.pauseTimer,
         resumeTimer: timerHookMocks.resumeTimer,
+        stopTimer: timerHookMocks.stopTimer,
         clearTimer: timerHookMocks.clearTimer
-    })
-}))
-
-vi.mock('../../hooks/useTimeEntries.ts', () => ({
-
-    useTimeEntries: () => ({
-        entries: mockEntries,
-        createEntry: entriesHookMocks.createEntry
     })
 }))
 
@@ -57,13 +54,6 @@ vi.mock('../../hooks/useTasks.ts', () => ({
         tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Test Task' }],
         activeTasks: [{ id: 'task-1', projectId: 'project-1', title: 'Test Task' }],
         updateTask: vi.fn()
-    })
-}))
-
-vi.mock('../../hooks/useProjects.ts', () => ({
-
-    useProjects: () => ({
-        projects: [{ id: 'project-1', title: 'Test Project', billableTimeIncrementMinutes: null }],
     })
 }))
 
@@ -125,8 +115,8 @@ describe('Timer workflow integration', () => {
 
         // Click stop
         await user.click(screen.getByTitle('Save & Stop Timer'))
-        expect(entriesHookMocks.createEntry).toHaveBeenCalled()
-        expect(timerHookMocks.clearTimer).toHaveBeenCalledWith('project-1')
+        expect(timerHookMocks.stopTimer).toHaveBeenCalledWith('project-1')
+        expect(mockEntries).toHaveLength(1)
     })
 
     it('pause then stop uses paused elapsed time', async () => {
@@ -150,8 +140,8 @@ describe('Timer workflow integration', () => {
         // Click stop (when paused, should use elapsedTime)
         await user.click(screen.getByTitle('Save & Stop Timer'))
 
-        expect(entriesHookMocks.createEntry).toHaveBeenCalled()
-        const entryData = entriesHookMocks.createEntry.mock.calls[0][0]
+        expect(timerHookMocks.stopTimer).toHaveBeenCalledWith('project-1')
+        const entryData = mockEntries[0]
         // Entry end time should equal start + elapsedTime
         expect(entryData.end - entryData.start).toBe(5000)
     })

@@ -139,7 +139,7 @@ export const useUrlState = () => {
         () => (typeof preferences.weekStartsOn === 'number' ? preferences.weekStartsOn : 1),
         [preferences.weekStartsOn]
     );
-    const firstWeekContainsDate = useMemo(
+    const firstWeekContainsDate = useMemo<1 | 4>(
         () => (weekStartsOn === 1 ? 4 : 1),
         [weekStartsOn]
     );

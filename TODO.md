@@ -9,11 +9,11 @@
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
 [ ] Then publish version 1 once we see that it's stable
 
-[ ] Centralize remaining shared UI/agent operations in separate controlled updates
-    [ ] Timer lifecycle and stop recovery — the highest-priority shared operation
-    [ ] Manual time-entry validation — overlaps, billing cutoff, duration fields, updates, and deletion
-    [ ] Task completion and recurring-task state — completion dates, skipping, and stale-skip reconciliation
-    [ ] Task/project/client creation and updates where relationship invariants apply
+[x] Centralize remaining shared UI/agent operations in separate controlled updates
+    [x] Timer lifecycle and stop recovery — the highest-priority shared operation
+    [x] Manual time-entry validation — overlaps, billing cutoff, duration fields, updates, and deletion
+    [x] Task completion and recurring-task state — completion dates, skipping, and stale-skip reconciliation
+    [x] Task/project/client creation and updates where relationship invariants apply
 
 [ ] Publish in more places:
     [ ] PulseMCP - VERIFY AUTO LISTING

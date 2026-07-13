@@ -9,7 +9,7 @@ const integrationState = vi.hoisted(() => ({
     todayStr: '2026-02-25',
     expenses: [],
     recurrences: [],
-    createExpense: vi.fn(),
+    createExpenseWithPaymentSnapshot: vi.fn(),
     markAsPaid: vi.fn(),
     generatePendingExpenses: vi.fn(),
     updateRecurrence: vi.fn(),
@@ -120,7 +120,7 @@ vi.mock('../../hooks/useToast.ts', () => ({
 vi.mock('../../hooks/useExpenses.ts', () => ({
     useExpenses: () => ({
         expenses: integrationState.expenses,
-        createExpense: integrationState.createExpense,
+        createExpenseWithPaymentSnapshot: integrationState.createExpenseWithPaymentSnapshot,
         markAsPaid: integrationState.markAsPaid,
     }),
 }))
@@ -303,7 +303,7 @@ describe('Recurring expense App integration', () => {
         integrationState.expenses.length = 0
         integrationState.recurrences.length = 0
         integrationState.recurrences.push({ ...recurrenceTemplate })
-        integrationState.createExpense.mockImplementation((data) => {
+        integrationState.createExpenseWithPaymentSnapshot.mockImplementation((data) => {
             const expense = {
                 ...data,
                 id: data.id || `expense-${integrationState.expenses.length + 1}`,
@@ -340,20 +340,20 @@ describe('Recurring expense App integration', () => {
         vi.restoreAllMocks()
     })
 
-    it('materializes a due planner preview into a real expense before opening the modal', () => {
+    it('materializes a due planner preview into a real expense before opening the modal', async () => {
         integrationState.view = 'planner'
 
         render(<App />)
 
         fireEvent.click(screen.getByRole('button', { name: 'Open planner recurring expense' }))
 
-        expect(integrationState.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+        await screen.findByRole('button', { name: 'Mark as paid' })
+        expect(integrationState.createExpenseWithPaymentSnapshot).toHaveBeenCalledWith(expect.objectContaining({
             title: 'Office',
             date: '2026-02-25',
             recurrenceId: 'rec-office',
             paymentStatus: 'unpaid',
         }))
-        expect(screen.getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
         expect(screen.queryByText('Upcoming')).not.toBeInTheDocument()
     })
 

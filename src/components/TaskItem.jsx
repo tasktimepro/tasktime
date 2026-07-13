@@ -14,7 +14,7 @@ import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { BILLABLE_TIME_THRESHOLD_MS } from '../constants/app';
 import { formatDurationWithSeconds, getTodayString } from '../utils/dateUtils.ts';
-import { buildBillableDurationFields, getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
+import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import { startOfDay, endOfDay } from 'date-fns';
 
 /**
@@ -55,12 +55,12 @@ const TaskItem = ({
     const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
     const [newSubtaskEstimatedHours, setNewSubtaskEstimatedHours] = useState('');
     const [newSubtaskEstimatedFlatAmount, setNewSubtaskEstimatedFlatAmount] = useState('');
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
     
     // Yjs hooks for state
     const { tasks, updateTask, toggleRecurringCompletion, isCompletedOnDate } = useTasks();
-    const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { getTimerForTask, clearTimer } = useTimers();
+    const { entries: timeEntries } = useTimeEntries();
+    const { getTimerForTask, stopTimer } = useTimers();
     const { projects } = useProjects();
 
     const subtasks = useMemo(() => {
@@ -189,25 +189,17 @@ const TaskItem = ({
      * Toggle task completion status.
      * @param {boolean} checked
      */
-    const handleToggleComplete = useCallback((checked) => {
+    const handleToggleComplete = useCallback(async (checked) => {
         const now = Date.now();
 
         // If timer is active for this task, stop it and create entry
         if (isTimerActive && projectTimer?.startTime) {
-            createEntry({
-                taskId: task.id,
-                start: projectTimer.startTime,
-                end: now,
-                note: projectTimer.note,
-                _stoppedTimerKey: timerKey,
-                _stoppedTimerInstanceId: projectTimer.timerInstanceId,
-                ...buildBillableDurationFields({
-                    start: projectTimer.startTime,
-                    end: now,
-                    billingIncrementMinutes: currentProject?.billableTimeIncrementMinutes,
-                }),
-            });
-            clearTimer(timerKey);
+            try {
+                if (!await stopTimer(timerKey)) return;
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Could not stop the timer.');
+                return;
+            }
         }
 
         if (task.recurring && recurringCompletionDate) {
@@ -225,7 +217,7 @@ const TaskItem = ({
             completedOnDate: checked ? todayStr : null,
             lastActive: now
         });
-    }, [isTimerActive, projectTimer, task.id, task.recurring, task.promptTimeEntry, recurringCompletionDate, effectiveDateStr, createEntry, clearTimer, updateTask, toggleRecurringCompletion, timerKey, currentProject]);
+    }, [isTimerActive, projectTimer, task.id, task.recurring, task.promptTimeEntry, recurringCompletionDate, effectiveDateStr, showError, stopTimer, updateTask, toggleRecurringCompletion, timerKey]);
 
     /**
      * Update task title.

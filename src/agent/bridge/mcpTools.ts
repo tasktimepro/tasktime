@@ -948,15 +948,31 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
                 parentTaskId: nullableString,
                 note: nullableString,
                 billable: optionalBoolean,
+                startDate: nullableString,
+                recurring: {
+                    type: ['object', 'null'],
+                    properties: {
+                        type: { type: 'string', enum: ['weekly', 'monthly', 'yearly'] },
+                        weeklyDays: { type: 'array', items: optionalNumber },
+                        monthlyType: { type: 'string', enum: ['first', 'last', 'specific'] },
+                        monthlyDay: optionalNumber,
+                        yearlyDate: optionalString,
+                    },
+                    required: ['type'],
+                    additionalProperties: false,
+                },
+                promptTimeEntry: optionalBoolean,
+                estimatedHours: { type: ['number', 'null'] },
+                estimatedFlatAmount: { type: ['number', 'null'] },
                 idempotencyKey: optionalString,
             },
             required: ['title'],
-            additionalProperties: true,
+            additionalProperties: false,
         },
     },
     {
         name: 'update_task',
-        description: 'Update an existing TaskTime Pro task.',
+        description: 'Update a TaskTime Pro task through relationship and task-state invariants. Use complete_task for recurring occurrences.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1118,13 +1134,14 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'stop_timer',
-        description: 'Stop a timer and create the matching time entry.',
+        description: 'Stop a timer and create one matching time entry with complete-history validation and replay/concurrency recovery.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
             properties: {
                 timerKey: optionalString,
                 taskId: optionalString,
+                idempotencyKey: optionalString,
             },
             additionalProperties: false,
         },
@@ -1162,7 +1179,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'add_manual_time_entry',
-        description: 'Create a manual time entry after TaskTime Pro validates billing cutoffs and overlaps.',
+        description: 'Create a manual time entry after TaskTime Pro validates billing cutoffs and overlaps against complete local history.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1180,7 +1197,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'update_time_entry',
-        description: 'Edit an active unbilled time entry after validating task, billing cutoff, and overlap rules. Historical and billed entries are rejected.',
+        description: 'Edit an active unbilled time entry after validating source/target task, billing cutoff, and complete-history overlap rules. Historical and billed entries are rejected.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1375,12 +1392,29 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
                 currency: optionalString,
                 isPersonal: optionalBoolean,
                 billable: optionalBoolean,
+                note: nullableString,
+                supplierName: nullableString,
+                receiptNumber: nullableString,
+                paidOn: nullableString,
+                paidBy: nullableString,
+                paymentStatus: { type: 'string', enum: ['unpaid', 'paid'] },
+                paymentMode: { type: 'string', enum: ['manual', 'auto'] },
                 clientId: nullableString,
                 projectId: nullableString,
+                businessId: nullableString,
+                categoryId: nullableString,
+                isRecurring: optionalBoolean,
+                recurrenceId: nullableString,
+                amountType: { type: ['string', 'null'], enum: ['fixed', 'variable', null] },
+                taxNumber: nullableString,
+                isTaxExempt: optionalBoolean,
+                amountExcludingTax: { type: ['number', 'null'] },
+                taxLabel: nullableString,
+                taxRate: { type: ['number', 'null'] },
                 idempotencyKey: optionalString,
             },
             required: ['title', 'date', 'amount', 'currency', 'isPersonal', 'billable'],
-            additionalProperties: true,
+            additionalProperties: false,
         },
     },
     {
@@ -1904,13 +1938,13 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'get_dashboard_summary',
-        description: 'Get a bounded summary of current TaskTime Pro work, timers, unbilled time, expenses, and draft invoices.',
+        description: 'Get a bounded summary of current work and canonical invoice-eligible time across complete local history.',
         scopes: ['read'],
         inputSchema: emptySchema,
     },
     {
         name: 'get_project_overview',
-        description: 'Get a bounded project summary with task, timer, unbilled time, expense, and invoice counts.',
+        description: 'Get a bounded project summary with canonical invoice-eligible time across complete local history.',
         scopes: ['read'],
         inputSchema: {
             type: 'object',
@@ -2159,7 +2193,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'find_unbilled_time',
-        description: 'Find recent unbilled time entries, optionally scoped by project or task.',
+        description: 'Find canonical invoice-eligible time across complete local history, optionally scoped by project or task.',
         scopes: ['read'],
         inputSchema: {
             type: 'object',
@@ -2173,7 +2207,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'list_recent_entries',
-        description: 'List recent time entries as bounded summary records.',
+        description: 'List recent entries across complete local history with actual and billable duration summaries.',
         scopes: ['read'],
         inputSchema: {
             type: 'object',

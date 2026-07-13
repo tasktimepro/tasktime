@@ -22,6 +22,8 @@ export interface CreateTaxReturnPeriodCommandInput extends Partial<Omit<TaxRetur
     type: TaxReturnPeriod['type'];
     startDate: string;
     endDate: string;
+    createdAt?: number;
+    updatedAt?: number;
     idempotencyKey?: string;
 }
 

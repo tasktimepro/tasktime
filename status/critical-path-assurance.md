@@ -6,8 +6,9 @@ This is the execution checklist for the production-safety findings discovered du
 
 - [x] Complete the initial source, contract, unit, browser, PWA, and live-agent audit.
 - [x] Confirm the current broad baseline: lint, build, 1,746 tests, coverage, 34 browser smoke tests, 2 PWA smoke tests, and the live agent release flow.
-- [x] Complete remediation slices A-F below.
+- [x] Complete remediation slices A-G below.
 - [x] Run the full release gate and reconcile specifications, contracts, status, and generated agent artifacts.
+- [x] Clear the repository-wide TypeScript baseline and make type checking a required release gate.
 
 Do not mark this assurance phase complete while a Critical or High finding remains unresolved or while a required product decision remains open in `spec/ambiguities.md`.
 
@@ -78,12 +79,30 @@ Do not mark this assurance phase complete while a Critical or High finding remai
 - [x] Show requested scopes before pairing and bind persistent grants to a stronger stable agent identity.
 - [x] Regenerate and validate command catalogs, bridge package, OpenClaw/Claude bundles, and public docs after command/schema changes.
 
+## Slice G — Shared UI/agent operation follow-up
+
+- [x] Remove automatic recurring-task skip cleanup writes; derive current-occurrence skip state without overwriting stale or concurrently synced skip evidence.
+- [x] Reject caller-supplied duplicate entity identities before mutation in shared UI collections and agent creates, including loaded archive documents.
+- [x] Enforce one billed/tax-claimed expense deletion guard in UI hooks, modals, and agent commands.
+- [x] Make agent dashboard, project, unbilled, and recent-entry queries load complete lazy data and use canonical billing evidence and billable duration.
+- [x] Prepare required paid cross-currency expense snapshots before create/update/recurring persistence and advance recurrence cursors only after successful generation.
+- [x] Add regressions for duplicate identity preservation, protected expense deletion, historical/legacy billing query parity, FX failure atomicity, and recurring retry behavior.
+
+## Slice H — Repository-wide type-safety baseline
+
+- [x] Clear all 87 repository-wide `tsc --noEmit` diagnostics without narrowing the files included by the compiler.
+- [x] Replace stale ambient dependency declarations with the installed package types while preserving the project-specific Yjs compatibility declarations.
+- [x] Align app, domain, report, invoice, sync, and agent types with supported persisted legacy shapes and current runtime contracts.
+- [x] Preserve project-note local-only transaction origins through the centralized project update hook and add a regression for the forwarding contract.
+- [x] Add `make typecheck` and require it in both the Makefile and npm release gates.
+
 ## Required validation
 
 - [x] Focused red/green tests for every completed checklist item.
 - [x] `make test-run`
 - [x] `make test-coverage`
 - [x] `make lint`
+- [x] `make typecheck`
 - [x] `make test-e2e-smoke`
 - [x] `make test-e2e-pwa-smoke`
 - [x] `make build`
@@ -143,3 +162,28 @@ Do not mark this assurance phase complete while a Critical or High finding remai
 - Preserved late-sync safety: only an exact finalized legacy invoice period/task-duration match suppresses markerless historical entries; ambiguous and later-created entries remain eligible.
 - Added focused domain, UI-calculation, agent-parity, preview, and real backup-import regressions.
 - Passed the full Docker release gate: lint, 1,812 tests across 208 files with 94.28% statement coverage, 34 browser smoke tests, 2 production PWA/offline smoke tests, and production app/public-site builds. The packaged bridge/bundle/live MCP release flow also passed, including invoice preview, draft, finalization, and post-finalization eligibility.
+
+### 2026-07-13 — Shared-operation production follow-up
+
+- Removed the recurring-task stale-skip mutation path so occurrence status is a pure read and sync cannot turn local cleanup into a destructive remote update.
+- Added fail-closed identity guards for UI and agent creates so a caller-provided ID cannot replace an active or loaded archived record.
+- Centralized protected expense deletion and made paid foreign-currency expense writes prepare a valid exchange snapshot before any durable mutation.
+- Made recurring expense generation retry-safe: failed creation leaves the cursor unchanged, and deterministic occurrence IDs prevent duplicate materialization.
+- Made agent summary/unbilled/recent queries await historical and archived documents and share canonical invoice eligibility, legacy billing evidence, and billable-duration calculations with the app.
+- Passed 1,858 tests across 214 files with 93.96% statement coverage, lint, 34 browser smoke tests, 2 production PWA/offline smoke tests, and production app/public-site builds. The packaged bridge, managed bundles, and live MCP release flow also passed, including timer lifecycle, manual time creation, invoice preview/finalization, and post-finalization unbilled reconciliation.
+- Final pre-ship review found no unresolved Critical or High issue in the shared-operation scope.
+
+### 2026-07-13 — Zero-diagnostic typecheck follow-up
+
+- Cleared all 87 diagnostics from the existing repository-wide `tsc --noEmit` run, including stale ambient declarations and contract drift across persisted entities, date preferences, reports, invoices, sync, and agent transport/commands.
+- Recovered one runtime-relevant project-note behavior exposed by the type audit: `useProjects.updateProject` now forwards the local-only Yjs transaction origin used to defer note-only sync scheduling, with a focused regression preserving ordinary two-argument callers.
+- Added `make typecheck` and made it mandatory in the npm and Makefile release gates; requirements, acceptance, contributor guidance, and architecture documentation now record that contract.
+- Passed the full Docker release gate: lint, zero-diagnostic typecheck, 1,859 tests across 214 files with 93.96% statement coverage, 34 browser smoke tests, 2 production PWA/offline smoke tests, and production app/public-site builds.
+- Passed the packaged bridge, managed bundle, and live MCP release flow, including timer lifecycle/recovery, manual billable entry creation, invoice preview/finalization, and post-finalization unbilled reconciliation.
+- Detected and closed an artifact-only release gap by comparing the built bridge with the managed bundle copies: prepared `@tasktimepro/agent-bridge` 0.2.0 and the OpenClaw/Claude 0.2.0 bundles, refreshed both vendored bridges byte-for-byte, and repeated the bundle/live-agent validation.
+
+### 2026-07-13 — Time-entry display parity follow-up
+
+- Replaced the dashboard time-entry widget's minutes-only formatter with the seconds-aware formatter already used by tasks and detailed time-entry views; valid sub-minute entries now render as values such as `45s`, mixed durations as `1m 5s`, exact-minute durations remain compact, and non-positive intervals show `0s`.
+- Added a focused component regression covering sub-minute, mixed, exact-minute, and zero-length durations.
+- Passed the full Docker app release gate: lint, zero-diagnostic typecheck, 1,860 tests across 215 files with 93.96% statement coverage, 34 browser smoke tests, 2 production PWA/offline smoke tests, and production app/public-site builds.

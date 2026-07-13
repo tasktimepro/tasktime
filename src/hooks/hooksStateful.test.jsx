@@ -94,7 +94,7 @@ describe('stateful hooks', () => {
 
         const timersMap = createTestYMap({}, coreDoc, 'timers')
         const tasksMap = createTestYMap({
-            'task-1': { id: 'task-1', projectId: 'project-1' }
+            'task-1': { id: 'task-1', title: 'Task', projectId: 'project-1' }
         }, coreDoc, 'tasks')
         const entriesMap = createTestYMap({}, activeEntriesDoc, 'entries')
         const store = {
@@ -137,7 +137,7 @@ describe('stateful hooks', () => {
 
         let entry
         await act(async () => {
-            entry = result.current.stopTimer('project-1')
+            entry = await result.current.stopTimer('project-1')
         })
         expect(entry?.taskId).toBe('task-1')
         expect(readStored(entriesMap, entry.id)?.taskId).toBe('task-1')

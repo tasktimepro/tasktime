@@ -90,6 +90,7 @@ export interface Task {
     sortOrderUpdatedAt?: number | null;
     lastActive?: number;
     createdAt?: number;
+    updatedAt?: number;
     lastBilledAt?: number | null;
     startDate?: string | null;
     recurring?: RecurringConfig | null;
@@ -152,6 +153,8 @@ export interface Client {
     updatedAt?: number;
     /** Display name / Company name shown in lists */
     title: string;
+    /** Supported legacy display-name alias */
+    name?: string;
     /** Business legal name (for invoices) */
     clientName?: string;
     /** Contact person name */
@@ -329,6 +332,8 @@ export interface InvoiceBillingSelectionSnapshot {
 export interface Invoice {
     id: string;
     projectId: string | null;
+    /** Supported legacy embedded project snapshot */
+    project?: Project;
     projectIds?: string[];
     projectBreakdowns?: InvoiceProjectBreakdown[];
     clientExpenseItems?: InvoiceExpenseBreakdownItem[];
@@ -395,6 +400,8 @@ export interface InvoiceBrandingSnapshot {
 export interface InvoiceTemplate {
     id: string;
     name: string;
+    createdAt?: number;
+    updatedAt?: number;
     prefix?: string;
     useSequentialNumbers?: boolean;
     currentSequentialNumber?: number;
@@ -627,7 +634,7 @@ export interface Preferences {
     timeFormat?: string;
     theme?: 'light' | 'dark' | 'system';
     defaultView?: string;
-    weekStartsOn?: number;
+    weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
     autoHideTotalsOnRevisit?: boolean;
     showCompletedTasks?: boolean;
     defaultBillable?: boolean;

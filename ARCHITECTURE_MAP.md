@@ -41,6 +41,7 @@ Public web build
 - Domain modules remain UI-independent and receive explicit inputs/dependencies.
 - Sync providers operate on Yjs document updates and manifests; they do not redefine entity business rules.
 - Agent commands call the same store/domain behaviors as the UI and never expose raw Yjs access to MCP clients.
+- Shared operations under `src/domain/time/`, `src/domain/tasks/`, `src/domain/work/`, `src/domain/entities/`, and `src/domain/expenses/` own cross-surface validation and mutation planning; hooks and agent commands adapt errors, permissions, transactions, archive loading, and activity metrics around them.
 - The local bridge transports commands but does not become a second data owner.
 - Public docs and generated tool artifacts derive from the implemented command/catalog sources.
 

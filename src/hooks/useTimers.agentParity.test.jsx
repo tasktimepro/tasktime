@@ -167,7 +167,7 @@ describe('useTimers and agent command parity', () => {
         expect(Date.now() - readTimer(harness.uiStore).startTime).toBe(5_375);
     });
 
-    it('stops into equivalent time-entry data and clears the same timer', () => {
+    it('stops into equivalent time-entry data and clears the same timer', async () => {
         const harness = createParityHarness();
         startBoth(harness);
         const uiTimerInstanceId = readTimer(harness.uiStore).timerInstanceId;
@@ -187,10 +187,10 @@ describe('useTimers and agent command parity', () => {
         vi.advanceTimersByTime(3_250);
 
         let uiEntry;
-        act(() => {
-            uiEntry = harness.result.current.stopTimer('project-1');
+        await act(async () => {
+            uiEntry = await harness.result.current.stopTimer('project-1');
         });
-        const agentResult = stopTimerCommand(harness.agentContext, { timerKey: 'project-1' });
+        const agentResult = await stopTimerCommand(harness.agentContext, { timerKey: 'project-1' });
 
         expect(comparableEntry(uiEntry)).toEqual(comparableEntry(agentResult.entry));
         expect(uiEntry.end - uiEntry.start).toBe(8_625);

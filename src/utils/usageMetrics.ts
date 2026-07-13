@@ -11,7 +11,7 @@ const SESSION_GAP_MS = 30 * 60 * 1000;
 const OPEN_SEND_DELAY_MS = 30 * 1000;
 const MAX_SESSION_COUNT_PER_DAY = 100;
 
-type CollectionActionVerb = 'create' | 'update' | 'delete' | 'archive' | 'unarchive';
+type CollectionActionVerb = 'create' | 'update' | 'delete' | 'archive' | 'unarchive' | 'remove' | 'set';
 
 export type UsageMetricsAction =
     | `${string}_${CollectionActionVerb}`
@@ -62,7 +62,7 @@ const runtime = {
     sessionId: null as string | null,
     started: false,
     hiddenAt: null as number | null,
-    openSendTimer: null as ReturnType<typeof window.setTimeout> | null,
+    openSendTimer: null as number | null,
 };
 
 let operationQueue = Promise.resolve<unknown>(undefined);

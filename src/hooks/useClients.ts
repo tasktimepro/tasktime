@@ -9,6 +9,8 @@ import { useYjsCollection } from './useYjsCollection';
 import { useYjs } from '@/contexts/YjsContext';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import type { Client } from '@/stores/yjs/types';
+import { buildClientEntity, buildClientUpdates } from '@/domain/work/workEntityOperations';
+import { generateId } from '@/utils/idUtils';
 
 export function useClients() {
     const { store, isReady } = useYjs();
@@ -29,6 +31,22 @@ export function useClients() {
         return items.find(c => (c.title || '').toLowerCase() === lower);
     }, [items]);
 
+    const createClient = useCallback((data: Omit<Client, 'id'> & { id?: string }) => {
+        const id = data.id || generateId();
+        return create(buildClientEntity({ data, id, now: Date.now() }));
+    }, [create]);
+
+    const updateClient = useCallback((id: string, updates: Partial<Client>) => {
+        const existing = get(id);
+        if (!existing) return undefined;
+        const built = buildClientUpdates({ existing, updates, now: Date.now() });
+        const normalizedUpdates = Object.prototype.hasOwnProperty.call(updates, 'title')
+            ? { ...updates, title: built.title }
+            : updates;
+        const { id: _immutableId, ...persistedUpdates } = normalizedUpdates;
+        return update(id, persistedUpdates);
+    }, [get, update]);
+
     const deleteClient = useCallback((id: string) => {
         const deleted = remove(id);
 
@@ -47,8 +65,8 @@ export function useClients() {
         
         // CRUD
         getClient: get,
-        createClient: create,
-        updateClient: update,
+        createClient,
+        updateClient,
         deleteClient,
         
         // Helpers

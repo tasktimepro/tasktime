@@ -2,7 +2,7 @@ import { ClockIcon, ListFilterIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import useIsMobileLayout from '../../hooks/useIsMobileLayout';
-import { formatDuration, toDisplayDate } from '../../utils/dateUtils.ts';
+import { formatDurationWithSeconds, toDisplayDate } from '../../utils/dateUtils.ts';
 import { DEFAULT_TIME_ENTRIES_PROJECT_FILTER } from './dashboardWidgetConstants';
 
 const TimeEntriesOverview = ({
@@ -58,8 +58,8 @@ const TimeEntriesOverview = ({
                     <div className="divide-y divide-border">
                         {entries.map((entry) => {
                             const duration = entry.end > entry.start
-                                ? formatDuration(entry.end - entry.start)
-                                : '0m';
+                                ? formatDurationWithSeconds(entry.end - entry.start)
+                                : '0s';
 
                             return (
                                 <div key={entry.id} className="px-3 py-3 hover:bg-muted transition-colors">

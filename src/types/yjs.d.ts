@@ -9,6 +9,7 @@
 declare module 'yjs' {
     export class Doc {
         constructor();
+        readonly share: globalThis.Map<string, unknown>;
         getMap<T = unknown>(name: string): Map<string, T>;
         destroy(): void;
         on(event: string, callback: (...args: unknown[]) => void): void;
@@ -45,11 +46,13 @@ declare module 'y-indexeddb' {
 
     export class IndexeddbPersistence {
         constructor(name: string, doc: Doc);
+        synced: boolean;
         destroy(): Promise<void>;
         clearData(): Promise<void>;
         once(event: 'synced', callback: () => void): void;
         on(event: string, callback: (...args: unknown[]) => void): void;
         off(event: string, callback: (...args: unknown[]) => void): void;
         whenSynced: Promise<IndexeddbPersistence>;
+        set(key: string | number | ArrayBuffer | Date, value: string | number | ArrayBuffer | Date): Promise<string | number | ArrayBuffer | Date>;
     }
 }

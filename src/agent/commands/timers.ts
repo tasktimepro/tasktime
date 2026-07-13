@@ -1,12 +1,25 @@
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
-import { checkTimeOverlap } from '@/utils/timeValidationUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
-import { objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
-import { buildBillableDurationFields } from '@/utils/timeEntryDurationUtils';
-import type { MultiTimerState, Task, TimeEntry } from '@/stores/yjs/types';
+import { objectToYMap, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
+import type { MultiTimerState, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
 import { assertPermission, assertReady, getId, getNow, readRequiredEntity, requireString, withIdempotency } from './shared';
+import {
+    TimerOperationError,
+    buildPausedTimer,
+    buildResumedTimer,
+    buildStartedTimer,
+    buildUpdatedTimer,
+    findStoppedTimerEntry,
+    planStoppedTimer,
+} from '@/domain/time/timerOperations';
+import {
+    TimeEntryOperationError,
+    assertManualTimeEntryDeletion,
+    buildManualTimeEntry,
+    buildManualTimeEntryUpdate,
+} from '@/domain/time/manualTimeEntryOperations';
 
 export interface StartTimerCommandInput {
     taskId: string;
@@ -107,52 +120,65 @@ function resolveTimerKey(context: AgentCommandContext, input: { timerKey?: strin
     throw new AgentCommandError('INVALID_INPUT', 'timerKey or taskId is required.');
 }
 
-function isEntryBilled(entry: TimeEntry): boolean {
-    return Boolean(entry.billedAt || entry.billedInvoiceId);
-}
-
-function getTaskOverlapContext(context: AgentCommandContext) {
-    return collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent time entry task overlap')
-        .map((item) => ({
-            id: item.id,
-            projectId: item.projectId || item.id,
-            title: item.title,
-        }));
-}
-
-function assertValidEntryTiming(start: number, end: number, label: string): void {
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
-        throw new AgentCommandError('INVALID_INPUT', `${label} start/end are invalid.`);
+function throwAgentTimeEntryError(error: unknown): never {
+    if (error instanceof TimeEntryOperationError) {
+        throw new AgentCommandError(error.code, error.message, error.details);
     }
+    throw error;
 }
 
-function assertEntryAfterBillingCutoff(task: Task, start: number): void {
-    const billingCutoff = task.lastBilledAt || 0;
-
-    if (start < billingCutoff) {
-        throw new AgentCommandError('CONFLICT', 'Cannot place time entries before the latest billed time entry.', { billingCutoff });
+function throwAgentTimerError(error: unknown): never {
+    if (error instanceof TimerOperationError) {
+        throw new AgentCommandError(error.code, error.message, error.details);
     }
+    throw error;
 }
 
-function assertNoTimeOverlap(
+async function collectStoppedTimerEntries(context: AgentCommandContext): Promise<TimeEntry[]> {
+    if (typeof context.store.loadAllTimeEntries === 'function') {
+        return context.store.loadAllTimeEntries();
+    }
+    if (typeof context.store.getAllTimeEntries === 'function') {
+        return context.store.getAllTimeEntries();
+    }
+
+    return collectValidatedEntities<TimeEntry>('timeEntries', context.store.activeTimeEntries as any, 'agent stopped timer entries');
+}
+
+async function collectManualTimeEntryState(context: AgentCommandContext): Promise<{
+    archivedTaskMap: any;
+    entries: TimeEntry[];
+    tasks: Task[];
+}> {
+    const archivedTaskMap = typeof context.store.loadArchivedTasks === 'function'
+        ? await context.store.loadArchivedTasks()
+        : context.store.archivedTasks;
+    const entries = await collectStoppedTimerEntries(context);
+    const tasks = [
+        ...collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent time entry tasks'),
+        ...(archivedTaskMap
+            ? collectValidatedEntities<Task>('tasks', archivedTaskMap as any, 'agent time entry archived tasks')
+            : []),
+    ];
+
+    return { archivedTaskMap, entries, tasks };
+}
+
+function readManualTimeEntryTask(
     context: AgentCommandContext,
-    task: Task,
-    start: number,
-    end: number,
-    excludeEntryId?: string | null
-): void {
-    const overlap = checkTimeOverlap(
-        start,
-        end,
-        task.projectId || task.id,
-        context.store.getAllTimeEntries(),
-        getTaskOverlapContext(context),
-        excludeEntryId || null
-    );
+    archivedTaskMap: any,
+    taskId: string,
+): Task {
+    const task = readValidatedEntity<Task>('tasks', context.store.tasks.get(taskId), `agent time entry task ${taskId}`)
+        || (archivedTaskMap
+            ? readValidatedEntity<Task>('tasks', archivedTaskMap.get(taskId), `agent archived time entry task ${taskId}`)
+            : null);
 
-    if (!overlap.isValid) {
-        throw new AgentCommandError('CONFLICT', overlap.error || 'Time entry overlaps an existing entry.');
+    if (!task) {
+        throw new AgentCommandError('NOT_FOUND', 'Task not found.', { id: taskId });
     }
+
+    return task;
 }
 
 export function getActiveTimersCommand(context: AgentCommandContext): ActiveTimerResult[] {
@@ -191,16 +217,13 @@ export function startTimerCommand(context: AgentCommandContext, input: StartTime
         }
 
         const now = getNow(context);
-        const timer = validateCollectionEntity<MultiTimerState>('timers', {
-            projectId: timerKey,
-            taskId,
+        const task = readRequiredEntity<Task>(context.store.tasks as any, taskId, 'Task');
+        const timer = validateCollectionEntity<MultiTimerState>('timers', buildStartedTimer({
+            task,
             timerInstanceId: getId(context),
-            startTime: Math.ceil(now / 1000) * 1000,
-            paused: false,
-            pausedElapsedTime: 0,
-            note: input.note || '',
-            lastActive: now,
-        }, `agent start timer ${timerKey}`);
+            now,
+            note: input.note,
+        }), `agent start timer ${timerKey}`);
 
         context.store.coreDoc.transact(() => {
             (context.store.timers as any).set(timerKey, objectToYMap(timer as unknown as Record<string, unknown>));
@@ -229,24 +252,19 @@ export function pauseTimerCommand(context: AgentCommandContext, input: PauseTime
     const pausedAt = typeof input.pausedAt === 'number' && Number.isFinite(input.pausedAt)
         ? input.pausedAt
         : getNow(context);
-    const pausedElapsedTime = Math.max(0, pausedAt - timer.startTime);
+    const paused = buildPausedTimer(timer, pausedAt);
 
     context.store.coreDoc.transact(() => {
         updateEntityFields(context.store.timers as any, timerKey, {
-            paused: true,
-            pausedElapsedTime,
-            lastActive: pausedAt,
+            paused: paused.paused,
+            pausedElapsedTime: paused.pausedElapsedTime,
+            lastActive: paused.lastActive,
         });
     });
 
     markMeaningfulActivity('timer_pause');
 
-    return {
-        ...timer,
-        paused: true,
-        pausedElapsedTime,
-        lastActive: pausedAt,
-    };
+    return paused;
 }
 
 export function resumeTimerCommand(context: AgentCommandContext, input: ResumeTimerCommandInput): MultiTimerState {
@@ -264,18 +282,14 @@ export function resumeTimerCommand(context: AgentCommandContext, input: ResumeTi
         return timer;
     }
 
-    const pausedTime = timer.pausedElapsedTime || 0;
     const now = getNow(context);
+    const merged = validateCollectionEntity<MultiTimerState>('timers', buildResumedTimer(timer, now), `agent resume timer ${timerKey}`);
     const updates = {
-        startTime: now - pausedTime,
-        paused: false,
-        pausedElapsedTime: 0,
-        lastActive: now,
+        startTime: merged.startTime,
+        paused: merged.paused,
+        pausedElapsedTime: merged.pausedElapsedTime,
+        lastActive: merged.lastActive,
     };
-    const merged = validateCollectionEntity<MultiTimerState>('timers', {
-        ...timer,
-        ...updates,
-    }, `agent resume timer ${timerKey}`);
 
     context.store.coreDoc.transact(() => {
         updateEntityFields(context.store.timers as any, timerKey, updates);
@@ -285,81 +299,95 @@ export function resumeTimerCommand(context: AgentCommandContext, input: ResumeTi
     return merged;
 }
 
-export function stopTimerCommand(context: AgentCommandContext, input: StopTimerCommandInput): { timerKey: string; entry: TimeEntry; durationMs: number } {
+export async function stopTimerCommand(context: AgentCommandContext, input: StopTimerCommandInput): Promise<{ timerKey: string; entry: TimeEntry; durationMs: number }> {
     assertReady(context);
     assertPermission(context, 'write');
 
-    return withIdempotency(context, input.idempotencyKey, () => {
-        const timerKey = resolveTimerKey(context, input);
-        const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent stop timer ${timerKey}`);
-        const priorOperationEntry = input.idempotencyKey
-            ? findStoppedTimerEntry(context, (entry) => entry._stoppedTimerOperationId === input.idempotencyKey)
-            : null;
+    const timerKey = resolveTimerKey(context, input);
+    const cacheKey = input.idempotencyKey
+        ? `stop_timer:${timerKey}:${input.idempotencyKey}`
+        : undefined;
 
-        if (!timer) {
-            if (priorOperationEntry) {
-                return buildStopTimerResult(timerKey, priorOperationEntry);
-            }
+    return withIdempotency(context, cacheKey, async () => {
+        const requestedTimer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent stop timer ${timerKey}`);
+        if (!requestedTimer) {
+            const stoppedEntries = await collectStoppedTimerEntries(context);
+            const recovered = findStoppedTimerEntry({
+                timerKey,
+                timer: null,
+                entries: stoppedEntries,
+                operationId: input.idempotencyKey,
+            });
 
+            if (recovered) return buildStopTimerResult(timerKey, recovered);
             throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
         }
 
-        const priorInstanceEntry = timer.timerInstanceId
-            ? findStoppedTimerEntry(context, (entry) => (
-                entry._stoppedTimerKey === timerKey
-                && entry._stoppedTimerInstanceId === timer.timerInstanceId
-            ))
-            : null;
+        const stoppedEntries = await collectStoppedTimerEntries(context);
+        const archivedTaskMap = typeof context.store.loadArchivedTasks === 'function'
+            ? await context.store.loadArchivedTasks()
+            : context.store.archivedTasks;
+        const tasks = [
+            ...collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent stopped timer tasks'),
+            ...(archivedTaskMap
+                ? collectValidatedEntities<Task>('tasks', archivedTaskMap as any, 'agent stopped timer archived tasks')
+                : []),
+        ];
+        const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent finish stopping timer ${timerKey}`);
 
-        if (priorInstanceEntry) {
-            context.store.coreDoc.transact(() => {
-                context.store.timers.delete(timerKey);
-            });
-
-            markMeaningfulActivity('timer_stop');
-            return buildStopTimerResult(timerKey, priorInstanceEntry);
+        if (!timer) {
+            const recovered = findStoppedTimerEntry({ timerKey, timer: requestedTimer, entries: stoppedEntries, operationId: input.idempotencyKey });
+            if (recovered) return buildStopTimerResult(timerKey, recovered);
+            throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
+        }
+        if (timer.timerInstanceId !== requestedTimer.timerInstanceId
+            || timer.taskId !== requestedTimer.taskId
+            || timer.startTime !== requestedTimer.startTime) {
+            throw new AgentCommandError('CONFLICT', 'The active timer changed while it was being stopped.', { timerKey });
         }
 
         const now = getNow(context);
-        const startTime = timer.paused
-            ? (now - (timer.pausedElapsedTime || 0))
-            : timer.startTime;
+        const stoppedTask = tasks.find((candidate) => candidate.id === timer.taskId) || null;
+        const stoppedProject = stoppedTask?.projectId && context.store.projects
+            ? readEntity<Project>(context.store.projects.get(stoppedTask.projectId)) || null
+            : null;
+        let stopPlan;
+        try {
+            stopPlan = planStoppedTimer({
+                timerKey,
+                timer,
+                entries: stoppedEntries,
+                tasks,
+                now,
+                operationId: input.idempotencyKey,
+                billingIncrementMinutes: stoppedProject?.billableTimeIncrementMinutes,
+            });
+        } catch (error) {
+            throwAgentTimerError(error);
+        }
+        const entry = validateCollectionEntity<TimeEntry>('timeEntries', stopPlan.entry, `agent stop timer entry ${timerKey}`);
 
-        const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
-            id: getId(context),
-            taskId: timer.taskId,
-            start: startTime,
-            end: now,
-            note: timer.note,
-            _stoppedTimerKey: timerKey,
-            _stoppedTimerInstanceId: timer.timerInstanceId,
-            _stoppedTimerOperationId: input.idempotencyKey,
-            createdAt: now,
-            updatedAt: now,
-        }, `agent stop timer entry ${timerKey}`);
-
-        context.store.activeEntriesDoc.transact(() => {
-            (context.store.activeTimeEntries as any).set(entry.id, objectToYMap(entry as unknown as Record<string, unknown>));
-        });
+        if (!stopPlan.recovered) {
+            context.store.activeEntriesDoc.transact(() => {
+                (context.store.activeTimeEntries as any).set(entry.id, objectToYMap(entry as unknown as Record<string, unknown>));
+            });
+        }
 
         context.store.coreDoc.transact(() => {
-            context.store.timers.delete(timerKey);
+            const latestTimer = readEntity<MultiTimerState>(context.store.timers.get(timerKey));
+            const matchesStoppedInstance = latestTimer
+                && latestTimer.taskId === timer.taskId
+                && latestTimer.startTime === timer.startTime
+                && latestTimer.timerInstanceId === timer.timerInstanceId;
+
+            if (matchesStoppedInstance) {
+                context.store.timers.delete(timerKey);
+            }
         });
 
         markMeaningfulActivity('timer_stop');
         return buildStopTimerResult(timerKey, entry);
     });
-}
-
-function findStoppedTimerEntry(
-    context: AgentCommandContext,
-    predicate: (entry: TimeEntry) => boolean
-): TimeEntry | null {
-    return collectValidatedEntities<TimeEntry>(
-        'timeEntries',
-        context.store.activeTimeEntries as any,
-        'agent stopped timer recovery'
-    ).find(predicate) || null;
 }
 
 function buildStopTimerResult(timerKey: string, entry: TimeEntry) {
@@ -418,26 +446,15 @@ export function updateTimerCommand(context: AgentCommandContext, input: UpdateTi
         throw new AgentCommandError('INVALID_INPUT', 'startTime or note is required to update a timer.', { timerKey });
     }
 
-    const updates: Record<string, unknown> = {
-        lastActive: getNow(context),
-    };
-
-    if (input.startTime !== undefined) {
-        if (typeof input.startTime !== 'number' || !Number.isFinite(input.startTime)) {
-            throw new AgentCommandError('INVALID_INPUT', 'startTime must be a finite timestamp.', { timerKey });
-        }
-
-        updates.startTime = input.startTime;
+    let merged: MultiTimerState;
+    try {
+        merged = validateCollectionEntity<MultiTimerState>('timers', buildUpdatedTimer(timer, input, getNow(context)), `agent update timer ${timerKey}`);
+    } catch (error) {
+        throw new AgentCommandError('INVALID_INPUT', error instanceof Error ? error.message : 'Invalid timer update.', { timerKey });
     }
-
-    if (input.note !== undefined) {
-        updates.note = typeof input.note === 'string' ? input.note : '';
-    }
-
-    const merged = validateCollectionEntity<MultiTimerState>('timers', {
-        ...timer,
-        ...updates,
-    }, `agent update timer ${timerKey}`);
+    const updates: Record<string, unknown> = { lastActive: merged.lastActive };
+    if (input.startTime !== undefined) updates.startTime = merged.startTime;
+    if (input.note !== undefined) updates.note = merged.note;
 
     context.store.coreDoc.transact(() => {
         updateEntityFields(context.store.timers as any, timerKey, updates);
@@ -447,33 +464,33 @@ export function updateTimerCommand(context: AgentCommandContext, input: UpdateTi
     return merged;
 }
 
-export function addManualTimeEntryCommand(context: AgentCommandContext, input: AddManualTimeEntryCommandInput): TimeEntry {
+export function addManualTimeEntryCommand(context: AgentCommandContext, input: AddManualTimeEntryCommandInput): Promise<TimeEntry> {
     assertReady(context);
     assertPermission(context, 'write');
 
-    return withIdempotency(context, input.idempotencyKey, () => {
+    return withIdempotency(context, input.idempotencyKey, async () => {
         const taskId = requireString(input.taskId, 'taskId');
-        const task = readRequiredEntity<Task>(context.store.tasks as any, taskId, 'Task');
-
-        assertValidEntryTiming(input.start, input.end, 'Manual time entry');
-        assertEntryAfterBillingCutoff(task, input.start);
-        assertNoTimeOverlap(context, task, input.start, input.end);
+        const operationState = await collectManualTimeEntryState(context);
+        const task = readManualTimeEntryTask(context, operationState.archivedTaskMap, taskId);
 
         const now = getNow(context);
-        const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
-            id: getId(context),
-            taskId,
-            start: input.start,
-            end: input.end,
-            note: input.note?.trim() || undefined,
-            ...buildBillableDurationFields({
+        let builtEntry: TimeEntry;
+        try {
+            builtEntry = buildManualTimeEntry({
+                id: getId(context),
+                task,
+                tasks: operationState.tasks,
+                entries: operationState.entries,
                 start: input.start,
                 end: input.end,
+                note: input.note,
                 billingIncrementMinutes: input.billingIncrementMinutes,
-            }),
-            createdAt: now,
-            updatedAt: now,
-        }, `agent create manual entry ${taskId}`);
+                now,
+            });
+        } catch (error) {
+            throwAgentTimeEntryError(error);
+        }
+        const entry = validateCollectionEntity<TimeEntry>('timeEntries', builtEntry, `agent create manual entry ${taskId}`);
 
         context.store.activeEntriesDoc.transact(() => {
             (context.store.activeTimeEntries as any).set(entry.id, objectToYMap(entry as unknown as Record<string, unknown>));
@@ -484,52 +501,57 @@ export function addManualTimeEntryCommand(context: AgentCommandContext, input: A
     });
 }
 
-export function updateTimeEntryCommand(context: AgentCommandContext, input: UpdateTimeEntryCommandInput): TimeEntry {
+export async function updateTimeEntryCommand(context: AgentCommandContext, input: UpdateTimeEntryCommandInput): Promise<TimeEntry> {
     assertReady(context);
     assertPermission(context, 'write');
 
     const entryId = requireString(input.entryId, 'entryId');
+    const operationState = await collectManualTimeEntryState(context);
     const existing = readValidatedEntity<TimeEntry>('timeEntries', context.store.activeTimeEntries.get(entryId), `agent update time entry ${entryId}`);
 
     if (!existing) {
         throw new AgentCommandError('NOT_FOUND', 'Active time entry not found. Historical entries cannot be edited by an agent in v1.', { entryId });
     }
 
-    if (isEntryBilled(existing)) {
-        throw new AgentCommandError('CONFLICT', 'Billed time entries cannot be edited by an agent.', { entryId });
-    }
-
     const nextTaskId = input.taskId ? requireString(input.taskId, 'taskId') : existing.taskId;
-    const task = readRequiredEntity<Task>(context.store.tasks as any, nextTaskId, 'Task');
-    const start = input.start ?? existing.start;
-    const end = input.end ?? existing.end;
-
-    assertValidEntryTiming(start, end, 'Time entry');
-    assertEntryAfterBillingCutoff(task, start);
-    assertNoTimeOverlap(context, task, start, end, entryId);
-
-    const hasBillingIncrement = Object.prototype.hasOwnProperty.call(input, 'billingIncrementMinutes');
-    const billingIncrementMinutes = hasBillingIncrement
-        ? input.billingIncrementMinutes
-        : existing.billingIncrementMinutes;
-    const durationFields = buildBillableDurationFields({
-        start,
-        end,
-        billingIncrementMinutes,
-    });
+    const sourceTask = readManualTimeEntryTask(context, operationState.archivedTaskMap, existing.taskId);
+    const task = readManualTimeEntryTask(context, operationState.archivedTaskMap, nextTaskId);
+    let builtEntry: TimeEntry;
+    try {
+        builtEntry = buildManualTimeEntryUpdate({
+            entry: existing,
+            sourceTask,
+            task,
+            tasks: operationState.tasks,
+            entries: operationState.entries,
+            updates: {
+                taskId: nextTaskId,
+                start: input.start,
+                end: input.end,
+                note: input.note,
+                ...(Object.prototype.hasOwnProperty.call(input, 'billingIncrementMinutes')
+                    ? { billingIncrementMinutes: input.billingIncrementMinutes }
+                    : {}),
+            },
+            now: getNow(context),
+        });
+    } catch (error) {
+        throwAgentTimeEntryError(error);
+    }
+    const merged = validateCollectionEntity<TimeEntry>('timeEntries', builtEntry, `agent update time entry ${entryId}`);
     const updates: Partial<TimeEntry> = {
-        taskId: nextTaskId,
-        start,
-        end,
-        note: typeof input.note === 'string' ? input.note.trim() || undefined : (input.note === null ? undefined : existing.note),
-        billedDurationMs: durationFields.billedDurationMs ?? null,
-        billingIncrementMinutes: durationFields.billingIncrementMinutes ?? null,
-        updatedAt: getNow(context),
+        taskId: merged.taskId,
+        start: merged.start,
+        end: merged.end,
+        note: merged.note,
+        updatedAt: merged.updatedAt,
     };
-    const merged = validateCollectionEntity<TimeEntry>('timeEntries', {
-        ...existing,
-        ...updates,
-    }, `agent update time entry ${entryId}`);
+    if (Object.prototype.hasOwnProperty.call(merged, 'billedDurationMs')) {
+        updates.billedDurationMs = merged.billedDurationMs;
+    }
+    if (Object.prototype.hasOwnProperty.call(merged, 'billingIncrementMinutes')) {
+        updates.billingIncrementMinutes = merged.billingIncrementMinutes;
+    }
 
     context.store.activeEntriesDoc.transact(() => {
         const updated = updateEntityFields(context.store.activeTimeEntries as any, entryId, updates as Record<string, unknown>);
@@ -543,7 +565,7 @@ export function updateTimeEntryCommand(context: AgentCommandContext, input: Upda
     return merged;
 }
 
-export function deleteTimeEntryCommand(context: AgentCommandContext, input: DeleteTimeEntryCommandInput): DeleteTimeEntryResult {
+export async function deleteTimeEntryCommand(context: AgentCommandContext, input: DeleteTimeEntryCommandInput): Promise<DeleteTimeEntryResult> {
     assertReady(context);
     assertPermission(context, 'write');
 
@@ -557,14 +579,20 @@ export function deleteTimeEntryCommand(context: AgentCommandContext, input: Dele
         throw new AgentCommandError('INVALID_INPUT', 'confirmationText must match entryId to delete a time entry.', { entryId });
     }
 
+    const archivedTaskMap = typeof context.store.loadArchivedTasks === 'function'
+        ? await context.store.loadArchivedTasks()
+        : context.store.archivedTasks;
     const existing = readValidatedEntity<TimeEntry>('timeEntries', context.store.activeTimeEntries.get(entryId), `agent delete time entry ${entryId}`);
 
     if (!existing) {
         throw new AgentCommandError('NOT_FOUND', 'Active time entry not found. Historical entries cannot be deleted by an agent in v1.', { entryId });
     }
 
-    if (isEntryBilled(existing)) {
-        throw new AgentCommandError('CONFLICT', 'Billed time entries cannot be deleted by an agent.', { entryId });
+    const task = readManualTimeEntryTask(context, archivedTaskMap, existing.taskId);
+    try {
+        assertManualTimeEntryDeletion(existing, task);
+    } catch (error) {
+        throwAgentTimeEntryError(error);
     }
 
     context.store.activeEntriesDoc.transact(() => {

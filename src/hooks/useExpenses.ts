@@ -20,6 +20,8 @@ import {
     buildMarkExpensePaidUpdates,
     buildMarkExpenseUnpaidUpdates,
 } from '@/domain/expenses/expenseUpdates';
+import { assertExpenseCanBeDeleted } from '@/domain/expenses/expenseOperations';
+import { assertEntityIdentityAvailable } from '@/domain/entities/entityIdentity';
 
 export interface UseExpensesOptions {
     clientId?: string;
@@ -261,12 +263,6 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         }, validated);
     }, [applyValidatedExpenseUpdate, findExpenseMap, getPreferredCurrency]);
 
-    const queueExpensePaymentSnapshot = useCallback((id: string) => {
-        void ensureExpensePaymentSnapshot(id).catch((error) => {
-            console.warn(`[useExpenses] Unable to persist payment snapshot for expense ${id}:`, error);
-        });
-    }, [ensureExpensePaymentSnapshot]);
-
     const createExpense = useCallback((data: Omit<Expense, 'id'> & { id?: string }): Expense => {
         if (!isReady) throw new Error('Store not ready');
 
@@ -288,20 +284,76 @@ export function useExpenses(options: UseExpensesOptions = {}) {
 
         const validatedExpense = validateCollectionEntity<Expense>('expenses', expense, `create expense ${id}`);
 
+        assertEntityIdentityAvailable({
+            id,
+            existingIds: [
+                ...store.expenses.keys(),
+                ...(store.archivedExpenses ? [...store.archivedExpenses.keys()] : []),
+            ],
+            label: 'Expense',
+        });
+
+        const preferredCurrency = getPreferredCurrency();
+        if (
+            validatedExpense.paymentStatus === 'paid'
+            && shouldStoreExpensePaymentSnapshot(validatedExpense, preferredCurrency)
+            && !getExpensePaymentCurrencySnapshot(validatedExpense)
+        ) {
+            throw new Error('A payment currency snapshot is required before creating a paid cross-currency expense.');
+        }
+
         const entityMap = objectToYMap(validatedExpense as unknown as Record<string, unknown>);
         (store.expenses as any).set(id, entityMap);
         markMeaningfulActivity();
 
-        if (validatedExpense.paymentStatus === 'paid' && !getExpensePaymentCurrencySnapshot(validatedExpense)) {
-            const preferredCurrency = getPreferredCurrency();
+        return validatedExpense;
+    }, [getPreferredCurrency, isReady, store]);
 
-            if (shouldStoreExpensePaymentSnapshot(validatedExpense, preferredCurrency)) {
-                queueExpensePaymentSnapshot(id);
-            }
+    const prepareExpensePaymentSnapshot = useCallback(async (
+        expense: Partial<Expense>,
+        options: { force?: boolean } = {}
+    ): Promise<Partial<Expense>> => {
+        const preferredCurrency = getPreferredCurrency();
+        const requiresSnapshot = expense.paymentStatus === 'paid'
+            && shouldStoreExpensePaymentSnapshot(expense, preferredCurrency);
+
+        if (!requiresSnapshot) {
+            return {
+                ...expense,
+                paymentCurrencySnapshot: undefined,
+            };
         }
 
-        return validatedExpense;
-    }, [getPreferredCurrency, isReady, queueExpensePaymentSnapshot, store]);
+        if (!options.force && getExpensePaymentCurrencySnapshot(expense)) {
+            return expense;
+        }
+
+        const { rates, error } = await fetchExchangeRates();
+
+        if (!rates) {
+            throw new Error(error || 'Unable to load exchange rates for expense payment snapshot.');
+        }
+
+        return {
+            ...expense,
+            paymentCurrencySnapshot: createExpensePaymentCurrencySnapshot({
+                expense,
+                preferredCurrency,
+                exchangeRates: rates,
+            }) ?? undefined,
+        };
+    }, [getPreferredCurrency]);
+
+    const createExpenseWithPaymentSnapshot = useCallback(async (
+        data: Omit<Expense, 'id'> & { id?: string }
+    ): Promise<Expense> => {
+        if (data.id) {
+            await loadArchivedExpenses();
+        }
+
+        const prepared = await prepareExpensePaymentSnapshot(data);
+        return createExpense(prepared as Omit<Expense, 'id'> & { id?: string });
+    }, [createExpense, loadArchivedExpenses, prepareExpensePaymentSnapshot]);
 
     const updateExpense = useCallback((id: string, updates: Partial<Expense>): Expense | undefined => {
         if (!isReady) return undefined;
@@ -323,32 +375,58 @@ export function useExpenses(options: UseExpensesOptions = {}) {
             && !hasProvidedPaymentSnapshot
             && (
                 updatesWithTimestamp.paymentCurrencySnapshot === null
-                || !getExpensePaymentCurrencySnapshot(nextExpense)
                 || SNAPSHOT_SENSITIVE_EXPENSE_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(updatesWithTimestamp, field))
             );
 
         if (!shouldStoreSnapshot && Object.prototype.hasOwnProperty.call(existing, 'paymentCurrencySnapshot')) {
             updatesWithTimestamp.paymentCurrencySnapshot = undefined;
         } else if (shouldRefreshPaymentSnapshot) {
-            updatesWithTimestamp.paymentCurrencySnapshot = undefined;
+            throw new Error('A payment currency snapshot is required before changing paid cross-currency expense details.');
         }
 
         const merged = { ...existing, ...updatesWithTimestamp };
         const validated = validateCollectionEntity<Expense>('expenses', merged, `update expense ${id}`);
 
-        applyValidatedExpenseUpdate(map, id, updatesWithTimestamp, validated);
+        return applyValidatedExpenseUpdate(map, id, updatesWithTimestamp, validated);
+    }, [applyValidatedExpenseUpdate, getPreferredCurrency, isReady, findExpenseMap]);
 
-        if (shouldRefreshPaymentSnapshot) {
-            queueExpensePaymentSnapshot(id);
+    const updateExpenseWithPaymentSnapshot = useCallback(async (
+        id: string,
+        updates: Partial<Expense>
+    ): Promise<Expense | undefined> => {
+        if (!isReady) return undefined;
+
+        const map = findExpenseMap(id);
+        if (!map) return undefined;
+
+        const existing = readValidatedEntity<Expense>('expenses', map.get(id), `prepare expense update ${id}`);
+        if (!existing) return undefined;
+
+        const nextExpense = { ...existing, ...updates };
+        const touchesSnapshotSensitiveField = SNAPSHOT_SENSITIVE_EXPENSE_FIELDS.some(
+            (field) => Object.prototype.hasOwnProperty.call(updates, field)
+        );
+        const prepared = await prepareExpensePaymentSnapshot(nextExpense, {
+            force: touchesSnapshotSensitiveField,
+        });
+        const preparedUpdates: Partial<Expense> = { ...updates };
+
+        if (Object.prototype.hasOwnProperty.call(prepared, 'paymentCurrencySnapshot')) {
+            preparedUpdates.paymentCurrencySnapshot = prepared.paymentCurrencySnapshot;
         }
 
-        return validated;
-    }, [applyValidatedExpenseUpdate, getPreferredCurrency, isReady, findExpenseMap, queueExpensePaymentSnapshot]);
+        return updateExpense(id, preparedUpdates);
+    }, [findExpenseMap, isReady, prepareExpensePaymentSnapshot, updateExpense]);
 
     const deleteExpense = useCallback((id: string): boolean => {
         if (!isReady) return false;
         const map = findExpenseMap(id);
         if (!map) return false;
+        const expense = readValidatedEntity<Expense>('expenses', map.get(id), `delete expense ${id}`);
+        if (!expense) return false;
+
+        assertExpenseCanBeDeleted(expense);
+
         const removed = map.delete(id);
 
         if (removed) {
@@ -506,7 +584,9 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         getExpense,
         ensureExpensePaymentSnapshot,
         createExpense,
+        createExpenseWithPaymentSnapshot,
         updateExpense,
+        updateExpenseWithPaymentSnapshot,
         deleteExpense,
 
         markAsPaid,

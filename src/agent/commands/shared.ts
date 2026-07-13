@@ -3,6 +3,7 @@ import { generateId as defaultGenerateId } from '@/utils/idUtils';
 import { readEntity, updateEntityFields, objectToYMap } from '@/stores/yjs/entityUtils';
 import { validateCollectionEntity, type YjsCollectionName } from '@/stores/yjs/validation';
 import { AgentCommandError, type AgentCommandContext, type AgentPermissionScope } from '@/agent/types';
+import { assertEntityIdentityAvailable, EntityIdentityConflictError } from '@/domain/entities/entityIdentity';
 
 export function assertReady(context: AgentCommandContext): void {
     const isReady = context.isReady ?? context.store.isReady;
@@ -54,9 +55,28 @@ export function createValidatedEntity<T extends { id: string }>(
     map: Y.Map<string, unknown>,
     collectionName: YjsCollectionName,
     data: Record<string, unknown>,
-    contextLabel: string
+    contextLabel: string,
+    additionalIdentityMaps: Array<Y.Map<string, unknown> | null | undefined> = []
 ): T {
     const validated = validateCollectionEntity<T>(collectionName, data, contextLabel);
+
+    try {
+        assertEntityIdentityAvailable({
+            id: validated.id,
+            existingIds: [
+                ...map.keys(),
+                ...additionalIdentityMaps.flatMap((identityMap) => identityMap ? [...identityMap.keys()] : []),
+            ],
+            label: collectionName,
+        });
+    } catch (error) {
+        if (error instanceof EntityIdentityConflictError) {
+            throw new AgentCommandError('CONFLICT', error.message, error.details);
+        }
+
+        throw error;
+    }
+
     map.set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
     return validated;
 }

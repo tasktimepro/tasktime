@@ -244,6 +244,11 @@ describe('MCP bridge tool definitions', () => {
         expect(fullTools.map((tool) => tool.name)).toContain('set_daily_goal');
         expect(fullTools.map((tool) => tool.name)).toContain('resume_timer');
         expect(fullTools.map((tool) => tool.name)).toContain('clear_timer');
+        expect(fullTools.find((tool) => tool.name === 'stop_timer')?.inputSchema).toEqual(expect.objectContaining({
+            properties: expect.objectContaining({
+                idempotencyKey: expect.any(Object),
+            }),
+        }));
         expect(fullTools.map((tool) => tool.name)).toContain('update_project_notes');
         expect(fullTools.map((tool) => tool.name)).toContain('cascade_delete_task');
         expect(fullTools.map((tool) => tool.name)).toContain('delete_task');

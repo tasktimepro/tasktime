@@ -76,7 +76,7 @@ describe('useTimers', () => {
                 lastActive: Date.now(),
             }
         }, coreDoc, 'timers')
-        const tasks = createTestYMap({ t1: { id: 't1', projectId: 'p1' } }, coreDoc, 'tasks')
+        const tasks = createTestYMap({ t1: { id: 't1', title: 'Task', projectId: 'p1' } }, coreDoc, 'tasks')
         const activeTimeEntries = createTestYMap({}, activeEntriesDoc, 'activeTimeEntries')
 
         const store = {
@@ -116,7 +116,7 @@ describe('useTimers', () => {
 
         let entry
         await act(async () => {
-            entry = result.current.stopTimer('p1')
+            entry = await result.current.stopTimer('p1')
         })
 
         expect(entry).toBeTruthy()

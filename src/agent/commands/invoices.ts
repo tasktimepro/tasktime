@@ -1252,7 +1252,7 @@ export function sendProjectQuoteEmailCommand(
     assertPermission(context, 'read');
     assertPermission(context, 'email');
 
-    return withIdempotency(context, input.idempotencyKey, async () => {
+    return withIdempotency<Promise<SendProjectQuoteEmailResult>>(context, input.idempotencyKey, async () => {
         if (input.confirmSend !== true) {
             throw new AgentCommandError('INVALID_INPUT', 'Sending a project quote email requires confirmSend: true.');
         }

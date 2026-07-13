@@ -88,16 +88,18 @@ export const createExpensePaymentCurrencySnapshot = ({
 
     const normalizedRates = getFiniteRecord(exchangeRates);
 
-    let preferredCurrencyAmount = sourceAmount;
     const result = convertCurrency(sourceAmount, sourceCurrency, targetCurrency, normalizedRates);
-    preferredCurrencyAmount = result.amount;
+
+    if (!result.success) {
+        throw new Error(result.error || `Unable to convert ${sourceCurrency} to ${targetCurrency}.`);
+    }
 
     return {
         capturedAt: capturedAt ?? resolveExpensePaymentSnapshotCapturedAt(expense),
         sourceCurrency,
         sourceAmount,
         preferredCurrencyAtPayment: targetCurrency,
-        preferredCurrencyAmount,
+        preferredCurrencyAmount: result.amount,
     };
 };
 

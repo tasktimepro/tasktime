@@ -9,13 +9,23 @@ import { addDays } from 'date-fns';
 import { useYjs } from '@/contexts/YjsContext';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { useYjsCollection } from './useYjsCollection';
-import type { PlannerAttachment, Task } from '@/stores/yjs/types';
-import { getTodayString, toStorageDate } from '@/utils/dateUtils.ts';
-import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils.ts';
-import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils.ts';
+import type { MultiTimerState, PlannerAttachment, Task } from '@/stores/yjs/types';
+import { getTodayString, toStorageDate } from '@/utils/dateUtils';
+import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
+import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { collectEntities, updateEntityFields } from '@/stores/yjs/entityUtils';
+import { collectValidatedEntities } from '@/stores/yjs/validation';
 import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
+import {
+    buildRecurringSkipUpdates,
+    buildTaskCompletionUpdates,
+    buildTaskStatePatchUpdates,
+} from '@/domain/tasks/taskStateOperations';
+import { WorkEntityOperationError, buildTaskEntity, buildTaskUpdates } from '@/domain/work/workEntityOperations';
+import { assertEntityIdentityAvailable } from '@/domain/entities/entityIdentity';
+import type { Project } from '@/stores/yjs/types';
+import { generateId } from '@/utils/idUtils';
 
 export interface UseTasksOptions {
     /** Filter to a specific project */
@@ -30,6 +40,81 @@ export function useTasks(options: UseTasksOptions = {}) {
     // Active tasks from core doc
     const { items: activeTasks, isLoading: activeLoading, get, create, update, remove } = 
         useYjsCollection<Task>((store) => store.tasks, { collectionName: 'tasks' });
+
+    const getOperationProjects = useCallback((): Project[] => {
+        if (store.projects) {
+            return collectValidatedEntities<Project>('projects', store.projects as any, 'UI task projects');
+        }
+
+        return [...new Set(activeTasks.map((task) => task.projectId).filter(Boolean))]
+            .map((id) => ({ id: id as string, title: id as string }));
+    }, [activeTasks, store]);
+
+    const createTask = useCallback((data: Omit<Task, 'id'> & { id?: string }) => {
+        const now = Date.now();
+        const id = data.id || generateId();
+
+        assertEntityIdentityAvailable({
+            id,
+            existingIds: store.archivedTasks?.keys() ?? [],
+            label: 'Task',
+        });
+
+        return create(buildTaskEntity({
+            data,
+            id,
+            now,
+            projects: getOperationProjects(),
+            tasks: activeTasks,
+        }));
+    }, [activeTasks, create, getOperationProjects, store.archivedTasks]);
+
+    const updateTask = useCallback((id: string, updates: Partial<Task>, updateOptions?: { origin?: unknown }) => {
+        const existing = get(id);
+        if (!existing) return undefined;
+        const now = Date.now();
+        let normalizedUpdates = buildTaskStatePatchUpdates({ task: existing, updates, now });
+        const relationshipChanged = (
+            Object.prototype.hasOwnProperty.call(normalizedUpdates, 'projectId')
+            && (normalizedUpdates.projectId || null) !== (existing.projectId || null)
+        ) || (
+            Object.prototype.hasOwnProperty.call(normalizedUpdates, 'parentTaskId')
+            && (normalizedUpdates.parentTaskId || null) !== (existing.parentTaskId || null)
+        );
+        if (relationshipChanged && !store.archivedTasks) {
+            throw new WorkEntityOperationError(
+                'CONFLICT',
+                'Archived task relationships are still loading. Try the update again.',
+                { taskId: id },
+            );
+        }
+        const operationTasks = [
+            ...activeTasks,
+            ...(store.archivedTasks
+                ? collectValidatedEntities<Task>('tasks', store.archivedTasks as any, 'UI update archived task relationships')
+                : []),
+        ];
+        const operationTimers = store.timers
+            ? collectValidatedEntities<MultiTimerState>('timers', store.timers as any, 'UI update task timers')
+            : [];
+        if (store.projects) {
+            const built = buildTaskUpdates({
+                existing,
+                updates: normalizedUpdates,
+                now,
+                projects: getOperationProjects(),
+                tasks: operationTasks,
+                timers: operationTimers,
+            });
+            if (Object.prototype.hasOwnProperty.call(normalizedUpdates, 'title')) {
+                normalizedUpdates = { ...normalizedUpdates, title: built.title };
+            }
+        }
+        const { id: _immutableId, ...persistedUpdates } = normalizedUpdates;
+        return updateOptions
+            ? update(id, persistedUpdates, updateOptions)
+            : update(id, persistedUpdates);
+    }, [activeTasks, get, getOperationProjects, store, update]);
 
     // Archived tasks state
     const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
@@ -258,14 +343,12 @@ export function useTasks(options: UseTasksOptions = {}) {
         const task = get(taskId);
         if (!task) return undefined;
 
-        const nextCompletedDates = toggleRecurringCompletionDate(task.completedDatesByYear, dateStr);
-        return update(taskId, {
-            completedDatesByYear: nextCompletedDates,
-            skipUntilNextRecurring: false,
-            skippedOccurrenceDate: null,
-            lastActive: Date.now()
-        });
-    }, [get, update]);
+        return updateTask(taskId, buildTaskCompletionUpdates({
+            task,
+            occurrenceDate: dateStr,
+            now: Date.now(),
+        }));
+    }, [get, updateTask]);
 
     /**
      * Temporarily skip the current recurring occurrence until the next one arrives
@@ -274,12 +357,8 @@ export function useTasks(options: UseTasksOptions = {}) {
         const task = get(taskId);
         if (!task || !task.recurring) return undefined;
 
-        return update(taskId, {
-            skipUntilNextRecurring: true,
-            skippedOccurrenceDate: dateStr,
-            lastActive: Date.now()
-        });
-    }, [get, update]);
+        return updateTask(taskId, buildRecurringSkipUpdates(task, dateStr, Date.now()));
+    }, [get, updateTask]);
 
     const getOverdueTasks = useCallback(() => {
         const today = getTodayString();
@@ -411,17 +490,9 @@ export function useTasks(options: UseTasksOptions = {}) {
         }
 
         if (isRecurringTaskDueOnDate(todayDate, task.recurring)) {
-            // Determine if skip flag is stale (from a past occurrence) — pure read, no writes
-            const skipIsStale = Boolean(
-                task.skipUntilNextRecurring
-                && task.skippedOccurrenceDate
-                && task.skippedOccurrenceDate !== resolvedToday
-            );
-
             const isSkipped = Boolean(
                 task.skipUntilNextRecurring
                 && task.skippedOccurrenceDate === resolvedToday
-                && !skipIsStale
             );
 
             return {
@@ -431,7 +502,6 @@ export function useTasks(options: UseTasksOptions = {}) {
                 nextDueDateStr: null as string | null,
                 effectiveDateStr: resolvedToday,
                 isSkipped,
-                _needsSkipReset: skipIsStale,
             };
         }
 
@@ -443,19 +513,11 @@ export function useTasks(options: UseTasksOptions = {}) {
         const isBeforeRecurringStart = Boolean(recurringStartStr && previousDueStr && previousDueStr < recurringStartStr);
         const wasCompleted = previousDueStr ? isCompletedOnDate(task, previousDueStr) : false;
 
-        const skipIsStaleForOccurrence = Boolean(
-            task.skipUntilNextRecurring
-            && task.skippedOccurrenceDate
-            && previousDueStr
-            && task.skippedOccurrenceDate !== previousDueStr
-        );
-
         const isSkippedForOccurrence = Boolean(
             previousDueStr
             && task.skipUntilNextRecurring
             && task.skippedOccurrenceDate
             && task.skippedOccurrenceDate === previousDueStr
-            && !skipIsStaleForOccurrence
         );
 
         const isOverdue = Boolean(
@@ -474,40 +536,8 @@ export function useTasks(options: UseTasksOptions = {}) {
             nextDueDateStr: nextDueStr,
             effectiveDateStr: isOverdue ? previousDueStr : null,
             isSkipped: isSkippedForOccurrence,
-            _needsSkipReset: skipIsStaleForOccurrence,
         };
     }, [isCompletedOnDate]);
-
-    /**
-     * Reset stale skip flags for recurring tasks.
-     * Call this explicitly (e.g., on mount or user action), not during render/status checks.
-     */
-    const resetExpiredSkips = useCallback(() => {
-        const today = getTodayString();
-        if (!today) return;
-
-        const todayDate = new Date();
-
-        for (const task of projectActiveTasks) {
-            if (!task.recurring || !task.skipUntilNextRecurring || !task.skippedOccurrenceDate) continue;
-            if (task.skippedOccurrenceDate === today) continue;
-
-            // Don't reset if the skip matches the current overdue occurrence —
-            // it's still valid until the next recurrence cycle arrives.
-            const previousDueDate = findPreviousRecurringDueDate(todayDate, task.recurring);
-            if (previousDueDate) {
-                const previousDueStr = toStorageDate(previousDueDate);
-                if (previousDueStr && task.skippedOccurrenceDate === previousDueStr) {
-                    continue;
-                }
-            }
-
-            update(task.id, {
-                skipUntilNextRecurring: false,
-                skippedOccurrenceDate: null,
-            });
-        }
-    }, [projectActiveTasks, update]);
 
     return {
         // Data
@@ -520,8 +550,8 @@ export function useTasks(options: UseTasksOptions = {}) {
         
         // CRUD
         getTask: get,
-        createTask: create,
-        updateTask: update,
+        createTask,
+        updateTask,
         deleteTask,
         
         // Archive operations
@@ -543,6 +573,5 @@ export function useTasks(options: UseTasksOptions = {}) {
         toggleRecurringCompletion,
         skipRecurringOccurrence,
         getRecurringStatus,
-        resetExpiredSkips,
     };
 }

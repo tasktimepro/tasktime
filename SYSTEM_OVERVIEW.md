@@ -44,6 +44,8 @@ The Yjs store is split into documents so current work stays loaded and historica
 - Local data remains usable offline; cloud features are optional.
 - Schema changes are additive or explicitly migrated and tested against historical data.
 - UI badges, invoice composition, and agent invoice commands share the same read-only eligibility operation, including conservative support for finalized legacy invoices with markerless source entries.
+- UI hooks and agent commands share domain operations for timer lifecycle/recovered stops, protected manual time-entry mutations, task completion/recurrence state, duplicate-safe entity identity, protected expense deletion, and relationship-safe project/client/task writes.
+- Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.
 - Destructive data, billing, deletion, and sync actions require explicit intent and safe preview/confirmation where available.
 - Agent access is loopback-only with short-lived pairing, scoped permissions, approvals, rate limits, revocation, and memory-only session credentials.
@@ -51,6 +53,6 @@ The Yjs store is split into documents so current work stays loaded and historica
 
 ## Development and verification
 
-All Node/npm work runs through Docker-backed Make targets. Vitest tests are colocated throughout `src/`; integration tests live in `src/test/integration/`; Playwright browser flows live in `e2e/`. CI runs `make release-gate`.
+All Node/npm work runs through Docker-backed Make targets. Vitest tests are colocated throughout `src/`; integration tests live in `src/test/integration/`; Playwright browser flows live in `e2e/`. Repository-wide TypeScript checking is a required release gate, and CI runs `make release-gate`.
 
 See `ARCHITECTURE_MAP.md` for module navigation, `spec/roadmap.md` and `status/_status.md` for current work, and `spec/ambiguities.md` for unresolved decisions.

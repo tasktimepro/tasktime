@@ -14,6 +14,7 @@ const timerHookMocks = vi.hoisted(() => ({
     startTimer: vi.fn(),
     pauseTimer: vi.fn(),
     resumeTimer: vi.fn(),
+    stopTimer: vi.fn(() => ({ id: 'entry-1' })),
     clearTimer: vi.fn(),
     getTimerForProject: vi.fn((projectId) => {
         if (!mockProjectTimer) return null
@@ -21,21 +22,10 @@ const timerHookMocks = vi.hoisted(() => ({
     })
 }))
 
-// Hoisted mocks for time entries hook
-const entriesHookMocks = vi.hoisted(() => ({
-
-    createEntry: vi.fn(() => ({ id: 'entry-1' }))
-}))
-
 // Hoisted mocks for tasks hook
 const tasksHookMocks = vi.hoisted(() => ({
 
     updateTask: vi.fn()
-}))
-
-const projectHookMocks = vi.hoisted(() => ({
-
-    projects: [{ id: 'project-1', billableTimeIncrementMinutes: 15 }]
 }))
 
 vi.mock('../hooks/useTimers.ts', () => ({
@@ -45,6 +35,7 @@ vi.mock('../hooks/useTimers.ts', () => ({
         startTimer: timerHookMocks.startTimer,
         pauseTimer: timerHookMocks.pauseTimer,
         resumeTimer: timerHookMocks.resumeTimer,
+        stopTimer: timerHookMocks.stopTimer,
         clearTimer: timerHookMocks.clearTimer,
         getTimerForTask: (taskId, projectId) => {
             if (!mockProjectTimer) return null;
@@ -54,25 +45,12 @@ vi.mock('../hooks/useTimers.ts', () => ({
     })
 }))
 
-vi.mock('../hooks/useTimeEntries.ts', () => ({
-
-    useTimeEntries: () => ({
-        entries: [],
-        createEntry: entriesHookMocks.createEntry
-    })
-}))
-
 vi.mock('../hooks/useTasks.ts', () => ({
 
     useTasks: () => ({
         activeTasks: [],
         updateTask: tasksHookMocks.updateTask
     })
-}))
-
-vi.mock('../hooks/useProjects.ts', () => ({
-
-    useProjects: () => projectHookMocks
 }))
 
 describe('TimerControls', () => {
@@ -189,8 +167,7 @@ describe('TimerControls', () => {
 
         await userEvent.click(screen.getByTitle('Save & Stop Timer'))
 
-        expect(entriesHookMocks.createEntry).toHaveBeenCalled()
-        expect(timerHookMocks.clearTimer).toHaveBeenCalledWith('project-1')
+        expect(timerHookMocks.stopTimer).toHaveBeenCalledWith('project-1')
     })
 
     it('stops a paused timer using paused elapsed time', async () => {
@@ -214,16 +191,10 @@ describe('TimerControls', () => {
 
         await userEvent.click(screen.getByTitle('Save & Stop Timer'))
 
-        // Verify entry was created with correct elapsed time
-        expect(entriesHookMocks.createEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                taskId: 'task-1'
-            })
-        )
-        expect(timerHookMocks.clearTimer).toHaveBeenCalledWith('project-1')
+        expect(timerHookMocks.stopTimer).toHaveBeenCalledWith('project-1')
     })
 
-    it('stores billable duration metadata when the project has a billing increment', async () => {
+    it('delegates billable duration snapshots to the shared stop operation', async () => {
 
         mockProjectTimer = {
             projectId: 'project-1',
@@ -242,10 +213,7 @@ describe('TimerControls', () => {
 
         await userEvent.click(screen.getByTitle('Save & Stop Timer'))
 
-        expect(entriesHookMocks.createEntry).toHaveBeenCalledWith(expect.objectContaining({
-            billedDurationMs: 15 * 60 * 1000,
-            billingIncrementMinutes: 15,
-        }))
+        expect(timerHookMocks.stopTimer).toHaveBeenCalledWith('project-1')
 
         nowSpy.mockRestore()
     })
@@ -268,7 +236,7 @@ describe('TimerControls', () => {
 
         await userEvent.click(screen.getByTitle('Start Timer'))
 
-        // When starting a new timer while another is running, it creates an entry and starts new timer
+        expect(timerHookMocks.stopTimer).toHaveBeenCalledWith('project-1')
         expect(timerHookMocks.startTimer).toHaveBeenCalledWith('task-2')
     })
 })

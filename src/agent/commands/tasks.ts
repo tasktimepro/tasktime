@@ -1,6 +1,5 @@
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { toStorageDate } from '@/utils/dateUtils';
-import { isRecurringCompletedOnDate, toggleRecurringCompletionDate } from '@/utils/recurringCompletionUtils';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { collectEntities } from '@/stores/yjs/entityUtils';
@@ -21,6 +20,18 @@ import {
     updateValidatedEntity,
     withIdempotency,
 } from './shared';
+import {
+    TaskStateOperationError,
+    buildTaskCompletionUpdates,
+    buildTaskStatePatchUpdates,
+} from '@/domain/tasks/taskStateOperations';
+import {
+    WorkEntityOperationError,
+    buildProjectEntity,
+    buildProjectUpdates,
+    buildTaskEntity,
+    buildTaskUpdates,
+} from '@/domain/work/workEntityOperations';
 
 export interface CreateTaskCommandInput extends Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>> {
     id?: string;
@@ -202,6 +213,16 @@ function assertArrayMatches(label: string, expected: string[] | undefined, actua
     }
 }
 
+function throwAgentWorkError(error: unknown): never {
+    if (error instanceof WorkEntityOperationError) {
+        throw new AgentCommandError(error.code, error.message, error.details);
+    }
+    if (error instanceof TaskStateOperationError) {
+        throw new AgentCommandError('INVALID_INPUT', error.message);
+    }
+    throw error;
+}
+
 export function listProjectsCommand(context: AgentCommandContext): Project[] {
     assertReady(context);
     assertPermission(context, 'read');
@@ -219,19 +240,19 @@ export function createProjectCommand(context: AgentCommandContext, input: Create
         const now = getNow(context);
         const id = input.id || getId(context);
 
-        if (input.preferredClientId) {
-            readRequiredEntity<Client>(context.store.clients as any, input.preferredClientId, 'Client');
+        const { idempotencyKey: _idempotencyKey, ...entityInput } = input;
+        let built: Project;
+        try {
+            built = buildProjectEntity({
+                data: { ...entityInput, title },
+                id,
+                now,
+                clients: collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent create project clients'),
+            });
+        } catch (error) {
+            throwAgentWorkError(error);
         }
-
-        const project = createValidatedEntity<Project>(context.store.projects as any, 'projects', {
-            ...input,
-            id,
-            title,
-            archived: input.archived ?? false,
-            archivedOnDate: input.archivedOnDate ?? null,
-            createdAt: input.createdAt ?? now,
-            updatedAt: input.updatedAt ?? now,
-        }, `agent create project ${id}`);
+        const project = createValidatedEntity<Project>(context.store.projects as any, 'projects', built as unknown as Record<string, unknown>, `agent create project ${id}`);
 
         markMeaningfulActivity('project_create');
         return project;
@@ -246,14 +267,24 @@ export function updateProjectCommand(context: AgentCommandContext, input: Update
     const updates = input.updates || {};
     readRequiredEntity<Project>(context.store.projects as any, projectId, 'Project');
 
-    if (updates.preferredClientId) {
-        readRequiredEntity<Client>(context.store.clients as any, updates.preferredClientId, 'Client');
+    let built: Project;
+    try {
+        built = buildProjectUpdates({
+            existing: readRequiredEntity<Project>(context.store.projects as any, projectId, 'Project'),
+            updates,
+            now: getNow(context),
+            clients: collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent update project clients'),
+        });
+    } catch (error) {
+        throwAgentWorkError(error);
     }
-
-    const updated = updateValidatedEntity<Project>(context.store.projects as any, 'projects', projectId, {
+    const projectFieldUpdates: Record<string, unknown> = {
         ...updates,
-        updatedAt: getNow(context),
-    }, `agent update project ${projectId}`);
+        updatedAt: built.updatedAt,
+    };
+    delete projectFieldUpdates.id;
+    if (Object.prototype.hasOwnProperty.call(updates, 'title')) projectFieldUpdates.title = built.title;
+    const updated = updateValidatedEntity<Project>(context.store.projects as any, 'projects', projectId, projectFieldUpdates, `agent update project ${projectId}`);
 
     markMeaningfulActivity('project_update');
     return updated;
@@ -478,59 +509,71 @@ export function createTaskCommand(context: AgentCommandContext, input: CreateTas
         const now = getNow(context);
         const id = input.id || getId(context);
 
-        if (input.projectId) {
-            readRequiredEntity<Project>(context.store.projects as any, input.projectId, 'Project');
+        const { idempotencyKey: _idempotencyKey, ...entityInput } = input;
+        let built: Task;
+        try {
+            built = buildTaskEntity({
+                data: { ...entityInput, title },
+                id,
+                now,
+                projects: collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent create task projects'),
+                tasks: collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent create task tasks'),
+            });
+        } catch (error) {
+            throwAgentWorkError(error);
         }
-
-        if (input.parentTaskId) {
-            readRequiredEntity<Task>(context.store.tasks as any, input.parentTaskId, 'Parent task');
-
-            if (input.recurring) {
-                throw new AgentCommandError('INVALID_INPUT', 'Subtasks cannot be recurring.');
-            }
-        }
-
-        const task = createValidatedEntity<Task>(context.store.tasks as any, 'tasks', {
-            ...input,
-            id,
-            title,
-            completed: input.completed ?? false,
-            archived: input.archived ?? false,
-            createdAt: input.createdAt ?? now,
-            updatedAt: input.updatedAt ?? now,
-            lastActive: input.lastActive ?? now,
-        }, `agent create task ${id}`);
+        const task = createValidatedEntity<Task>(
+            context.store.tasks as any,
+            'tasks',
+            built as unknown as Record<string, unknown>,
+            `agent create task ${id}`,
+            [context.store.archivedTasks as any]
+        );
 
         markMeaningfulActivity('task_create');
         return task;
     });
 }
 
-export function updateTaskCommand(context: AgentCommandContext, input: UpdateTaskCommandInput): Task {
+export async function updateTaskCommand(context: AgentCommandContext, input: UpdateTaskCommandInput): Promise<Task> {
     assertReady(context);
     assertPermission(context, 'write');
 
     const taskId = requireString(input.taskId, 'taskId');
+    const archivedMap = await context.store.loadArchivedTasks();
     const existing = readRequiredEntity<Task>(context.store.tasks as any, taskId, 'Task');
 
-    if (input.updates.projectId) {
-        readRequiredEntity<Project>(context.store.projects as any, input.updates.projectId, 'Project');
-    }
-
-    if (input.updates.parentTaskId) {
-        readRequiredEntity<Task>(context.store.tasks as any, input.updates.parentTaskId, 'Parent task');
-    }
-
-    if ((input.updates.parentTaskId || existing.parentTaskId) && input.updates.recurring) {
-        throw new AgentCommandError('INVALID_INPUT', 'Subtasks cannot be recurring.');
-    }
-
     const now = getNow(context);
-    const updated = updateValidatedEntity<Task>(context.store.tasks as any, 'tasks', taskId, {
-        ...input.updates,
-        updatedAt: now,
-        lastActive: now,
-    }, `agent update task ${taskId}`);
+    let built: Task;
+    let normalizedUpdates: Partial<Task>;
+    try {
+        normalizedUpdates = buildTaskStatePatchUpdates({
+            task: existing,
+            updates: input.updates || {},
+            now,
+        });
+        built = buildTaskUpdates({
+            existing,
+            updates: normalizedUpdates,
+            now,
+            projects: collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent update task projects'),
+            tasks: [
+                ...collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent update task tasks'),
+                ...collectValidatedEntities<Task>('tasks', archivedMap as any, 'agent update archived task relationships'),
+            ],
+            timers: collectValidatedEntities<MultiTimerState>('timers', context.store.timers as any, 'agent update task timers'),
+        });
+    } catch (error) {
+        throwAgentWorkError(error);
+    }
+    const taskFieldUpdates: Record<string, unknown> = {
+        ...normalizedUpdates,
+        updatedAt: built.updatedAt,
+        lastActive: built.lastActive,
+    };
+    delete taskFieldUpdates.id;
+    if (Object.prototype.hasOwnProperty.call(normalizedUpdates, 'title')) taskFieldUpdates.title = built.title;
+    const updated = updateValidatedEntity<Task>(context.store.tasks as any, 'tasks', taskId, taskFieldUpdates, `agent update task ${taskId}`);
 
     markMeaningfulActivity('task_update');
     return updated;
@@ -546,34 +589,27 @@ export function completeTaskCommand(context: AgentCommandContext, input: Complet
 
     if (task.recurring) {
         const occurrenceDate = requireString(input.occurrenceDate, 'occurrenceDate');
-        if (isRecurringCompletedOnDate(task.completedDatesByYear, occurrenceDate)) {
-            return task;
-        }
 
-        const completedDatesByYear = toggleRecurringCompletionDate(task.completedDatesByYear, occurrenceDate);
-        const updated = updateValidatedEntity<Task>(context.store.tasks as any, 'tasks', taskId, {
-            completedDatesByYear,
-            skipUntilNextRecurring: false,
-            skippedOccurrenceDate: null,
-            updatedAt: now,
-            lastActive: now,
-        }, `agent complete recurring task ${taskId}`);
+        const updated = updateValidatedEntity<Task>(context.store.tasks as any, 'tasks', taskId, buildTaskCompletionUpdates({
+            task,
+            completed: true,
+            occurrenceDate,
+            now,
+        }) as Record<string, unknown>, `agent complete recurring task ${taskId}`);
 
         markMeaningfulActivity('task_update');
         return updated;
     }
 
-    if (task.completed) {
+    if (task.completed && task.completedOnDate) {
         return task;
     }
 
-    const completedOnDate = toStorageDate(new Date(now));
-    const updated = updateValidatedEntity<Task>(context.store.tasks as any, 'tasks', taskId, {
+    const updated = updateValidatedEntity<Task>(context.store.tasks as any, 'tasks', taskId, buildTaskCompletionUpdates({
+        task,
         completed: true,
-        completedOnDate,
-        updatedAt: now,
-        lastActive: now,
-    }, `agent complete task ${taskId}`);
+        now,
+    }) as Record<string, unknown>, `agent complete task ${taskId}`);
 
     markMeaningfulActivity('task_update');
     return updated;

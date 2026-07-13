@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { useTimeEntries } from './useTimeEntries'
 import { useYjs } from '@/contexts/YjsContext'
 import { createTestYMap, readStored } from '@/test/yjs-test-helpers'
+import * as Y from 'yjs'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 
@@ -94,7 +95,163 @@ describe('useTimeEntries', () => {
         nowSpy.mockRestore()
     })
 
-    it('throws when creating entries and store is not ready', () => {
+    it('routes manual create, update, and delete through shared validation', async () => {
+        const coreDoc = new Y.Doc()
+        const activeEntriesDoc = new Y.Doc()
+        const tasks = createTestYMap({
+            t1: { id: 't1', title: 'Task', projectId: 'p1' },
+        }, coreDoc, 'tasks')
+        const activeTimeEntries = createTestYMap({}, activeEntriesDoc, 'timeEntries')
+        const store = {
+            tasks,
+            activeTimeEntries,
+            activeEntriesDoc,
+            getAllTimeEntries: () => Array.from(activeTimeEntries.values()).map((value) => (
+                value instanceof Y.Map ? Object.fromEntries(value.entries()) : value
+            )),
+            isYearLoaded: vi.fn(() => true),
+        }
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadEntriesForYear: vi.fn(async () => {}),
+            getAvailableYears: vi.fn(() => []),
+        })
+
+        const { result } = renderHook(() => useTimeEntries())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        let entry
+        await act(async () => {
+            entry = await result.current.createManualEntry({ taskId: 't1', start: 1000, end: 2000 })
+        })
+        expect(readStored(activeTimeEntries, entry.id)).toEqual(expect.objectContaining({ taskId: 't1' }))
+
+        await act(async () => {
+            await result.current.updateManualEntry(entry.id, { end: 3000, note: 'Updated' })
+        })
+        expect(readStored(activeTimeEntries, entry.id)).toEqual(expect.objectContaining({ end: 3000, note: 'Updated' }))
+
+        await act(async () => {
+            await expect(result.current.deleteManualEntry(entry.id)).resolves.toBe(true)
+        })
+        expect(activeTimeEntries.has(entry.id)).toBe(false)
+    })
+
+    it('loads historical entries before validating a manual overlap', async () => {
+        const coreDoc = new Y.Doc()
+        const activeEntriesDoc = new Y.Doc()
+        const tasks = createTestYMap({
+            t1: { id: 't1', title: 'Task', projectId: 'p1' },
+        }, coreDoc, 'tasks')
+        const activeTimeEntries = createTestYMap({}, activeEntriesDoc, 'timeEntries')
+        const historicalEntry = { id: 'historical', taskId: 't1', start: 1_000, end: 3_000 }
+        const loadAllTimeEntries = vi.fn(async () => [historicalEntry])
+        const store = {
+            tasks,
+            activeTimeEntries,
+            activeEntriesDoc,
+            loadAllTimeEntries,
+            getAllTimeEntries: () => [],
+            isYearLoaded: vi.fn(() => false),
+        }
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadEntriesForYear: vi.fn(async () => {}),
+            getAvailableYears: vi.fn(async () => [2024]),
+        })
+
+        const { result } = renderHook(() => useTimeEntries())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        await act(async () => {
+            await expect(result.current.createManualEntry({
+                taskId: 't1',
+                start: 2_000,
+                end: 4_000,
+            })).rejects.toThrow(/overlaps/)
+        })
+        expect(loadAllTimeEntries).toHaveBeenCalledTimes(1)
+        expect(activeTimeEntries.size).toBe(0)
+    })
+
+    it('supports archived task lookups and protected manual-entry edge branches', async () => {
+        const coreDoc = new Y.Doc()
+        const activeEntriesDoc = new Y.Doc()
+        const tasks = createTestYMap({
+            target: { id: 'target', title: 'Target', projectId: 'p1' },
+        }, coreDoc, 'tasks')
+        const archivedTasks = createTestYMap({
+            source: { id: 'source', title: 'Archived source', projectId: 'p2', archived: true },
+        })
+        const activeTimeEntries = createTestYMap({}, activeEntriesDoc, 'timeEntries')
+        const loadArchivedTasks = vi.fn(async () => archivedTasks)
+        const loadAllTimeEntries = vi.fn(async () => Array.from(activeTimeEntries.keys())
+            .map((id) => readStored(activeTimeEntries, id)))
+        const store = {
+            tasks,
+            archivedTasks: null,
+            activeTimeEntries,
+            activeEntriesDoc,
+            loadArchivedTasks,
+            loadAllTimeEntries,
+            getAllTimeEntries: () => [],
+            isYearLoaded: vi.fn(() => true),
+        }
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadEntriesForYear: vi.fn(async () => {}),
+            getAvailableYears: vi.fn(async () => []),
+        })
+
+        const { result } = renderHook(() => useTimeEntries())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        let created
+        await act(async () => {
+            created = await result.current.createManualEntry({
+                taskId: 'source',
+                start: 1_000,
+                end: 2_000,
+                billingIncrementMinutes: 15,
+            })
+        })
+        expect(created.billingIncrementMinutes).toBe(15)
+
+        await act(async () => {
+            await result.current.updateManualEntry(created.id, {
+                taskId: 'target',
+                start: 3_000,
+                end: 4_000,
+                billingIncrementMinutes: null,
+            })
+        })
+        expect(readStored(activeTimeEntries, created.id)).toEqual(expect.objectContaining({
+            taskId: 'target',
+            billedDurationMs: null,
+            billingIncrementMinutes: null,
+        }))
+
+        await act(async () => {
+            activeTimeEntries.set('archived-delete', {
+                id: 'archived-delete', taskId: 'source', start: 5_000, end: 6_000,
+            })
+            await expect(result.current.deleteManualEntry('archived-delete')).resolves.toBe(true)
+            await expect(result.current.updateManualEntry('missing', { note: 'Nope' })).resolves.toBeUndefined()
+            await expect(result.current.deleteManualEntry('missing')).resolves.toBe(false)
+            await expect(result.current.createManualEntry({
+                taskId: 'missing', start: 7_000, end: 8_000,
+            })).rejects.toThrow('Task not found')
+        })
+        expect(loadArchivedTasks).toHaveBeenCalled()
+    })
+
+    it('throws when creating entries and store is not ready', async () => {
         const store = {
             activeTimeEntries: createTestYMap(),
             getAllTimeEntries: () => [],
@@ -113,6 +270,9 @@ describe('useTimeEntries', () => {
         expect(() => result.current.createEntry({ taskId: 't1', start: 1, end: 2 })).toThrow('Store not ready')
         expect(result.current.updateEntry('missing', { note: 'Nope' })).toBeUndefined()
         expect(result.current.deleteEntry('missing')).toBe(false)
+        await expect(result.current.createManualEntry({ taskId: 't1', start: 1, end: 2 })).rejects.toThrow('Store not ready')
+        await expect(result.current.updateManualEntry('missing', { note: 'Nope' })).resolves.toBeUndefined()
+        await expect(result.current.deleteManualEntry('missing')).resolves.toBe(false)
     })
 
     it('loads year when requested', async () => {

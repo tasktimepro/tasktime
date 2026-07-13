@@ -23,9 +23,9 @@ const toastMocks = vi.hoisted(() => ({
 
 const timeEntriesHookMocks = vi.hoisted(() => ({
 
-    createEntry: vi.fn(() => ({ id: 'generated-id' })),
-    updateEntry: vi.fn(),
-    deleteEntry: vi.fn(() => true)
+    createManualEntry: vi.fn(() => ({ id: 'generated-id' })),
+    updateManualEntry: vi.fn(),
+    deleteManualEntry: vi.fn(() => true)
 }))
 
 let mockTimeEntries = []
@@ -42,9 +42,9 @@ vi.mock('../hooks/useTimeEntries.ts', () => ({
 
     useTimeEntries: () => ({
         entries: mockTimeEntries,
-        createEntry: timeEntriesHookMocks.createEntry,
-        updateEntry: timeEntriesHookMocks.updateEntry,
-        deleteEntry: timeEntriesHookMocks.deleteEntry
+        createManualEntry: timeEntriesHookMocks.createManualEntry,
+        updateManualEntry: timeEntriesHookMocks.updateManualEntry,
+        deleteManualEntry: timeEntriesHookMocks.deleteManualEntry
     })
 }))
 
@@ -89,9 +89,9 @@ describe('TimeEntriesModal', () => {
 
         toastMocks.showSuccess.mockClear()
         toastMocks.showError.mockClear()
-        timeEntriesHookMocks.createEntry.mockClear()
-        timeEntriesHookMocks.updateEntry.mockClear()
-        timeEntriesHookMocks.deleteEntry.mockClear()
+        timeEntriesHookMocks.createManualEntry.mockClear()
+        timeEntriesHookMocks.updateManualEntry.mockClear()
+        timeEntriesHookMocks.deleteManualEntry.mockClear()
         mockTimeEntries = []
         window.matchMedia = createMatchMedia()
     })
@@ -122,9 +122,9 @@ describe('TimeEntriesModal', () => {
         const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
         await user.click(addButtons[addButtons.length - 1])
 
-        expect(timeEntriesHookMocks.createEntry).toHaveBeenCalledTimes(1)
+        expect(timeEntriesHookMocks.createManualEntry).toHaveBeenCalledTimes(1)
 
-        const entryData = timeEntriesHookMocks.createEntry.mock.calls[0][0]
+        const entryData = timeEntriesHookMocks.createManualEntry.mock.calls[0][0]
         expect(entryData).toMatchObject({
             taskId: 'task-1',
             note: 'Manual entry'
@@ -177,7 +177,7 @@ describe('TimeEntriesModal', () => {
         const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
         await user.click(addButtons[addButtons.length - 1])
 
-        expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
+        expect(timeEntriesHookMocks.createManualEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Time spent must be greater than 0')
     })
 
@@ -198,7 +198,7 @@ describe('TimeEntriesModal', () => {
         const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
         await user.click(addButtons[addButtons.length - 1])
 
-        expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
+        expect(timeEntriesHookMocks.createManualEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Please fill in date started and start time')
     })
 
@@ -229,9 +229,9 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getByRole('button', { name: 'Save Changes' }))
 
-        expect(timeEntriesHookMocks.updateEntry).toHaveBeenCalledTimes(1)
+        expect(timeEntriesHookMocks.updateManualEntry).toHaveBeenCalledTimes(1)
 
-        const [entryId, updates] = timeEntriesHookMocks.updateEntry.mock.calls[0]
+        const [entryId, updates] = timeEntriesHookMocks.updateManualEntry.mock.calls[0]
         expect(entryId).toBe('entry-1')
         expect(updates.end).toBeGreaterThan(entry.end)
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry updated successfully')
@@ -263,8 +263,8 @@ describe('TimeEntriesModal', () => {
 
         await user.click(screen.getByRole('button', { name: 'Save Changes' }))
 
-        expect(timeEntriesHookMocks.updateEntry).toHaveBeenCalledTimes(1)
-        const [entryId, updates] = timeEntriesHookMocks.updateEntry.mock.calls[0]
+        expect(timeEntriesHookMocks.updateManualEntry).toHaveBeenCalledTimes(1)
+        const [entryId, updates] = timeEntriesHookMocks.updateManualEntry.mock.calls[0]
         expect(entryId).toBe('entry-seconds')
         expect(updates.end - updates.start).toBe((1 * 60 * 60 + 30 * 60 + 45) * 1000)
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry updated successfully')
@@ -343,7 +343,7 @@ describe('TimeEntriesModal', () => {
         const addButtons = screen.getAllByRole('button', { name: 'Add Entry' })
         await user.click(addButtons[addButtons.length - 1])
 
-        expect(timeEntriesHookMocks.createEntry).not.toHaveBeenCalled()
+        expect(timeEntriesHookMocks.createManualEntry).not.toHaveBeenCalled()
         expect(toastMocks.showError).toHaveBeenCalledWith('Use format like 2w 4d 6h 45m')
     })
 
@@ -369,8 +369,8 @@ describe('TimeEntriesModal', () => {
         await user.click(screen.getByTitle('Delete entry'))
 
         await user.click(screen.getByRole('button', { name: 'Delete' }))
-        expect(timeEntriesHookMocks.deleteEntry).toHaveBeenCalledTimes(1)
-        expect(timeEntriesHookMocks.deleteEntry).toHaveBeenCalledWith('entry-1')
+        expect(timeEntriesHookMocks.deleteManualEntry).toHaveBeenCalledTimes(1)
+        expect(timeEntriesHookMocks.deleteManualEntry).toHaveBeenCalledWith('entry-1')
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Time entry deleted successfully')
     })
 

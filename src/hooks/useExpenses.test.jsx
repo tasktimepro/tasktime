@@ -241,7 +241,7 @@ describe('useExpenses', () => {
         })
     })
 
-    it('queues a payment snapshot when creating a paid cross-currency expense', async () => {
+    it('prepares a payment snapshot before creating a paid cross-currency expense', async () => {
         const { store, loadArchivedExpenses } = buildStore()
 
         store.preferences = new Map([['currency', 'EUR']])
@@ -254,8 +254,8 @@ describe('useExpenses', () => {
 
         const { result } = renderHook(() => useExpenses())
 
-        act(() => {
-            result.current.createExpense(buildExpense({
+        await act(async () => {
+            await result.current.createExpenseWithPaymentSnapshot(buildExpense({
                 id: 'created-paid',
                 currency: 'USD',
                 amount: 50,
@@ -264,14 +264,40 @@ describe('useExpenses', () => {
             }))
         })
 
-        await waitFor(() => {
-            expect(readStored(store.expenses, 'created-paid')).toEqual(expect.objectContaining({
-                paymentCurrencySnapshot: expect.objectContaining({
-                    sourceCurrency: 'USD',
-                    preferredCurrencyAtPayment: 'EUR',
-                }),
-            }))
+        expect(readStored(store.expenses, 'created-paid')).toEqual(expect.objectContaining({
+            paymentCurrencySnapshot: expect.objectContaining({
+                sourceCurrency: 'USD',
+                preferredCurrencyAtPayment: 'EUR',
+            }),
+        }))
+    })
+
+    it('does not create or update paid cross-currency expenses when snapshot preparation fails', async () => {
+        mockFetchExchangeRates.mockResolvedValue({ rates: null, error: 'offline' })
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({ id: 'existing-fx', currency: 'USD', amount: 10 })],
         })
+        store.preferences = new Map([['currency', 'EUR']])
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedExpenses })
+
+        const { result } = renderHook(() => useExpenses())
+
+        await expect(result.current.createExpenseWithPaymentSnapshot(buildExpense({
+            id: 'new-fx',
+            currency: 'USD',
+            paymentStatus: 'paid',
+            paidOn: '2025-02-05',
+        }))).rejects.toThrow('offline')
+        await expect(result.current.updateExpenseWithPaymentSnapshot('existing-fx', {
+            paymentStatus: 'paid',
+            paidOn: '2025-02-05',
+        })).rejects.toThrow('offline')
+
+        expect(store.expenses.has('new-fx')).toBe(false)
+        expect(readStored(store.expenses, 'existing-fx')).toEqual(expect.objectContaining({
+            paymentStatus: 'unpaid',
+            amount: 10,
+        }))
     })
 
     it('does not mark cross-currency expenses paid when exchange rates are unavailable', async () => {
@@ -346,7 +372,7 @@ describe('useExpenses', () => {
         expect(mockFetchExchangeRates).not.toHaveBeenCalled()
     })
 
-    it('refreshes paid expense snapshots when sensitive fields change', async () => {
+    it('refreshes paid expense snapshots before sensitive fields change', async () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [buildExpense({
                 id: 'paid-refresh',
@@ -373,8 +399,8 @@ describe('useExpenses', () => {
 
         const { result } = renderHook(() => useExpenses())
 
-        act(() => {
-            result.current.updateExpense('paid-refresh', { paidOn: '2025-02-03' })
+        await act(async () => {
+            await result.current.updateExpenseWithPaymentSnapshot('paid-refresh', { paidOn: '2025-02-03' })
         })
 
         await waitFor(() => {
@@ -668,6 +694,71 @@ describe('useExpenses', () => {
             createdAt: 111,
             updatedAt: 222,
         }))
+    })
+
+    it('rejects duplicate expense IDs without replacing the existing record', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({ id: 'duplicate-expense', title: 'Original' })],
+        })
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedExpenses })
+
+        const { result } = renderHook(() => useExpenses())
+
+        expect(() => result.current.createExpense(buildExpense({
+            id: 'duplicate-expense',
+            title: 'Replacement',
+        }))).toThrow(/already exists/i)
+        expect(readStored(store.expenses, 'duplicate-expense')).toEqual(expect.objectContaining({ title: 'Original' }))
+    })
+
+    it('rejects raw paid cross-currency writes that have no prepared snapshot', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({
+                id: 'paid-existing',
+                currency: 'USD',
+                paymentStatus: 'paid',
+                paidOn: '2025-02-01',
+                paymentCurrencySnapshot: {
+                    capturedAt: 1,
+                    sourceCurrency: 'USD',
+                    sourceAmount: 10,
+                    preferredCurrencyAtPayment: 'EUR',
+                    preferredCurrencyAmount: 8,
+                },
+            })],
+        })
+        store.preferences = new Map([['currency', 'EUR']])
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedExpenses })
+
+        const { result } = renderHook(() => useExpenses())
+
+        expect(() => result.current.createExpense(buildExpense({
+            id: 'paid-new',
+            currency: 'USD',
+            paymentStatus: 'paid',
+            paidOn: '2025-02-01',
+        }))).toThrow(/payment currency snapshot is required/i)
+        expect(() => result.current.updateExpense('paid-existing', { amount: 20 }))
+            .toThrow(/payment currency snapshot is required/i)
+        expect(store.expenses.has('paid-new')).toBe(false)
+        expect(readStored(store.expenses, 'paid-existing')).toEqual(expect.objectContaining({ amount: 10 }))
+    })
+
+    it('rejects deletion of billed and tax-claimed expenses', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [
+                buildExpense({ id: 'billed', billingStatus: 'billed', invoiceId: 'invoice-1' }),
+                buildExpense({ id: 'claimed', taxClaimStatus: 'claimed', taxClaimPeriodId: 'period-1' }),
+            ],
+        })
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedExpenses })
+
+        const { result } = renderHook(() => useExpenses())
+
+        expect(() => result.current.deleteExpense('billed')).toThrow(/billed expenses cannot be deleted/i)
+        expect(() => result.current.deleteExpense('claimed')).toThrow(/tax-claimed expenses cannot be deleted/i)
+        expect(store.expenses.has('billed')).toBe(true)
+        expect(store.expenses.has('claimed')).toBe(true)
     })
 
     it('updates and deletes archived expenses when includeArchived is enabled', async () => {

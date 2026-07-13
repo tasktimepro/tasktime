@@ -16,8 +16,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { BILLABLE_TIME_THRESHOLD_MS } from '@/constants/app';
 import { getCurrentTimeString, getTodayString, timestampToDateString, timestampToTimeString } from '@/utils/dateUtils.ts';
-import { buildBillableDurationFields, getBillableDurationMs } from '@/utils/timeEntryDurationUtils.ts';
-import { checkTimeOverlap } from '@/utils/timeValidationUtils.ts';
+import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils.ts';
 
 /**
  * @param {Object} props
@@ -36,8 +35,8 @@ const AddTimeEntryModal = ({
 }) => {
 
     const { showSuccess, showError } = useToast();
-    const { entries: timeEntries, createEntry, updateEntry } = useTimeEntries();
-    const { tasks: allTasks, updateTask } = useTasks();
+    const { entries: timeEntries, createManualEntry, updateManualEntry } = useTimeEntries();
+    const { updateTask } = useTasks();
     const { projects } = useProjects();
 
     const timeSpentInputRef = useRef(null);
@@ -56,6 +55,7 @@ const AddTimeEntryModal = ({
         timeSpent: '',
         note: ''
     });
+    const [isSaving, setIsSaving] = useState(false);
 
     const getDefaultStartTime = () => getCurrentTimeString().slice(0, 5);
     const formatStartTime = (timestamp, showSeconds = false) => {
@@ -231,8 +231,6 @@ const AddTimeEntryModal = ({
         return project && typeof project.hourlyRate === 'number' && project.hourlyRate > 0;
     }, [task?.projectId, projects]);
 
-    const preservedBillingIncrementMinutes = entry?.billingIncrementMinutes || null;
-
     const taskBillableTimeMs = useMemo(() => {
         if (!task) return 0;
         const taskLastBilledAt = task.lastBilledAt || task.createdAt || 0;
@@ -251,8 +249,8 @@ const AddTimeEntryModal = ({
         }
     }, [task, projectHasHourlyRate, taskBillableTimeMs, updateTask]);
 
-    const handleSubmit = () => {
-        if (!task) return;
+    const handleSubmit = async () => {
+        if (!task || isSaving) return;
 
         if (!formData.startDate || !formData.startTime) {
             showError('Please fill in date started and start time');
@@ -268,50 +266,31 @@ const AddTimeEntryModal = ({
         const startTimestamp = new Date(`${formData.startDate}T${formData.startTime}`).getTime();
         const endTimestamp = startTimestamp + durationResult.durationMs;
 
-        if (!entry) {
-            const billingCutoffDate = task.lastBilledAt || 0;
-            if (startTimestamp < billingCutoffDate) {
-                showError('Cannot add time entries before the latest billed time entry');
+        setIsSaving(true);
+        try {
+            if (entry) {
+                await updateManualEntry(entry.id, {
+                    start: startTimestamp,
+                    end: endTimestamp,
+                    note: formData.note.trim() || undefined,
+                });
+                showSuccess('Time entry updated successfully');
+                onClose();
                 return;
             }
-        }
 
-        const overlapCheck = checkTimeOverlap(
-            startTimestamp,
-            endTimestamp,
-            task.projectId,
-            timeEntries,
-            allTasks,
-            entry?.id || null
-        );
-
-        if (!overlapCheck.isValid) {
-            showError(overlapCheck.error);
-            return;
-        }
-
-        if (entry) {
-            updateEntry(entry.id, {
+            await createManualEntry({
+                taskId: task.id,
                 start: startTimestamp,
                 end: endTimestamp,
                 note: formData.note.trim() || undefined,
-                ...buildBillableDurationFields({
-                    start: startTimestamp,
-                    end: endTimestamp,
-                    billingIncrementMinutes: preservedBillingIncrementMinutes,
-                })
             });
-            showSuccess('Time entry updated successfully');
-            onClose();
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Could not save the time entry');
             return;
+        } finally {
+            setIsSaving(false);
         }
-
-        createEntry({
-            taskId: task.id,
-            start: startTimestamp,
-            end: endTimestamp,
-            note: formData.note.trim() || undefined
-        });
 
         maybeMarkTaskBillable(durationResult.durationMs);
         showSuccess('Time entry added successfully');
@@ -324,14 +303,16 @@ const AddTimeEntryModal = ({
                 variant="secondary"
                 size="sm"
                 onClick={onClose}
+                disabled={isSaving}
             >
                 Cancel
             </Button>
             <Button
                 size="sm"
                 onClick={handleSubmit}
+                disabled={isSaving}
             >
-                {entry ? 'Save Changes' : 'Add Entry'}
+                {isSaving ? 'Saving…' : (entry ? 'Save Changes' : 'Add Entry')}
             </Button>
         </div>
     );

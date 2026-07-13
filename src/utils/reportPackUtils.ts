@@ -28,7 +28,7 @@ export type AccountantPackManifestRow = {
 
 type BuildAccountantPackFilesInput = {
     csvFiles: AccountantPackCsvFile[];
-    invoicePdfFiles?: AccountantPackInvoicePdfFile[];
+    invoicePdfFiles?: Array<Pick<AccountantPackInvoicePdfFile, 'filename' | 'invoiceId' | 'invoiceNumber'>>;
     pdfFiles: AccountantPackPdfFile[];
 };
 
@@ -47,14 +47,14 @@ export const buildAccountantPackManifestRows = ({
     const csvRows = csvFiles.map((file) => ({
         category: 'csv',
         fileName: file.filename,
-        description: file.filename.replace(/\.csv$/i, '').replaceAll('-', ' '),
+        description: file.filename.replace(/\.csv$/i, '').replace(/-/g, ' '),
         recordCount: file.rows.length,
     }));
 
     const pdfRows = pdfFiles.map((file) => ({
         category: 'pdf',
         fileName: file.filename,
-        description: file.filename.replace(/\.pdf$/i, '').replaceAll('-', ' '),
+        description: file.filename.replace(/\.pdf$/i, '').replace(/-/g, ' '),
         recordCount: 1,
     }));
 

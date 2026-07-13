@@ -7,11 +7,19 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useMasterClock } from '@/hooks/useMasterClock';
-import type { MultiTimerState, TimeEntry } from '@/stores/yjs/types';
+import type { MultiTimerState, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { generateId } from '@/utils/idUtils';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { readEntity, objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
+import {
+    buildPausedTimer,
+    buildResumedTimer,
+    buildStartedTimer,
+    buildUpdatedTimer,
+    findStoppedTimerEntry,
+    planStoppedTimer,
+} from '@/domain/time/timerOperations';
 
 export interface ActiveTimer extends MultiTimerState {
     elapsedTime: number;
@@ -36,7 +44,7 @@ export interface UseTimersResult {
     /** Resume a project's timer */
     resumeTimer: (projectId: string) => void;
     /** Stop timer and create time entry */
-    stopTimer: (projectId: string) => TimeEntry | null;
+    stopTimer: (projectId: string) => Promise<TimeEntry | null>;
     /** Clear timer without creating entry */
     clearTimer: (projectId: string) => void;
     /** Update timer properties */
@@ -121,24 +129,16 @@ export function useTimers(): UseTimersResult {
         const task = readEntity<{ id: string; projectId?: string }>(store.tasks.get(taskId));
         if (!task) return;
 
-        const timerKey = task.projectId || task.id;
-
         const now = Date.now();
-        // Align start time to the next second boundary
-        // This ensures all timers tick in sync with real-world clock seconds
-        // e.g., if now is 14:30:15.432, startTime becomes 14:30:16.000
-        const alignedStartTime = Math.ceil(now / 1000) * 1000;
+        const timerKey = task.projectId || task.id;
+        if (store.timers.has(timerKey)) return;
         
-        const timer = validateCollectionEntity<MultiTimerState>('timers', {
-            projectId: timerKey,
-            taskId,
+        const timer = validateCollectionEntity<MultiTimerState>('timers', buildStartedTimer({
+            task,
             timerInstanceId: generateId(),
-            startTime: alignedStartTime,
-            paused: false,
-            pausedElapsedTime: 0,
-            note: note || '',
-            lastActive: now,
-        }, `start timer ${timerKey}`);
+            now,
+            note,
+        }), `start timer ${timerKey}`);
 
         store.coreDoc.transact(() => {
             const entityMap = objectToYMap(timer as unknown as Record<string, unknown>);
@@ -157,13 +157,13 @@ export function useTimers(): UseTimersResult {
         const pauseTimestamp = typeof pausedAt === 'number' && Number.isFinite(pausedAt)
             ? pausedAt
             : Date.now();
-        const elapsed = pauseTimestamp - timer.startTime;
+        const paused = buildPausedTimer(timer, pauseTimestamp);
 
         store.coreDoc.transact(() => {
             updateEntityFields(store.timers as any, projectId, {
-                paused: true,
-                pausedElapsedTime: elapsed,
-                lastActive: pauseTimestamp,
+                paused: paused.paused,
+                pausedElapsedTime: paused.pausedElapsedTime,
+                lastActive: paused.lastActive,
             });
         });
 
@@ -176,50 +176,91 @@ export function useTimers(): UseTimersResult {
         const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `resume timer ${projectId}`);
         if (!timer || !timer.paused) return;
 
-        const pausedTime = timer.pausedElapsedTime || 0;
         const now = Date.now();
+        const resumed = buildResumedTimer(timer, now);
 
         store.coreDoc.transact(() => {
             updateEntityFields(store.timers as any, projectId, {
-                // Preserve the exact paused elapsed time so resume never jumps backward.
-                startTime: now - pausedTime,
-                paused: false,
-                pausedElapsedTime: 0,
-                lastActive: now,
+                startTime: resumed.startTime,
+                paused: resumed.paused,
+                pausedElapsedTime: resumed.pausedElapsedTime,
+                lastActive: resumed.lastActive,
             });
         });
 
         markMeaningfulActivity('timer_resume');
     }, [isReady, store]);
 
-    const stopTimer = useCallback((projectId: string): TimeEntry | null => {
+    const stopTimer = useCallback(async (projectId: string): Promise<TimeEntry | null> => {
         if (!isReady) return null;
 
-        const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `stop timer ${projectId}`);
-        if (!timer) return null;
+        const requestedTimer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `stop timer ${projectId}`) || null;
+        if (!requestedTimer) return null;
+
+        const entries = typeof store.loadAllTimeEntries === 'function'
+            ? await store.loadAllTimeEntries()
+            : (typeof store.getAllTimeEntries === 'function'
+                ? store.getAllTimeEntries()
+                : collectValidatedEntities<TimeEntry>('timeEntries', store.activeTimeEntries as any, 'stopped timer recovery'));
+        const archivedTaskMap = typeof store.loadArchivedTasks === 'function'
+            ? await store.loadArchivedTasks()
+            : store.archivedTasks;
+        const tasks = [
+            ...collectValidatedEntities<Task>('tasks', store.tasks as any, 'stopped timer tasks'),
+            ...(archivedTaskMap
+                ? collectValidatedEntities<Task>('tasks', archivedTaskMap as any, 'stopped timer archived tasks')
+                : []),
+        ];
+        const currentTimer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `finish stopping timer ${projectId}`) || null;
+
+        if (!currentTimer) {
+            const recoveredEntry = findStoppedTimerEntry({
+                timerKey: projectId,
+                timer: requestedTimer,
+                entries,
+            });
+
+            return recoveredEntry;
+        }
+
+        if (currentTimer.timerInstanceId !== requestedTimer.timerInstanceId
+            || currentTimer.taskId !== requestedTimer.taskId
+            || currentTimer.startTime !== requestedTimer.startTime) {
+            throw new Error('The active timer changed while it was being stopped. Please try again.');
+        }
 
         const now = Date.now();
-        const startTime = timer.paused
-            ? (now - (timer.pausedElapsedTime || 0))
-            : timer.startTime;
-
-        const entry = validateCollectionEntity<TimeEntry>('timeEntries', {
-            id: generateId(),
-            taskId: timer.taskId,
-            start: startTime,
-            end: now,
-            note: timer.note,
-            _stoppedTimerKey: projectId,
-            _stoppedTimerInstanceId: timer.timerInstanceId,
-        }, `stop timer entry ${projectId}`);
-
-        store.activeEntriesDoc.transact(() => {
-            const entryMap = objectToYMap(entry as unknown as Record<string, unknown>);
-            (store.activeTimeEntries as any).set(entry.id, entryMap);
+        const task = tasks.find((candidate) => candidate.id === currentTimer.taskId) || null;
+        const project = task?.projectId
+            ? readEntity<Project>(store.projects?.get(task.projectId))
+            : null;
+        const stopPlan = planStoppedTimer({
+            timerKey: projectId,
+            timer: currentTimer,
+            entries,
+            tasks,
+            now,
+            billingIncrementMinutes: project?.billableTimeIncrementMinutes,
         });
+        const entry = validateCollectionEntity<TimeEntry>('timeEntries', stopPlan.entry, `stop timer entry ${projectId}`);
+
+        if (!stopPlan.recovered) {
+            store.activeEntriesDoc.transact(() => {
+                const entryMap = objectToYMap(entry as unknown as Record<string, unknown>);
+                (store.activeTimeEntries as any).set(entry.id, entryMap);
+            });
+        }
 
         store.coreDoc.transact(() => {
-            store.timers.delete(projectId);
+            const latestTimer = readEntity<MultiTimerState>(store.timers.get(projectId));
+            const matchesStoppedInstance = latestTimer
+                && latestTimer.taskId === currentTimer.taskId
+                && latestTimer.startTime === currentTimer.startTime
+                && latestTimer.timerInstanceId === currentTimer.timerInstanceId;
+
+            if (matchesStoppedInstance) {
+                store.timers.delete(projectId);
+            }
         });
 
         markMeaningfulActivity('timer_stop');
@@ -243,9 +284,10 @@ export function useTimers(): UseTimersResult {
         const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `update timer ${projectId}`);
         if (!timer) return;
 
-        const fieldUpdates: Record<string, unknown> = { lastActive: Date.now() };
-        if (updates.startTime !== undefined) fieldUpdates.startTime = updates.startTime;
-        if (updates.note !== undefined) fieldUpdates.note = updates.note;
+        const updated = buildUpdatedTimer(timer, updates, Date.now());
+        const fieldUpdates: Record<string, unknown> = { lastActive: updated.lastActive };
+        if (updates.startTime !== undefined) fieldUpdates.startTime = updated.startTime;
+        if (updates.note !== undefined) fieldUpdates.note = updated.note;
 
         store.coreDoc.transact(() => {
             updateEntityFields(store.timers as any, projectId, fieldUpdates);

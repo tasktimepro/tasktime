@@ -53,4 +53,5 @@
 - Behavior changes start with a failing focused test and finish with the relevant Docker-backed green checks.
 - Persisted, sync, billing, reporting, import/export, and agent changes include negative and compatibility coverage proportional to risk.
 - Broad release-sensitive changes pass `make release-gate`.
+- The repository-wide TypeScript check completes with zero diagnostics as part of `make release-gate`.
 - Public agent interface changes also pass the agent bridge/bundle smoke path and update generated documentation.

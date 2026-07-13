@@ -53,7 +53,7 @@ describe('useExpenseRecurrences', () => {
         expect(result.current.activeRecurrences.map((r) => r.id)).toEqual(['r1'])
     })
 
-    it('generatePendingExpenses creates expenses and updates lastGeneratedDate', () => {
+    it('generatePendingExpenses creates expenses and updates lastGeneratedDate', async () => {
         const update = vi.fn()
         const createExpense = vi.fn()
 
@@ -75,15 +75,15 @@ describe('useExpenseRecurrences', () => {
 
         const { result } = renderHook(() => useExpenseRecurrences())
 
-        act(() => {
-            result.current.generatePendingExpenses(createExpense)
+        await act(async () => {
+            await result.current.generatePendingExpenses(createExpense)
         })
 
         expect(createExpense).toHaveBeenCalledTimes(2)
         expect(update).toHaveBeenCalledWith('r1', { lastGeneratedDate: '2025-03-01' })
     })
 
-    it('skips expenses that already exist when existingExpenseIds provided', () => {
+    it('skips expenses that already exist when existingExpenseIds provided', async () => {
         const update = vi.fn()
         const createExpense = vi.fn()
 
@@ -107,8 +107,8 @@ describe('useExpenseRecurrences', () => {
 
         const existingIds = new Set(['det-r1-2025-02-01'])
 
-        act(() => {
-            result.current.generatePendingExpenses(createExpense, existingIds)
+        await act(async () => {
+            await result.current.generatePendingExpenses(createExpense, existingIds)
         })
 
         expect(createExpense).toHaveBeenCalledTimes(1)
@@ -118,7 +118,7 @@ describe('useExpenseRecurrences', () => {
         expect(update).toHaveBeenCalledWith('r1', { lastGeneratedDate: '2025-03-01' })
     })
 
-    it('skips updates when there are no pending dates', () => {
+    it('skips updates when there are no pending dates', async () => {
         const update = vi.fn()
         const createExpense = vi.fn()
 
@@ -135,11 +135,39 @@ describe('useExpenseRecurrences', () => {
 
         const { result } = renderHook(() => useExpenseRecurrences())
 
-        act(() => {
-            result.current.generatePendingExpenses(createExpense)
+        await act(async () => {
+            await result.current.generatePendingExpenses(createExpense)
         })
 
         expect(createExpense).not.toHaveBeenCalled()
+        expect(update).not.toHaveBeenCalled()
+    })
+
+    it('does not advance the recurrence cursor when expense creation fails', async () => {
+        const update = vi.fn()
+        const createExpense = vi.fn()
+            .mockResolvedValueOnce({ id: 'det-r1-2025-02-01' })
+            .mockRejectedValueOnce(new Error('Exchange rates unavailable'))
+
+        getPendingPeriods.mockReturnValue(['2025-02-01', '2025-03-01'])
+        buildExpenseFromRecurrence.mockImplementation((recurrence, dateValue) => ({
+            id: `det-${recurrence.id}-${dateValue}`,
+            title: recurrence.title,
+            date: dateValue,
+        }))
+        mockUseYjsCollection.mockReturnValue({
+            items: [baseRecurrence],
+            isLoading: false,
+            get: vi.fn(),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useExpenseRecurrences())
+
+        await expect(result.current.generatePendingExpenses(createExpense))
+            .rejects.toThrow('Exchange rates unavailable')
         expect(update).not.toHaveBeenCalled()
     })
 

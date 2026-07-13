@@ -635,7 +635,7 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     update_task: {
         name: 'update_task',
-        description: 'Update a task through the TaskTime Pro command layer.',
+        description: 'Update a task through relationship and task-state invariants; recurring completion remains occurrence-specific.',
         scopes: ['write'],
         handler: updateTaskCommand,
     },
@@ -703,7 +703,7 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     stop_timer: {
         name: 'stop_timer',
-        description: 'Stop a timer and create the corresponding time entry with replay-safe operation recovery.',
+        description: 'Stop a timer and create one corresponding time entry with complete-history validation and replay/concurrency recovery.',
         scopes: ['write'],
         handler: stopTimerCommand,
     },
@@ -722,13 +722,13 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     add_manual_time_entry: {
         name: 'add_manual_time_entry',
-        description: 'Create a manual time entry after validating billing cutoffs and overlap rules.',
+        description: 'Create a manual time entry after validating billing cutoffs and overlaps against complete local history.',
         scopes: ['write'],
         handler: addManualTimeEntryCommand,
     },
     update_time_entry: {
         name: 'update_time_entry',
-        description: 'Edit an active unbilled time entry after validating task, billing cutoff, and overlap rules.',
+        description: 'Edit an active unbilled time entry after validating source/target task, billing cutoff, and complete-history overlap rules.',
         scopes: ['write'],
         handler: updateTimeEntryCommand,
     },
@@ -1005,13 +1005,13 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     get_dashboard_summary: {
         name: 'get_dashboard_summary',
-        description: 'Return a bounded summary of current TaskTime Pro work, timers, unbilled time, expenses, and draft invoices.',
+        description: 'Return a bounded summary of current work and canonical invoice-eligible time across complete local history.',
         scopes: ['read'],
         handler: (context) => getDashboardSummaryCommand(context),
     },
     get_project_overview: {
         name: 'get_project_overview',
-        description: 'Return a bounded project summary with task, timer, unbilled time, expense, and invoice counts.',
+        description: 'Return a bounded project summary with canonical invoice-eligible time across complete local history.',
         scopes: ['read'],
         handler: getProjectOverviewCommand,
     },
@@ -1110,13 +1110,13 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     find_unbilled_time: {
         name: 'find_unbilled_time',
-        description: 'Find recent unbilled time entries, optionally scoped by project or task.',
+        description: 'Find canonical invoice-eligible time across complete local history, optionally scoped by project or task.',
         scopes: ['read'],
         handler: findUnbilledTimeCommand,
     },
     list_recent_entries: {
         name: 'list_recent_entries',
-        description: 'List recent time entries with bounded results and summarized fields.',
+        description: 'List recent entries across complete local history with actual and billable duration summaries.',
         scopes: ['read'],
         handler: listRecentEntriesCommand,
     },

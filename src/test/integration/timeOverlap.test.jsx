@@ -8,9 +8,11 @@ import TimeEntriesModal from '../../components/TimeEntriesModal';
 import { ToastContext } from '../../contexts/ToastContext';
 
 // Mock hooks with hoisted mocks
-const mockCreateEntry = vi.fn();
-const mockUpdateEntry = vi.fn();
-const mockDeleteEntry = vi.fn();
+const mockCreateManualEntry = vi.fn(() => {
+    throw new Error('Time range overlaps with existing entry for "Test Task"');
+});
+const mockUpdateManualEntry = vi.fn();
+const mockDeleteManualEntry = vi.fn();
 
 const mockEntries = [
     {
@@ -24,9 +26,9 @@ const mockEntries = [
 vi.mock('../../hooks/useTimeEntries.ts', () => ({
     useTimeEntries: () => ({
         entries: mockEntries,
-        createEntry: mockCreateEntry,
-        updateEntry: mockUpdateEntry,
-        deleteEntry: mockDeleteEntry
+        createManualEntry: mockCreateManualEntry,
+        updateManualEntry: mockUpdateManualEntry,
+        deleteManualEntry: mockDeleteManualEntry
     })
 }));
 
@@ -102,11 +104,11 @@ describe('Time Overlap Detection', () => {
         const saveButton = screen.getByRole('button', { name: 'Add Entry' });
         fireEvent.click(saveButton);
 
-        // Should show error toast and NOT call createEntry
+        // The shared manual-entry operation rejects the overlapping range.
         await waitFor(() => {
             expect(toastContextValue.showError).toHaveBeenCalled();
         });
 
-        expect(mockCreateEntry).not.toHaveBeenCalled();
+        expect(mockCreateManualEntry).toHaveBeenCalledTimes(1);
     });
 });

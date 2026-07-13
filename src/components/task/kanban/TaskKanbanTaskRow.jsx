@@ -1,13 +1,11 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArchiveBoxIcon, ArchiveRestoreIcon, GripVerticalIcon, TrashIcon } from '@/components/ui/icons';
-import { useProjects } from '@/hooks/useProjects';
 import { useTasks } from '@/hooks/useTasks';
-import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useTimers } from '@/hooks/useTimers';
+import { useToast } from '@/hooks/useToast';
 import { cn } from '@/lib/utils';
 import { getTodayString } from '@/utils/dateUtils.ts';
-import { buildBillableDurationFields } from '@/utils/timeEntryDurationUtils.ts';
 import TaskTimer from '../../TaskTimer';
 import TaskHeader from '../TaskHeader';
 
@@ -58,23 +56,14 @@ const TaskKanbanTaskRow = ({
     dragDisabled = false,
 }) => {
     const { updateTask } = useTasks();
-    const { createEntry } = useTimeEntries();
-    const { getTimerForTask, clearTimer } = useTimers();
-    const { projects } = useProjects();
+    const { getTimerForTask, stopTimer } = useTimers();
+    const { showError } = useToast();
 
     const timerKey = task.projectId || task.id;
     const projectTimer = getTimerForTask(task.id, task.projectId);
     const isTimerActive = Boolean(projectTimer && projectTimer.taskId === task.id);
 
-    const currentProject = useMemo(() => {
-        if (!task.projectId) {
-            return null;
-        }
-
-        return projects.find((project) => project.id === task.projectId) || null;
-    }, [projects, task.projectId]);
-
-    const handleToggleComplete = useCallback((checked) => {
+    const handleToggleComplete = useCallback(async (checked) => {
         if (task.recurring || task.archived) {
             return;
         }
@@ -82,20 +71,12 @@ const TaskKanbanTaskRow = ({
         const now = Date.now();
 
         if (isTimerActive && projectTimer?.startTime) {
-            createEntry({
-                taskId: task.id,
-                start: projectTimer.startTime,
-                end: now,
-                note: projectTimer.note,
-                _stoppedTimerKey: timerKey,
-                _stoppedTimerInstanceId: projectTimer.timerInstanceId,
-                ...buildBillableDurationFields({
-                    start: projectTimer.startTime,
-                    end: now,
-                    billingIncrementMinutes: currentProject?.billableTimeIncrementMinutes,
-                }),
-            });
-            clearTimer(timerKey);
+            try {
+                if (!await stopTimer(timerKey)) return;
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Could not stop the timer.');
+                return;
+            }
         }
 
         updateTask(task.id, {
@@ -103,7 +84,7 @@ const TaskKanbanTaskRow = ({
             completedOnDate: checked ? getTodayString() : null,
             lastActive: now,
         });
-    }, [clearTimer, createEntry, currentProject?.billableTimeIncrementMinutes, isTimerActive, projectTimer, task.archived, task.id, task.recurring, timerKey, updateTask]);
+    }, [isTimerActive, projectTimer, showError, stopTimer, task.archived, task.id, task.recurring, timerKey, updateTask]);
 
     const dragHandle = buildDragHandle({
         dragActivatorRef,

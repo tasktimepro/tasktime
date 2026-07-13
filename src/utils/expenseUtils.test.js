@@ -195,6 +195,18 @@ describe('expenseUtils', () => {
         })).toBeNull();
     });
 
+    it('rejects a cross-currency snapshot when the requested conversion is unavailable', () => {
+        expect(() => createExpensePaymentCurrencySnapshot({
+            expense: {
+                currency: 'USD',
+                amount: 125,
+                paidOn: '2025-02-01',
+            },
+            preferredCurrency: 'EUR',
+            exchangeRates: { USD: 1 },
+        })).toThrow('Missing exchange rate for EUR');
+    });
+
     it('falls back to the raw expense amount when no snapshot exists', () => {
         expect(getPaidExpenseConvertedAmount({
             amount: 50,

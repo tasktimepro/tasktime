@@ -29,7 +29,7 @@ type ReadyServiceWorkerRegistrationOptions = {
 
 const PUSH_REQUEST_TIMEOUT_MS = 10000;
 
-function base64UrlToUint8Array(value: string): Uint8Array {
+function base64UrlToUint8Array(value: string): Uint8Array<ArrayBuffer> {
     const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
     const raw = atob(padded);

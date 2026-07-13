@@ -11,7 +11,7 @@ const expenseHookMocks = vi.hoisted(() => ({
 
     markAsPaid: vi.fn(),
     markAsUnpaid: vi.fn(),
-    createExpense: vi.fn()
+    createExpenseWithPaymentSnapshot: vi.fn()
 }))
 
 const recurrenceHookMocks = vi.hoisted(() => ({
@@ -41,7 +41,7 @@ vi.mock('../../hooks/useExpenses.ts', () => ({
         expenses: mockExpenses,
         markAsPaid: expenseHookMocks.markAsPaid,
         markAsUnpaid: expenseHookMocks.markAsUnpaid,
-        createExpense: expenseHookMocks.createExpense
+        createExpenseWithPaymentSnapshot: expenseHookMocks.createExpenseWithPaymentSnapshot
     })
 }))
 

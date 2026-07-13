@@ -66,7 +66,7 @@ export interface PlannerClientItem extends PlannerItemBase {
 export interface PlannerProjectItem extends PlannerItemBase {
     type: 'project';
     entity: Project;
-    attachment: PlannerAttachment;
+    attachment?: PlannerAttachment;
     isDeadlineItem?: boolean;
 }
 

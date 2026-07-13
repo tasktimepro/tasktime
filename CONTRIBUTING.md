@@ -22,6 +22,7 @@ All Node/npm commands run through Docker.
 make install
 make dev
 make lint
+make typecheck
 make test-run
 make build
 ```
@@ -41,6 +42,7 @@ Before requesting review, run the smallest useful verification set. For broad ch
 
 ```bash
 make lint
+make typecheck
 make test-run
 make build
 ```

@@ -1,7 +1,8 @@
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
-import type { AddressInfo, Socket } from 'node:net';
+import type { AddressInfo } from 'node:net';
+import type { Duplex } from 'node:stream';
 import { createAgentBridgeSession, isAgentBridgeSessionExpired, type AgentBridgeSession } from '@/agent/session';
 import {
     AGENT_APP_SESSION_PROTOCOL_VERSION,
@@ -74,9 +75,9 @@ export class BridgeWebSocketClient {
 
     readonly id: string;
     readonly session: AgentBridgeSession | null;
-    private readonly socket: Socket;
+    private readonly socket: Duplex;
 
-    constructor(socket: Socket, id: string, session: AgentBridgeSession | null = null) {
+    constructor(socket: Duplex, id: string, session: AgentBridgeSession | null = null) {
         this.id = id;
         this.session = session;
         this.socket = socket;
@@ -428,13 +429,14 @@ export class BridgeAppSessionServer {
         clearTimeout(pending.timeoutId);
         this.pendingResponses.delete(requestId);
         pending.resolve(response);
+        const errorCode = 'error' in response.response ? response.response.error.code : undefined;
         this.audit({
             action: response.response.ok ? 'command_completed' : 'command_failed',
             clientId: client.id,
             requestId,
             command: response.response.command,
             ok: response.response.ok,
-            errorCode: response.response.ok ? undefined : response.response.error.code,
+            errorCode,
         });
         return true;
     }
@@ -582,7 +584,7 @@ export class BridgeAppSessionServer {
         this.options.onAudit?.(event);
     }
 
-    private async handleUpgrade(request: IncomingMessage, socket: Socket): Promise<void> {
+    private async handleUpgrade(request: IncomingMessage, socket: Duplex): Promise<void> {
         try {
             assertAllowedTaskTimeOrigin(request.headers.origin, this.options.allowedOrigins || DEFAULT_ALLOWED_TASKTIME_ORIGINS);
 

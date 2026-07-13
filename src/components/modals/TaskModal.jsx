@@ -58,7 +58,7 @@ const TaskModal = ({
     const { showSuccess, showError } = useToast();
     const { projects } = useProjects();
     const { clients } = useClients();
-    const { createTask, updateTask } = useTasks();
+    const { createTask, updateTask, isLoading: taskRelationshipsLoading } = useTasks({ includeArchived: true });
     const { entries: timeEntries } = useTimeEntries();
 
     const activeProjects = useMemo(() => {
@@ -75,6 +75,7 @@ const TaskModal = ({
         estimatedHours: '',
         estimatedFlatAmount: ''
     });
+    const [isSaving, setIsSaving] = useState(false);
 
     const selectedProject = useMemo(() => {
         if (!formData.projectId || formData.projectId === NO_PROJECT_VALUE) {
@@ -246,8 +247,14 @@ const TaskModal = ({
         }));
     };
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
+
+        if (isSaving) return;
+        if (editingTask && taskRelationshipsLoading) {
+            showError('Task relationships are still loading. Please try again in a moment.');
+            return;
+        }
 
         if (!formData.title.trim()) {
             showError('Task title is required');
@@ -277,21 +284,29 @@ const TaskModal = ({
             payload.quotedAmountBilling = null;
         }
 
-        if (editingTask) {
-            updateTask(editingTask.id, {
-                ...payload,
-                parentTaskId: editingTask.parentTaskId || null
-            });
-            showSuccess('Task updated');
-        } else {
-            const createdTask = createTask({
-                ...payload,
-                parentTaskId: null,
-                completed: false,
-                archived: false
-            });
-            modalOptions?.onCreate?.(createdTask);
-            showSuccess('Task created');
+        setIsSaving(true);
+        try {
+            if (editingTask) {
+                await updateTask(editingTask.id, {
+                    ...payload,
+                    parentTaskId: editingTask.parentTaskId || null
+                });
+                showSuccess('Task updated');
+            } else {
+                const createdTask = createTask({
+                    ...payload,
+                    parentTaskId: null,
+                    completed: false,
+                    archived: false
+                });
+                modalOptions?.onCreate?.(createdTask);
+                showSuccess('Task created');
+            }
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Could not save the task.');
+            return;
+        } finally {
+            setIsSaving(false);
         }
 
         if (clearSavedState) {
@@ -315,14 +330,16 @@ const TaskModal = ({
                 variant="outline"
                 onClick={handleClose}
                 type="button"
+                disabled={isSaving}
             >
                 Cancel
             </Button>
             <Button
                 onClick={handleSubmit}
                 type="submit"
+                disabled={isSaving || Boolean(editingTask && taskRelationshipsLoading)}
             >
-                {editingTask ? 'Save' : 'Create'}
+                {isSaving ? 'Saving…' : (editingTask ? 'Save' : 'Create')}
             </Button>
         </div>
     );

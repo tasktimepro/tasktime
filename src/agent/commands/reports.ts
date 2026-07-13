@@ -45,6 +45,27 @@ type ReportSection =
     | 'hours'
     | 'to-invoice';
 
+interface HoursReportRow {
+    key: string;
+    projectTitle: string;
+    clientTitle: string;
+    totalMs: number;
+    billableMs: number;
+    unbilledBillableMs: number;
+    entriesCount: number;
+}
+
+interface ToInvoiceReportRow {
+    key: string;
+    clientTitle: string;
+    projectTitle: string;
+    uninvoicedHoursMs: number;
+    expenseAmountsByCurrency: Record<string, number>;
+    expenseCount: number;
+    estimatedAmountsByCurrency: Record<string, number>;
+    hourlyRate: number;
+}
+
 export interface ReportSummaryInput {
     section?: ReportSection;
     period?: ReportPeriodValue;
@@ -385,7 +406,7 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
         existing.entriesCount += 1;
         grouped.set(projectKey, existing);
         return grouped;
-    }, new Map<string, any>()).values()).sort((rowA, rowB) => rowB.totalMs - rowA.totalMs);
+    }, new Map<string, HoursReportRow>()).values()).sort((rowA, rowB) => rowB.totalMs - rowA.totalMs);
 
     const unbilledExpenseRows = filteredExpenses.filter((expense) => expense.billable && expense.billingStatus === 'unbilled');
     const activeProjects = data.projects.filter((project) => !project.archived);
@@ -410,7 +431,7 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
             hourlyRate,
         });
         return grouped;
-    }, new Map<string, any>()).values());
+    }, new Map<string, ToInvoiceReportRow>()).values());
 
     const toInvoiceRowsByKey = new Map(toInvoiceRows.map((row) => [row.key, row]));
     unbilledExpenseRows.forEach((expense) => {

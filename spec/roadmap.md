@@ -40,6 +40,7 @@ The detailed finding-by-finding execution checklist and validation state live in
 
 ## Phase 5 — Maintainability evolution
 
+- Shared UI/agent work and time operations centralized for timer recovery, manual entries, recurring completion/skip state, and relationship-safe work-entity writes
 - Gradual TypeScript migration
 - Test infrastructure improvements
 - Approved product backlog such as task templates and invoice cancellation after ambiguities are resolved

@@ -36,7 +36,6 @@ import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
 import { linkifyNodes } from '@/utils/linkifyUtils';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate, getPaidExpenseConvertedAmount } from '@/utils/expenseUtils';
-import { buildBillableDurationFields } from '@/utils/timeEntryDurationUtils.ts';
 import AddTimeEntryModal from '@/components/modals/AddTimeEntryModal';
 import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
 
@@ -133,7 +132,7 @@ const Dashboard = ({
     openExpenseView
 }) => {
     const hasClients = clients.length > 0;
-    const { showWarning, showSuccess } = useToast();
+    const { showWarning, showSuccess, showError } = useToast();
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [taskFilter, setTaskFilter] = useState(DEFAULT_TASK_FILTER);
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
@@ -154,12 +153,11 @@ const Dashboard = ({
         toggleRecurringCompletion,
         isCompletedOnDate,
         getRecurringStatus,
-        resetExpiredSkips,
         archivedLoading,
         archivedLoaded,
     } = useTasks({ includeArchived: true });
-    const { entries: timeEntries, createEntry, deleteEntry } = useTimeEntries();
-    const { timers, clearTimer } = useTimers();
+    const { entries: timeEntries, deleteEntry } = useTimeEntries();
+    const { timers, stopTimer, clearTimer } = useTimers();
     const { expenses } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
     const { preferences } = usePreferences();
@@ -178,11 +176,6 @@ const Dashboard = ({
     // priority sections (ToDoToday + MetricsCards) appear instantly.
     const [deferredReady, setDeferredReady] = useState(false);
     useEffect(() => { setDeferredReady(true); }, []);
-
-    // Reset stale skip flags once on mount / when date changes
-    useEffect(() => {
-        resetExpiredSkips();
-    }, [todayStr]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const resolveRecurringActionDate = useCallback((task) => {
         if (!task?.recurring || !todayStr) return null;
@@ -780,7 +773,7 @@ const Dashboard = ({
     /**
      * Toggle task completion status
      */
-    const handleCompleteTask = useCallback((task) => {
+    const handleCompleteTask = useCallback(async (task) => {
         const isCompleted = getTaskCompletedStatus(task);
         const newCompletedStatus = !isCompleted;
         const now = Date.now();
@@ -788,25 +781,12 @@ const Dashboard = ({
         // If timer is active for this task and we're completing it, stop the timer
         const activeTimer = timers.find(timer => timer.taskId === task.id);
         if (newCompletedStatus && activeTimer) {
-            const endTime = activeTimer.isPaused && activeTimer.elapsedTime > 0
-                ? activeTimer.startTime + activeTimer.elapsedTime
-                : now;
-
-            createEntry({
-                taskId: task.id,
-                start: activeTimer.startTime,
-                end: endTime,
-                note: activeTimer.note,
-                _stoppedTimerKey: task.projectId || task.id,
-                _stoppedTimerInstanceId: activeTimer.timerInstanceId,
-                ...buildBillableDurationFields({
-                    start: activeTimer.startTime,
-                    end: endTime,
-                    billingIncrementMinutes: projects.find(project => project.id === task.projectId)?.billableTimeIncrementMinutes,
-                }),
-            });
-
-            clearTimer(task.projectId || task.id);
+            try {
+                if (!await stopTimer(task.projectId || task.id)) return;
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Could not stop the timer.');
+                return;
+            }
         }
 
         // Update task completion status and lastActive timestamp
@@ -825,7 +805,7 @@ const Dashboard = ({
                 lastActive: now
             });
         }
-    }, [timers, createEntry, clearTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr, resolveRecurringActionDate, projects]);
+    }, [timers, stopTimer, updateTask, getTaskCompletedStatus, toggleRecurringCompletion, todayStr, resolveRecurringActionDate, showError]);
 
     /**
      * Handle clicking on task title to navigate to project

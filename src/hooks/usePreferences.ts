@@ -82,9 +82,11 @@ export function usePreferences() {
             ...updates,
         } as Record<string, unknown>, 'update preferences');
         
-        Object.entries(updates).forEach(([key, value]) => {
+        (Object.keys(updates) as Array<keyof Preferences>).forEach((key) => {
+            const value = updates[key];
+
             if (value !== undefined) {
-                store.preferences.set(key, (nextPreferences as Record<string, unknown>)[key]);
+                store.preferences.set(key, nextPreferences[key]);
             }
         });
 

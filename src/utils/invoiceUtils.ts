@@ -6,6 +6,18 @@ import type { InvoicePaymentCurrencySnapshot } from '@/stores/yjs/types';
 import { convertCurrency, normalizeCurrencyCode } from './currencyUtils';
 import { parseStoredDate } from './dateUtils';
 
+type NormalizedProjectBreakdown = Record<string, unknown> & {
+    projectId: string;
+    projectTitle: string;
+    clientId: string;
+    totalHours: number;
+    subtotal: number;
+    allocatedDiscount?: number;
+    allocatedShipping?: number;
+    allocatedTax?: number;
+    allocatedTotal?: number;
+};
+
 const SIMPLE_SEQUENTIAL_TOKEN = '{sequential}';
 
 const PAID_INVOICE_STATUS = 'paid';
@@ -68,14 +80,14 @@ const getFiniteRecord = (value: any) => {
     return Object.fromEntries(entries) as Record<string, number>;
 };
 
-const getNormalizedProjectBreakdowns = (invoice: any) => {
+const getNormalizedProjectBreakdowns = (invoice: any): NormalizedProjectBreakdown[] | undefined => {
     if (!Array.isArray(invoice?.projectBreakdowns)) {
         return undefined;
     }
 
     const normalizedBreakdowns = invoice.projectBreakdowns
         .filter((breakdown: any) => breakdown && typeof breakdown === 'object')
-        .map((breakdown: any) => ({
+        .map((breakdown: any): NormalizedProjectBreakdown => ({
             ...breakdown,
             projectId: getTrimmedString(breakdown.projectId),
             projectTitle: getTrimmedString(breakdown.projectTitle),
@@ -173,10 +185,10 @@ const resolveProjectTitleFromCollection = (projects: any[] | Map<string, any> | 
 
 export const getInvoiceProjectTitle = (invoice: any, projects?: any[] | Map<string, any> | null): string => {
     const projectIds = getInvoiceProjectIds(invoice);
-    const breakdownTitleById = new Map(
+    const breakdownTitleById = new Map<string, string>(
         (Array.isArray(invoice?.projectBreakdowns) ? invoice.projectBreakdowns : [])
             .filter((breakdown: any) => breakdown?.projectId && breakdown?.projectTitle)
-            .map((breakdown: any) => [breakdown.projectId, getTrimmedString(breakdown.projectTitle)])
+            .map((breakdown: any) => [breakdown.projectId, getTrimmedString(breakdown.projectTitle)] as const)
     );
 
     if (projectIds.length === 0) {

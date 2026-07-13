@@ -59,9 +59,8 @@ export function planInvoiceFinalization({
 }): InvoiceFinalizationPlan {
     const invoiceRecord = invoice as Invoice & {
         agentDraft?: Record<string, unknown>;
-        tasks?: Array<Record<string, unknown>>;
-        projectBreakdowns?: Array<Record<string, unknown>>;
-        expenseItems?: Array<Record<string, unknown>>;
+        tasks?: unknown;
+        expenseItems?: unknown;
     };
     const agentDraft = normalizeAgentDraft(invoiceRecord.agentDraft);
     const billingSelection = getBillingSelectionSnapshot(invoice.billingSelectionSnapshot);
@@ -80,7 +79,7 @@ export function planInvoiceFinalization({
         ])
         : (invoiceTaskIds.size > 0
             ? invoiceTaskIds
-            : collectFallbackAgentDraftTaskIds({ agentDraft, invoice, projects, tasks }));
+            : collectFallbackAgentDraftTaskIds({ agentDraft, invoice, tasks }));
     const taskLastBilledAt: Record<string, number | null> = {};
     const previousBillingCutoffs = new Map<string, number>();
     const nextTaskCutoffs = new Map<string, number>();
@@ -277,7 +276,7 @@ function collectSnapshotQuotedTaskClaims(
     });
 }
 
-function collectInvoiceTasks(invoice: { tasks?: Array<Record<string, unknown>>; projectBreakdowns?: Array<Record<string, unknown>> }) {
+function collectInvoiceTasks(invoice: { tasks?: unknown; projectBreakdowns?: unknown }) {
     const tasks: Array<Record<string, unknown>> = [];
 
     if (Array.isArray(invoice.tasks)) {
@@ -285,8 +284,8 @@ function collectInvoiceTasks(invoice: { tasks?: Array<Record<string, unknown>>; 
     }
 
     if (Array.isArray(invoice.projectBreakdowns)) {
-        invoice.projectBreakdowns.forEach((breakdown) => {
-            if (Array.isArray(breakdown?.tasks)) {
+        invoice.projectBreakdowns.filter(isRecord).forEach((breakdown) => {
+            if (Array.isArray(breakdown.tasks)) {
                 tasks.push(...breakdown.tasks.filter(isRecord));
             }
         });
@@ -489,9 +488,9 @@ function planInvoiceAdjustments({
 }
 
 function collectInvoiceExpenseIds(invoice: {
-    items?: Array<Record<string, unknown>>;
-    expenseItems?: Array<Record<string, unknown>>;
-    projectBreakdowns?: Array<Record<string, unknown>>;
+    items?: unknown;
+    expenseItems?: unknown;
+    projectBreakdowns?: unknown;
 }) {
     const ids = new Set<string>();
     const collect = (items: unknown) => {
@@ -505,7 +504,9 @@ function collectInvoiceExpenseIds(invoice: {
 
     collect(invoice.items);
     collect(invoice.expenseItems);
-    invoice.projectBreakdowns?.forEach((breakdown) => collect(breakdown.expenseItems));
+    if (Array.isArray(invoice.projectBreakdowns)) {
+        invoice.projectBreakdowns.filter(isRecord).forEach((breakdown) => collect(breakdown.expenseItems));
+    }
 
     return ids;
 }

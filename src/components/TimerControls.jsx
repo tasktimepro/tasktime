@@ -1,13 +1,9 @@
 import React, { useCallback, useRef } from 'react';
 import { PlayIcon, PauseIcon, StopIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
-import { checkTimeOverlap } from '../utils/timeValidationUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useTimers } from '../hooks/useTimers.ts';
-import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useTasks } from '../hooks/useTasks.ts';
-import { useProjects } from '../hooks/useProjects.ts';
-import { buildBillableDurationFields } from '../utils/timeEntryDurationUtils.ts';
 
 /**
  * TimerControls component - Handles task timer functionality using Yjs hooks directly
@@ -34,12 +30,10 @@ function TimerControls({
         startTimer: timerStart,
         pauseTimer: timerPause,
         resumeTimer: timerResume,
-        clearTimer
+        stopTimer,
     } = useTimers();
     
-    const { entries, createEntry } = useTimeEntries();
-    const { activeTasks, updateTask } = useTasks();
-    const { projects } = useProjects();
+    const { updateTask } = useTasks();
     
     const projectId = task.projectId;
     const timerKey = projectId || task.id;
@@ -48,65 +42,9 @@ function TimerControls({
     const isTimerPaused = isTimerActive && projectTimer.isPaused;
 
     /**
-     * Validate time entry doesn't overlap with existing entries
-     */
-    const validateTimeEntry = useCallback((taskId, entryStartTime, endTime) => {
-        const entryTask = activeTasks.find(t => t.id === taskId) || task;
-        const projectId = entryTask?.projectId;
-
-        if (activeTasks.length > 0 && projectId) {
-            const overlapCheck = checkTimeOverlap(
-                entryStartTime,
-                endTime,
-                projectId,
-                entries,
-                activeTasks
-            );
-
-            if (!overlapCheck.isValid) {
-                showError(overlapCheck.error);
-                return false;
-            }
-        }
-        return true;
-    }, [activeTasks, entries, task, showError]);
-
-    const buildTimeEntryPayload = useCallback((taskId, start, end, entryNote, stoppedTimerKey, stoppedTimerInstanceId) => {
-        const entryTask = activeTasks.find(activeTask => activeTask.id === taskId) || (task.id === taskId ? task : null);
-        const project = entryTask?.projectId
-            ? projects.find(currentProject => currentProject.id === entryTask.projectId)
-            : null;
-
-        return {
-            taskId,
-            start,
-            end,
-            note: entryNote,
-            _stoppedTimerKey: stoppedTimerKey,
-            _stoppedTimerInstanceId: stoppedTimerInstanceId,
-            ...buildBillableDurationFields({
-                start,
-                end,
-                billingIncrementMinutes: project?.billableTimeIncrementMinutes,
-            }),
-        };
-    }, [activeTasks, projects, task]);
-
-    /**
-     * Create a time entry with overlap validation
-     */
-    const createValidatedEntry = useCallback((taskId, start, end, entryNote, stoppedTimerKey, stoppedTimerInstanceId) => {
-        if (!validateTimeEntry(taskId, start, end)) {
-            return false;
-        }
-        createEntry(buildTimeEntryPayload(taskId, start, end, entryNote, stoppedTimerKey, stoppedTimerInstanceId));
-        return true;
-    }, [validateTimeEntry, createEntry, buildTimeEntryPayload]);
-
-    /**
      * Start timer for current task
      */
-    const handleStart = useCallback(() => {
+    const handleStart = useCallback(async () => {
         // If this task's timer is paused, resume it
         if (isTimerPaused) {
             timerResume(timerKey);
@@ -118,15 +56,15 @@ function TimerControls({
         
         // If another timer in this project is running, stop it first and create its entry
         if (projectTimer && projectTimer.taskId !== task.id) {
-            const existingStart = projectTimer.startTime;
-            const existingEnd = projectTimer.isPaused
-                ? (existingStart + projectTimer.elapsedTime)
-                : Date.now();
-
-            if (!createValidatedEntry(projectTimer.taskId, existingStart, existingEnd, projectTimer.note, timerKey, projectTimer.timerInstanceId)) {
+            try {
+                if (!await stopTimer(timerKey)) {
+                    showError('Could not stop the existing timer.');
+                    return;
+                }
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Could not stop the existing timer.');
                 return;
             }
-            clearTimer(timerKey);
         }
 
         // Start new timer
@@ -134,7 +72,7 @@ function TimerControls({
         if (onStart) {
             onStart();
         }
-    }, [isTimerPaused, projectTimer, task.id, timerKey, timerResume, createValidatedEntry, clearTimer, timerStart, onStart]);
+    }, [isTimerPaused, projectTimer, task.id, timerKey, timerResume, stopTimer, showError, timerStart, onStart]);
 
     /**
      * Pause the timer
@@ -164,32 +102,26 @@ function TimerControls({
     /**
      * Stop timer and create time entry
      */
-    const handleStop = useCallback(() => {
+    const handleStop = useCallback(async () => {
         if (!isTimerActive || !projectTimer) return;
 
         const now = Date.now();
-        const entryStart = projectTimer.startTime;
-        const entryEnd = projectTimer.isPaused
-            ? entryStart + projectTimer.elapsedTime
-            : now;
-        
-        // Validate and create entry
-        if (!createValidatedEntry(task.id, entryStart, entryEnd, projectTimer.note, timerKey, projectTimer.timerInstanceId)) {
-            return; // Don't clear timer if validation failed
+        try {
+            if (!await stopTimer(timerKey)) return;
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Could not stop the timer.');
+            return;
         }
         
         // Update task's lastActive
         updateTask(task.id, { lastActive: now });
-        
-        // Clear the timer
-        clearTimer(timerKey);
         
         // Call completion callback
         if (onComplete) {
             onComplete();
         }
     }, [isTimerActive, projectTimer, task.id,
-        createValidatedEntry, updateTask, clearTimer, onComplete, timerKey]);
+        stopTimer, updateTask, onComplete, showError, timerKey]);
 
     // Determine icon size based on size prop
     const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-5 w-5';

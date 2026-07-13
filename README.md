@@ -51,6 +51,7 @@ make install                         # install dependencies
 make dev                             # start the app on localhost:3101
 make stop                            # stop local containers
 make lint                            # run ESLint
+make typecheck                       # run the repository-wide TypeScript check
 make test-run                        # run Vitest once
 make test-coverage                   # run Vitest with coverage
 make test-e2e-smoke                  # run Playwright smoke tests

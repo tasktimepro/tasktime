@@ -1,6 +1,12 @@
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 import type { Client, Expense, Invoice, MultiTimerState, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
+import {
+    collectLegacyBilledTimeEntryIds,
+    getInvoiceEligibleTimeEntries,
+    hasExplicitBillingMarker,
+} from '@/domain/invoices/invoiceEligibility';
+import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 import { assertPermission, assertReady, readRequiredEntity } from './shared';
 
 const DEFAULT_RESULT_LIMIT = 25;
@@ -13,6 +19,7 @@ export interface AgentEntrySummary {
     start: number;
     end: number;
     durationMs: number;
+    billableDurationMs: number;
     billed: boolean;
     billedInvoiceId?: string | null;
     note?: string;
@@ -67,10 +74,6 @@ function getLimit(limit?: number): number {
     return Math.max(1, Math.min(MAX_RESULT_LIMIT, Math.floor(limit as number)));
 }
 
-function getTasks(context: AgentCommandContext): Task[] {
-    return collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent query tasks');
-}
-
 function getProjects(context: AgentCommandContext): Project[] {
     return collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent query projects');
 }
@@ -87,9 +90,25 @@ function getTimers(context: AgentCommandContext): MultiTimerState[] {
     return collectValidatedEntities<MultiTimerState>('timers', context.store.timers as any, 'agent query timers');
 }
 
-function getEntries(context: AgentCommandContext): TimeEntry[] {
-    return context.store.getAllTimeEntries()
-        .filter((entry): entry is TimeEntry => !!entry && typeof entry.id === 'string' && typeof entry.taskId === 'string');
+async function getCompleteBillingData(context: AgentCommandContext): Promise<{
+    tasks: Task[];
+    entries: TimeEntry[];
+    invoices: Invoice[];
+}> {
+    const [tasks, entries, invoices] = await Promise.all([
+        context.store.getAllTasks(),
+        context.store.loadAllTimeEntries(),
+        context.store.getAllInvoices(),
+    ]);
+
+    return {
+        tasks: tasks.filter((task): task is Task => Boolean(task?.id)),
+        entries: entries.filter((entry): entry is TimeEntry => (
+            Boolean(entry?.id)
+            && typeof entry.taskId === 'string'
+        )),
+        invoices: invoices.filter((invoice): invoice is Invoice => Boolean(invoice?.id)),
+    };
 }
 
 function getTaskProjectId(task: Task | undefined): string | null {
@@ -100,11 +119,15 @@ function getTaskProjectId(task: Task | undefined): string | null {
     return task.projectId || task.id;
 }
 
-function isEntryBilled(entry: TimeEntry): boolean {
-    return Boolean(entry.billedAt || entry.billedInvoiceId);
+function isEntryBilled(entry: TimeEntry, legacyBilledEntryIds: Set<string>): boolean {
+    return hasExplicitBillingMarker(entry) || legacyBilledEntryIds.has(entry.id);
 }
 
-function summarizeEntry(entry: TimeEntry, taskById: Map<string, Task>): AgentEntrySummary {
+function summarizeEntry(
+    entry: TimeEntry,
+    taskById: Map<string, Task>,
+    legacyBilledEntryIds: Set<string>
+): AgentEntrySummary {
     const projectId = getTaskProjectId(taskById.get(entry.taskId));
 
     return {
@@ -114,7 +137,8 @@ function summarizeEntry(entry: TimeEntry, taskById: Map<string, Task>): AgentEnt
         start: entry.start,
         end: entry.end,
         durationMs: Math.max(0, entry.end - entry.start),
-        billed: isEntryBilled(entry),
+        billableDurationMs: getBillableDurationMs(entry),
+        billed: isEntryBilled(entry, legacyBilledEntryIds),
         billedInvoiceId: entry.billedInvoiceId,
         note: entry.note,
     };
@@ -132,16 +156,20 @@ function filterEntries(input: EntryListInput, entries: TimeEntry[], taskById: Ma
         });
 }
 
-export function getDashboardSummaryCommand(context: AgentCommandContext): DashboardSummary {
+export async function getDashboardSummaryCommand(context: AgentCommandContext): Promise<DashboardSummary> {
     assertReady(context);
     assertPermission(context, 'read');
 
     const projects = getProjects(context).filter((project) => !project.archived);
-    const tasks = getTasks(context).filter((task) => !task.archived);
-    const entries = getEntries(context);
+    const billingData = await getCompleteBillingData(context);
+    const tasks = billingData.tasks.filter((task) => !task.archived);
     const expenses = getExpenses(context);
-    const invoices = getInvoices(context);
-    const unbilledEntries = entries.filter((entry) => !isEntryBilled(entry));
+    const invoices = billingData.invoices;
+    const unbilledEntries = getInvoiceEligibleTimeEntries({
+        tasks: billingData.tasks,
+        timeEntries: billingData.entries,
+        invoices,
+    });
 
     return {
         projectCount: projects.length,
@@ -150,24 +178,35 @@ export function getDashboardSummaryCommand(context: AgentCommandContext): Dashbo
         completedTaskCount: tasks.filter((task) => task.completed).length,
         activeTimerCount: getTimers(context).length,
         unbilledEntryCount: unbilledEntries.length,
-        unbilledDurationMs: unbilledEntries.reduce((total, entry) => total + Math.max(0, entry.end - entry.start), 0),
+        unbilledDurationMs: unbilledEntries.reduce((total, entry) => total + getBillableDurationMs(entry), 0),
         billableExpenseCount: expenses.filter((expense) => expense.billable).length,
         unbilledExpenseCount: expenses.filter((expense) => expense.billable && expense.billingStatus !== 'billed').length,
         draftInvoiceCount: invoices.filter((invoice) => invoice.status === 'draft').length,
     };
 }
 
-export function getProjectOverviewCommand(context: AgentCommandContext, input: { projectId: string }): ProjectOverview {
+export async function getProjectOverviewCommand(
+    context: AgentCommandContext,
+    input: { projectId: string }
+): Promise<ProjectOverview> {
     assertReady(context);
     assertPermission(context, 'read');
 
     const project = readRequiredEntity<Project>(context.store.projects as any, input.projectId, 'Project');
-    const tasks = getTasks(context).filter((task) => getTaskProjectId(task) === project.id && !task.archived);
-    const taskById = new Map(tasks.map((task) => [task.id, task]));
-    const entries = filterEntries({ projectId: project.id }, getEntries(context), taskById);
-    const unbilledEntries = entries.filter((entry) => !isEntryBilled(entry));
+    const billingData = await getCompleteBillingData(context);
+    const tasks = billingData.tasks.filter((task) => getTaskProjectId(task) === project.id && !task.archived);
+    const taskById = new Map(billingData.tasks.map((task) => [task.id, task]));
+    const unbilledEntries = filterEntries(
+        { projectId: project.id },
+        getInvoiceEligibleTimeEntries({
+            tasks: billingData.tasks,
+            timeEntries: billingData.entries,
+            invoices: billingData.invoices,
+        }),
+        taskById
+    );
     const expenses = getExpenses(context).filter((expense) => expense.projectId === project.id);
-    const invoices = getInvoices(context).filter((invoice) => invoice.projectId === project.id || invoice.projectIds?.includes(project.id));
+    const invoices = billingData.invoices.filter((invoice) => invoice.projectId === project.id || invoice.projectIds?.includes(project.id));
 
     return {
         project: {
@@ -183,7 +222,7 @@ export function getProjectOverviewCommand(context: AgentCommandContext, input: {
         completedTaskCount: tasks.filter((task) => task.completed).length,
         activeTimerCount: getTimers(context).filter((timer) => timer.projectId === project.id).length,
         unbilledEntryCount: unbilledEntries.length,
-        unbilledDurationMs: unbilledEntries.reduce((total, entry) => total + Math.max(0, entry.end - entry.start), 0),
+        unbilledDurationMs: unbilledEntries.reduce((total, entry) => total + getBillableDurationMs(entry), 0),
         billableExpenseCount: expenses.filter((expense) => expense.billable).length,
         draftInvoiceCount: invoices.filter((invoice) => invoice.status === 'draft').length,
     };
@@ -215,27 +254,48 @@ export function getClientOverviewCommand(context: AgentCommandContext, input: { 
     };
 }
 
-export function findUnbilledTimeCommand(context: AgentCommandContext, input: EntryListInput = {}): AgentEntrySummary[] {
+export async function findUnbilledTimeCommand(
+    context: AgentCommandContext,
+    input: EntryListInput = {}
+): Promise<AgentEntrySummary[]> {
     assertReady(context);
     assertPermission(context, 'read');
 
-    const taskById = new Map(getTasks(context).map((task) => [task.id, task]));
+    const billingData = await getCompleteBillingData(context);
+    const taskById = new Map(billingData.tasks.map((task) => [task.id, task]));
+    const legacyBilledEntryIds = collectLegacyBilledTimeEntryIds({
+        tasks: billingData.tasks,
+        timeEntries: billingData.entries,
+        invoices: billingData.invoices,
+    });
 
-    return filterEntries(input, getEntries(context), taskById)
-        .filter((entry) => !isEntryBilled(entry))
+    return filterEntries(input, getInvoiceEligibleTimeEntries({
+        tasks: billingData.tasks,
+        timeEntries: billingData.entries,
+        invoices: billingData.invoices,
+    }), taskById)
         .sort((a, b) => b.end - a.end)
         .slice(0, getLimit(input.limit))
-        .map((entry) => summarizeEntry(entry, taskById));
+        .map((entry) => summarizeEntry(entry, taskById, legacyBilledEntryIds));
 }
 
-export function listRecentEntriesCommand(context: AgentCommandContext, input: EntryListInput = {}): AgentEntrySummary[] {
+export async function listRecentEntriesCommand(
+    context: AgentCommandContext,
+    input: EntryListInput = {}
+): Promise<AgentEntrySummary[]> {
     assertReady(context);
     assertPermission(context, 'read');
 
-    const taskById = new Map(getTasks(context).map((task) => [task.id, task]));
+    const billingData = await getCompleteBillingData(context);
+    const taskById = new Map(billingData.tasks.map((task) => [task.id, task]));
+    const legacyBilledEntryIds = collectLegacyBilledTimeEntryIds({
+        tasks: billingData.tasks,
+        timeEntries: billingData.entries,
+        invoices: billingData.invoices,
+    });
 
-    return filterEntries(input, getEntries(context), taskById)
+    return filterEntries(input, billingData.entries, taskById)
         .sort((a, b) => b.end - a.end)
         .slice(0, getLimit(input.limit))
-        .map((entry) => summarizeEntry(entry, taskById));
+        .map((entry) => summarizeEntry(entry, taskById, legacyBilledEntryIds));
 }

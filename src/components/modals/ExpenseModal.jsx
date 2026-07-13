@@ -27,6 +27,7 @@ import { buildExpenseFromRecurrence } from '@/utils/expenseUtils';
 import { DEFAULT_CURRENCY } from '@/utils/currencyUtils.ts';
 import { toStorageDate } from '@/utils/dateUtils.ts';
 import { parseOptionalNumberInput } from '@/utils/numberInputUtils.ts';
+import { getExpenseDeletionBlockReason } from '@/domain/expenses/expenseOperations';
 
 const NO_CLIENT_VALUE = 'no-client';
 const NO_PROJECT_VALUE = 'no-project';
@@ -303,7 +304,12 @@ const ExpenseModal = ({
     clearSavedState,
 }) => {
     const { showSuccess, showError } = useToast();
-    const { expenses, createExpense, updateExpense, deleteExpense } = useExpenses({ includeArchived: true });
+    const {
+        expenses,
+        createExpenseWithPaymentSnapshot,
+        updateExpenseWithPaymentSnapshot,
+        deleteExpense,
+    } = useExpenses({ includeArchived: true });
     const { createRecurrence, getRecurrence, updateRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
@@ -347,6 +353,8 @@ const ExpenseModal = ({
     const defaultCurrency = preferences.currency || DEFAULT_CURRENCY;
     const emptyFormData = useMemo(() => buildEmptyFormData(todayString, defaultCurrency), [defaultCurrency, todayString]);
     const [confirmDialog, setConfirmDialog] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const saveInFlightRef = useRef(false);
     const [activeSuggestionField, setActiveSuggestionField] = useState(null);
     const titleInputRef = useRef(null);
     const oneTimePaymentModeOverrideRef = useRef(null);
@@ -679,6 +687,9 @@ const ExpenseModal = ({
     const showRecurringFields = formData.isRecurring && !isEditingInstance;
     const typeSelectionLocked = Boolean(editingExpense?.isRecurring || editingRecurrenceId);
     const recurringFieldsLocked = Boolean(editingExpense?.isRecurring && !editingRecurrenceId);
+    const expenseDeletionBlockReason = editingExpense
+        ? getExpenseDeletionBlockReason(editingExpense)
+        : null;
 
     const setFormData = (updater) => {
         setDraftState((prevState) => {
@@ -1051,7 +1062,7 @@ const ExpenseModal = ({
         };
     }, [formData.isRecurring, formData.repeat, formData.startDate, formData.monthlyDay, formData.monthlyType, todayString]);
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
 
         const isEditingTemplate = Boolean(editingRecurrenceId);
@@ -1145,103 +1156,117 @@ const ExpenseModal = ({
             taxRate: effectiveTaxRate,
         };
 
-        if (isEditingTemplate) {
-            const existing = getRecurrence(editingRecurrenceId);
-            if (!existing) {
-                showError('Recurring expense not found');
-                return;
-            }
+        if (saveInFlightRef.current) {
+            return;
+        }
 
-            updateRecurrence(editingRecurrenceId, {
-                title: payload.title,
-                note: payload.note,
-                supplierName: payload.supplierName,
-                paidBy: payload.paidBy,
-                paymentMode: payload.paymentMode,
-                currency: payload.currency,
-                amount: amountValue || 0,
-                amountType: formData.amountType,
-                repeat: formData.repeat,
-                startDate: formData.startDate,
-                monthlyType: formData.repeat === 'monthly' ? formData.monthlyType : undefined,
-                monthlyDay: formData.repeat === 'monthly' ? formData.monthlyDay : undefined,
-                endDate: formData.endDate || null,
-                clientId: payload.clientId,
-                projectId: payload.projectId,
-                categoryId: payload.categoryId,
-                businessId: payload.businessId,
-                isPersonal: payload.isPersonal,
-                billable: payload.billable,
-                taxNumber: payload.taxNumber,
-                isTaxExempt: payload.isTaxExempt,
-                amountExcludingTax: payload.amountExcludingTax,
-                taxLabel: payload.taxLabel,
-                taxRate: payload.taxRate,
-            });
-            showSuccess('Recurring expense updated');
+        saveInFlightRef.current = true;
+        setIsSaving(true);
+
+        try {
+            if (isEditingTemplate) {
+                const existing = getRecurrence(editingRecurrenceId);
+                if (!existing) {
+                    showError('Recurring expense not found');
+                    return;
+                }
+
+                updateRecurrence(editingRecurrenceId, {
+                    title: payload.title,
+                    note: payload.note,
+                    supplierName: payload.supplierName,
+                    paidBy: payload.paidBy,
+                    paymentMode: payload.paymentMode,
+                    currency: payload.currency,
+                    amount: amountValue || 0,
+                    amountType: formData.amountType,
+                    repeat: formData.repeat,
+                    startDate: formData.startDate,
+                    monthlyType: formData.repeat === 'monthly' ? formData.monthlyType : undefined,
+                    monthlyDay: formData.repeat === 'monthly' ? formData.monthlyDay : undefined,
+                    endDate: formData.endDate || null,
+                    clientId: payload.clientId,
+                    projectId: payload.projectId,
+                    categoryId: payload.categoryId,
+                    businessId: payload.businessId,
+                    isPersonal: payload.isPersonal,
+                    billable: payload.billable,
+                    taxNumber: payload.taxNumber,
+                    isTaxExempt: payload.isTaxExempt,
+                    amountExcludingTax: payload.amountExcludingTax,
+                    taxLabel: payload.taxLabel,
+                    taxRate: payload.taxRate,
+                });
+                showSuccess('Recurring expense updated');
+            } else if (editingExpense) {
+                const updatedExpense = await updateExpenseWithPaymentSnapshot(editingExpense.id, payload);
+                if (!updatedExpense) {
+                    throw new Error('Expense no longer exists.');
+                }
+                showSuccess('Expense updated');
+            } else if (formData.isRecurring) {
+                const shouldGenerateInitial = formData.startDate && formData.startDate <= todayString;
+                const recurrence = createRecurrence({
+                    title: payload.title,
+                    note: payload.note,
+                    supplierName: payload.supplierName,
+                    paidBy: payload.paidBy,
+                    paymentMode: payload.paymentMode,
+                    currency: payload.currency,
+                    amount: amountValue || 0,
+                    amountType: formData.amountType,
+                    repeat: formData.repeat,
+                    startDate: formData.startDate,
+                    monthlyType: formData.repeat === 'monthly' ? formData.monthlyType : undefined,
+                    monthlyDay: formData.repeat === 'monthly' ? formData.monthlyDay : undefined,
+                    endDate: formData.endDate || null,
+                    clientId: payload.clientId,
+                    projectId: payload.projectId,
+                    categoryId: payload.categoryId,
+                    businessId: payload.businessId,
+                    isPersonal: payload.isPersonal,
+                    billable: payload.billable,
+                    taxNumber: payload.taxNumber,
+                    isTaxExempt: payload.isTaxExempt,
+                    amountExcludingTax: payload.amountExcludingTax,
+                    taxLabel: payload.taxLabel,
+                    taxRate: payload.taxRate,
+                    lastGeneratedDate: null,
+                    active: true,
+                });
+
+                if (shouldGenerateInitial) {
+                    try {
+                        const instance = buildExpenseFromRecurrence(recurrence, formData.startDate);
+                        await createExpenseWithPaymentSnapshot(instance);
+                        updateRecurrence(recurrence.id, { lastGeneratedDate: formData.startDate });
+                    } catch (error) {
+                        deleteRecurrence(recurrence.id);
+                        throw error;
+                    }
+                }
+                showSuccess('Recurring expense created');
+            } else {
+                await createExpenseWithPaymentSnapshot({
+                    ...payload,
+                    isRecurring: false,
+                    recurrenceId: null,
+                    amountType: null,
+                });
+                showSuccess('Expense created');
+            }
 
             if (clearSavedState) {
                 clearSavedState();
             }
 
             onClose();
-            return;
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Unable to save expense');
+        } finally {
+            saveInFlightRef.current = false;
+            setIsSaving(false);
         }
-
-        if (editingExpense) {
-            updateExpense(editingExpense.id, payload);
-            showSuccess('Expense updated');
-        } else if (formData.isRecurring) {
-            const shouldGenerateInitial = formData.startDate && formData.startDate <= todayString;
-            const recurrence = createRecurrence({
-                title: payload.title,
-                note: payload.note,
-                supplierName: payload.supplierName,
-                paidBy: payload.paidBy,
-                paymentMode: payload.paymentMode,
-                currency: payload.currency,
-                amount: amountValue || 0,
-                amountType: formData.amountType,
-                repeat: formData.repeat,
-                startDate: formData.startDate,
-                monthlyType: formData.repeat === 'monthly' ? formData.monthlyType : undefined,
-                monthlyDay: formData.repeat === 'monthly' ? formData.monthlyDay : undefined,
-                endDate: formData.endDate || null,
-                clientId: payload.clientId,
-                projectId: payload.projectId,
-                categoryId: payload.categoryId,
-                businessId: payload.businessId,
-                isPersonal: payload.isPersonal,
-                billable: payload.billable,
-                taxNumber: payload.taxNumber,
-                isTaxExempt: payload.isTaxExempt,
-                amountExcludingTax: payload.amountExcludingTax,
-                taxLabel: payload.taxLabel,
-                taxRate: payload.taxRate,
-                lastGeneratedDate: shouldGenerateInitial ? formData.startDate : null,
-                active: true,
-            });
-
-            if (shouldGenerateInitial) {
-                const instance = buildExpenseFromRecurrence(recurrence, formData.startDate);
-                createExpense(instance);
-            }
-            showSuccess('Recurring expense created');
-        } else {
-            createExpense({
-                ...payload,
-                isRecurring: false,
-                recurrenceId: null,
-                amountType: null,
-            });
-            showSuccess('Expense created');
-        }
-
-        if (clearSavedState) {
-            clearSavedState();
-        }
-
-        onClose();
     };
 
     const handleClose = () => {
@@ -1285,15 +1310,22 @@ const ExpenseModal = ({
 
     const confirmDeleteInstance = () => {
         if (!editingExpense) return;
-        deleteExpense(editingExpense.id);
-        showSuccess('Expense deleted');
-        setConfirmDialog(null);
+        try {
+            const deleted = deleteExpense(editingExpense.id);
+            if (!deleted) {
+                throw new Error('Expense no longer exists.');
+            }
+            showSuccess('Expense deleted');
+            setConfirmDialog(null);
 
-        if (clearSavedState) {
-            clearSavedState();
+            if (clearSavedState) {
+                clearSavedState();
+            }
+
+            onClose();
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Unable to delete expense');
         }
-
-        onClose();
     };
 
     const submitLabel = isSubmittingRecurring
@@ -1305,7 +1337,7 @@ const ExpenseModal = ({
     const modalFooter = (
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-row flex-wrap gap-2 sm:items-center">
-                {(isSubmittingRecurring || (editingExpense && !editingRecurrenceId)) && (
+                {(isSubmittingRecurring || (editingExpense && !editingRecurrenceId)) && !expenseDeletionBlockReason && (
                     <Button variant="destructive" type="button" onClick={handleDeleteInstance}>
                         Delete Expense
                     </Button>
@@ -1320,7 +1352,7 @@ const ExpenseModal = ({
                 <Button variant="outline" onClick={handleClose} type="button">
                     Cancel
                 </Button>
-                <Button onClick={handleSubmit} type="submit">
+                <Button disabled={isSaving} onClick={handleSubmit} type="submit">
                     {submitLabel}
                 </Button>
             </div>
@@ -1353,6 +1385,13 @@ const ExpenseModal = ({
                         <Notice
                             title="Expense is billed"
                             description="This expense is attached to an invoice. Editing won't update that invoice."
+                        />
+                    )}
+
+                    {editingExpense && expenseDeletionBlockReason && editingExpense.billingStatus !== 'billed' && (
+                        <Notice
+                            title="Expense record is protected"
+                            description={expenseDeletionBlockReason}
                         />
                     )}
 

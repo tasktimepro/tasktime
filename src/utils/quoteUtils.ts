@@ -41,6 +41,8 @@ type QuoteDocumentParams = {
     preferredCurrency?: string;
 };
 
+type QuoteTaskInput = NonNullable<QuoteDocumentParams['quoteTasks']>[number];
+
 export const getQuoteNumberTimestamp = (value = new Date()): string => {
     const date = value instanceof Date ? value : new Date(value);
 
@@ -75,13 +77,13 @@ export const buildProjectQuoteLineItems = ({
         ? clients.find((candidate) => candidate.id === project.preferredClientId) || null
         : null;
 
-    const quoteTasks = tasks
+    const quoteTasks: QuoteTaskInput[] = tasks
         .filter((task) => (
             task.projectId === project.id
             && task.archived !== true
             && task.billable === true
         ))
-        .map((task) => {
+        .map<QuoteTaskInput | null>((task) => {
             const amount = getTaskEstimateAmount(task, project, client);
 
             if (amount <= 0) {
@@ -109,9 +111,9 @@ export const buildProjectQuoteLineItems = ({
                 parentTaskId: task.parentTaskId || null,
             };
         })
-        .filter(Boolean);
+        .filter((task): task is QuoteTaskInput => task !== null);
 
-    const additionalTasks = quoteTasks.length === 0 && typeof project.budgetAmount === 'number' && project.budgetAmount > 0
+    const additionalTasks: QuoteTaskInput[] = quoteTasks.length === 0 && typeof project.budgetAmount === 'number' && project.budgetAmount > 0
         ? [{
             title: 'Project budget / target',
             flatRate: project.budgetAmount,

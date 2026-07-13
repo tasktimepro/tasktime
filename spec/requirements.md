@@ -75,5 +75,5 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **UX-3:** Use semantic, keyboard-operable, labeled controls with visible focus and non-color cues.
 - **OPS-1:** Run development and release commands through Docker-backed Make targets.
 - **OPS-2:** Keep public/private repository boundaries and environment documentation accurate.
-- **OPS-3:** Run lint, coverage, browser smoke, PWA smoke, and build checks as the broad release gate.
+- **OPS-3:** Run lint, repository-wide TypeScript checking, coverage, browser smoke, PWA smoke, and build checks as the broad release gate.
 - **OPS-4:** Review the persisted-data and cross-surface change impact matrix before completion; no consumer may be silently omitted.

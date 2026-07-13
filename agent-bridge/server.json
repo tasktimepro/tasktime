@@ -3,7 +3,7 @@
   "name": "pro.tasktime/agent-bridge",
   "title": "TaskTime Pro",
   "description": "Local-first task, time, expense, invoice, and planning tools.",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "websiteUrl": "https://tasktime.pro/agents/",
   "repository": {
     "url": "https://github.com/tasktimepro/tasktime",
@@ -14,7 +14,7 @@
     {
       "registryType": "npm",
       "identifier": "@tasktimepro/agent-bridge",
-      "version": "0.1.5",
+      "version": "0.2.0",
       "runtimeHint": "npx",
       "packageArguments": [
         {

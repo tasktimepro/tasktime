@@ -8,9 +8,9 @@ import { formatDurationWithSeconds, getTodayString } from '../../../utils/dateUt
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
 import { useTimers } from '../../../hooks/useTimers';
-import { useProjects } from '../../../hooks/useProjects';
+import { useToast } from '../../../hooks/useToast';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
-import { buildBillableDurationFields, getBillableDurationMs } from '../../../utils/timeEntryDurationUtils.ts';
+import { getBillableDurationMs } from '../../../utils/timeEntryDurationUtils.ts';
 
 /**
  * SubtaskItem component - Displays individual subtask.
@@ -38,9 +38,9 @@ const SubtaskItem = ({
 
     // Yjs hooks for state
     const { updateTask } = useTasks();
-    const { entries: timeEntries, createEntry } = useTimeEntries();
-    const { getTimerForTask, clearTimer } = useTimers();
-    const { projects } = useProjects();
+    const { entries: timeEntries } = useTimeEntries();
+    const { getTimerForTask, stopTimer } = useTimers();
+    const { showError } = useToast();
 
     // Compute state
     const timerKey = task.projectId || task.id;
@@ -55,14 +55,6 @@ const SubtaskItem = ({
     
     // Should dim if another task has active timer
     const shouldDimTask = isAnyTimerActive && !projectTimer?.isPaused && !isRelatedToActiveTimer;
-
-    const currentProject = useMemo(() => {
-        if (!task.projectId) {
-            return null;
-        }
-
-        return projects.find((project) => project.id === task.projectId) || null;
-    }, [projects, task.projectId]);
 
     // Calculate time for this subtask
     const mainTaskTime = useMemo(() => {
@@ -102,7 +94,7 @@ const SubtaskItem = ({
     /**
      * Toggle subtask completion status
      */
-    const handleToggleComplete = useCallback((checked) => {
+    const handleToggleComplete = useCallback(async (checked) => {
         if (task.recurring) {
             return;
         }
@@ -110,20 +102,12 @@ const SubtaskItem = ({
 
         // If timer is active for this task, stop it and create entry
         if (isTimerActive && projectTimer?.startTime) {
-            createEntry({
-                taskId: task.id,
-                start: projectTimer.startTime,
-                end: now,
-                note: projectTimer.note,
-                _stoppedTimerKey: timerKey,
-                _stoppedTimerInstanceId: projectTimer.timerInstanceId,
-                ...buildBillableDurationFields({
-                    start: projectTimer.startTime,
-                    end: now,
-                    billingIncrementMinutes: currentProject?.billableTimeIncrementMinutes,
-                }),
-            });
-            clearTimer(timerKey);
+            try {
+                if (!await stopTimer(timerKey)) return;
+            } catch (error) {
+                showError(error instanceof Error ? error.message : 'Could not stop the timer.');
+                return;
+            }
         }
 
         const todayStr = getTodayString();
@@ -132,7 +116,7 @@ const SubtaskItem = ({
             completedOnDate: checked ? todayStr : null,
             lastActive: now
         });
-    }, [isTimerActive, projectTimer, task.id, task.recurring, createEntry, clearTimer, updateTask, timerKey, currentProject]);
+    }, [isTimerActive, projectTimer, task.id, task.recurring, showError, stopTimer, updateTask, timerKey]);
 
     /**
      * Update subtask title

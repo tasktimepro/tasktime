@@ -10,6 +10,10 @@ import { useYjs } from '@/contexts/YjsContext';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { toStorageDate } from '@/utils/dateUtils';
 import type { Project } from '@/stores/yjs/types';
+import type { Client } from '@/stores/yjs/types';
+import { collectValidatedEntities } from '@/stores/yjs/validation';
+import { buildProjectEntity, buildProjectUpdates } from '@/domain/work/workEntityOperations';
+import { generateId } from '@/utils/idUtils';
 
 export function useProjects() {
     const { store, isReady } = useYjs();
@@ -28,6 +32,39 @@ export function useProjects() {
         () => items.filter(p => p.archived),
         [items]
     );
+
+    const createProject = useCallback((data: Omit<Project, 'id'> & { id?: string }) => {
+        const id = data.id || generateId();
+        const clients = store.clients
+            ? collectValidatedEntities<Client>('clients', store.clients as any, 'UI create project clients')
+            : [];
+        return create(buildProjectEntity({ data, id, now: Date.now(), clients }));
+    }, [create, store]);
+
+    const updateProject = useCallback((
+        id: string,
+        updates: Partial<Project>,
+        updateOptions?: { origin?: unknown },
+    ) => {
+        const existing = get(id);
+        if (!existing) return undefined;
+        let normalizedUpdates = updates;
+        if (store.clients) {
+            const built = buildProjectUpdates({
+                existing,
+                updates,
+                now: Date.now(),
+                clients: collectValidatedEntities<Client>('clients', store.clients as any, 'UI update project clients'),
+            });
+            normalizedUpdates = Object.prototype.hasOwnProperty.call(updates, 'title')
+                ? { ...updates, title: built.title }
+                : updates;
+        }
+        const { id: _immutableId, ...persistedUpdates } = normalizedUpdates;
+        return updateOptions
+            ? update(id, persistedUpdates, updateOptions)
+            : update(id, persistedUpdates);
+    }, [get, store, update]);
 
     // Helper methods
     const archiveProject = useCallback((id: string) => {
@@ -61,8 +98,8 @@ export function useProjects() {
         
         // CRUD
         getProject: get,
-        createProject: create,
-        updateProject: update,
+        createProject,
+        updateProject,
         deleteProject,
         
         // Helpers

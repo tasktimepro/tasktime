@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpenseModal from './ExpenseModal'
 
@@ -14,7 +14,9 @@ const expensesMocks = vi.hoisted(() => ({
 
     expenses: [],
     createExpense: vi.fn(),
+    createExpenseWithPaymentSnapshot: vi.fn(),
     updateExpense: vi.fn(),
+    updateExpenseWithPaymentSnapshot: vi.fn(),
     deleteExpense: vi.fn()
 }))
 
@@ -72,7 +74,9 @@ vi.mock('../../hooks/useExpenses.ts', () => ({
     useExpenses: () => ({
         expenses: expensesMocks.expenses,
         createExpense: expensesMocks.createExpense,
+        createExpenseWithPaymentSnapshot: expensesMocks.createExpenseWithPaymentSnapshot,
         updateExpense: expensesMocks.updateExpense,
+        updateExpenseWithPaymentSnapshot: expensesMocks.updateExpenseWithPaymentSnapshot,
         deleteExpense: expensesMocks.deleteExpense
     })
 }))
@@ -157,6 +161,9 @@ describe('ExpenseModal', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         expensesMocks.expenses = []
+        expensesMocks.createExpenseWithPaymentSnapshot.mockImplementation(async (expense) => expense)
+        expensesMocks.updateExpenseWithPaymentSnapshot.mockImplementation(async (id, updates) => ({ id, ...updates }))
+        expensesMocks.deleteExpense.mockReturnValue(true)
         recurrencesMocks.createRecurrence.mockImplementation((data) => ({ id: 'r1', ...data }))
         clientsMocks.clients = []
         projectsMocks.projects = []
@@ -183,7 +190,7 @@ describe('ExpenseModal', () => {
         await user.type(screen.getByLabelText(/Amount/i), '45.50')
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
-        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).toHaveBeenCalledWith(expect.objectContaining({
             title: 'Office supplies',
             amount: 45.50,
             isRecurring: false
@@ -224,7 +231,7 @@ describe('ExpenseModal', () => {
         await user.type(titleInput, 'Updated expense')
         await user.click(screen.getByRole('button', { name: 'Save Expense' }))
 
-        expect(expensesMocks.updateExpense).toHaveBeenCalledWith('e1', expect.objectContaining({
+        expect(expensesMocks.updateExpenseWithPaymentSnapshot).toHaveBeenCalledWith('e1', expect.objectContaining({
             title: 'Updated expense'
         }))
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Expense updated')
@@ -275,18 +282,87 @@ describe('ExpenseModal', () => {
         }
 
         fireEvent.change(typeSelect, { target: { value: 'recurring' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Create Expense' }))
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Create Expense' }))
+            await Promise.resolve()
+        })
 
         expect(recurrencesMocks.createRecurrence).toHaveBeenCalledWith(expect.objectContaining({
             title: 'Adobe CC',
             repeat: 'monthly',
             amountType: 'fixed'
         }))
-        expect(expensesMocks.createExpense).toHaveBeenCalled()
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).toHaveBeenCalled()
         expect(toastMocks.showSuccess).toHaveBeenCalledWith('Recurring expense created')
         expect(onClose).toHaveBeenCalled()
 
         vi.useRealTimers();
+    })
+
+    it('keeps the modal open when a paid expense payment snapshot cannot be prepared', async () => {
+        const onClose = vi.fn()
+        const user = userEvent.setup()
+        expensesMocks.createExpenseWithPaymentSnapshot.mockRejectedValueOnce(new Error('Exchange rates unavailable'))
+
+        render(<ExpenseModal isOpen onClose={onClose} />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Foreign subscription')
+        await user.clear(screen.getByLabelText(/Amount/i))
+        await user.type(screen.getByLabelText(/Amount/i), '20')
+        await user.click(screen.getByRole('button', { name: 'Create Expense' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith('Exchange rates unavailable')
+        expect(toastMocks.showSuccess).not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('does not submit a second expense while snapshot preparation is in flight', async () => {
+        let resolveCreate
+        expensesMocks.createExpenseWithPaymentSnapshot.mockImplementationOnce(() => new Promise((resolve) => {
+            resolveCreate = resolve
+        }))
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} />)
+
+        fireEvent.change(screen.getByLabelText(/Title/i), { target: { value: 'Foreign hosting' } })
+        fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '25' } })
+        const submitButton = screen.getByRole('button', { name: 'Create Expense' })
+        fireEvent.click(submitButton)
+        fireEvent.click(submitButton)
+
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).toHaveBeenCalledTimes(1)
+
+        await act(async () => {
+            resolveCreate({ id: 'created-expense' })
+            await Promise.resolve()
+        })
+    })
+
+    it.each([
+        ['billed', { billingStatus: 'billed', invoiceId: 'invoice-1' }],
+        ['tax-claimed', { taxClaimStatus: 'claimed', taxClaimPeriodId: 'period-1' }],
+    ])('does not offer deletion for a %s expense', (_label, protectedState) => {
+        render(<ExpenseModal
+            isOpen
+            onClose={vi.fn()}
+            editingExpense={{
+                id: 'protected-expense',
+                title: 'Protected expense',
+                date: '2026-04-13',
+                amount: 50,
+                currency: 'EUR',
+                paymentStatus: 'paid',
+                paymentMode: 'manual',
+                billingStatus: 'unbilled',
+                isPersonal: true,
+                billable: false,
+                isRecurring: false,
+                isTaxExempt: false,
+                ...protectedState,
+            }}
+        />)
+
+        expect(screen.queryByRole('button', { name: 'Delete Expense' })).not.toBeInTheDocument()
     })
 
     it('defaults new one-time expenses dated today to automatically paid and mirrors paid on', () => {
@@ -555,7 +631,7 @@ describe('ExpenseModal', () => {
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
         expect(toastMocks.showError).toHaveBeenCalledWith('Business is required for business expenses')
-        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).not.toHaveBeenCalled()
     })
 
     it('blocks saving a project-only business expense without a business', async () => {
@@ -573,7 +649,7 @@ describe('ExpenseModal', () => {
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
         expect(toastMocks.showError).toHaveBeenCalledWith('Business is required for business expenses')
-        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).not.toHaveBeenCalled()
     })
 
     it('blocks saving a client-only business expense without a business', async () => {
@@ -591,7 +667,7 @@ describe('ExpenseModal', () => {
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
         expect(toastMocks.showError).toHaveBeenCalledWith('Business is required for business expenses')
-        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).not.toHaveBeenCalled()
     })
 
     it('saves a business-only expense without requiring a client', async () => {
@@ -608,7 +684,7 @@ describe('ExpenseModal', () => {
         await user.click(screen.getByRole('checkbox', { name: 'Business Expense' }))
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
-        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).toHaveBeenCalledWith(expect.objectContaining({
             title: 'Software license',
             isPersonal: false,
             clientId: null,
@@ -634,7 +710,7 @@ describe('ExpenseModal', () => {
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
         expect(toastMocks.showError).toHaveBeenCalledWith('Client is required for billable expenses')
-        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).not.toHaveBeenCalled()
     })
 
     it('pre-calculates and stores tax details for expenses assigned to a tax-enabled business', async () => {
@@ -678,7 +754,7 @@ describe('ExpenseModal', () => {
 
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
-        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).toHaveBeenCalledWith(expect.objectContaining({
             amount: 220,
             amountExcludingTax: 200,
             taxLabel: 'VAT',
@@ -717,7 +793,7 @@ describe('ExpenseModal', () => {
 
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
-        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).toHaveBeenCalledWith(expect.objectContaining({
             isTaxExempt: true,
             amountExcludingTax: null,
             taxLabel: null,
@@ -752,7 +828,7 @@ describe('ExpenseModal', () => {
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
         expect(toastMocks.showError).toHaveBeenCalledWith('Total amount must match Amount (excl. VAT) plus VAT')
-        expect(expensesMocks.createExpense).not.toHaveBeenCalled()
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).not.toHaveBeenCalled()
     })
 
     it('accepts auto-calculated tax details when rounding the tax-exclusive amount to two decimals', async () => {
@@ -781,7 +857,7 @@ describe('ExpenseModal', () => {
         await user.click(screen.getByRole('button', { name: 'Create Expense' }))
 
         expect(toastMocks.showError).not.toHaveBeenCalledWith('Total amount must match Amount (excl. VAT) plus VAT')
-        expect(expensesMocks.createExpense).toHaveBeenCalledWith(expect.objectContaining({
+        expect(expensesMocks.createExpenseWithPaymentSnapshot).toHaveBeenCalledWith(expect.objectContaining({
             amount: 100,
             amountExcludingTax: 84.75,
             taxLabel: 'VAT',

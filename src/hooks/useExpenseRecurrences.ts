@@ -18,11 +18,11 @@ export function useExpenseRecurrences() {
         [items]
     );
 
-    const generatePendingExpenses = useCallback((
-        createExpense: (data: Omit<Expense, 'id'> & { id?: string }) => Expense,
+    const generatePendingExpenses = useCallback(async (
+        createExpense: (data: Omit<Expense, 'id'> & { id?: string }) => Expense | Promise<Expense>,
         existingExpenseIds?: Set<string>,
-    ) => {
-        activeRecurrences.forEach((recurrence) => {
+    ): Promise<void> => {
+        for (const recurrence of activeRecurrences) {
             const pendingDates = getPendingPeriods({
                 startDate: recurrence.startDate,
                 lastGeneratedDate: recurrence.lastGeneratedDate,
@@ -32,17 +32,18 @@ export function useExpenseRecurrences() {
                     monthlyDay: recurrence.monthlyDay,
             });
 
-            if (pendingDates.length === 0) return;
+            if (pendingDates.length === 0) continue;
 
-            pendingDates.forEach((dateValue) => {
+            for (const dateValue of pendingDates) {
                 const expense = buildExpenseFromRecurrence(recurrence, dateValue);
-                if (existingExpenseIds?.has(expense.id)) return;
-                createExpense(expense);
-            });
+                if (existingExpenseIds?.has(expense.id)) continue;
+                await createExpense(expense);
+                existingExpenseIds?.add(expense.id);
+            }
 
             const lastGeneratedDate = pendingDates[pendingDates.length - 1];
             update(recurrence.id, { lastGeneratedDate });
-        });
+        }
     }, [activeRecurrences, update]);
 
     const pauseRecurrence = useCallback((id: string) => {

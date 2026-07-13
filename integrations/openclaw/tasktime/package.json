@@ -1,6 +1,6 @@
 {
   "name": "@tasktimepro/openclaw",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "OpenClaw-compatible TaskTime Pro bundle with MCP server configuration and skill instructions.",
   "type": "module",
   "repository": {

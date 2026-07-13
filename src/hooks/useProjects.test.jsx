@@ -83,6 +83,66 @@ describe('useProjects', () => {
         expect(result.current.getProjectsByClient('c1').map((p) => p.id)).toEqual(['p1'])
     })
 
+    it('validates relationship-bearing project creates and updates', () => {
+        const existing = { id: 'p1', title: 'Existing', preferredClientId: 'c1' }
+        const get = vi.fn((id) => id === 'p1' ? existing : undefined)
+        const create = vi.fn((project) => project)
+        const update = vi.fn((id, updates) => ({ ...existing, ...updates, id }))
+        mockUseYjs.mockReturnValue({
+            store: {
+                plannerAttachments: createTestYMap(),
+                clients: createTestYMap({ c1: { id: 'c1', title: 'Client' } }),
+            },
+            isReady: true,
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [existing], isLoading: false, get, create, update, remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useProjects())
+        let created
+        act(() => {
+            created = result.current.createProject({ title: ' New ', preferredClientId: 'c1' })
+        })
+        expect(created).toEqual(expect.objectContaining({ title: 'New', preferredClientId: 'c1' }))
+
+        act(() => {
+            result.current.updateProject('p1', { preferredClientId: null })
+        })
+        expect(update).toHaveBeenCalledWith('p1', { preferredClientId: null })
+        expect(result.current.updateProject('missing', { title: 'Nope' })).toBeUndefined()
+        expect(() => result.current.createProject({ title: 'Invalid', preferredClientId: 'missing' })).toThrow('Client not found')
+        expect(() => result.current.updateProject('p1', { id: 'replacement' })).toThrow(/identity/i)
+    })
+
+    it('forwards an explicit transaction origin through project updates', () => {
+        const existing = { id: 'p1', title: 'Existing' }
+        const update = vi.fn((id, updates) => ({ ...existing, ...updates, id }))
+        mockUseYjs.mockReturnValue({
+            store: {
+                plannerAttachments: createTestYMap(),
+                clients: createTestYMap(),
+            },
+            isReady: true,
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [existing],
+            isLoading: false,
+            get: vi.fn(() => existing),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+        const origin = Symbol('project-notes-save')
+        const { result } = renderHook(() => useProjects())
+
+        act(() => {
+            result.current.updateProject('p1', { notes: null }, { origin })
+        })
+
+        expect(update).toHaveBeenCalledWith('p1', { notes: null }, { origin })
+    })
+
     it('cleans up planner attachments when deleting a project', () => {
         const plannerAttachments = createTestYMap({
             'att-1': { id: 'att-1', type: 'project', referenceId: 'p1' },

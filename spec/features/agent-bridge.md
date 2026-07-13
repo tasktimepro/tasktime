@@ -7,6 +7,8 @@
 - Every command declares permission scope and may require approval/idempotency behavior according to risk.
 - The browser command context owns Yjs mutations and navigation.
 - Managed integrations use stable agent identities and status-file discovery without leaking credentials.
+- Entity creates reject duplicate IDs before any Yjs mutation, and externally advertised create schemas remain closed to unadvertised caller fields.
+- Dashboard/project unbilled summaries and entry queries load complete local task, entry, and invoice history and use the same canonical invoice eligibility, legacy billing evidence, and billable-duration rules as the UI.
 
 ## Security and reliability
 

@@ -213,6 +213,12 @@ describe('Dashboard', () => {
         expect(metrics.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
+    it('does not persist automatic recurring-skip cleanup during dashboard startup', () => {
+        renderDashboard();
+
+        expect(mockUseTasks.mock.results[0].value.resetExpiredSkips).not.toHaveBeenCalled();
+    });
+
     it('sends a system notification for due todo items when notifications are enabled', async () => {
         const notifications = [];
         const originalNotification = window.Notification;

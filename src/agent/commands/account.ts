@@ -1,5 +1,6 @@
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
+import type { AutoSyncMode } from '@/stores/yjs/types';
 import { getBackupImportCounts, parseBackupImportJson, type BackupImportPayload } from '@/utils/backupData';
 import { resetOnboardingCompleted } from '@/utils/onboardingUtils';
 import { assertPermission, assertReady, requireString } from './shared';
@@ -102,7 +103,7 @@ async function downloadDriveBackup(context: AgentCommandContext, backupId: strin
 
 function getCurrentSyncSettings(context: AgentCommandContext) {
     const autoSyncEnabled = context.store.preferences.get('autoSyncEnabled') === true;
-    const autoSyncMode = context.store.preferences.get('autoSyncMode') === 'backup' ? 'backup' : 'sync';
+    const autoSyncMode: AutoSyncMode = context.store.preferences.get('autoSyncMode') === 'backup' ? 'backup' : 'sync';
 
     return {
         isDriveConnected: context.store.isDriveConnected(),

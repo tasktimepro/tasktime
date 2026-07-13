@@ -23,7 +23,7 @@ const expensesState = vi.hoisted(() => ({
     expenses: [],
     markAsPaid: vi.fn(),
     markAsUnpaid: vi.fn(),
-    createExpense: vi.fn(),
+    createExpenseWithPaymentSnapshot: vi.fn(),
 }));
 
 const recurrenceState = vi.hoisted(() => ({

@@ -19,6 +19,11 @@ import {
     updateValidatedEntity,
     withIdempotency,
 } from './shared';
+import {
+    WorkEntityOperationError,
+    buildClientEntity,
+    buildClientUpdates,
+} from '@/domain/work/workEntityOperations';
 
 export interface ListClientsCommandInput {
     includeArchived?: boolean;
@@ -141,6 +146,13 @@ function assertArrayMatches(label: string, expected: string[] | undefined, actua
     }
 }
 
+function throwAgentWorkError(error: unknown): never {
+    if (error instanceof WorkEntityOperationError) {
+        throw new AgentCommandError(error.code, error.message, error.details);
+    }
+    throw error;
+}
+
 export function listClientsCommand(context: AgentCommandContext, input: ListClientsCommandInput = {}): Client[] {
     assertReady(context);
     assertPermission(context, 'read');
@@ -158,15 +170,14 @@ export function createClientCommand(context: AgentCommandContext, input: CreateC
         const title = requireString(input.title, 'title');
         const now = getNow(context);
         const id = input.id || getId(context);
-        const client = createValidatedEntity<Client>(context.store.clients as any, 'clients', {
-            ...input,
-            id,
-            title,
-            archived: input.archived ?? false,
-            archivedOnDate: input.archivedOnDate ?? null,
-            createdAt: input.createdAt ?? now,
-            updatedAt: input.updatedAt ?? now,
-        }, `agent create client ${id}`);
+        const { idempotencyKey: _idempotencyKey, ...entityInput } = input;
+        let built: Client;
+        try {
+            built = buildClientEntity({ data: { ...entityInput, title }, id, now });
+        } catch (error) {
+            throwAgentWorkError(error);
+        }
+        const client = createValidatedEntity<Client>(context.store.clients as any, 'clients', built as unknown as Record<string, unknown>, `agent create client ${id}`);
 
         markMeaningfulActivity('client_create');
         return client;
@@ -178,11 +189,20 @@ export function updateClientCommand(context: AgentCommandContext, input: UpdateC
     assertPermission(context, 'write');
 
     const clientId = requireString(input.clientId, 'clientId');
-    readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
-    const updated = updateValidatedEntity<Client>(context.store.clients as any, 'clients', clientId, {
+    const existing = readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
+    let built: Client;
+    try {
+        built = buildClientUpdates({ existing, updates: input.updates || {}, now: getNow(context) });
+    } catch (error) {
+        throwAgentWorkError(error);
+    }
+    const clientFieldUpdates: Record<string, unknown> = {
         ...(input.updates || {}),
-        updatedAt: getNow(context),
-    }, `agent update client ${clientId}`);
+        updatedAt: built.updatedAt,
+    };
+    delete clientFieldUpdates.id;
+    if (Object.prototype.hasOwnProperty.call(input.updates || {}, 'title')) clientFieldUpdates.title = built.title;
+    const updated = updateValidatedEntity<Client>(context.store.clients as any, 'clients', clientId, clientFieldUpdates, `agent update client ${clientId}`);
 
     markMeaningfulActivity('client_update');
     return updated;

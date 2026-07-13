@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as Y from 'yjs';
+import * as currencyUtils from '@/utils/currencyUtils';
 import { objectToYMap, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
@@ -134,6 +135,7 @@ import {
     updateProjectNotesCommand,
     updateSyncSettingsCommand,
     updateTaxReturnPeriodCommand,
+    updateTaskCommand,
     updateTimerCommand,
     updateTimeEntryCommand,
 } from './index';
@@ -221,6 +223,7 @@ function createContext(): AgentCommandContext & {
         timers: Y.Map<string, unknown>;
         entries: Y.Map<string, unknown>;
         expenses: Y.Map<string, unknown>;
+        archivedExpenses: Y.Map<string, unknown>;
         clients: Y.Map<string, unknown>;
         preferences: Y.Map<string, unknown>;
         invoices: Y.Map<string, unknown>;
@@ -244,6 +247,7 @@ function createContext(): AgentCommandContext & {
     const archivedTasks = new Y.Doc().getMap('tasks');
     const timers = coreDoc.getMap('timers');
     const expenses = coreDoc.getMap('expenses');
+    const archivedExpenses = new Y.Doc().getMap('expenses');
     const clients = coreDoc.getMap('clients');
     const preferences = coreDoc.getMap('preferences');
     const invoices = coreDoc.getMap('invoices');
@@ -296,6 +300,8 @@ function createContext(): AgentCommandContext & {
         tasks,
         timers,
         expenses,
+        archivedTasks,
+        archivedExpenses,
         clients,
         preferences,
         invoices,
@@ -503,6 +509,7 @@ function createContext(): AgentCommandContext & {
         setDriveSyncPreferences: vi.fn(),
         forceDriveSync: vi.fn(async () => undefined),
         loadArchivedTasks: vi.fn(async () => archivedTasks),
+        loadArchivedExpenses: vi.fn(async () => archivedExpenses),
         archiveTask: vi.fn(async (taskId: string) => {
             const task = readStored<Record<string, unknown>>(tasks, taskId);
             if (task) {
@@ -547,6 +554,7 @@ function createContext(): AgentCommandContext & {
             timers,
             entries,
             expenses,
+            archivedExpenses,
             clients,
             preferences,
             invoices,
@@ -2085,7 +2093,7 @@ describe('agent commands', () => {
             title: 'Recurrence Reference Business',
             businessName: 'Recurrence Reference Business',
         });
-        createExpenseRecurrenceCommand(context, {
+        await createExpenseRecurrenceCommand(context, {
             id: 'recurrence-business-reference',
             title: 'Business recurrence',
             currency: 'USD',
@@ -2826,7 +2834,7 @@ describe('agent commands', () => {
             id: 'category-referenced-recurrence',
             name: 'Referenced recurrence category',
         });
-        createExpenseRecurrenceCommand(context, {
+        await createExpenseRecurrenceCommand(context, {
             id: 'recurrence-category-reference',
             title: 'Categorized recurrence',
             currency: 'USD',
@@ -3101,6 +3109,147 @@ describe('agent commands', () => {
         expect(repeated.completedDatesByYear?.['2026']?.['6']).toContain(22);
     });
 
+    it('reconciles a recurring skip when completion is already recorded', () => {
+        const context = createContext();
+        const task = createTaskCommand(context, {
+            id: 'task-recurring-replay',
+            title: 'Weekly replay',
+            recurring: { type: 'weekly', weeklyDays: [1] },
+            completedDatesByYear: { '2026': { '6': [22] } },
+            skipUntilNextRecurring: true,
+            skippedOccurrenceDate: '2026-06-22',
+        });
+
+        const completed = completeTaskCommand(context, {
+            taskId: task.id,
+            occurrenceDate: '2026-06-22',
+        });
+
+        expect(completed.completedDatesByYear?.['2026']?.['6']).toContain(22);
+        expect(completed.skipUntilNextRecurring).toBe(false);
+        expect(completed.skippedOccurrenceDate).toBeNull();
+    });
+
+    it('normalizes generic task state updates and protects identities and complete relationships', async () => {
+        const context = createContext();
+        const task = createTaskCommand(context, {
+            id: 'task-update-guard',
+            title: 'Guarded task',
+            projectId: 'project-1',
+        });
+        const completed = await updateTaskCommand(context, {
+            taskId: task.id,
+            updates: { completed: true },
+        });
+
+        expect(completed).toEqual(expect.objectContaining({
+            completed: true,
+            completedOnDate: '2023-11-14',
+        }));
+        await expect(updateTaskCommand(context, {
+            taskId: task.id,
+            updates: { id: 'task-replacement' },
+        })).rejects.toThrow(/identity/i);
+
+        const recurring = createTaskCommand(context, {
+            id: 'task-update-recurring',
+            title: 'Recurring guard',
+            recurring: { type: 'weekly', weeklyDays: [4] },
+        });
+        await expect(updateTaskCommand(context, {
+            taskId: recurring.id,
+            updates: { completed: true },
+        })).rejects.toThrow(/occurrence/i);
+
+        createProjectCommand(context, { id: 'project-2', title: 'Other project' });
+        context.maps.archivedTasks.set('archived-child', objectToYMap({
+            id: 'archived-child',
+            title: 'Archived child',
+            projectId: 'project-1',
+            parentTaskId: task.id,
+            archived: true,
+        }));
+        await expect(updateTaskCommand(context, {
+            taskId: task.id,
+            updates: { projectId: 'project-2' },
+        })).rejects.toThrow(/cannot move/i);
+
+        const timerTask = createTaskCommand(context, {
+            id: 'task-running-move',
+            title: 'Running task',
+            projectId: 'project-1',
+        });
+        context.maps.timers.set('project-1', objectToYMap({
+            projectId: 'project-1',
+            taskId: timerTask.id,
+            startTime: 1,
+            paused: false,
+        }));
+        await expect(updateTaskCommand(context, {
+            taskId: timerTask.id,
+            updates: { projectId: 'project-2' },
+        })).rejects.toThrow(/Stop the active timer/i);
+
+        const client = createClientCommand(context, { id: 'client-identity', title: 'Identity client' });
+        expect(() => updateClientCommand(context, {
+            clientId: client.id,
+            updates: { id: 'client-replacement' },
+        })).toThrow(/identity/i);
+        expect(() => updateProjectCommand(context, {
+            projectId: 'project-1',
+            updates: { id: 'project-replacement' },
+        })).toThrow(/identity/i);
+    });
+
+    it('rejects duplicate create IDs without replacing active or archived records', async () => {
+        const context = createContext();
+        createProjectCommand(context, { id: 'project-duplicate', title: 'Original project' });
+        createClientCommand(context, { id: 'client-duplicate', title: 'Original client' });
+        createTaskCommand(context, { id: 'task-duplicate', title: 'Original task', projectId: 'project-1' });
+        context.maps.archivedTasks.set('archived-task-duplicate', objectToYMap({
+            id: 'archived-task-duplicate',
+            title: 'Archived original',
+            projectId: 'project-1',
+            archived: true,
+        }));
+        createExpenseCommand(context, {
+            id: 'expense-duplicate',
+            title: 'Original expense',
+            date: '2026-06-25',
+            amount: 20,
+            currency: 'USD',
+            isPersonal: true,
+            billable: false,
+        });
+
+        expect(() => createProjectCommand(context, { id: 'project-duplicate', title: 'Replacement project' }))
+            .toThrow(/already exists/i);
+        expect(() => createClientCommand(context, { id: 'client-duplicate', title: 'Replacement client' }))
+            .toThrow(/already exists/i);
+        expect(() => createTaskCommand(context, { id: 'task-duplicate', title: 'Replacement task', projectId: 'project-1' }))
+            .toThrow(/already exists/i);
+        expect(() => createTaskCommand(context, {
+            id: 'archived-task-duplicate',
+            title: 'Replacement archived task',
+            projectId: 'project-1',
+        })).toThrow(/already exists/i);
+        await expect(Promise.resolve().then(() => createExpenseCommand(context, {
+            id: 'expense-duplicate',
+            title: 'Replacement expense',
+            date: '2026-06-25',
+            amount: 99,
+            currency: 'USD',
+            isPersonal: true,
+            billable: false,
+        }))).rejects.toThrow(/already exists/i);
+
+        expect(readStored<{ title: string }>(context.maps.projects, 'project-duplicate')?.title).toBe('Original project');
+        expect(readStored<{ title: string }>(context.maps.clients, 'client-duplicate')?.title).toBe('Original client');
+        expect(readStored<{ title: string }>(context.maps.tasks, 'task-duplicate')?.title).toBe('Original task');
+        expect(readStored<{ title: string }>(context.maps.archivedTasks, 'archived-task-duplicate')?.title).toBe('Archived original');
+        expect(readStored<{ title: string }>(context.maps.expenses, 'expense-duplicate')?.title).toBe('Original expense');
+    });
+
     it('archives and unarchives tasks through the existing multi-doc store behavior', async () => {
         const context = createContext();
         const task = createTaskCommand(context, {
@@ -3161,7 +3310,7 @@ describe('agent commands', () => {
         expect(() => startTimerCommand(context, { taskId: 'task-1' })).toThrow(/already active/);
     });
 
-    it('stops timers by creating a time entry and clearing the active timer', () => {
+    it('stops timers by creating a time entry and clearing the active timer', async () => {
         const context = createContext();
         createTaskCommand(context, {
             id: 'task-1',
@@ -3170,7 +3319,7 @@ describe('agent commands', () => {
         });
         startTimerCommand(context, { taskId: 'task-1' });
 
-        const result = stopTimerCommand(context, { timerKey: 'project-1' });
+        const result = await stopTimerCommand(context, { timerKey: 'project-1' });
 
         expect(result.timerKey).toBe('project-1');
         expect(result.entry.taskId).toBe('task-1');
@@ -3181,7 +3330,7 @@ describe('agent commands', () => {
         }));
     });
 
-    it('reuses a timer-instance entry after entry creation succeeded but timer cleanup did not', () => {
+    it('reuses a timer-instance entry after entry creation succeeded but timer cleanup did not', async () => {
         const context = createContext();
         createTaskCommand(context, {
             id: 'task-1',
@@ -3199,14 +3348,14 @@ describe('agent commands', () => {
         };
         context.maps.entries.set(recoveredEntry.id, objectToYMap(recoveredEntry));
 
-        const result = stopTimerCommand(context, { timerKey: 'project-1' });
+        const result = await stopTimerCommand(context, { timerKey: 'project-1' });
 
         expect(result.entry.id).toBe('existing-stop-entry');
         expect(context.maps.entries.size).toBe(1);
         expect(context.maps.timers.has('project-1')).toBe(false);
     });
 
-    it('replays a completed timer stop by durable operation identity after session state is lost', () => {
+    it('replays a completed timer stop by durable operation identity after session state is lost', async () => {
         const context = createContext();
         createTaskCommand(context, {
             id: 'task-1',
@@ -3215,18 +3364,52 @@ describe('agent commands', () => {
         });
         startTimerCommand(context, { taskId: 'task-1' });
 
-        const first = stopTimerCommand(context, {
+        const first = await stopTimerCommand(context, {
             timerKey: 'project-1',
             idempotencyKey: 'stop-operation-1',
         });
         context.idempotency = new Map();
-        const replay = stopTimerCommand(context, {
+        const replay = await stopTimerCommand(context, {
             timerKey: 'project-1',
             idempotencyKey: 'stop-operation-1',
         });
 
         expect(replay).toEqual(first);
         expect(context.maps.entries.size).toBe(1);
+    });
+
+    it('scopes stop idempotency cache entries to the selected timer', async () => {
+        const context = createContext();
+        createTaskCommand(context, {
+            id: 'task-1',
+            title: 'First timed task',
+            projectId: 'project-1',
+        });
+        createProjectCommand(context, {
+            id: 'project-2',
+            title: 'Second project',
+        });
+        createTaskCommand(context, {
+            id: 'task-2',
+            title: 'Second timed task',
+            projectId: 'project-2',
+        });
+        startTimerCommand(context, { taskId: 'task-1' });
+        startTimerCommand(context, { taskId: 'task-2' });
+
+        const first = await stopTimerCommand(context, {
+            timerKey: 'project-1',
+            idempotencyKey: 'reused-operation-key',
+        });
+        const second = await stopTimerCommand(context, {
+            timerKey: 'project-2',
+            idempotencyKey: 'reused-operation-key',
+        });
+
+        expect(first.entry.taskId).toBe('task-1');
+        expect(second.entry.taskId).toBe('task-2');
+        expect(context.maps.entries.size).toBe(2);
+        expect(context.maps.timers.size).toBe(0);
     });
 
     it('resumes, updates, and approval-confirms timer clearing', async () => {
@@ -3400,7 +3583,7 @@ describe('agent commands', () => {
         }));
     });
 
-    it('rejects manual entries before the task billing cutoff', () => {
+    it('rejects manual entries before the task billing cutoff', async () => {
         const context = createContext();
         createTaskCommand(context, {
             id: 'task-billed',
@@ -3409,13 +3592,13 @@ describe('agent commands', () => {
             lastBilledAt: 5000,
         });
 
-        expect(() => addManualTimeEntryCommand(context, {
+        await expect(addManualTimeEntryCommand(context, {
             taskId: 'task-billed',
             start: 4000,
             end: 4500,
-        })).toThrow(/latest billed/);
+        })).rejects.toThrow(/latest billed/);
 
-        const entry = addManualTimeEntryCommand(context, {
+        const entry = await addManualTimeEntryCommand(context, {
             taskId: 'task-billed',
             start: 6000,
             end: 7000,
@@ -3426,6 +3609,61 @@ describe('agent commands', () => {
             taskId: 'task-billed',
             note: 'Post-billing work',
         }));
+    });
+
+    it('matches historical overlap, source billing-lock, and legacy snapshot rules through the agent path', async () => {
+        const context = createContext();
+        createTaskCommand(context, {
+            id: 'task-entry-source-lock',
+            title: 'Source task',
+            projectId: 'project-1',
+            lastBilledAt: 5_000,
+        });
+        createTaskCommand(context, {
+            id: 'task-entry-target',
+            title: 'Target task',
+            projectId: 'project-1',
+        });
+        context.maps.entries.set('entry-source-locked', objectToYMap({
+            id: 'entry-source-locked',
+            taskId: 'task-entry-source-lock',
+            start: 4_000,
+            end: 4_500,
+        }));
+
+        await expect(updateTimeEntryCommand(context, {
+            entryId: 'entry-source-locked',
+            taskId: 'task-entry-target',
+            start: 6_000,
+            end: 7_000,
+        })).rejects.toThrow(/Billed time entries/);
+
+        context.maps.entries.set('entry-legacy-duration', objectToYMap({
+            id: 'entry-legacy-duration',
+            taskId: 'task-entry-source-lock',
+            start: 6_000,
+            end: 7_000,
+            billedDurationMs: 900_000,
+        }));
+        await updateTimeEntryCommand(context, {
+            entryId: 'entry-legacy-duration',
+            note: 'Preserve billing evidence',
+        });
+        expect(readStored(context.maps.entries, 'entry-legacy-duration')).toEqual(expect.objectContaining({
+            billedDurationMs: 900_000,
+        }));
+
+        (context.store as any).loadAllTimeEntries = vi.fn(async () => [{
+            id: 'historical-overlap',
+            taskId: 'task-entry-target',
+            start: 8_000,
+            end: 10_000,
+        }]);
+        await expect(addManualTimeEntryCommand(context, {
+            taskId: 'task-entry-target',
+            start: 9_000,
+            end: 11_000,
+        })).rejects.toThrow(/overlap/i);
     });
 
     it('updates active unbilled time entries with billing and overlap validation', async () => {
@@ -3443,19 +3681,19 @@ describe('agent commands', () => {
             projectId: 'project-1',
         });
 
-        const entry = addManualTimeEntryCommand(context, {
+        const entry = await addManualTimeEntryCommand(context, {
             taskId: 'task-entry-edit',
             start: 2000,
             end: 3000,
             note: 'Original entry',
         });
-        addManualTimeEntryCommand(context, {
+        await addManualTimeEntryCommand(context, {
             taskId: 'task-entry-other',
             start: 5000,
             end: 6000,
         });
 
-        const updated = updateTimeEntryCommand(context, {
+        const updated = await updateTimeEntryCommand(context, {
             entryId: entry.id,
             start: 3000,
             end: 3900,
@@ -3479,16 +3717,16 @@ describe('agent commands', () => {
             billingIncrementMinutes: 15,
         }));
 
-        expect(() => updateTimeEntryCommand(context, {
+        await expect(updateTimeEntryCommand(context, {
             entryId: entry.id,
             start: 900,
-        })).toThrow(/latest billed/);
+        })).rejects.toThrow(/latest billed/);
 
-        expect(() => updateTimeEntryCommand(context, {
+        await expect(updateTimeEntryCommand(context, {
             entryId: entry.id,
             start: 5500,
             end: 5600,
-        })).toThrow(/overlap/i);
+        })).rejects.toThrow(/overlap/i);
 
         context.maps.entries.set('entry-billed-agent-edit', objectToYMap({
             id: 'entry-billed-agent-edit',
@@ -3499,10 +3737,10 @@ describe('agent commands', () => {
             billedInvoiceId: 'invoice-entry-edit',
         }));
 
-        expect(() => updateTimeEntryCommand(context, {
+        await expect(updateTimeEntryCommand(context, {
             entryId: 'entry-billed-agent-edit',
             note: 'Nope',
-        })).toThrow(/Billed time entries/);
+        })).rejects.toThrow(/Billed time entries/);
 
         await expect(executeAgentCommand(context, 'update_time_entry', {
             entryId: entry.id,
@@ -3524,24 +3762,24 @@ describe('agent commands', () => {
             projectId: 'project-1',
         });
 
-        const entry = addManualTimeEntryCommand(context, {
+        const entry = await addManualTimeEntryCommand(context, {
             taskId: 'task-entry-delete',
             start: 2000,
             end: 5000,
             note: 'Delete me',
         });
 
-        expect(() => deleteTimeEntryCommand(context, {
+        await expect(deleteTimeEntryCommand(context, {
             entryId: entry.id,
-        })).toThrow(/confirmDelete/);
+        })).rejects.toThrow(/confirmDelete/);
 
-        expect(() => deleteTimeEntryCommand(context, {
+        await expect(deleteTimeEntryCommand(context, {
             entryId: entry.id,
             confirmDelete: true,
             confirmationText: 'wrong-entry',
-        })).toThrow(/confirmationText/);
+        })).rejects.toThrow(/confirmationText/);
 
-        const deleted = deleteTimeEntryCommand(context, {
+        const deleted = await deleteTimeEntryCommand(context, {
             entryId: entry.id,
             confirmDelete: true,
             confirmationText: entry.id,
@@ -3566,13 +3804,13 @@ describe('agent commands', () => {
             billedInvoiceId: 'invoice-entry-delete',
         }));
 
-        expect(() => deleteTimeEntryCommand(context, {
+        await expect(deleteTimeEntryCommand(context, {
             entryId: 'entry-billed-agent-delete',
             confirmDelete: true,
             confirmationText: 'entry-billed-agent-delete',
-        })).toThrow(/Billed time entries/);
+        })).rejects.toThrow(/Billed time entries/);
 
-        const dispatchEntry = addManualTimeEntryCommand(context, {
+        const dispatchEntry = await addManualTimeEntryCommand(context, {
             taskId: 'task-entry-delete',
             start: 9000,
             end: 10000,
@@ -3733,7 +3971,7 @@ describe('agent commands', () => {
             archived: false,
         }));
 
-        const created = createExpenseRecurrenceCommand(context, {
+        const created = await createExpenseRecurrenceCommand(context, {
             id: 'recurrence-hosting',
             title: 'Monthly hosting',
             note: 'Server',
@@ -3836,11 +4074,42 @@ describe('agent commands', () => {
         }));
     });
 
+    it('does not persist an agent recurrence or occurrence when required FX evidence is unavailable', async () => {
+        const context = createContext();
+        context.now = () => Date.parse('2026-06-25T10:00:00Z');
+        context.maps.preferences.set('currency', 'EUR');
+        const fetchRates = vi.spyOn(currencyUtils, 'fetchExchangeRates')
+            .mockResolvedValueOnce({ rates: null, error: 'Exchange rates unavailable' });
+
+        try {
+            await expect(createExpenseRecurrenceCommand(context, {
+                id: 'recurrence-fx-failure',
+                title: 'Foreign auto payment',
+                paymentMode: 'auto',
+                currency: 'USD',
+                amount: 30,
+                amountType: 'fixed',
+                repeat: 'monthly',
+                monthlyType: 'specific',
+                monthlyDay: 25,
+                startDate: '2026-06-25',
+                isPersonal: true,
+                billable: false,
+                isTaxExempt: true,
+            })).rejects.toThrow('Exchange rates unavailable');
+
+            expect(context.maps.expenseRecurrences.has('recurrence-fx-failure')).toBe(false);
+            expect(context.maps.expenses.size).toBe(0);
+        } finally {
+            fetchRates.mockRestore();
+        }
+    });
+
     it('deletes recurring expense templates with confirmation without deleting generated expenses', async () => {
         const context = createContext();
         context.now = () => Date.parse('2026-06-25T10:00:00Z');
 
-        const created = createExpenseRecurrenceCommand(context, {
+        const created = await createExpenseRecurrenceCommand(context, {
             id: 'recurrence-delete-agent',
             title: 'Delete monthly hosting',
             currency: 'USD',
@@ -3886,7 +4155,7 @@ describe('agent commands', () => {
             isRecurring: true,
         }));
 
-        const dispatchRecurrence = createExpenseRecurrenceCommand(context, {
+        const dispatchRecurrence = await createExpenseRecurrenceCommand(context, {
             id: 'recurrence-dispatch-delete',
             title: 'Dispatch recurrence delete',
             currency: 'USD',
@@ -4093,9 +4362,10 @@ describe('agent commands', () => {
             id: 'task-query',
             title: 'Query task',
             projectId: 'project-1',
+            billable: true,
         });
 
-        addManualTimeEntryCommand(context, {
+        await addManualTimeEntryCommand(context, {
             taskId: task.id,
             start: 10_000,
             end: 20_000,
@@ -4133,7 +4403,7 @@ describe('agent commands', () => {
             total: 100,
         }));
 
-        expect(getDashboardSummaryCommand(context)).toEqual(expect.objectContaining({
+        expect(await getDashboardSummaryCommand(context)).toEqual(expect.objectContaining({
             projectCount: 1,
             taskCount: 1,
             openTaskCount: 1,
@@ -4143,7 +4413,7 @@ describe('agent commands', () => {
             unbilledExpenseCount: 1,
             draftInvoiceCount: 1,
         }));
-        expect(getProjectOverviewCommand(context, { projectId: 'project-1' })).toEqual(expect.objectContaining({
+        expect(await getProjectOverviewCommand(context, { projectId: 'project-1' })).toEqual(expect.objectContaining({
             taskCount: 1,
             unbilledEntryCount: 1,
             billableExpenseCount: 1,
@@ -4156,7 +4426,7 @@ describe('agent commands', () => {
             openInvoiceTotal: 100,
         }));
 
-        expect(findUnbilledTimeCommand(context, { projectId: 'project-1' })).toEqual([
+        expect(await findUnbilledTimeCommand(context, { projectId: 'project-1' })).toEqual([
             expect.objectContaining({
                 id: 'agent-id-0',
                 taskId: task.id,
@@ -4166,7 +4436,7 @@ describe('agent commands', () => {
                 note: 'Unbilled work',
             }),
         ]);
-        expect(listRecentEntriesCommand(context, { limit: 1 })).toEqual([
+        expect(await listRecentEntriesCommand(context, { limit: 1 })).toEqual([
             expect.objectContaining({
                 id: 'entry-billed',
                 billed: true,
@@ -4201,6 +4471,86 @@ describe('agent commands', () => {
             ok: true,
             command: 'list_invoices',
         }));
+    });
+
+    it('uses complete canonical invoice eligibility and billable duration in unbilled queries', async () => {
+        const context = createContext();
+        const task = createTaskCommand(context, {
+            id: 'task-canonical-query',
+            title: 'Canonical query task',
+            projectId: 'project-1',
+            billable: true,
+        });
+        const legacyStart = Date.parse('2026-01-10T09:00:00Z');
+        const markerStart = Date.parse('2026-02-10T09:00:00Z');
+        const eligibleStart = Date.parse('2026-03-10T09:00:00Z');
+        const entries = [
+            {
+                id: 'legacy-billed-entry',
+                taskId: task.id,
+                start: legacyStart,
+                end: legacyStart + 3_600_000,
+                createdAt: legacyStart,
+            },
+            {
+                id: 'rate-marked-entry',
+                taskId: task.id,
+                start: markerStart,
+                end: markerStart + 3_600_000,
+                billedHourlyRate: 100,
+            },
+            {
+                id: 'historical-eligible-entry',
+                taskId: task.id,
+                start: eligibleStart,
+                end: eligibleStart + 3_600_000,
+                billedDurationMs: 1_800_000,
+                billingIncrementMinutes: 30,
+            },
+        ];
+        const legacyInvoice = {
+            id: 'legacy-finalized-invoice',
+            invoiceNumber: 'INV-LEGACY',
+            date: '2026-01-31',
+            status: 'sent',
+            billingPeriodStart: '2026-01-01',
+            billingPeriodEnd: '2026-01-31',
+            createdAt: Date.parse('2026-01-31T12:00:00Z'),
+            tasks: [{ id: task.id, originalTimeMs: 3_600_000 }],
+            items: [],
+            subtotal: 100,
+            total: 100,
+        };
+        context.store.loadAllTimeEntries = vi.fn(async () => entries as any);
+        context.store.getAllTasks = vi.fn(async () => [task]);
+        context.store.getAllInvoices = vi.fn(async () => [legacyInvoice as any]);
+
+        const unbilled = await findUnbilledTimeCommand(context, { projectId: 'project-1', limit: 10 });
+        const dashboard = await getDashboardSummaryCommand(context);
+        const project = await getProjectOverviewCommand(context, { projectId: 'project-1' });
+        const recent = await listRecentEntriesCommand(context, { limit: 10 });
+
+        expect(unbilled).toEqual([
+            expect.objectContaining({
+                id: 'historical-eligible-entry',
+                durationMs: 3_600_000,
+                billableDurationMs: 1_800_000,
+                billed: false,
+            }),
+        ]);
+        expect(dashboard).toEqual(expect.objectContaining({
+            unbilledEntryCount: 1,
+            unbilledDurationMs: 1_800_000,
+        }));
+        expect(project).toEqual(expect.objectContaining({
+            unbilledEntryCount: 1,
+            unbilledDurationMs: 1_800_000,
+        }));
+        expect(recent.find((entry) => entry.id === 'legacy-billed-entry')).toEqual(expect.objectContaining({ billed: true }));
+        expect(recent.find((entry) => entry.id === 'rate-marked-entry')).toEqual(expect.objectContaining({ billed: true }));
+        expect(context.store.loadAllTimeEntries).toHaveBeenCalled();
+        expect(context.store.getAllTasks).toHaveBeenCalled();
+        expect(context.store.getAllInvoices).toHaveBeenCalled();
     });
 
     it('returns read-only report summaries using Reports-page filters and totals', async () => {

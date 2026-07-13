@@ -600,7 +600,7 @@ describe('useTasks', () => {
         expect(result.current.toggleRecurringCompletion('missing', '2025-01-06')).toBeUndefined()
     })
 
-    it('skips recurring task for current occurrence and resets on next recurrence', () => {
+    it('derives current recurring status without rewriting prior skip evidence', () => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2025-01-07T09:00:00Z'))
 
@@ -669,32 +669,72 @@ describe('useTasks', () => {
         expect(status.effectiveDateStr).toBe('2025-01-13')
         expect(status.isSkipped).toBe(false)
 
-        // On Monday Jan 13, the skip for Jan 6 is still for the previous
-        // overdue occurrence, so resetExpiredSkips must NOT reset it yet.
-        act(() => {
-            result.current.resetExpiredSkips()
-        })
-
-        expect(update).not.toHaveBeenCalledWith(
-            'recurring-overdue',
-            { skipUntilNextRecurring: false, skippedOccurrenceDate: null }
-        )
-
-        // Advance past this recurrence cycle — on Jan 14 (Tuesday) the
-        // previous due date is now Jan 13, so the Jan 6 skip is truly expired.
+        // Once the next occurrence becomes overdue, the previous skip remains
+        // durable evidence but is ignored by pure status derivation.
         update.mockClear()
         vi.setSystemTime(new Date('2025-01-14T09:00:00Z'))
 
-        act(() => {
-            result.current.resetExpiredSkips()
+        expect(result.current.getRecurringStatus(activeTasks[0], '2025-01-14')).toEqual(expect.objectContaining({
+            isDueToday: false,
+            isOverdue: true,
+            effectiveDateStr: '2025-01-13',
+            isSkipped: false,
+        }))
+        expect(activeTasks[0]).toEqual(expect.objectContaining({
+            skipUntilNextRecurring: true,
+            skippedOccurrenceDate: '2025-01-06',
+        }))
+        expect(update).not.toHaveBeenCalled()
+    })
+
+    it('protects task identity, archived descendants, and active timers during UI updates', () => {
+        const archivedTasks = createTestYMap({
+            archivedChild: {
+                id: 'archived-child',
+                title: 'Archived child',
+                projectId: 'p1',
+                parentTaskId: 'root',
+                archived: true,
+            },
+        })
+        const projects = createTestYMap({
+            p1: { id: 'p1', title: 'Project one' },
+            p2: { id: 'p2', title: 'Project two' },
+        })
+        const timers = createTestYMap({
+            p1: { projectId: 'p1', taskId: 'running', startTime: 1, paused: false },
+        })
+        const activeTasks = [
+            { id: 'root', title: 'Root', projectId: 'p1' },
+            { id: 'running', title: 'Running', projectId: 'p1' },
+        ]
+        const update = vi.fn()
+
+        mockUseYjs.mockReturnValue({
+            store: {
+                archivedTasks,
+                projects,
+                timers,
+                archiveTask: vi.fn(),
+                unarchiveTask: vi.fn(),
+            },
+            isReady: true,
+            loadArchivedTasks: vi.fn(async () => {}),
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: activeTasks,
+            isLoading: false,
+            get: vi.fn((id) => activeTasks.find((task) => task.id === id)),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
         })
 
-        expect(update).toHaveBeenCalledWith(
-            'recurring-overdue',
-            {
-                skipUntilNextRecurring: false,
-                skippedOccurrenceDate: null,
-            }
-        )
+        const { result } = renderHook(() => useTasks())
+
+        expect(() => result.current.updateTask('root', { id: 'replacement' })).toThrow(/identity/i)
+        expect(() => result.current.updateTask('root', { projectId: 'p2' })).toThrow(/cannot move/i)
+        expect(() => result.current.updateTask('running', { projectId: 'p2' })).toThrow(/Stop the active timer/i)
+        expect(update).not.toHaveBeenCalled()
     })
 })

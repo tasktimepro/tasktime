@@ -8,7 +8,8 @@ import {
     startOfYear,
     endOfYear,
     subMonths,
-    subWeeks
+    subWeeks,
+    type Day,
 } from 'date-fns';
 
 type DateRange = {
@@ -33,7 +34,7 @@ export const getTodayRange = (): DateRange => {
  * Get date range for current week
  * @returns {Object} Object with start and end timestamps
  */
-export const getThisWeekRange = (weekStartsOn: number = 1): DateRange => {
+export const getThisWeekRange = (weekStartsOn: Day = 1): DateRange => {
     const now = new Date();
 
     return {
@@ -46,7 +47,7 @@ export const getThisWeekRange = (weekStartsOn: number = 1): DateRange => {
  * Get date range for last week
  * @returns {Object} Object with start and end timestamps
  */
-export const getLastWeekRange = (weekStartsOn: number = 1): DateRange => {
+export const getLastWeekRange = (weekStartsOn: Day = 1): DateRange => {
     const lastWeek = subWeeks(new Date(), 1);
 
     return {

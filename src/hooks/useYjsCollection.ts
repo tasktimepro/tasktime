@@ -14,6 +14,7 @@ import { generateId } from '@/utils/idUtils';
 import { markMeaningfulActivity, type UsageMetricsAction } from '@/utils/usageMetrics';
 import { readEntity, objectToYMap, yMapToObject, collectEntities } from '@/stores/yjs/entityUtils';
 import { validateCollectionEntity, safeValidateCollectionEntity, type YjsCollectionName } from '@/stores/yjs/validation';
+import { assertEntityIdentityAvailable } from '@/domain/entities/entityIdentity';
 
 const COLLECTION_ACTION_BASE_NAMES: Partial<Record<YjsCollectionName, string>> = {
     businessInfos: 'business_info',
@@ -175,6 +176,12 @@ export function useYjsCollection<T extends { id: string }>(
         const validatedItem = options.collectionName
             ? validateCollectionEntity<T>(options.collectionName, item, `create ${options.collectionName}.${id}`)
             : item as unknown as T;
+
+        assertEntityIdentityAvailable({
+            id,
+            existingIds: yMap.keys(),
+            label: options.collectionName || 'Entity',
+        });
 
         const entityMap = objectToYMap(validatedItem as unknown as Record<string, unknown>);
         (yMap as unknown as Y.Map<string, unknown>).set(id, entityMap);

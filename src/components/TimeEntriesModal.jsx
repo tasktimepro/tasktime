@@ -10,6 +10,7 @@ import { useToast } from '../hooks/useToast.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { getActualDurationMs, getBillableDurationMs, hasBillableDurationOverride } from '../utils/timeEntryDurationUtils.ts';
+import { isManualTimeEntryLocked } from '@/domain/time/manualTimeEntryOperations';
 
 /**
  * TimeEntriesModal component - Modal for viewing and managing time entries for a task
@@ -24,16 +25,14 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const isMobileLayout = useIsMobileLayout();
 
     // Yjs hooks for state
-    const { entries: timeEntries, deleteEntry } = useTimeEntries();
+    const { entries: timeEntries, deleteManualEntry } = useTimeEntries();
 
     // Helper functions for billing protection
 
     const isEntryBilled = useCallback(
         (entry) => {
             if (!task || !entry) return false;
-            // Only consider entries billed if the task has actually been billed (has lastBilledAt)
-            if (!task.lastBilledAt) return false;
-            return entry.start <= task.lastBilledAt;
+            return isManualTimeEntryLocked(entry, task);
         },
         [task]
     );
@@ -85,6 +84,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
     const [showAddEntryModal, setShowAddEntryModal] = useState(false);
 
     const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState(null);
+    const [isDeletingEntry, setIsDeletingEntry] = useState(false);
 
     // State for collapsible billed entries section
     const [showBilledEntries, setShowBilledEntries] = useState(false);
@@ -94,6 +94,7 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
         if (!isOpen) {
             setEditingEntry(null);
             setPendingDeleteEntryId(null);
+            setIsDeletingEntry(false);
             setShowAddEntryModal(false);
         }
     }, [isOpen]);
@@ -129,19 +130,28 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
 
     const closeDeleteEntryModal = () => {
 
+        if (isDeletingEntry) return;
         setPendingDeleteEntryId(null);
     };
 
-    const confirmDeleteEntry = () => {
+    const confirmDeleteEntry = async () => {
 
-        if (!pendingDeleteEntryId) {
+        if (!pendingDeleteEntryId || isDeletingEntry) {
 
             return;
         }
 
-        deleteEntry(pendingDeleteEntryId);
-        showSuccess('Time entry deleted successfully');
-        setPendingDeleteEntryId(null);
+        setIsDeletingEntry(true);
+        try {
+            const deleted = await deleteManualEntry(pendingDeleteEntryId);
+            if (!deleted) throw new Error('Time entry not found.');
+            showSuccess('Time entry deleted successfully');
+            setPendingDeleteEntryId(null);
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Could not delete the time entry');
+        } finally {
+            setIsDeletingEntry(false);
+        }
     };
 
     const pendingDeleteEntry = pendingDeleteEntryId
@@ -394,14 +404,16 @@ const TimeEntriesModal = ({ isOpen, onClose, task }) => {
                         <Button
                             variant="outline"
                             onClick={closeDeleteEntryModal}
+                            disabled={isDeletingEntry}
                         >
                             Cancel
                         </Button>
                         <Button
                             variant="destructive"
                             onClick={confirmDeleteEntry}
+                            disabled={isDeletingEntry}
                         >
-                            Delete
+                            {isDeletingEntry ? 'Deleting…' : 'Delete'}
                         </Button>
                     </div>
                 )}

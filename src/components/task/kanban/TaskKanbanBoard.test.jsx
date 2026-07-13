@@ -8,7 +8,9 @@ const kanbanMocks = vi.hoisted(() => ({
     updateTask: vi.fn(),
     createEntry: vi.fn(),
     getTimerForTask: vi.fn(() => null),
+    stopTimer: vi.fn(async () => null),
     clearTimer: vi.fn(),
+    showError: vi.fn(),
     projects: [{ id: 'project-1', title: 'Client Work', isPersonal: false }],
     dndContextProps: null,
 }));
@@ -67,11 +69,18 @@ vi.mock('@/hooks/useTimeEntries', () => ({
 vi.mock('@/hooks/useTimers', () => ({
     useTimers: () => ({
         getTimerForTask: kanbanMocks.getTimerForTask,
+        stopTimer: kanbanMocks.stopTimer,
         clearTimer: kanbanMocks.clearTimer,
         timers: [],
         startTimer: vi.fn(),
         pauseTimer: vi.fn(),
         resumeTimer: vi.fn(),
+    }),
+}));
+
+vi.mock('@/hooks/useToast', () => ({
+    useToast: () => ({
+        showError: kanbanMocks.showError,
     }),
 }));
 

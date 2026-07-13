@@ -68,7 +68,12 @@ const Expenses = ({
 
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
-    const { expenses, markAsPaid, markAsUnpaid, createExpense } = useExpenses({ includeArchived: true });
+    const {
+        expenses,
+        markAsPaid,
+        markAsUnpaid,
+        createExpenseWithPaymentSnapshot,
+    } = useExpenses({ includeArchived: true });
     const {
         recurrences,
         isLoading: expenseRecurrencesLoading,
@@ -162,9 +167,21 @@ const Expenses = ({
 
     useEffect(() => {
         if (expenseRecurrencesLoading || recurrenceGeneratedRef.current) return;
-        generatePendingExpenses(createExpense);
         recurrenceGeneratedRef.current = true;
-    }, [expenseRecurrencesLoading, generatePendingExpenses, createExpense]);
+        void Promise.resolve(generatePendingExpenses(
+            createExpenseWithPaymentSnapshot,
+            new Set(expenses.map((expense) => expense.id))
+        )).catch((error) => {
+            recurrenceGeneratedRef.current = false;
+            showError(error instanceof Error ? error.message : 'Unable to generate recurring expenses');
+        });
+    }, [
+        createExpenseWithPaymentSnapshot,
+        expenseRecurrencesLoading,
+        expenses,
+        generatePendingExpenses,
+        showError,
+    ]);
 
     useEffect(() => {
         if (initialFiltersAppliedRef.current) return;

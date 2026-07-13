@@ -256,7 +256,7 @@ function AppContent() {
 
     const {
         expenses,
-        createExpense,
+        createExpenseWithPaymentSnapshot,
     } = useExpenses();
 
     const {
@@ -297,6 +297,7 @@ function AppContent() {
     const todayStr = useTodayString();
     const onboardingSeedTaskCreatedRef = useRef(false);
     const lastExpenseGenerationDayRef = useRef(null);
+    const expenseGenerationInFlightDayRef = useRef(null);
 
     useEffect(() => {
         if (
@@ -304,13 +305,33 @@ function AppContent() {
             || expenseRecurrencesLoading
             || !todayStr
             || lastExpenseGenerationDayRef.current === todayStr
+            || expenseGenerationInFlightDayRef.current === todayStr
         ) {
             return;
         }
 
-        generatePendingExpenses(createExpense, new Set(expenses.map((e) => e.id)));
-        lastExpenseGenerationDayRef.current = todayStr;
-    }, [isReady, expenseRecurrencesLoading, todayStr, generatePendingExpenses, createExpense, expenses]);
+        expenseGenerationInFlightDayRef.current = todayStr;
+        void Promise.resolve(generatePendingExpenses(
+            createExpenseWithPaymentSnapshot,
+            new Set(expenses.map((expense) => expense.id))
+        )).then(() => {
+            lastExpenseGenerationDayRef.current = todayStr;
+        }).catch((error) => {
+            toast?.showError(error instanceof Error ? error.message : 'Unable to generate recurring expenses');
+        }).finally(() => {
+            if (expenseGenerationInFlightDayRef.current === todayStr) {
+                expenseGenerationInFlightDayRef.current = null;
+            }
+        });
+    }, [
+        createExpenseWithPaymentSnapshot,
+        expenseRecurrencesLoading,
+        expenses,
+        generatePendingExpenses,
+        isReady,
+        toast,
+        todayStr,
+    ]);
 
     const isPaused = focusedTimer?.isPaused || false;
     const timerTaskId = focusedTimer?.taskId || null;
@@ -576,7 +597,7 @@ function AppContent() {
         setModalOptions(options || null);
     }, []);
 
-    const openExpenseView = useCallback((expense) => {
+    const openExpenseView = useCallback(async (expense) => {
         if (!expense) return;
 
         const resolvedExpense = expense.isPreview && expense.recurrenceId && expense.date
@@ -594,7 +615,14 @@ function AppContent() {
             const recurrence = recurrences.find((item) => item.id === targetExpense.recurrenceId);
 
             if (recurrence) {
-                targetExpense = createExpense(buildExpenseFromRecurrence(recurrence, targetExpense.date));
+                try {
+                    targetExpense = await createExpenseWithPaymentSnapshot(
+                        buildExpenseFromRecurrence(recurrence, targetExpense.date)
+                    );
+                } catch (error) {
+                    toast?.showError(error instanceof Error ? error.message : 'Unable to create recurring expense');
+                    return;
+                }
 
                 if (!recurrence.lastGeneratedDate || recurrence.lastGeneratedDate < targetExpense.date) {
                     updateRecurrence(recurrence.id, { lastGeneratedDate: targetExpense.date });
@@ -626,7 +654,15 @@ function AppContent() {
             isOpen: true,
             expense: targetExpense
         });
-    }, [expenses, recurrences, todayStr, createExpense, updateRecurrence, openExpenseModal]);
+    }, [
+        createExpenseWithPaymentSnapshot,
+        expenses,
+        openExpenseModal,
+        recurrences,
+        toast,
+        todayStr,
+        updateRecurrence,
+    ]);
 
     const closeExpenseView = useCallback(() => {
         setExpenseViewState({

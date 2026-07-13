@@ -107,6 +107,21 @@ describe('useYjsCollection', () => {
         expect(created.updatedAt).toBe(456)
     })
 
+    it('rejects duplicate create IDs without replacing the existing entity', async () => {
+        const mockMap = createTestYMap({
+            existing: { id: 'existing', name: 'Original' },
+        })
+        mockUseYjs.mockReturnValue({ store: { test: mockMap }, isReady: true })
+
+        const { result } = renderHook(() => useYjsCollection((store) => store.test))
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        expect(() => result.current.create({ id: 'existing', name: 'Replacement' }))
+            .toThrow(/already exists/i)
+        expect(result.current.get('existing')).toEqual({ id: 'existing', name: 'Original' })
+    })
+
     it('skips invalid stored entities and rejects invalid writes when validation is enabled', async () => {
         const mockMap = createTestYMap({
             good: { id: 'good', title: 'Valid Project' },

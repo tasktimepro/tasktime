@@ -4,7 +4,7 @@
 APP_RUN_ENV ?=
 APP_RUN = docker compose run --rm $(APP_RUN_ENV) app
 
-.PHONY: help dev dev-push-local preview-push-local preview-push-cloud stop build preview preview-build install lint clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
+.PHONY: help dev dev-push-local preview-push-local preview-push-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
 
 PREVIEW_PORT ?= 3101
 
@@ -27,6 +27,7 @@ help:
 	@echo "  make install  - Install all dependencies"
 	@echo "  make add PKG=<package>  - Add a new npm package"
 	@echo "  make lint     - Run ESLint"
+	@echo "  make typecheck - Run the repository-wide TypeScript check"
 	@echo "  make logs     - View container logs"
 	@echo "  make shell    - Open shell in container"
 	@echo "  make clean    - Remove containers and rebuild"
@@ -36,7 +37,7 @@ help:
 	@echo "  make test-e2e - Run Playwright E2E tests"
 	@echo "  make test-e2e-smoke - Run critical Playwright smoke tests"
 	@echo "  make test-e2e-pwa-smoke - Run production-preview PWA offline boot smoke test"
-	@echo "  make release-gate - Run coverage, browser smoke, and build"
+	@echo "  make release-gate - Run lint, typecheck, coverage, browser/PWA smoke, and build"
 	@echo ""
 
 # Start development server
@@ -137,6 +138,9 @@ lint:
 	done
 
 # Run tests
+typecheck:
+	docker compose run --rm app npm run typecheck
+
 test:
 	docker compose run --rm app npm test
 
@@ -155,9 +159,10 @@ test-e2e-smoke:
 test-e2e-pwa-smoke:
 	docker compose run --rm app npm run test:e2e:pwa:smoke
 
-# Release gate checks (coverage + browser smoke + build)
+# Release gate checks (lint + typecheck + coverage + browser/PWA smoke + build)
 release-gate:
 	$(MAKE) lint
+	$(APP_RUN) npm run typecheck
 	$(APP_RUN) npm run test:coverage
 	$(APP_RUN) npm run test:e2e:smoke
 	$(APP_RUN) npm run test:e2e:pwa:smoke

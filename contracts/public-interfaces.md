@@ -12,6 +12,10 @@ Components obtain product state and mutations through entity hooks under `src/ho
 
 Callers must not create a second persistence layer. Hook return shapes may evolve additively, but established mutation semantics and persisted effects are durable.
 
+`useTimers` is the browser timer-lifecycle boundary, including stop recovery and timer-created entry snapshots; `stopTimer` resolves asynchronously after complete-history validation/recovery. `useTimeEntries` keeps generic internal CRUD for controlled billing/deletion applications and exposes asynchronous protected manual-entry mutations for user-facing create/edit/delete flows so historical documents and archived task relationships are loaded before mutation. Project, client, and task hooks validate relationship-bearing writes through the same domain contracts used by agent commands; persisted entity IDs are immutable and create operations reject an existing ID before writing.
+
+`useExpenses` retains synchronous raw create/update methods for controlled internal applications, while user-facing paid or payment-sensitive mutations use `createExpenseWithPaymentSnapshot` and `updateExpenseWithPaymentSnapshot`. Those asynchronous methods prepare required cross-currency evidence before committing. `deleteExpense` rejects billed/invoice-linked and tax-claimed expenses on every UI call path.
+
 ## Persisted Yjs boundary
 
 - Managed document names: `core`, `entries-active`, `entries-{year}`, `tasks-archived`, `expenses-archived`, `invoices-archived`.
@@ -96,6 +100,10 @@ Command groups include:
 - application navigation
 
 The authoritative command-name/metadata catalog is generated from `src/agent/commands/registry.ts`. A command may additionally require explicit TaskTime approval and idempotency/confirmation data. Changes require synchronized tool schemas, bridge package, bundles, public docs, and tests.
+
+`stop_timer` accepts an optional `idempotencyKey` and also converges concurrent stops through deterministic timer-instance entry identity. Manual time-entry commands validate complete local history and source/target billing rules before mutation. Generic `update_task` requests are normalized through task-state invariants; recurring completion still requires the occurrence-aware `complete_task` command. Create commands return `CONFLICT` for an existing persisted ID and must not replace the prior record.
+
+`find_unbilled_time`, dashboard/project unbilled summaries, and recent-entry billing state load complete local task, time-entry, and invoice history. Unbilled results use canonical invoice eligibility and legacy finalized-invoice evidence; entry summaries preserve `durationMs` as actual elapsed time and add `billableDurationMs` for invoice calculations.
 
 ## Local bridge process
 

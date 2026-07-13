@@ -12,6 +12,7 @@ import type {
     ExpenseCategory,
     ExpenseRecurrence,
     Invoice,
+    InvoiceBillingSelectionSnapshot,
     InvoiceTemplate,
     MultiTimerState,
     PaymentMethod,
@@ -44,7 +45,7 @@ const optionalNullableIdSchema = z.string().trim().min(1).nullable().optional();
 const nullableIdWithLegacyUndefinedSchema = z.preprocess(
     (value) => (value === undefined ? null : value),
     nullableIdSchema
-);
+) as z.ZodType<string | null>;
 const hexColorSchema = z.string().regex(HEX_COLOR_REGEX);
 const imageDataUrlSchema = z.string().regex(IMAGE_DATA_URL_REGEX);
 const brandAssetMimeTypeSchema = z.enum(['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp']);
@@ -374,7 +375,7 @@ const invoiceBillingSelectionSnapshotSchema = z.object({
         invoiceCurrency: nonEmptyStringSchema,
         exchangeRate: finiteNumberSchema.positive(),
     })),
-}).passthrough();
+}).passthrough() as z.ZodType<InvoiceBillingSelectionSnapshot>;
 
 const invoiceSchema = z.object({
     id: nonEmptyStringSchema,
@@ -624,7 +625,15 @@ const preferencesSchema = z.object({
     timeFormat: z.string().optional(),
     theme: z.enum(['light', 'dark', 'system']).optional(),
     defaultView: z.string().optional(),
-    weekStartsOn: integerNumberSchema.min(0).max(6).optional(),
+    weekStartsOn: z.union([
+        z.literal(0),
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+        z.literal(5),
+        z.literal(6),
+    ]).optional(),
     autoHideTotalsOnRevisit: z.boolean().optional(),
     showCompletedTasks: z.boolean().optional(),
     defaultBillable: z.boolean().optional(),

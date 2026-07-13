@@ -311,12 +311,13 @@ export class AgentAppSessionWebSocketClient {
                 }),
                 timeoutAfter(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
             ]);
+            const errorCode = 'error' in response.response ? response.response.error.code : undefined;
 
             this.options.onCommandActivity?.({
                 requestId: response.requestId,
                 command: response.response.command,
                 ok: response.response.ok,
-                errorCode: response.response.ok ? undefined : response.response.error.code,
+                errorCode,
             });
 
             socket.send(JSON.stringify(response));
@@ -343,12 +344,13 @@ export class AgentAppSessionWebSocketClient {
                     }),
                     timeoutAfter(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
                 ]);
+                const errorCode = 'error' in response.response ? response.response.error.code : undefined;
 
                 this.options.onCommandActivity?.({
                     requestId: response.requestId,
                     command: response.response.command,
                     ok: response.response.ok,
-                    errorCode: response.response.ok ? undefined : response.response.error.code,
+                    errorCode,
                 });
 
                 if (socket === this.socket && socket.readyState === 1) {

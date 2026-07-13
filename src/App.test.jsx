@@ -23,7 +23,7 @@ const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((qu
 
 const expenseHookState = vi.hoisted(() => ({
     expenses: [],
-    createExpense: vi.fn((expense) => ({
+    createExpenseWithPaymentSnapshot: vi.fn((expense) => ({
         ...expense,
         id: expense.id || 'created-expense',
     })),
@@ -174,7 +174,7 @@ vi.mock('./hooks/useTimeEntries.ts', () => ({
 vi.mock('./hooks/useExpenses.ts', () => ({
     useExpenses: () => ({
         expenses: expenseHookState.expenses,
-        createExpense: expenseHookState.createExpense,
+        createExpenseWithPaymentSnapshot: expenseHookState.createExpenseWithPaymentSnapshot,
     }),
 }))
 
@@ -432,8 +432,8 @@ describe('App component', () => {
         })
         window.matchMedia = createMatchMedia()
         expenseHookState.expenses.length = 0
-        expenseHookState.createExpense.mockReset()
-        expenseHookState.createExpense.mockImplementation((expense) => ({
+        expenseHookState.createExpenseWithPaymentSnapshot.mockReset()
+        expenseHookState.createExpenseWithPaymentSnapshot.mockImplementation((expense) => ({
             ...expense,
             id: expense.id || 'created-expense',
         }))
@@ -998,7 +998,7 @@ describe('App component', () => {
 
         expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledTimes(1)
         expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledWith(
-            expenseHookState.createExpense,
+            expenseHookState.createExpenseWithPaymentSnapshot,
             expect.any(Set),
         )
 
@@ -1011,7 +1011,7 @@ describe('App component', () => {
         expect(recurrenceHookState.generatePendingExpenses).toHaveBeenCalledTimes(2)
     })
 
-    it('materializes due preview expenses before opening the expense view', () => {
+    it('materializes due preview expenses before opening the expense view', async () => {
         recurrenceHookState.recurrences.push({
             id: 'rec-office',
             title: 'Office',
@@ -1042,15 +1042,17 @@ describe('App component', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Open preview expense' }))
 
-        expect(expenseHookState.createExpense).toHaveBeenCalledWith(expect.objectContaining({
-            title: 'Office',
-            date: '2026-02-25',
-            recurrenceId: 'rec-office',
-            paymentStatus: 'unpaid',
-        }))
-        expect(recurrenceHookState.updateRecurrence).toHaveBeenCalledWith('rec-office', { lastGeneratedDate: '2026-02-25' })
-        const modalText = screen.getByTestId('expense-view-modal').textContent
-        expect(modalText).toContain(':Office:actual')
-        expect(modalText).not.toContain('created-expense')
+        await waitFor(() => {
+            expect(expenseHookState.createExpenseWithPaymentSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+                title: 'Office',
+                date: '2026-02-25',
+                recurrenceId: 'rec-office',
+                paymentStatus: 'unpaid',
+            }))
+            expect(recurrenceHookState.updateRecurrence).toHaveBeenCalledWith('rec-office', { lastGeneratedDate: '2026-02-25' })
+            const modalText = screen.getByTestId('expense-view-modal').textContent
+            expect(modalText).toContain(':Office:actual')
+            expect(modalText).not.toContain('created-expense')
+        })
     })
 })

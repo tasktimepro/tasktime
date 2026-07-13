@@ -60,6 +60,32 @@ describe('useClients', () => {
         expect(result.current.findByName('nope')).toBeUndefined()
     })
 
+    it('validates client creates and updates', () => {
+        const existing = { id: 'c1', title: 'Existing' }
+        const get = vi.fn((id) => id === 'c1' ? existing : undefined)
+        const create = vi.fn((client) => client)
+        const update = vi.fn((id, updates) => ({ ...existing, ...updates, id }))
+        mockUseYjs.mockReturnValue({ store: { plannerAttachments: createTestYMap() }, isReady: true })
+        mockUseYjsCollection.mockReturnValue({
+            items: [existing], isLoading: false, get, create, update, remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useClients())
+        let created
+        act(() => {
+            created = result.current.createClient({ title: ' New client ' })
+        })
+        expect(created).toEqual(expect.objectContaining({ title: 'New client', archived: false }))
+
+        act(() => {
+            result.current.updateClient('c1', { title: 'Updated' })
+        })
+        expect(update).toHaveBeenCalledWith('c1', { title: 'Updated' })
+        expect(result.current.updateClient('missing', { title: 'Nope' })).toBeUndefined()
+        expect(() => result.current.createClient({ title: '   ' })).toThrow('title is required')
+        expect(() => result.current.updateClient('c1', { id: 'replacement' })).toThrow(/identity/i)
+    })
+
     it('cleans up planner attachments when deleting a client', () => {
         const plannerAttachments = createTestYMap({
             'att-1': { id: 'att-1', type: 'client', referenceId: 'c1' },

@@ -243,6 +243,7 @@ make build        # Production build
 make install      # Install dependencies
 make add PKG=idb  # Add a package
 make lint         # Run ESLint
+make typecheck    # Run the repository-wide TypeScript check
 make logs         # View container logs
 make shell        # Open shell in container
 make clean        # Full rebuild (after package.json changes)

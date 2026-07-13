@@ -15,6 +15,7 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 - Approved product backlog after its recorded ambiguities are resolved
 
 The July 2026 deep validation and Critical/High remediation are complete. Evidence, decisions, and the full release gate are recorded in `status/critical-path-assurance.md`.
+The repository now has a zero-diagnostic TypeScript baseline enforced by the release gate; gradual source migration remains ongoing.
 
 ## Completed
 
@@ -28,6 +29,7 @@ The July 2026 deep validation and Critical/High remediation are complete. Eviden
 
 - [x] Remediated sync/storage, backup/restore, billing/undo, reports/export, and agent trust findings.
 - [x] Passed unit/integration coverage, lint, production build, browser/PWA smoke, and packaged live-agent gates.
+- [x] Established and enforced a zero-diagnostic repository-wide TypeScript release baseline.
 
 ## Blockers and open questions
 
