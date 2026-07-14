@@ -6,6 +6,7 @@
 - A supported historical backup or Drive record is validated/migrated and retains valid relationships.
 - Offline use allows local work; unavailable cloud actions fail visibly without corrupting local state.
 - Reconnecting never silently replaces unsynced valid local work with an older remote snapshot.
+- Core use does not require a TaskTime account or cloud sync, and public discovery metadata states that work records use browser-local storage.
 
 ## Work and time
 
@@ -47,6 +48,7 @@
 - A paired allowed command produces the same business effect and validation as its UI counterpart.
 - Session tokens do not appear in status files, launch URLs, logs, docs, or error recovery payloads.
 - The installed integration can complete the long-running task/start/work/stop/verify flow.
+- The discovery manifest and generated tool catalog agree on core-use, privacy, and canonical first-party ClawHub metadata.
 
 ## Quality evidence
 

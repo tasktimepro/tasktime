@@ -2,8 +2,8 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/terms' } = Astro.props;
-const LAST_UPDATED = '14 April 2026';
-const LAST_UPDATED_ISO = '2026-04-14';
+const LAST_UPDATED = '14 July 2026';
+const LAST_UPDATED_ISO = '2026-07-14';
 ---
 
 <PublicPageLayout
@@ -13,7 +13,7 @@ const LAST_UPDATED_ISO = '2026-04-14';
     lastUpdated={LAST_UPDATED}
     lastUpdatedIso={LAST_UPDATED_ISO}
     highlights={[
-        'TaskTime Pro is a local-first tool — your data lives in your browser, not on our servers.',
+        'TaskTime Pro is local-first — work records live in your browser and, optionally, your own Google Drive.',
         'The app is provided as-is without warranties. Keep your own backups.',
         'Liability is limited to the fullest extent permitted by law.',
     ]}
@@ -29,7 +29,7 @@ const LAST_UPDATED_ISO = '2026-04-14';
     <section>
         <h2>2. What TaskTime Pro is</h2>
         <p>
-            TaskTime Pro is a local-first productivity app for freelancers. It helps you track time, manage tasks and expenses, and generate invoices. Everything runs in your browser and is stored on your device. There is no account, no server-side database, and no way for us to see what you put in the app.
+            TaskTime Pro is a local-first productivity app for freelancers. It helps you track time, manage tasks and expenses, and generate invoices. Core use runs in your browser and stores work records on your device. There is no required TaskTime account or TaskTime-hosted workspace database.
         </p>
         <p>
             TaskTime Pro is a tool, not professional advice. You are responsible for reviewing anything you create, export, or send &mdash; including invoices, time records, and expense reports.
@@ -39,14 +39,14 @@ const LAST_UPDATED_ISO = '2026-04-14';
     <section>
         <h2>3. Your data, your responsibility</h2>
         <p>
-            Because your data lives entirely in your browser (and optionally in your own Google Drive), you are responsible for keeping backups, maintaining accurate records, and securing your devices and accounts. If you clear your browser data and have no sync or export, that data is gone &mdash; we cannot recover it for you because we never had it.
+            Because your work records live primarily in your browser (and optionally in your own Google Drive), you are responsible for keeping backups, maintaining accurate records, and securing your devices and accounts. If you clear your browser data and have no sync or export, that data is gone &mdash; we cannot recover it because TaskTime Pro does not maintain a hosted workspace copy.
         </p>
     </section>
 
     <section>
         <h2>4. Google Drive sync</h2>
         <p>
-            Google Drive sync is optional. When enabled, it stores your data in <strong>your own</strong> Google Drive account. The sync feature depends on Google&apos;s services and is governed by Google&apos;s own terms and privacy policies. We are not responsible for Google&apos;s availability, outages, or policy changes.
+            Google Drive sync is optional. When enabled, it stores sync documents in <strong>your own</strong> Google Drive account and uses TaskTime Pro&apos;s edge service to securely maintain the Google connection. The sync feature depends on Google&apos;s and Cloudflare&apos;s services and is governed by their applicable terms and privacy policies. We are not responsible for their availability, outages, or policy changes.
         </p>
     </section>
 

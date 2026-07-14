@@ -1,6 +1,6 @@
 export const SITE_URL = 'https://tasktime.pro';
 export const SITE_NAME = 'TaskTime Pro';
-export const SITE_DESCRIPTION = 'Local-first task management, time tracking, expenses, and invoicing for freelancers and solo professionals.';
+export const SITE_DESCRIPTION = 'Free, open-source, local-first work management for freelancers, covering tasks, timers, expenses, invoices, and reports. No TaskTime account or cloud sync is required for core use.';
 export const BLOG_BASE_PATH = '/blog';
 export const DEFAULT_SOCIAL_IMAGE = '/icons/web-app-manifest-512x512.png';
 export const DEFAULT_SOCIAL_IMAGE_ALT = 'TaskTime Pro app icon';

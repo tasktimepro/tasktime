@@ -9,12 +9,6 @@
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
 [ ] Then publish version 1 once we see that it's stable
 
-[x] Centralize remaining shared UI/agent operations in separate controlled updates
-    [x] Timer lifecycle and stop recovery — the highest-priority shared operation
-    [x] Manual time-entry validation — overlaps, billing cutoff, duration fields, updates, and deletion
-    [x] Task completion and recurring-task state — completion dates, skipping, and stale-skip reconciliation
-    [x] Task/project/client creation and updates where relationship invariants apply
-
 [ ] Publish in more places:
     [ ] PulseMCP - VERIFY AUTO LISTING
     [ ] Smithery
@@ -23,13 +17,17 @@
     [ ] Glama
     [ ] MCP.so
 
+[ ] Drive worker sync updates: tasktime-infra/docs/todo/direct-google-drive-sync-implementation-plan.md
+
+[ ] Invoice cancellation: tasktime-infra/docs/todo/invoice-cancellation-implementation-plan.md
+
 ---
 
 ## Blog Posts
 
 - Always keep in mind trending words and most likely searched for words for better SEO reachability
 [ ] We should have a blog post that mentions task and time management for AI agents, another for Invoicing with AI agents, Expense management for AI agents etc. I need the most likely searched terms for people that want to do what this product can achieve but using their AI agent
-[ ] ...
+[ ] We must also have posts for open-source and that we mention something like "Open-source task management app", etc.
 
 
 ---

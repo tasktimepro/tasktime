@@ -201,26 +201,32 @@ docker run --rm \
   sh -lc 'npx -y clawhub@0.23.1 auth whoami'
 ```
 
-Dry-run or inspect before publishing when possible:
+Dry-run or inspect before publishing when possible. Pin the public source
+repository, commit, and skill path so ClawHub can associate the submitted bytes
+with the canonical first-party source:
 
 ```bash
+SOURCE_COMMIT="$(git rev-parse HEAD)"
 docker run --rm \
   -v "$PWD:/repo" \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
+  -e SOURCE_COMMIT \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --dry-run'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime --dry-run'
 ```
 
 Publish:
 
 ```bash
+SOURCE_COMMIT="$(git rev-parse HEAD)"
 docker run --rm \
   -v "$PWD:/repo" \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
+  -e SOURCE_COMMIT \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro"'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime'
 ```
 
 Verify:
@@ -242,6 +248,19 @@ docker run --rm \
   node:24-alpine \
   sh -lc 'npx -y clawhub@0.23.1 skill verify @tasktimepro/tasktime-agent --card'
 ```
+
+Read the generated card as a semantic review, not only an availability check.
+It must describe TaskTime Pro and the submitted skill without inventing access
+to unrelated services, release workflows, messaging platforms, shared memory,
+or other capabilities absent from `SKILL.md`. Request a rescan and then contact
+ClawHub support if the generated card remains inaccurate.
+
+ClawHub CLI `0.23.1` accepts GitHub repository, commit, ref, and path provenance
+but exposes no publisher-signature option. Verification may therefore continue
+to report `signature.status: unsigned`; do not describe the skill as signed.
+First-party verification depends on the `tasktimepro` publisher identity plus
+server-resolved GitHub provenance. Treat unavailable or self-declared-only
+provenance as an incomplete release follow-up even when security scans pass.
 
 Also test unqualified resolution, because it is the natural verification path
 after an OpenClaw search. It must resolve to the same `TaskTime Pro` publisher
@@ -334,6 +353,8 @@ Before tagging or announcing an agent release:
 - `@tasktimepro/tasktime-agent` is the only canonical TaskTime Pro ClawHub skill under owner `tasktimepro`.
 - `@tasktimepro/tasktime` and `@tasktimepro/tasktime-pro` redirect to `@tasktimepro/tasktime-agent` if inspected.
 - `clawhub skill verify @tasktimepro/tasktime-agent` returns `"ok": true` and a generated Skill Card.
+- ClawHub verification identifies the canonical public source repository, commit, and skill path; any unavailable or merely self-declared provenance is recorded for follow-up.
+- The generated Skill Card contains no unrelated or invented capabilities.
 - Unqualified `clawhub skill verify tasktime-agent` and `openclaw skills verify tasktime-agent` resolve to TaskTime Pro.
 - Public docs point to `@tasktimepro/tasktime-agent`, `@tasktimepro/agent-bridge`, and `pro.tasktime/agent-bridge`.
 - Vendored bridge files match `agent-bridge/dist/tasktime-agent-bridge.mjs` when a bundle includes the bridge.

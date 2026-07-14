@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "pro.tasktime/agent-bridge",
   "title": "TaskTime Pro",
-  "description": "Local-first task, time, expense, invoice, and planning tools.",
-  "version": "0.2.0",
+  "description": "First-party local TaskTime Pro tools for tasks, timers, expenses, invoices, reports, and planning.",
+  "version": "0.2.1",
   "websiteUrl": "https://tasktime.pro/agents/",
   "repository": {
     "url": "https://github.com/tasktimepro/tasktime",
@@ -14,7 +14,7 @@
     {
       "registryType": "npm",
       "identifier": "@tasktimepro/agent-bridge",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "runtimeHint": "npx",
       "packageArguments": [
         {

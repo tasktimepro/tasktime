@@ -1,5 +1,7 @@
 # TaskTime Pro OpenClaw Bundle
 
+TaskTime Pro is a free, open-source, local-first work manager for freelancers, covering tasks, timers, expenses, invoices, and reports. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser.
+
 This bundle gives OpenClaw-compatible agent platforms two TaskTime Pro integration pieces:
 
 - `skills/tasktime/SKILL.md` with agent instructions for safe TaskTime Pro use.

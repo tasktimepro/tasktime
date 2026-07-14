@@ -121,4 +121,12 @@ Stable managed identities include platform-specific `agent-id` and `agent-label`
 - generated skill: `/agents/skill.md`
 - OpenClaw and Claude bundles under `integrations/`
 
+The discovery manifest is additive and advertises explicit core-use facts under
+`app`: no TaskTime account is required for core use, core use is free, the PWA
+is offline-capable, the source is public, work records use browser-local
+storage, and limited aggregate usage metrics are enabled on the production
+origin. Its `clawHub` object identifies the canonical `tasktimepro` owner,
+`tasktime-agent` slug, owner-qualified reference, public source repository, and
+source path. Consumers must tolerate additional manifest fields.
+
 Release coordination is specified in `docs/agent-release-runbook.md`.

@@ -4,6 +4,7 @@
 
 - [ ] Continue investigating blog indexing visibility.
 - [ ] Keep SEO terminology useful without weakening product clarity or accuracy.
+- [x] Align homepage, README, `llms.txt`, agent docs, skill positioning, and public privacy content around explicit free, open-source, no-account, offline-capable, browser-local core use while disclosing aggregate metrics and the Drive proxy boundary.
 
 ## Production baseline
 

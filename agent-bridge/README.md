@@ -2,6 +2,8 @@
 
 `@tasktimepro/agent-bridge` provides the `tasktime-agent-bridge` binary used by same-device AI agents to talk to TaskTime Pro over MCP stdio.
 
+TaskTime Pro is a free, open-source, local-first work manager for freelancers. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser.
+
 The bridge does not read or write TaskTime Pro IndexedDB/Yjs data directly. It starts a loopback app-session endpoint, waits for the running TaskTime Pro browser app to pair through Account > Agent Access, and forwards MCP tool calls to the paired browser app.
 
 Install and run:

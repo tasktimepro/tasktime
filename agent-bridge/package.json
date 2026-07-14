@@ -1,7 +1,7 @@
 {
   "name": "@tasktimepro/agent-bridge",
-  "version": "0.2.0",
-  "description": "Local MCP stdio server for same-device TaskTime Pro agent access.",
+  "version": "0.2.1",
+  "description": "First-party local MCP server for same-device agent access to TaskTime Pro.",
   "mcpName": "pro.tasktime/agent-bridge",
   "type": "module",
   "bin": {
@@ -23,7 +23,10 @@
     "ai-agent",
     "time-tracking",
     "invoicing",
-    "local-first"
+    "local-first",
+    "open-source",
+    "offline",
+    "no-account"
   ],
   "repository": {
     "type": "git",

@@ -5,9 +5,9 @@
 [![MCP](https://img.shields.io/badge/mcp-pro.tasktime%2Fagent--bridge-0a7cff)](https://tasktime.pro/.well-known/tasktime-agent.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)](./LICENSE)
 
-TaskTime Pro is a local-first task management, time tracking, expenses, and invoicing app for freelancers and solo professionals.
+TaskTime Pro is a free, open-source, local-first work manager for freelancers, covering tasks, timers, expenses, invoices, and reports. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser.
 
-The app runs in the browser, stores user work data locally with Yjs and IndexedDB, supports optional Google Drive sync, and exposes an optional same-device MCP bridge for AI agents after explicit pairing.
+The app stores user work data locally with Yjs and IndexedDB, supports optional Google Drive sync, and exposes an optional first-party same-device MCP bridge for AI agents after explicit pairing. The production app sends limited aggregate usage metrics without project, task, client, invoice, expense, note, or time-entry content.
 
 - Production app: https://tasktime.pro
 - Agent docs: https://tasktime.pro/agents/

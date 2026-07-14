@@ -5,7 +5,7 @@ export function GET() {
     const body = [
         '# TaskTime Pro',
         '',
-        '> Local-first task management, time tracking, expenses, reports, and invoicing for freelancers and solo professionals.',
+        '> Free, open-source, local-first work management for freelancers, covering tasks, timers, expenses, invoices, and reports.',
         '',
         `Updated: ${AGENT_DOCS_LAST_UPDATED}`,
         `Canonical site: ${SITE_URL}`,
@@ -26,6 +26,9 @@ export function GET() {
         '',
         '## Agent Integration Summary',
         '',
+        'Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser.',
+        'The production app sends limited aggregate usage metrics without project, task, client, invoice, expense, note, or time-entry content.',
+        'The canonical first-party ClawHub skill is `@tasktimepro/tasktime-agent`, sourced from https://github.com/tasktimepro/tasktime/tree/main/integrations/openclaw/tasktime/skills/tasktime.',
         'TaskTime Pro supports same-device AI agent workflows through the packaged `tasktime-agent-bridge` MCP stdio server.',
         'The bridge is local-first: it requires a running paired TaskTime Pro browser app session, does not write IndexedDB or Yjs directly, and does not create a remote control channel.',
         'The browser app remains the mutation owner for tasks, timers, expenses, invoices, reports, exports, sync settings, account data, and navigation.',

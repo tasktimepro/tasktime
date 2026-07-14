@@ -1,11 +1,14 @@
-export const AGENT_DOCS_LAST_UPDATED = '2026-07-10';
+export const AGENT_DOCS_LAST_UPDATED = '2026-07-14';
 
-export const AGENT_DOCS_DESCRIPTION = 'Use TaskTime Pro with same-device AI agents through the local MCP agent bridge for private task management, time tracking, expenses, invoicing, reports, and app navigation.';
+export const AGENT_DOCS_DESCRIPTION = 'TaskTime Pro is a free, open-source, local-first work manager for freelancers. Its first-party local MCP bridge lets same-device agents work with tasks, timers, expenses, invoices, reports, and app navigation through scoped access and approval controls.';
 
 export const AGENT_DOCS_KEYWORDS = [
     'TaskTime Pro AI agent',
     'TaskTime Pro MCP',
     'TaskTime Pro local agent bridge',
+    'free open-source task manager',
+    'offline task and time tracking',
+    'no-account freelancer software',
     'MCP time tracking',
     'local-first invoicing agent',
     'AI agent task manager',

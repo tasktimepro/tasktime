@@ -21,7 +21,7 @@ This data stays on your device unless you choose a feature that intentionally se
 
 Google Drive sync is optional. If you connect it, TaskTime Pro stores sync documents and backups in the app-data area of your own Google Drive account.
 
-The public app uses a small edge authentication service at `sync.tasktime.pro` to complete Google OAuth, proxy Drive API calls, and keep the Drive session alive. That service stores a session identifier and encrypted OAuth refresh token. It is not designed to inspect your project, invoice, task, expense, or time-entry content.
+The public app uses a small edge authentication service at `sync.tasktime.pro` to securely maintain the Google connection. It stores the session record and encrypted OAuth refresh token needed for that connection, but it does not retain your work records as a hosted TaskTime workspace.
 
 Google Drive sync uses the minimum practical Google scopes for app-data sync and account identification. Google's own terms and privacy policy apply to your Google account and Drive storage.
 

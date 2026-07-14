@@ -2,40 +2,40 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/privacy' } = Astro.props;
-const LAST_UPDATED = '8 July 2026';
-const LAST_UPDATED_ISO = '2026-07-08';
+const LAST_UPDATED = '14 July 2026';
+const LAST_UPDATED_ISO = '2026-07-14';
 ---
 
 <PublicPageLayout
     pageKey="privacy"
     title="Privacy Policy"
-    summary="TaskTime Pro is a local-first app. Your work data lives in your browser and, if you choose, in your own Google Drive. Optional services are designed to avoid storing personal app data."
+    summary="TaskTime Pro is a local-first app. Your work data lives in your browser and, if you choose, in your own Google Drive. Connected services process only what their requested features need."
     lastUpdated={LAST_UPDATED}
     lastUpdatedIso={LAST_UPDATED_ISO}
     highlights={[
         'Your app records stay in your browser and, if you choose, your own Google Drive.',
-        'We cannot read your projects, tasks, invoices, expenses, or anything else you put in the app.',
+        'There is no TaskTime-hosted workspace database containing your projects, tasks, invoices, or expenses.',
         'No advertising cookies, tracking pixels, or cross-site ad tracking.',
     ]}
     canonicalPath={canonicalPath}
 >
     <section>
-        <h2>1. We cannot access your data</h2>
+        <h2>1. Your work records are local by default</h2>
         <p>
-            TaskTime Pro stores all of your projects, tasks, time entries, expenses, invoices, and preferences directly in your browser using IndexedDB. That data never leaves your device unless you explicitly turn on Google Drive sync, and even then it goes straight to <strong>your own</strong> Google Drive account &mdash; not to any server we operate.
+            TaskTime Pro stores all of your projects, tasks, time entries, expenses, invoices, and preferences directly in your browser using IndexedDB. Those records stay on your device unless you explicitly choose a connected feature such as Google Drive sync or invoice email delivery.
         </p>
         <p>
-            We have no database of user content. We cannot look up, read, or recover your data because we simply do not have it.
+            There is no TaskTime-hosted workspace database where we can look up or recover your work records as an account service. Connected services process only the information needed to perform the feature you request, as described below.
         </p>
     </section>
 
     <section>
         <h2>2. Google Drive sync goes to your own Drive</h2>
         <p>
-            If you connect Google Drive, TaskTime Pro syncs your data between your browser and a hidden app-data folder inside <strong>your own</strong> Google Drive storage. The files belong to you and are accessible only through your Google account. We do not have access to your Google Drive or its contents.
+            If you connect Google Drive, TaskTime Pro syncs your data between your browser and a hidden app-data folder inside <strong>your own</strong> Google Drive storage. The synced copies belong to your Google account and are not stored as a TaskTime-hosted workspace.
         </p>
         <p>
-            To make sync work, a small authentication service handles the Google sign-in flow and keeps your OAuth session alive. That service sees a session identifier and an encrypted refresh token &mdash; it never sees, stores, or inspects the actual files being synced. All file data travels directly between your browser and Google&apos;s servers.
+            To make sync work, a small edge service securely maintains your Google connection. It does not keep your Drive file content as a TaskTime-hosted workspace.
         </p>
         <p>
             Sync is entirely optional. TaskTime Pro works fully offline without it, and you can disconnect at any time.
@@ -48,17 +48,17 @@ const LAST_UPDATED_ISO = '2026-07-08';
             TaskTime Pro does not use cookies, advertising pixels, or any form of cross-site tracking. The app uses your browser&apos;s local storage (localStorage and IndexedDB) only to keep your workspace available and to remember your preferences.
         </p>
         <p>
-            The production app may send limited aggregate usage counters &mdash; things like &ldquo;a session happened today&rdquo; or &ldquo;N tasks were created.&rdquo; These are plain numeric tallies with no project names, task names, client names, invoice data, notes, email bodies, Drive file contents, or raw user records. They help us understand whether features are being used at all.
+            The production app may send limited aggregate usage counters &mdash; things like whether a session happened or how often broad action categories were used. Metrics may include the app version, a generated device-install identifier, local day buckets, session and action totals, and whether sync was enabled. They contain no project names, task names, client names, invoice or expense data, notes, report contents, email bodies, Drive file contents, tracked hours, or raw work records.
         </p>
     </section>
 
     <section>
-        <h2>4. What we do store</h2>
+        <h2>4. What optional services store</h2>
         <p>
-            The only thing stored outside your browser is the encrypted OAuth refresh token used to keep your Google Drive sync session alive. It is held on a Cloudflare Worker with no access to your Drive files. If you disconnect sync, the token is discarded.
+            Google Drive stores the sync documents and backups you choose to place in your own account. While Drive remains connected, TaskTime Pro&apos;s edge service stores the encrypted OAuth refresh token needed to keep that session alive. Disconnecting sync discards that token.
         </p>
         <p>
-            Additionally, the anonymous usage counters described in section 3 are stored in aggregate form. They contain no user-identifiable information &mdash; only daily numeric totals.
+            The aggregate usage data described in section 3 may include a generated device-install identifier and, when Drive is connected, a sync-session header used by the service boundary. These are technical identifiers rather than names or email addresses, and the metrics exclude raw work-record content.
         </p>
         <p>
             When you send an invoice by email, a minimal audit record is saved: a hashed identifier derived from your sync session, a hashed form of the recipient&apos;s address, and a timestamp. This is used only to enforce monthly sending limits and prevent duplicate sends. No invoice content, PDF data, or message body is stored server-side.
@@ -94,21 +94,21 @@ const LAST_UPDATED_ISO = '2026-07-08';
     <section>
         <h2>7. Data retention</h2>
         <p>
-            Your local data stays on your device until you delete it or clear your browser storage. Synced copies stay in your Google Drive until you delete them there. The encrypted session token is kept only while your sync connection is active.
+            Your local data stays on your device until you delete it or clear your browser storage. Synced copies stay in your Google Drive until you remove them through TaskTime Pro controls or your Google account. The encrypted refresh token is kept only while your sync connection is active. Aggregate metrics and operational audit data may be retained for abuse prevention, reliability analysis, and product maintenance, but should remain minimized and exclude private app records.
         </p>
     </section>
 
     <section>
         <h2>8. Security</h2>
         <p>
-            Because your data lives in your browser and your own Google Drive, its security depends on your device, your browser, and your Google account. We cannot guarantee the security of those systems, but we have deliberately chosen an architecture that keeps your data out of our hands entirely.
+            Because your work records live primarily in your browser and, if enabled, your own Google Drive, their security depends on your device, browser, and Google account. We cannot guarantee the security of those systems, but the architecture minimizes TaskTime-hosted data and limits connected services to their stated product functions.
         </p>
     </section>
 
     <section>
         <h2>9. You are in control</h2>
         <p>
-            You can export your data at any time for backup. You can connect or disconnect Google Drive sync whenever you want. You can delete all local data from the Account page. Because we never have your data in the first place, there is nothing for us to delete on our end.
+            You can use TaskTime Pro without an account, work offline without Drive sync, export your records, disconnect sync, explicitly remove TaskTime Pro sync data and backups from Drive, disable reminders, and delete local app data from the Account page. TaskTime Pro does not maintain a hosted workspace copy from which it can recover your projects, tasks, invoices, expenses, or time entries.
         </p>
     </section>
 

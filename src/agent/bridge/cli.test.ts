@@ -207,6 +207,26 @@ describe('TaskTime Pro agent bridge CLI', () => {
         expect(staticManifest).toEqual(getTaskTimeAgentBridgeManifest());
     });
 
+    it('advertises explicit core-use facts and canonical ClawHub provenance', () => {
+        expect(getTaskTimeAgentBridgeManifest()).toMatchObject({
+            app: {
+                coreUseAccountRequired: false,
+                coreUseFree: true,
+                offlineCapable: true,
+                openSource: true,
+                workDataStorage: 'browser-local',
+                aggregateUsageMetrics: true,
+            },
+            clawHub: {
+                owner: 'tasktimepro',
+                slug: 'tasktime-agent',
+                canonicalRef: '@tasktimepro/tasktime-agent',
+                sourceRepository: 'https://github.com/tasktimepro/tasktime',
+                sourcePath: 'integrations/openclaw/tasktime/skills/tasktime',
+            },
+        });
+    });
+
     it('starts a loopback stdio MCP bridge and keeps status output off stdout', async () => {
         const stdin = new PassThrough();
         const stdout = new PassThrough();

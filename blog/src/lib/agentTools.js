@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { MCP_TOOL_DEFINITIONS } from '../../../src/agent/bridge/mcpTools.ts';
 
 const APPROVAL_COMMAND_NAMES = readApprovalCommandNames();
+const AGENT_DISCOVERY_MANIFEST = readAgentDiscoveryManifest();
 
 const TOOL_GROUPS = [
     {
@@ -70,11 +71,8 @@ export function getAgentToolCatalog() {
             'src/agent/bridge/mcpTools.ts',
             'src/agent/commands/registry.ts',
         ],
-        app: {
-            id: 'pro.tasktime',
-            name: 'TaskTime Pro',
-            localFirst: true,
-        },
+        app: AGENT_DISCOVERY_MANIFEST.app,
+        clawHub: AGENT_DISCOVERY_MANIFEST.clawHub,
         bridge: {
             binary: 'tasktime-agent-bridge',
             transport: 'mcp-stdio-json-rpc',
@@ -224,4 +222,11 @@ function readApprovalCommandNames() {
     }
 
     return approvalNames;
+}
+
+function readAgentDiscoveryManifest() {
+    return JSON.parse(readFileSync(
+        new URL('../../../public/.well-known/tasktime-agent.json', import.meta.url),
+        'utf8'
+    ));
 }

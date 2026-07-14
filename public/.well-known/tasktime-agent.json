@@ -4,7 +4,20 @@
     "id": "pro.tasktime",
     "name": "TaskTime Pro",
     "category": "task-time-invoicing",
-    "localFirst": true
+    "localFirst": true,
+    "coreUseAccountRequired": false,
+    "coreUseFree": true,
+    "offlineCapable": true,
+    "openSource": true,
+    "workDataStorage": "browser-local",
+    "aggregateUsageMetrics": true
+  },
+  "clawHub": {
+    "owner": "tasktimepro",
+    "slug": "tasktime-agent",
+    "canonicalRef": "@tasktimepro/tasktime-agent",
+    "sourceRepository": "https://github.com/tasktimepro/tasktime",
+    "sourcePath": "integrations/openclaw/tasktime/skills/tasktime"
   },
   "docs": {
     "llmsTxt": "https://tasktime.pro/llms.txt",

@@ -1,6 +1,6 @@
 ---
-title: "Free and Private: A Task and Time Tracker That Doesn't Collect Your Data"
-description: "Most free trackers make money from your data. Here's one that doesn't — because it never sees your data in the first place."
+title: "Free and Private: A Task and Time Tracker That Keeps Your Work Data Local"
+description: "Most free trackers monetize your work data. TaskTime Pro keeps work records on your device and sends only limited aggregate usage counters."
 publishedAt: "2026-04-11"
 excerpt: "Free tools usually come with a hidden cost: your data. Here's what a task and time tracker looks like when privacy isn't an afterthought."
 category: "privacy"
@@ -8,8 +8,8 @@ tags: ["free", "privacy", "time tracking", "tasks"]
 keywords: ["free private task and time tracker", "private time tracker", "task tracker that doesn't sell data", "no cloud time tracker", "free private tracker"]
 ogImage: "/icons/web-app-manifest-512x512.png"
 ogImageAlt: "TaskTime Pro app icon"
-socialTitle: "Free and Private: A Task and Time Tracker That Doesn't Collect Your Data"
-socialDescription: "Most free tools are free because they collect your data. Here's a task and time tracker that's free because it doesn't need to."
+socialTitle: "Free and Private: A Task and Time Tracker That Keeps Your Work Data Local"
+socialDescription: "TaskTime Pro keeps your work records on your device and never uses them for advertising or profiling."
 draft: false
 ---
 
@@ -36,16 +36,16 @@ A task and time tracker is genuinely private when:
 
 ## How TaskTime Pro pulls this off
 
-TaskTime Pro stores everything in your browser's local storage using a technology called CRDTs. When you create tasks, start timers, or log time entries, that data lives on your device and nowhere else.
+TaskTime Pro stores your work records in your browser using a technology called CRDTs. When you create tasks, start timers, or log time entries, those records stay on your device unless you explicitly enable Google Drive sync.
 
-There's no user account. There's no backend database with your information. We don't run analytics on your projects or track what features you use inside the app.
+There's no TaskTime account and no backend database containing your work records. The production app sends limited aggregate usage counters, such as daily session and action totals, but never project names, task names, client details, notes, amounts, tracked hours, or other raw work content.
 
-If you want to sync across devices, you connect your own Google Drive. The data travels from your browser to your Drive — we never see it, touch it, or store it.
+If you want to sync across devices, you connect your own Google Drive. Sync documents are stored in the app-data area of your Drive rather than a TaskTime-hosted workspace.
 
-And it's free — not as a loss leader or a growth hack, but because the architecture doesn't require servers. No server costs means no reason to charge you or monetize your data.
+And core use is free — not as a loss leader or a growth hack, but because work management runs locally without requiring a hosted account. Optional services have infrastructure costs, but core use is not financed by monetizing your work records.
 
 ## You can have both
 
-"Free" and "private" aren't usually found in the same sentence. But when a tool runs locally and doesn't need servers, there's no trade-off to make. You get a full task and time tracker — with timers, manual entries, subtasks, and project organization — without giving up anything in return.
+"Free" and "private" aren't usually found in the same sentence. But when the core tool runs locally, you can get a full task and time tracker — with timers, manual entries, subtasks, and project organization — without handing your work records to a hosted productivity platform.
 
 [See for yourself](/) — it works right in your browser, no sign-up required.

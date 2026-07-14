@@ -1,13 +1,13 @@
 ---
 name: tasktime
 description: >-
-  TaskTime Pro is a privacy-first work management app that helps freelancers
-  manage client work; from tasks and timers through expenses, quotes, invoices,
-  and reports. This skill lets agents organize projects, find unbilled work,
-  prepare drafts, review business data, manage multiple timers, set tasks, and
-  open the right app screens while keeping sensitive actions visible and
-  approval-gated.
-version: 1.0.8
+  TaskTime Pro is a free, open-source, local-first work manager for freelancers,
+  covering tasks, timers, expenses, invoices, and reports. Core use requires no
+  TaskTime account or cloud sync, works offline after the PWA is loaded or
+  installed, and stores work records in the browser. This first-party TaskTime
+  Pro skill lets same-device agents operate the app through scoped access and
+  approval controls.
+version: 1.0.9
 metadata:
   openclaw:
     requires:
@@ -30,9 +30,11 @@ Stay on the supported TaskTime Pro bridge surface. Do not directly edit browser 
 
 ## Skill Scope
 
-This is the portable ClawHub skill for TaskTime Pro. It should guide agent clients that need safe TaskTime Pro access through MCP. If a repository or user environment also provides local TaskTime Pro instructions, read those too because they may contain the active app URL, workspace policy, or deployment-specific setup notes.
+This is the first-party portable ClawHub skill published by TaskTime Pro as `@tasktimepro/tasktime-agent`. It should guide agent clients that need safe TaskTime Pro access through MCP. If a repository or user environment also provides local TaskTime Pro instructions, read those too because they may contain the active app URL, workspace policy, or deployment-specific setup notes.
 
-TaskTime Pro is local-first. The paired browser app is the authority for customer data, validation, navigation, downloads, email sends, sync behavior, backups, restore flows, and account deletion. The bridge is a same-device MCP stdio server that forwards approved commands to that visible app session; it is not a remote API.
+TaskTime Pro is free and open source. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in browser-local storage. The production app sends limited aggregate usage metrics without project, task, client, invoice, expense, note, or time-entry content.
+
+The paired browser app is the authority for customer data, validation, navigation, downloads, email sends, sync behavior, backups, restore flows, and account deletion. The bridge is a same-device MCP stdio server that forwards approved commands to that visible app session; it is not a remote API.
 
 ## Connection
 

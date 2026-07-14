@@ -2,7 +2,9 @@
 
 This plugin adds TaskTime Pro skill guidance and a bundled MCP server configuration for Claude Code.
 
-TaskTime Pro remains local-first. The plugin launches the same-device TaskTime Pro agent bridge, and the user must still pair the visible TaskTime Pro browser app from Account > Agent Access before local data is readable or mutable.
+TaskTime Pro is a free, open-source, local-first work manager for freelancers, covering tasks, timers, expenses, invoices, and reports. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser.
+
+The plugin launches the same-device TaskTime Pro agent bridge, and the user must still pair the visible TaskTime Pro browser app from Account > Agent Access before local data is readable or mutable.
 
 ## Install
 

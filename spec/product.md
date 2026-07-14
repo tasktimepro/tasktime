@@ -2,11 +2,12 @@
 
 ## Product
 
-TaskTime Pro is a local-first work-management and billing application for freelancers and solo professionals. It combines projects, clients, hierarchical tasks, planning, timers, expenses, invoicing, and reporting without requiring a hosted account for core use.
+TaskTime Pro is a free, open-source, local-first work-management and billing application for freelancers and solo professionals. It combines projects, clients, hierarchical tasks, planning, timers, expenses, invoicing, and reporting without requiring a hosted account or cloud sync for core use.
 
 ## Product promise
 
 - Work data remains available locally and offline.
+- Core use remains free, requires no TaskTime account, and stores work records in browser-local storage.
 - Time can move from a task/timer into reports and billing without manual re-entry.
 - Financial actions remain understandable, reviewable, and reversible where the product supports reversal.
 - Optional Drive sync and backup improve portability without becoming mandatory for core use.
@@ -34,6 +35,7 @@ TaskTime Pro is a local-first work-management and billing application for freela
 - TaskTime Pro is not a multi-user hosted collaboration platform.
 - The browser is the primary product runtime and data owner.
 - Google Drive, push, email, diagnostics, and agent integrations are optional extensions.
+- The production origin may send limited aggregate usage metrics, but those metrics exclude project, task, client, invoice, expense, note, time-entry, and other raw work-record content.
 - The public repository does not contain the private sync/notification Worker implementation or operational secrets.
 
 ## Success principles
