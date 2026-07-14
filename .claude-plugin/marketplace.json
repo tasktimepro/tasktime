@@ -1,7 +1,7 @@
 {
   "name": "tasktimepro",
   "description": "TaskTime Pro Claude Code plugins for local-first productivity, time tracking, expenses, invoicing, and agent-ready MCP workflows.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "owner": {
     "name": "TaskTime Pro"
   },
@@ -10,8 +10,8 @@
       "name": "tasktime",
       "displayName": "TaskTime Pro",
       "source": "./integrations/claude/tasktime",
-      "description": "TaskTime Pro helps freelancers and small teams manage client work from tasks and timers through expenses, quotes, invoices, and reports. This skill lets agents organize projects, find unbilled work, prepare drafts, review business data, manage multiple timers, set tasks, and open the right app screens while keeping sensitive actions visible and approval-gated.",
-      "version": "0.1.2",
+      "description": "TaskTime Pro is a privacy-first work management app that helps freelancers manage client work; from tasks and timers through expenses, quotes, invoices, and reports. This skill lets agents organize projects, find unbilled work, prepare drafts, review business data, manage multiple timers, set tasks, and open the right app screens while keeping sensitive actions visible and approval-gated.",
+      "version": "0.2.1",
       "author": {
         "name": "TaskTime Pro",
         "url": "https://tasktime.pro"

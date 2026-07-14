@@ -1,12 +1,13 @@
 ---
 name: tasktime
 description: >-
-  TaskTime Pro helps freelancers and small teams manage client work from tasks
-  and timers through expenses, quotes, invoices, and reports. This skill lets
-  agents organize projects, find unbilled work, prepare drafts, review business
-  data, manage multiple timers, set tasks, and open the right app screens while
-  keeping sensitive actions visible and approval-gated.
-version: 1.0.7
+  TaskTime Pro is a privacy-first work management app that helps freelancers
+  manage client work; from tasks and timers through expenses, quotes, invoices,
+  and reports. This skill lets agents organize projects, find unbilled work,
+  prepare drafts, review business data, manage multiple timers, set tasks, and
+  open the right app screens while keeping sensitive actions visible and
+  approval-gated.
+version: 1.0.8
 metadata:
   openclaw:
     requires:

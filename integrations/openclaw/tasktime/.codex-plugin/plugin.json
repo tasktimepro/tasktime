@@ -1,7 +1,7 @@
 {
   "name": "tasktime",
-  "version": "0.2.0",
-  "description": "TaskTime Pro helps freelancers and small teams manage client work from tasks and timers through expenses, quotes, invoices, and reports. This skill lets agents organize projects, find unbilled work, prepare drafts, review business data, manage multiple timers, set tasks, and open the right app screens while keeping sensitive actions visible and approval-gated.",
+  "version": "0.2.1",
+  "description": "TaskTime Pro is a privacy-first work management app that helps freelancers manage client work; from tasks and timers through expenses, quotes, invoices, and reports. This skill lets agents organize projects, find unbilled work, prepare drafts, review business data, manage multiple timers, set tasks, and open the right app screens while keeping sensitive actions visible and approval-gated.",
   "author": {
     "name": "TaskTime Pro",
     "url": "https://tasktime.pro"
@@ -23,7 +23,7 @@
   "interface": {
     "displayName": "TaskTime Pro",
     "shortDescription": "Manage TaskTime Pro projects, tasks, timers, expenses, invoices, quotes, and reports with agent help.",
-    "longDescription": "TaskTime Pro helps freelancers and small teams manage client work from tasks and timers through expenses, quotes, invoices, and reports. This skill lets agents organize projects, find unbilled work, prepare drafts, review business data, manage multiple timers, set tasks, and open the right app screens while keeping sensitive actions visible and approval-gated.",
+    "longDescription": "TaskTime Pro is a privacy-first work management app that helps freelancers manage client work; from tasks and timers through expenses, quotes, invoices, and reports. This skill lets agents organize projects, find unbilled work, prepare drafts, review business data, manage multiple timers, set tasks, and open the right app screens while keeping sensitive actions visible and approval-gated.",
     "developerName": "TaskTime Pro",
     "category": "Productivity",
     "capabilities": [
