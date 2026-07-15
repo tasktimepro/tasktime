@@ -187,3 +187,10 @@ Do not mark this assurance phase complete while a Critical or High finding remai
 - Replaced the dashboard time-entry widget's minutes-only formatter with the seconds-aware formatter already used by tasks and detailed time-entry views; valid sub-minute entries now render as values such as `45s`, mixed durations as `1m 5s`, exact-minute durations remain compact, and non-positive intervals show `0s`.
 - Added a focused component regression covering sub-minute, mixed, exact-minute, and zero-length durations.
 - Passed the full Docker app release gate: lint, zero-diagnostic typecheck, 1,860 tests across 215 files with 93.96% statement coverage, 34 browser smoke tests, 2 production PWA/offline smoke tests, and production app/public-site builds.
+
+### 2026-07-15 — Invoice cancellation v1.2.0 release preparation
+
+- Re-ran the full Docker release gate after the final cancellation-dialog accessibility and layout polish: lint, zero-diagnostic typecheck, 1,914 tests across 218 files with 93.99% statement coverage, 36 browser smoke tests, 2 production PWA/offline smoke tests, and production app/public-site builds all passed.
+- Rebuilt and passed the packaged bridge, managed-bundle, and live paired-browser MCP flow through approved invoice cancellation, canceled reporting, and released-source parity.
+- Verified `@tasktimepro/agent-bridge@0.3.0` and `@tasktimepro/openclaw@0.3.0` with package-directory `npm pack --dry-run`; the rebuilt bridge remains byte-identical to both managed vendored copies.
+- Committed and tagged the complete local release as `v1.2.0`; remote push, package/registry/marketplace publication, GitHub release creation, and production deployment remain pending separate authorization.

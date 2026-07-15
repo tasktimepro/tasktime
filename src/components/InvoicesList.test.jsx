@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InvoicesList from './InvoicesList'
 
@@ -391,9 +391,11 @@ describe('InvoicesList', () => {
 
         const dialog = screen.getByRole('dialog', { name: 'Cancel Invoice?' })
         const submit = screen.getByRole('button', { name: 'Cancel Invoice' })
-        const reason = screen.getByLabelText('Cancellation reason')
+        const reason = screen.getByLabelText(/^Cancellation reason/)
         const confirmation = screen.getByLabelText(/Type INV-001 to confirm/i)
-        expect(dialog.className).toContain('sm:max-w-lg')
+        expect(dialog.className).toContain('sm:max-w-xl')
+        expect(reason).toBeRequired()
+        expect(within(reason.labels[0]).getByText('*')).toHaveClass('text-destructive-strong')
         expect(submit).toBeDisabled()
 
         await user.type(reason, 'Duplicate invoice')
@@ -431,7 +433,7 @@ describe('InvoicesList', () => {
         await user.click(screen.getByRole('button', { name: 'More actions' }))
         await user.click(screen.getByRole('menuitem', { name: 'Cancel invoice' }))
         const dialog = screen.getByRole('dialog', { name: 'Cancel Invoice?' })
-        const reason = screen.getByLabelText('Cancellation reason')
+        const reason = screen.getByLabelText(/^Cancellation reason/)
         const confirmation = screen.getByLabelText(/Type INV-001 to confirm/i)
         await user.type(reason, 'Duplicate invoice')
         await user.type(confirmation, 'INV-001')
@@ -467,13 +469,13 @@ describe('InvoicesList', () => {
         await user.click(screen.getByRole('button', { name: 'More actions' }))
         await user.click(screen.getByRole('menuitem', { name: 'Cancel invoice' }))
         const dialog = screen.getByRole('dialog', { name: 'Cancel Invoice?' })
-        await user.type(screen.getByLabelText('Cancellation reason'), 'Duplicate invoice')
+        await user.type(screen.getByLabelText(/^Cancellation reason/), 'Duplicate invoice')
         await user.type(screen.getByLabelText(/Type INV-001 to confirm/i), 'INV-001')
         await user.click(screen.getByRole('button', { name: 'Cancel Invoice' }))
 
         expect(screen.getByRole('button', { name: 'Canceling Invoice' })).toBeDisabled()
         expect(screen.getByRole('button', { name: 'Keep Invoice' })).toBeDisabled()
-        expect(screen.getByLabelText('Cancellation reason')).toBeDisabled()
+        expect(screen.getByLabelText(/^Cancellation reason/)).toBeDisabled()
         await user.click(screen.getByRole('button', { name: 'Close dialog' }))
         expect(dialog).toBeVisible()
 

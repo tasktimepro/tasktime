@@ -5,7 +5,7 @@
 - [x] Complete all six invoice-cancellation slices: terminal retained records, replay-safe source release, Canceled UI/PDF safety, zero-contribution financial reporting, agent parity, and backup `1.5` compatibility.
 - [x] Expose the existing paid-invoice correction in the browser three-dot menu with explicit confirmation, paid-only eligibility, refund-safe wording, payment-detail clearing, preserved billing-source claims, and Outstanding/Overdue routing.
 - [x] Complete pre-ship hardening for cancellation commit races, persisted-plan field constraints, late-arriving owned claims, protected later billing, and theme-aware canceled-state UI tokens.
-- [x] Prepare the cancellation release scope locally: core app `1.2.0`, backup contract `1.5`, agent bridge/MCP and OpenClaw/Claude bundles `0.3.0`, ClawHub skill `1.1.0`, and Claude marketplace `1.1.0`; no private Worker change, commit, publish, or deployment is authorized.
+- [x] Release the completed cancellation scope locally as `v1.2.0`: core app `1.2.0`, backup contract `1.5`, agent bridge/MCP and OpenClaw/Claude bundles `0.3.0`, ClawHub skill `1.1.0`, and Claude marketplace `1.1.0`; no private Worker change is required, and remote publication or deployment remains pending separate authorization.
 - [x] Cross-validate critical persistence and billing specifications against implementation and historical fixtures.
 - [x] Complete the dependency-ordered remediation and release checklist in `status/critical-path-assurance.md`.
 - [ ] Continue gradual TypeScript migration without breaking stable imports or persisted contracts.

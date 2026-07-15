@@ -36,7 +36,7 @@ The repository now has a zero-diagnostic TypeScript baseline enforced by the rel
 - [x] Delivered the six-slice terminal cancellation lifecycle across Yjs recovery, browser UI, reports/exports, backups, and agent surfaces.
 - [x] Preserved invoice audit records and numbering while conditionally releasing only source work still owned by the canceled invoice.
 - [x] Hardened first-commit eligibility, persisted-plan validation, late-arriving source reconciliation, protected later billing, and paid-only mark-as-unpaid behavior during pre-ship review.
-- [x] Passed the full release gate and packaged live-agent cancellation smoke; prepared release metadata remains uncommitted and unpublished.
+- [x] Passed the final full release gate and packaged live-agent cancellation smoke; the `v1.2.0` release is committed and tagged locally, while remote publication and deployment remain pending separate authorization.
 
 ## Blockers and open questions
 

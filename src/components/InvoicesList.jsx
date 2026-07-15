@@ -1169,7 +1169,7 @@ const InvoicesList = ({
                 isOpen={Boolean(pendingCancellationInvoice)}
                 onClose={handleCloseCancellationModal}
                 title="Cancel Invoice?"
-                size="lg"
+                size="xl"
                 footer={(
                     <div className="flex flex-wrap justify-end gap-3">
                         <Button
@@ -1235,7 +1235,9 @@ const InvoicesList = ({
                         />
 
                         <div className="space-y-2">
-                            <Label htmlFor="invoice-cancellation-reason">Cancellation reason</Label>
+                            <Label htmlFor="invoice-cancellation-reason">
+                                Cancellation reason <span className="text-destructive-strong" aria-hidden="true">*</span>
+                            </Label>
                             <Textarea
                                 id="invoice-cancellation-reason"
                                 value={cancellationReason}
@@ -1244,6 +1246,7 @@ const InvoicesList = ({
                                 rows={4}
                                 disabled={isCancelingInvoice}
                                 placeholder="Explain why this invoice is being canceled"
+                                required
                             />
                             <p className="text-xs text-muted-foreground">
                                 {cancellationReason.length}/{INVOICE_CANCELLATION_REASON_MAX_LENGTH} characters
