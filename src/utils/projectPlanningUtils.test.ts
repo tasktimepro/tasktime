@@ -117,6 +117,7 @@ describe('projectPlanningUtils', () => {
             [
                 { id: 'invoice-1', projectId: 'project-1', clientId: 'client-1', invoiceNumber: 'INV-1', date: '2026-05-01', status: 'sent', items: [], subtotal: 600, total: 600 },
                 { id: 'invoice-2', projectId: 'project-2', clientId: 'client-1', invoiceNumber: 'INV-2', date: '2026-05-01', status: 'sent', items: [], subtotal: 400, total: 400 },
+                { id: 'invoice-canceled', projectId: 'project-1', clientId: 'client-1', invoiceNumber: 'INV-CANCELED', date: '2026-05-01', status: 'canceled', canceledAt: 2, cancellationReason: 'Duplicate invoice', items: [], subtotal: 900, total: 900 },
             ],
             [{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }],
             'EUR'

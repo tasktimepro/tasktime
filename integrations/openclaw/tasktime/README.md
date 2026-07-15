@@ -9,6 +9,8 @@ This bundle gives OpenClaw-compatible agent platforms two TaskTime Pro integrati
 
 The MCP server launches the bundled TaskTime Pro agent bridge and still requires the user to pair the running TaskTime Pro browser app from Account > Agent Access before any local data is readable or mutable.
 
+The billing-scoped bridge can cancel an eligible finalized unpaid invoice only with explicit TaskTime Pro approval, a reason, and exact invoice-number confirmation; the invoice remains as a numbered audit record.
+
 For OpenClaw-managed installs, pair TaskTime Pro to the active MCP-owned bridge, not to a separately launched terminal bridge. Use the bridge-local `get_pairing_status` tool to find the exact dynamic localhost endpoint and TaskTime Pro launch URL. If the code expired or was already consumed, call `refresh_pairing` and use the new launch URL.
 
 This bundle identifies itself as `tasktime.agent.openclaw` / `OpenClaw on this device`, writes `tasktime-agent-bridge.status.json` beside the launcher, and uses a 24-hour app-session TTL for normal work sessions. Pairing codes remain short-lived and single-use.

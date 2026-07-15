@@ -18,6 +18,7 @@ import {
     getInvoiceUndoBlockReason as getInvoiceUndoBlockReasonForCollection,
     getInvoiceStatus,
     getInvoiceTotal,
+    isInvoiceCanceled,
     isInvoicePaid,
     resolveCurrentInvoiceTemplate,
 } from '@/utils/invoiceUtils';
@@ -28,6 +29,12 @@ import {
 } from '@/domain/invoices/invoiceUndoApplication';
 import { generateId } from '@/utils/idUtils';
 import type { InvoiceFinalizationApplicationPlan } from '@/domain/invoices/invoiceFinalizationApplication';
+import {
+    buildInvoiceCancellationApplication,
+    buildInvoiceCancellationResult,
+    getInvoiceCancellationBlockReason as getInvoiceCancellationBlockReasonForRecord,
+} from '@/domain/invoices/invoiceCancellation';
+import { isInvoiceBillingOperation, type InvoiceBillingOperation } from '@/domain/invoices/invoiceBillingOperation';
 
 const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredCurrency: string) => {
     return normalizeCurrencyCode(invoice.currency || preferredCurrency) !== preferredCurrency;
@@ -48,6 +55,12 @@ export interface UpdateInvoicePaymentDetailsOptions {
 }
 
 export interface MarkInvoicePaidOptions extends UpdateInvoicePaymentDetailsOptions {}
+
+export interface CancelInvoiceOptions {
+    reason: string;
+    canceledAt?: number;
+    operationId?: string;
+}
 
 export function useInvoices(options: UseInvoicesOptions = {}) {
     const {
@@ -157,10 +170,25 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         [filteredInvoices]
     );
 
+    const canceledInvoices = useMemo(
+        () => filteredInvoices.filter((invoice) => getInvoiceStatus(invoice) === 'canceled'),
+        [filteredInvoices]
+    );
+
     const getPreferredCurrency = useCallback(() => {
         const storedPreference = store.preferences?.get('currency');
         return normalizeCurrencyCode(typeof storedPreference === 'string' ? storedPreference : undefined);
     }, [store]);
+
+    const updateInvoice = useCallback((id: string, updates: Partial<Invoice>) => {
+        const invoice = get(id);
+
+        if (isInvoiceCanceled(invoice)) {
+            throw new Error('Canceled invoices are read-only historical records.');
+        }
+
+        return update(id, updates);
+    }, [get, update]);
 
     const resolveInvoicePaymentSnapshot = useCallback(async (
         invoice: Invoice,
@@ -196,6 +224,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         if (!invoice) {
             return undefined;
         }
+        if (isInvoiceCanceled(invoice)) {
+            throw new Error('Canceled invoices are read-only historical records.');
+        }
         if (invoice.status === 'draft') {
             throw new Error('Finalize this draft before marking it sent.');
         }
@@ -211,6 +242,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const invoice = get(id);
         if (!invoice) {
             return undefined;
+        }
+        if (isInvoiceCanceled(invoice)) {
+            throw new Error('Canceled invoices are read-only historical records.');
         }
         if (invoice.status === 'draft') {
             throw new Error('Finalize this draft before marking it paid.');
@@ -232,6 +266,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const invoice = get(id);
         if (!invoice) {
             return undefined;
+        }
+        if (isInvoiceCanceled(invoice)) {
+            throw new Error('Canceled invoices are read-only historical records.');
         }
         if (invoice.status === 'draft') {
             throw new Error('Finalize this draft before updating payment details.');
@@ -255,6 +292,12 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         const invoice = get(id);
         if (!invoice) {
             return undefined;
+        }
+        if (isInvoiceCanceled(invoice)) {
+            throw new Error('Canceled invoices are read-only historical records.');
+        }
+        if (!isInvoicePaid(invoice)) {
+            throw new Error('Only paid invoices can be marked as unpaid.');
         }
 
         return update(id, buildMarkInvoiceUnpaidUpdates({ invoice }));
@@ -381,6 +424,93 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         store,
     ]);
 
+    const getInvoiceCancellationBlockReason = useCallback((invoice: Invoice | string | null | undefined) => {
+        const record = typeof invoice === 'string'
+            ? allInvoices.find((candidate) => candidate.id === invoice)
+            : invoice;
+
+        return getInvoiceCancellationBlockReasonForRecord(record);
+    }, [allInvoices]);
+
+    const cancelInvoice = useCallback(async (id: string, options: CancelInvoiceOptions) => {
+        const operationId = options.operationId || generateId();
+        const persistedOperation = readEntity<InvoiceBillingOperation>(
+            store.invoiceBillingOperations?.get(operationId)
+        );
+
+        if (persistedOperation) {
+            if (!isInvoiceBillingOperation(persistedOperation)
+                || persistedOperation.kind !== 'cancel'
+                || persistedOperation.invoiceId !== id) {
+                throw new Error(`Invoice cancellation operation ${operationId} has conflicting persisted input.`);
+            }
+
+            const commit = await store.commitInvoiceCancellation({
+                operationId,
+                invoice: persistedOperation.invoice,
+                desiredInvoice: persistedOperation.desiredInvoice,
+                application: persistedOperation.application,
+                createdAt: persistedOperation.createdAt,
+            });
+
+            return buildInvoiceCancellationResult({
+                desiredInvoice: commit.invoice,
+                application: commit.operation.application,
+                alreadyApplied: commit.alreadyApplied,
+            });
+        }
+
+        const invoice = get(id);
+        const blockReason = getInvoiceCancellationBlockReasonForRecord(invoice);
+
+        if (blockReason) {
+            throw new Error(blockReason);
+        }
+
+        await Promise.all([
+            loadArchivedTasks(),
+            loadArchivedExpenses(),
+        ]);
+
+        const availableYears = await getAvailableYears();
+        await Promise.all(availableYears.map((year) => loadEntriesForYear(year)));
+
+        const canceledAt = typeof options.canceledAt === 'number'
+            ? options.canceledAt
+            : Date.now();
+        const taskMaps = [store.tasks, store.archivedTasks].filter(Boolean);
+        const expenseMaps = [store.expenses, store.archivedExpenses].filter(Boolean);
+        const cancellation = buildInvoiceCancellationApplication({
+            invoice: invoice as Invoice,
+            entries: store.getAllTimeEntries(),
+            expenses: expenseMaps.flatMap((expenseMap) => collectEntities<Expense>(expenseMap as any)),
+            tasks: taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any)),
+            projects: collectEntities(store.projects as any),
+            reason: options.reason,
+            canceledAt,
+        });
+        const commit = await store.commitInvoiceCancellation({
+            operationId,
+            invoice: invoice as Invoice,
+            desiredInvoice: cancellation.desiredInvoice,
+            application: cancellation.application,
+            createdAt: canceledAt,
+        });
+
+        return buildInvoiceCancellationResult({
+            desiredInvoice: commit.invoice,
+            application: commit.operation.application,
+            alreadyApplied: commit.alreadyApplied,
+        });
+    }, [
+        get,
+        getAvailableYears,
+        loadArchivedExpenses,
+        loadArchivedTasks,
+        loadEntriesForYear,
+        store,
+    ]);
+
     const finalizeInvoice = useCallback(async (
         desiredInvoice: Invoice,
         application: InvoiceFinalizationApplicationPlan,
@@ -397,7 +527,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     // Get total amounts
     const totals = useMemo(() => {
         const outstanding = filteredInvoices
-            .filter((invoice) => !isInvoicePaid(invoice))
+            .filter((invoice) => !isInvoicePaid(invoice) && !isInvoiceCanceled(invoice))
             .reduce((sum, invoice) => sum + getInvoiceTotal(invoice), 0);
             
         const paid = filteredInvoices
@@ -414,6 +544,7 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         sentInvoices,
         paidInvoices,
         overdueInvoices,
+        canceledInvoices,
         isLoading: activeLoading || archivedLoading || Boolean(options.includeArchived && !archivedLoaded),
         archivedLoaded,
         totals,
@@ -421,9 +552,10 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         // CRUD
         getInvoice: get,
         createInvoice: create,
-        updateInvoice: update,
+        updateInvoice,
         deleteInvoice,
         finalizeInvoice,
+        cancelInvoice,
         undoLatestInvoice,
 
         // Status helpers
@@ -433,5 +565,6 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         markAsUnpaid,
         canUndoInvoice,
         getInvoiceUndoBlockReason,
+        getInvoiceCancellationBlockReason,
     };
 }

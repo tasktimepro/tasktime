@@ -389,7 +389,7 @@ const invoiceSchema = z.object({
     invoiceNumber: nonEmptyStringSchema,
     date: storageDateSchema,
     dueDate: storageDateSchema.nullable().optional(),
-    status: z.enum(['draft', 'sent', 'paid', 'overdue']),
+    status: z.enum(['draft', 'sent', 'paid', 'overdue', 'canceled']),
     items: z.array(invoiceItemSchema),
     subtotal: finiteNumberSchema,
     tax: finiteNumberSchema.optional(),
@@ -405,6 +405,8 @@ const invoiceSchema = z.object({
     paymentCurrencySnapshot: paymentCurrencySnapshotSchema.nullable().optional(),
     sentAt: finiteNumberSchema.nullable().optional(),
     sentToEmail: z.string().nullable().optional(),
+    canceledAt: finiteNumberSchema.positive().nullable().optional(),
+    cancellationReason: z.string().trim().min(1).max(500).nullable().optional(),
     billingStateSnapshot: invoiceBillingStateSnapshotSchema.nullable().optional(),
     billingSelectionSnapshot: invoiceBillingSelectionSnapshotSchema.nullable().optional(),
     brandingSnapshot: z.object({
@@ -424,7 +426,27 @@ const invoiceSchema = z.object({
             contentHash: nonEmptyStringSchema,
         }).nullable().optional(),
     }).passthrough().nullable().optional(),
-}).passthrough() satisfies z.ZodType<Invoice>;
+}).passthrough().superRefine((invoice, ctx) => {
+    if (invoice.status !== 'canceled') {
+        return;
+    }
+
+    if (typeof invoice.canceledAt !== 'number') {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['canceledAt'],
+            message: 'canceledAt is required for canceled invoices',
+        });
+    }
+
+    if (typeof invoice.cancellationReason !== 'string' || !invoice.cancellationReason.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['cancellationReason'],
+            message: 'cancellationReason is required for canceled invoices',
+        });
+    }
+}) satisfies z.ZodType<Invoice>;
 
 const invoiceTemplateSchema = z.object({
     id: nonEmptyStringSchema,

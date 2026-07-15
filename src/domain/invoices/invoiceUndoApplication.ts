@@ -1,7 +1,12 @@
 import type { Expense, Invoice, InvoiceTemplate, Project, Task, TimeEntry } from '@/stores/yjs/types';
-import { planInvoiceUndo, type InvoiceUndoPlan } from './invoiceUndo';
+import {
+    planInvoiceSourceRelease,
+    planInvoiceUndo,
+    type InvoiceSourceReleasePlan,
+    type InvoiceUndoPlan,
+} from './invoiceUndo';
 
-export interface InvoiceUndoApplicationPlan {
+export interface InvoiceSourceReleaseApplicationPlan {
     entriesToDelete: TimeEntry[];
     entriesToClear: Array<{
         entry: TimeEntry;
@@ -20,6 +25,14 @@ export interface InvoiceUndoApplicationPlan {
         expectedLastBilledAt: number | null;
         updates: Partial<Task>;
     }>;
+    releasedTimeEntryCount: number;
+    deletedAdjustmentCount: number;
+    releasedExpenseCount: number;
+    releasedQuotedTaskCount: number;
+    restoredTaskCutoffCount: number;
+}
+
+export interface InvoiceUndoApplicationPlan extends InvoiceSourceReleaseApplicationPlan {
     projectUnlinkUpdates: Array<{
         id: string;
         updates: Partial<Project>;
@@ -32,6 +45,105 @@ export interface InvoiceUndoApplicationPlan {
     deletedAdjustmentCount: number;
     unbilledExpenseCount: number;
     rewoundSequence: boolean;
+}
+
+export function buildInvoiceSourceReleaseApplication({
+    invoice,
+    invoiceId,
+    entries,
+    expenses,
+    tasks,
+    releasedAt,
+}: {
+    invoice: Invoice;
+    invoiceId: string;
+    entries: TimeEntry[];
+    expenses: Expense[];
+    tasks: Task[];
+    releasedAt: number;
+}): {
+    plan: InvoiceSourceReleasePlan;
+    application: InvoiceSourceReleaseApplicationPlan;
+} {
+    const plan = planInvoiceSourceRelease({
+        invoice,
+        invoiceId,
+        entries,
+        expenses,
+        tasks,
+    });
+
+    return {
+        plan,
+        application: buildInvoiceSourceReleaseApplicationPlan({
+            invoiceId,
+            releasePlan: plan,
+            expenses,
+            tasks,
+            releasedAt,
+        }),
+    };
+}
+
+export function buildInvoiceSourceReleaseApplicationPlan({
+    invoiceId,
+    releasePlan,
+    expenses,
+    tasks,
+    releasedAt,
+}: {
+    invoiceId: string;
+    releasePlan: InvoiceSourceReleasePlan;
+    expenses: Expense[];
+    tasks: Task[];
+    releasedAt: number;
+}): InvoiceSourceReleaseApplicationPlan {
+    const expenseIdsToUnbill = new Set(releasePlan.expenseIdsToUnbill);
+    const expenseUpdatesToUnbill = expenses
+        .filter((expense) => expenseIdsToUnbill.has(expense.id))
+        .map((expense) => ({
+            id: expense.id,
+            updates: buildUnbilledExpenseUpdates({ updatedAt: releasedAt }),
+        }));
+    const quotedTaskUpdates = tasks
+        .map((task) => {
+            if (task.quotedAmountBilling?.invoiceId !== invoiceId) {
+                return null;
+            }
+
+            const updates = buildReleasedQuotedTaskUpdates({
+                task,
+                updatedAt: releasedAt,
+            });
+
+            return updates ? { id: task.id, updates } : null;
+        })
+        .filter((update): update is { id: string; updates: Partial<Task> } => Boolean(update));
+    const taskCutoffUpdates = Array.from(releasePlan.taskLastBilledAtRestorations.entries())
+        .map(([taskId, restoredCutoff]) => ({
+            id: taskId,
+            expectedLastBilledAt: tasks.find((task) => task.id === taskId)?.lastBilledAt ?? null,
+            updates: buildRestoredTaskBillingCutoffUpdates({
+                restoredCutoff,
+                updatedAt: releasedAt,
+            }),
+        }));
+
+    return {
+        entriesToDelete: [...releasePlan.entriesToDelete],
+        entriesToClear: releasePlan.entriesToClear.map((entry) => ({
+            entry,
+            updates: buildClearedBilledTimeEntryUpdates({ updatedAt: releasedAt }),
+        })),
+        expenseUpdatesToUnbill,
+        quotedTaskUpdates,
+        taskCutoffUpdates,
+        releasedTimeEntryCount: releasePlan.clearedTimeEntryCount,
+        deletedAdjustmentCount: releasePlan.deletedAdjustmentCount,
+        releasedExpenseCount: expenseUpdatesToUnbill.length,
+        releasedQuotedTaskCount: quotedTaskUpdates.length,
+        restoredTaskCutoffCount: taskCutoffUpdates.length,
+    };
 }
 
 export function buildInvoiceUndoApplication({
@@ -107,36 +219,13 @@ export function buildInvoiceUndoApplicationPlan({
     templateId?: string | null;
     undoneAt: number;
 }): InvoiceUndoApplicationPlan {
-    const expenseIdsToUnbill = new Set(undoPlan.expenseIdsToUnbill);
-    const expenseUpdatesToUnbill = expenses
-        .filter((expense) => expenseIdsToUnbill.has(expense.id))
-        .map((expense) => ({
-            id: expense.id,
-            updates: buildUnbilledExpenseUpdates({ updatedAt: undoneAt }),
-        }));
-    const quotedTaskUpdates = tasks
-        .map((task) => {
-            if (task.quotedAmountBilling?.invoiceId !== invoiceId) {
-                return null;
-            }
-
-            const updates = buildReleasedQuotedTaskUpdates({
-                task,
-                updatedAt: undoneAt,
-            });
-
-            return updates ? { id: task.id, updates } : null;
-        })
-        .filter((update): update is { id: string; updates: Partial<Task> } => Boolean(update));
-    const taskCutoffUpdates = Array.from(undoPlan.taskLastBilledAtRestorations.entries())
-        .map(([taskId, restoredCutoff]) => ({
-            id: taskId,
-            expectedLastBilledAt: tasks.find((task) => task.id === taskId)?.lastBilledAt ?? null,
-            updates: buildRestoredTaskBillingCutoffUpdates({
-                restoredCutoff,
-                updatedAt: undoneAt,
-            }),
-        }));
+    const sourceRelease = buildInvoiceSourceReleaseApplicationPlan({
+        invoiceId,
+        releasePlan: undoPlan,
+        expenses,
+        tasks,
+        releasedAt: undoneAt,
+    });
     const projectUnlinkUpdates = projects
         .map((project) => {
             const updates = buildProjectInvoiceUnlinkUpdates({
@@ -159,19 +248,12 @@ export function buildInvoiceUndoApplicationPlan({
         : null;
 
     return {
-        entriesToDelete: [...undoPlan.entriesToDelete],
-        entriesToClear: undoPlan.entriesToClear.map((entry) => ({
-            entry,
-            updates: buildClearedBilledTimeEntryUpdates({ updatedAt: undoneAt }),
-        })),
-        expenseUpdatesToUnbill,
-        quotedTaskUpdates,
-        taskCutoffUpdates,
+        ...sourceRelease,
         projectUnlinkUpdates,
         invoiceTemplateSequenceUpdate,
         clearedTimeEntryCount: undoPlan.clearedTimeEntryCount,
         deletedAdjustmentCount: undoPlan.deletedAdjustmentCount,
-        unbilledExpenseCount: expenseUpdatesToUnbill.length,
+        unbilledExpenseCount: sourceRelease.releasedExpenseCount,
         rewoundSequence: Boolean(invoiceTemplateSequenceUpdate),
     };
 }

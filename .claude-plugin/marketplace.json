@@ -1,7 +1,7 @@
 {
   "name": "tasktimepro",
   "description": "TaskTime Pro Claude Code plugins for local-first productivity, time tracking, expenses, invoicing, and agent-ready MCP workflows.",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "owner": {
     "name": "TaskTime Pro"
   },
@@ -11,7 +11,7 @@
       "displayName": "TaskTime Pro",
       "source": "./integrations/claude/tasktime",
       "description": "TaskTime Pro is a free, open-source, local-first work manager for freelancers, covering tasks, timers, expenses, invoices, and reports. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser. This first-party TaskTime Pro skill lets same-device agents operate the app through scoped access and approval controls.",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "author": {
         "name": "TaskTime Pro",
         "url": "https://tasktime.pro"

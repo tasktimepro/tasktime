@@ -19,6 +19,8 @@ const invoiceHookMocks = vi.hoisted(() => ({
     markAsUnpaid: vi.fn(),
     undoLatestInvoice: vi.fn(),
     canUndoInvoice: vi.fn(() => false),
+    cancelInvoice: vi.fn(),
+    getInvoiceCancellationBlockReason: vi.fn(() => null),
 }))
 
 const currencyUtilsMocks = vi.hoisted(() => ({
@@ -63,6 +65,8 @@ vi.mock('../hooks/useInvoices.ts', () => ({
         markAsUnpaid: invoiceHookMocks.markAsUnpaid,
         undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
         canUndoInvoice: invoiceHookMocks.canUndoInvoice,
+        cancelInvoice: invoiceHookMocks.cancelInvoice,
+        getInvoiceCancellationBlockReason: invoiceHookMocks.getInvoiceCancellationBlockReason,
     })
 }))
 
@@ -119,7 +123,7 @@ describe('InvoicesList', () => {
         invoiceHookMocks.updatePaymentDetails.mockReset()
         invoiceHookMocks.updatePaymentDetails.mockResolvedValue(undefined)
         invoiceHookMocks.markAsUnpaid.mockReset()
-        invoiceHookMocks.markAsUnpaid.mockReturnValue(undefined)
+        invoiceHookMocks.markAsUnpaid.mockResolvedValue({ id: 'inv-paid', status: 'sent' })
         invoiceHookMocks.invoices = []
         invoiceHookMocks.undoLatestInvoice.mockReset()
         invoiceHookMocks.undoLatestInvoice.mockResolvedValue({
@@ -131,6 +135,17 @@ describe('InvoicesList', () => {
         })
         invoiceHookMocks.canUndoInvoice.mockReset()
         invoiceHookMocks.canUndoInvoice.mockReturnValue(false)
+        invoiceHookMocks.cancelInvoice.mockReset()
+        invoiceHookMocks.cancelInvoice.mockResolvedValue({
+            invoice: { id: 'inv-1', invoiceNumber: 'INV-001', status: 'canceled' },
+            releasedTimeEntryCount: 2,
+            deletedAdjustmentCount: 1,
+            releasedExpenseCount: 3,
+            releasedQuotedTaskCount: 1,
+            retainedInvoiceNumber: true,
+        })
+        invoiceHookMocks.getInvoiceCancellationBlockReason.mockReset()
+        invoiceHookMocks.getInvoiceCancellationBlockReason.mockReturnValue(null)
         pdfMocks.generatePDF.mockClear()
         pdfMocks.createInvoiceHTML.mockClear()
         pdfMocks.getCurrentInvoiceHtmlContent.mockClear()
@@ -317,6 +332,163 @@ describe('InvoicesList', () => {
         expect(matches.length).toBeGreaterThan(0)
     })
 
+    it('shows canceled invoices only in the explicitly selected Canceled tab', async () => {
+
+        const canceledInvoice = {
+            ...baseInvoice,
+            id: 'inv-canceled',
+            invoiceNumber: 'INV-CANCELED',
+            status: 'canceled',
+            canceledAt: new Date('2026-07-14T08:30:00Z').getTime(),
+            cancellationReason: 'Duplicate invoice',
+            dueDate: '2000-01-01',
+        }
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice, canceledInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="canceled"
+            />
+        )
+
+        expect(screen.getByRole('tab', { name: 'Canceled (1)' })).toBeInTheDocument()
+        expect(screen.getByText('INV-CANCELED')).toBeInTheDocument()
+        expect(screen.queryByText('INV-001')).not.toBeInTheDocument()
+        expect(screen.getByText('Duplicate invoice')).toBeInTheDocument()
+        const cancellationNotice = screen.getByText('Cancellation reason').closest('.rounded-md')
+        expect(cancellationNotice).toHaveClass('bg-muted', 'border-border')
+        expect(screen.queryByText(/Historical/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Original total:/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/not outstanding or payable/i)).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Mark as Paid' })).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('tab', { name: 'Outstanding (1)' }))
+
+        expect(screen.getByText('INV-001')).toBeInTheDocument()
+        expect(screen.queryByText('INV-CANCELED')).not.toBeInTheDocument()
+    })
+
+    it('requires a bounded reason and exact invoice number before canceling', async () => {
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Cancel invoice' }))
+
+        const dialog = screen.getByRole('dialog', { name: 'Cancel Invoice?' })
+        const submit = screen.getByRole('button', { name: 'Cancel Invoice' })
+        const reason = screen.getByLabelText('Cancellation reason')
+        const confirmation = screen.getByLabelText(/Type INV-001 to confirm/i)
+        expect(dialog.className).toContain('sm:max-w-lg')
+        expect(submit).toBeDisabled()
+
+        await user.type(reason, 'Duplicate invoice')
+        await user.type(confirmation, 'INV-001')
+        expect(submit).toBeEnabled()
+
+        await user.click(submit)
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.cancelInvoice).toHaveBeenCalledWith('inv-1', {
+                reason: 'Duplicate invoice',
+            })
+        })
+        expect(updateUrlMock).toHaveBeenCalledWith({ tab: 'canceled', section: 'invoices' })
+        expect(toastMocks.showSuccess).toHaveBeenCalledWith(
+            'Invoice INV-001 canceled. 2 billed entries restored, 1 invoice adjustment removed, 3 expenses unbilled, and 1 quoted task released. Invoice number retained.'
+        )
+    })
+
+    it('keeps cancellation input available when the operation fails', async () => {
+
+        invoiceHookMocks.cancelInvoice.mockRejectedValueOnce(new Error('Cancellation could not be completed'))
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Cancel invoice' }))
+        const dialog = screen.getByRole('dialog', { name: 'Cancel Invoice?' })
+        const reason = screen.getByLabelText('Cancellation reason')
+        const confirmation = screen.getByLabelText(/Type INV-001 to confirm/i)
+        await user.type(reason, 'Duplicate invoice')
+        await user.type(confirmation, 'INV-001')
+        await user.click(screen.getByRole('button', { name: 'Cancel Invoice' }))
+
+        await waitFor(() => {
+            expect(toastMocks.showError).toHaveBeenCalledWith('Cancellation could not be completed')
+        })
+        expect(dialog).toBeVisible()
+        expect(reason).toHaveValue('Duplicate invoice')
+        expect(confirmation).toHaveValue('INV-001')
+        expect(screen.getByRole('button', { name: 'Cancel Invoice' })).toBeEnabled()
+    })
+
+    it('locks and keeps the cancellation dialog open while committing', async () => {
+
+        let resolveCancellation
+        invoiceHookMocks.cancelInvoice.mockReturnValueOnce(new Promise((resolve) => {
+            resolveCancellation = resolve
+        }))
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Cancel invoice' }))
+        const dialog = screen.getByRole('dialog', { name: 'Cancel Invoice?' })
+        await user.type(screen.getByLabelText('Cancellation reason'), 'Duplicate invoice')
+        await user.type(screen.getByLabelText(/Type INV-001 to confirm/i), 'INV-001')
+        await user.click(screen.getByRole('button', { name: 'Cancel Invoice' }))
+
+        expect(screen.getByRole('button', { name: 'Canceling Invoice' })).toBeDisabled()
+        expect(screen.getByRole('button', { name: 'Keep Invoice' })).toBeDisabled()
+        expect(screen.getByLabelText('Cancellation reason')).toBeDisabled()
+        await user.click(screen.getByRole('button', { name: 'Close dialog' }))
+        expect(dialog).toBeVisible()
+
+        resolveCancellation({
+            invoice: { ...baseInvoice, status: 'canceled', cancellationReason: 'Duplicate invoice' },
+            releasedTimeEntryCount: 0,
+            deletedAdjustmentCount: 0,
+            releasedExpenseCount: 0,
+            releasedQuotedTaskCount: 0,
+            retainedInvoiceNumber: true,
+        })
+
+        await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    })
+
     it('shows the undo latest invoice action only for eligible invoices', () => {
 
         invoiceHookMocks.canUndoInvoice.mockImplementation((invoice) => invoice.id === 'inv-latest')
@@ -470,7 +642,7 @@ describe('InvoicesList', () => {
         expect(screen.queryByText('Emailed')).not.toBeInTheDocument()
     })
 
-    it('toggles paid status without corrupting list', async () => {
+    it('marks a same-currency invoice paid without corrupting the list', async () => {
         const sameCurrencyInvoice = {
             ...baseInvoice,
             currency: 'EUR',
@@ -609,6 +781,201 @@ describe('InvoicesList', () => {
                 }),
             }))
         })
+    })
+
+    it('confirms a paid invoice payment correction before marking it unpaid', { timeout: 20000 }, async () => {
+
+        const paidInvoice = {
+            ...baseInvoice,
+            id: 'inv-paid-correction',
+            invoiceNumber: 'INV-PAID-CORRECTION',
+            status: 'paid',
+            paidAt: 1700000000000,
+            paymentCurrencySnapshot: {
+                capturedAt: 1700000000000,
+                sourceCurrency: 'USD',
+                sourceAmount: 100,
+                preferredCurrencyAtPayment: 'EUR',
+                preferredCurrencyAmount: 80,
+            },
+        }
+
+        render(
+            <InvoicesList
+                projectInvoices={[paidInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="paid"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Mark as unpaid' }))
+
+        expect(screen.getByRole('dialog', { name: 'Mark Invoice as Unpaid?' })).toBeVisible()
+        expect(screen.getByText('This does not record or issue a refund.')).toBeInTheDocument()
+        expect(invoiceHookMocks.markAsUnpaid).not.toHaveBeenCalled()
+
+        await user.click(screen.getByRole('button', { name: 'Mark as Unpaid' }))
+
+        await waitFor(() => {
+            expect(invoiceHookMocks.markAsUnpaid).toHaveBeenCalledWith('inv-paid-correction')
+        })
+        expect(updateUrlMock).toHaveBeenCalledWith({ tab: 'outstanding', section: 'invoices' })
+        expect(toastMocks.showSuccess).toHaveBeenCalledWith(
+            'Invoice INV-PAID-CORRECTION marked as unpaid. Recorded payment details were cleared.'
+        )
+        expect(screen.queryByRole('dialog', { name: 'Mark Invoice as Unpaid?' })).not.toBeInTheDocument()
+    })
+
+    it('returns a corrected past-due paid invoice to the Overdue tab', { timeout: 20000 }, async () => {
+
+        const paidInvoice = {
+            ...baseInvoice,
+            id: 'inv-paid-overdue',
+            status: 'paid',
+            dueDate: '2000-01-01',
+        }
+
+        render(
+            <InvoicesList
+                projectInvoices={[paidInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="paid"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Mark as unpaid' }))
+
+        expect(screen.getByRole('dialog', { name: 'Mark Invoice as Unpaid?' })).toHaveTextContent(
+            'It will return to Overdue.'
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Mark as Unpaid' }))
+
+        await waitFor(() => {
+            expect(updateUrlMock).toHaveBeenCalledWith({ tab: 'overdue', section: 'invoices' })
+        })
+    })
+
+    it('keeps the mark-unpaid confirmation open when the correction fails', { timeout: 20000 }, async () => {
+
+        const paidInvoice = { ...baseInvoice, id: 'inv-paid-error', status: 'paid' }
+        invoiceHookMocks.markAsUnpaid.mockRejectedValueOnce(new Error('Payment correction failed'))
+
+        render(
+            <InvoicesList
+                projectInvoices={[paidInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="paid"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Mark as unpaid' }))
+        await user.click(screen.getByRole('button', { name: 'Mark as Unpaid' }))
+
+        await waitFor(() => {
+            expect(toastMocks.showError).toHaveBeenCalledWith('Payment correction failed')
+        })
+        expect(screen.getByRole('dialog', { name: 'Mark Invoice as Unpaid?' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Mark as Unpaid' })).toBeEnabled()
+    })
+
+    it('does not report success when the paid invoice disappeared before correction', { timeout: 20000 }, async () => {
+
+        const paidInvoice = { ...baseInvoice, id: 'inv-paid-missing', status: 'paid' }
+        invoiceHookMocks.markAsUnpaid.mockResolvedValueOnce(undefined)
+
+        render(
+            <InvoicesList
+                projectInvoices={[paidInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="paid"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Mark as unpaid' }))
+        await user.click(screen.getByRole('button', { name: 'Mark as Unpaid' }))
+
+        await waitFor(() => {
+            expect(toastMocks.showError).toHaveBeenCalledWith(
+                'Invoice could not be found. Refresh the list and try again.'
+            )
+        })
+        expect(screen.getByRole('dialog', { name: 'Mark Invoice as Unpaid?' })).toBeVisible()
+        expect(toastMocks.showSuccess).not.toHaveBeenCalled()
+        expect(updateUrlMock).not.toHaveBeenCalled()
+    })
+
+    it('locks the mark-unpaid confirmation while the correction is being saved', { timeout: 20000 }, async () => {
+
+        let resolveMarkUnpaid
+        const paidInvoice = { ...baseInvoice, id: 'inv-paid-loading', status: 'paid' }
+        invoiceHookMocks.markAsUnpaid.mockReturnValueOnce(new Promise((resolve) => {
+            resolveMarkUnpaid = resolve
+        }))
+
+        render(
+            <InvoicesList
+                projectInvoices={[paidInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="paid"
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Mark as unpaid' }))
+        await user.click(screen.getByRole('button', { name: 'Mark as Unpaid' }))
+
+        const dialog = screen.getByRole('dialog', { name: 'Mark Invoice as Unpaid?' })
+        expect(screen.getByRole('button', { name: 'Marking as Unpaid' })).toBeDisabled()
+        expect(screen.getByRole('button', { name: 'Keep Paid' })).toBeDisabled()
+        await user.click(screen.getByRole('button', { name: 'Close dialog' }))
+        expect(dialog).toBeVisible()
+
+        resolveMarkUnpaid({ id: paidInvoice.id, status: 'sent' })
+
+        await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    })
+
+    it('does not offer mark as unpaid for invoices without a recorded paid status', { timeout: 20000 }, async () => {
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+
+        expect(screen.queryByRole('menuitem', { name: 'Mark as unpaid' })).not.toBeInTheDocument()
     })
 
     it('hides direct invoice editing for paid invoices', async () => {

@@ -123,6 +123,57 @@ test.describe('Invoices smoke', () => {
         await expect(reloadedPaidInvoiceCard).not.toContainText('Mark as Paid');
     });
 
+    test('corrects a mistakenly recorded payment without releasing billed time', async ({ page }) => {
+        const now = Date.now();
+        const projectTitle = `Playwright Unpaid Correction Project ${now}`;
+        const clientTitle = `Playwright Unpaid Correction Client ${now}`;
+        const clientName = `Unpaid Correction Client ${now}`;
+        const taskTitle = `Playwright Unpaid Correction Task ${now}`;
+        const templateName = `Playwright Unpaid Correction Template ${now}`;
+
+        const { expectedTotal } = await createTrackedInvoice(page, {
+            projectTitle,
+            clientTitle,
+            clientName,
+            taskTitle,
+            templateName,
+        });
+
+        const invoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await markInvoicePaid(page, invoiceCard);
+        await page.getByRole('tab', { name: /^Paid \(1\)$/ }).click();
+
+        const paidInvoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await openInvoiceActionMenu(paidInvoiceCard);
+        await page.getByRole('menuitem', { name: 'Mark as unpaid' }).click();
+
+        const correctionDialog = page.getByRole('dialog', { name: 'Mark Invoice as Unpaid?' });
+        await expect(correctionDialog).toContainText('This does not record or issue a refund.');
+        await expect(correctionDialog).toContainText('billed time and expenses stay linked');
+        await correctionDialog.getByRole('button', { name: 'Mark as Unpaid' }).click();
+
+        await expect(correctionDialog).not.toBeVisible();
+        await expect(page).toHaveURL(/\/invoices\?[^#]*section=invoices[^#]*tab=outstanding|\/invoices\?[^#]*tab=outstanding[^#]*section=invoices/);
+        await expect(page.getByRole('tab', { name: /^Outstanding \(1\)$/ })).toHaveAttribute('data-state', 'active');
+
+        const correctedInvoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await expect(correctedInvoiceCard).toContainText('Outstanding');
+        await expect(correctedInvoiceCard).toContainText(expectedTotal);
+        await expect(correctedInvoiceCard.getByRole('button', { name: 'Mark as Paid' })).toBeVisible();
+
+        await page.reload();
+        await expect(page.getByRole('tab', { name: /^Outstanding \(1\)$/ })).toHaveAttribute('data-state', 'active');
+        await expect(getInvoiceCardByProject(page, projectTitle)).toContainText('Outstanding');
+
+        await page.goto('/projects');
+        await openProjectDashboard(page, projectTitle);
+        await page.getByTitle('View Time Entries').click();
+
+        const timeEntriesDialog = page.getByRole('dialog', { name: `Time Entries - ${taskTitle}` });
+        await expect(timeEntriesDialog.getByRole('button', { name: /^Billed Time Entries \([1-9]\d*\)$/ })).toBeVisible();
+        await expect(timeEntriesDialog.getByText('Current Time Entries')).toHaveCount(0);
+    });
+
     test('freezes paid invoice received totals after exchange rates change', async ({ page }) => {
         const now = Date.now();
         const projectTitle = `Playwright Frozen Snapshot Project ${now}`;
@@ -242,6 +293,85 @@ test.describe('Invoices smoke', () => {
         await page.reload();
         await expect(page.getByRole('heading', { name: /^Invoices$/ })).toBeVisible();
         await expect(page.getByText(`Project: ${projectTitle}`)).toHaveCount(0);
+
+        await page.goto('/projects');
+        await openProjectDashboard(page, projectTitle);
+        await page.getByTitle('View Time Entries').click();
+
+        const timeEntriesDialog = page.getByRole('dialog', { name: `Time Entries - ${taskTitle}` });
+        await expect(timeEntriesDialog.getByRole('heading', { name: 'Current Time Entries (1)' })).toBeVisible();
+        await expect(timeEntriesDialog.getByText('Billed Time Entries')).toHaveCount(0);
+    });
+
+    test('cancels an unpaid invoice as a retained read-only record and restores its billed time', async ({ page }) => {
+        const now = Date.now();
+        const projectTitle = `Playwright Canceled Invoice Project ${now}`;
+        const clientTitle = `Playwright Canceled Invoice Client ${now}`;
+        const clientName = `Canceled Invoice Client ${now}`;
+        const taskTitle = `Playwright Canceled Invoice Task ${now}`;
+        const templateName = `Playwright Canceled Template ${now}`;
+        const cancellationReason = 'Duplicate invoice created during Playwright verification';
+
+        const { expectedTotal } = await createTrackedInvoice(page, {
+            projectTitle,
+            clientTitle,
+            clientName,
+            taskTitle,
+            templateName,
+        });
+
+        const invoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await expect(invoiceCard).toBeVisible();
+        const invoiceNumber = (await invoiceCard.getByRole('heading').innerText()).trim();
+
+        await openInvoiceActionMenu(invoiceCard);
+        await page.getByRole('menuitem', { name: 'Cancel invoice' }).click();
+
+        const cancelDialog = page.getByRole('dialog', { name: 'Cancel Invoice?' });
+        await expect(cancelDialog).toBeVisible();
+        await expect(cancelDialog).toContainText('invoice number stays permanently used');
+        await expect(cancelDialog).toContainText(expectedTotal);
+
+        const cancelButton = cancelDialog.getByRole('button', { name: 'Cancel Invoice', exact: true });
+        await expect(cancelButton).toBeDisabled();
+        await cancelDialog.getByLabel('Cancellation reason').fill(cancellationReason);
+        await expect(cancelButton).toBeDisabled();
+        await cancelDialog.getByLabel(new RegExp(`Type ${invoiceNumber}`)).fill(invoiceNumber);
+        await expect(cancelButton).toBeEnabled();
+        await cancelButton.click();
+
+        await expect(cancelDialog).not.toBeVisible();
+        await expect(page).toHaveURL(/\/invoices\?[^#]*section=invoices[^#]*tab=canceled|\/invoices\?[^#]*tab=canceled[^#]*section=invoices/);
+        await expect(page.getByRole('tab', { name: /^Canceled \(1\)$/ })).toHaveAttribute('data-state', 'active');
+
+        const canceledInvoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await expect(canceledInvoiceCard).toBeVisible();
+        await expect(canceledInvoiceCard).toContainText('Cancellation reason');
+        await expect(canceledInvoiceCard).toContainText(cancellationReason);
+        await expect(canceledInvoiceCard).not.toContainText('Historical');
+        await expect(canceledInvoiceCard).not.toContainText('Original total:');
+        await expect(canceledInvoiceCard).not.toContainText('not outstanding or payable');
+        await expect(canceledInvoiceCard.getByRole('button', { name: 'Mark as Paid' })).toHaveCount(0);
+        await expect(canceledInvoiceCard.getByTitle('Send Invoice by Email')).toHaveCount(0);
+
+        await openInvoiceActionMenu(canceledInvoiceCard);
+        await expect(page.getByRole('menuitem', { name: 'Download' })).toBeVisible();
+        await expect(page.getByRole('menuitem', { name: 'Edit invoice' })).toHaveCount(0);
+        await expect(page.getByRole('menuitem', { name: 'Undo' })).toHaveCount(0);
+        await expect(page.getByRole('menuitem', { name: 'Cancel invoice' })).toHaveCount(0);
+        await page.keyboard.press('Escape');
+
+        await canceledInvoiceCard.getByTitle('Preview Invoice').click();
+        const previewDialog = page.getByRole('dialog', { name: `Invoice Preview - ${invoiceNumber}` });
+        await expect(previewDialog).toContainText('Canceled invoice');
+        await expect(previewDialog).toContainText('read-only historical record');
+        await expect(previewDialog).toContainText(cancellationReason);
+        await expect(previewDialog.getByTestId('invoice-preview-page')).toContainText('CANCELED');
+        await previewDialog.getByRole('button', { name: 'Close', exact: true }).click();
+
+        await page.reload();
+        await expect(page.getByRole('tab', { name: /^Canceled \(1\)$/ })).toHaveAttribute('data-state', 'active');
+        await expect(getInvoiceCardByProject(page, projectTitle)).toContainText(cancellationReason);
 
         await page.goto('/projects');
         await openProjectDashboard(page, projectTitle);

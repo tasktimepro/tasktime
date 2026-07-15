@@ -21,14 +21,18 @@
 
 - Invoice preview includes only eligible selected work/expenses and its totals equal the visible line calculation, adjustments, and tax.
 - Finalization applies billing markers once and preserves snapshots needed for reporting/payment/undo.
-- Payment and unpaid transitions update invoice/report behavior consistently.
+- A paid invoice exposes an explicitly confirmed **Mark as unpaid** correction that clears its recorded payment date and currency snapshot, preserves its finalized billing-source claims, and returns it to the effective Outstanding or Overdue bucket; the UI makes clear that this does not issue a refund.
 - Undo restores only the supported latest invoice effects and is safe against repeated invocation.
+- Canceling a sent or overdue unpaid invoice retains its invoice number, original monetary and billing snapshots, sent metadata, project links, and required cancellation reason/time while releasing only time, adjustments, expenses, quote claims, and task cutoffs still owned by that invoice.
+- Cancellation is terminal and retry-safe: drafts and paid invoices are refused without mutation, an exact invoice-number confirmation is required, stale replay cannot make a canceled invoice payable again, and a later invoice's source claim or task cutoff is never cleared.
+- A canceled invoice appears only in the Canceled invoice-list bucket, is read-only/non-payable/non-emailable, and every preview/export visibly identifies it as canceled; the next invoice never reuses its number.
 - Quote preview/export/send does not mark work billed.
 - Expense and tax state transitions are explicit and reflected consistently in reports/exports.
 
 ## Reports and portability
 
 - Equivalent filters produce consistent on-screen, CSV, PDF, and accountant-pack totals.
+- Canceled invoices remain visible in audit/register scopes with original face value and cancellation metadata while contributing zero to financial, tax, payment, outstanding, aging, statement, and project-revenue totals; released eligible sources reappear exactly once in browser and agent unbilled views.
 - Backup export excludes auth/session secrets.
 - Import preview reports validation issues before mutation.
 - Accepted import preserves supported records and relationships; rejected input leaves current data unchanged.

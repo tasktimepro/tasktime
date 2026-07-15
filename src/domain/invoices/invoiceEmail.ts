@@ -16,7 +16,7 @@ import {
 } from '@/utils/emailTemplateUtils';
 import { DEFAULT_CURRENCY, getCurrencySymbol } from '@/utils/currencyUtils';
 import { toDisplayDate } from '@/utils/dateUtils';
-import { getInvoiceTotal } from '@/utils/invoiceUtils';
+import { getInvoiceTotal, isInvoiceCanceled } from '@/utils/invoiceUtils';
 
 export interface InvoiceEmailDraftOverrides {
     templateId?: string | null;
@@ -63,6 +63,10 @@ export function resolveInvoiceEmailDraft({
     overrides = {},
     preferredCurrency,
 }: ResolveInvoiceEmailDraftInput): InvoiceEmailDraft {
+    if (isInvoiceCanceled(invoice)) {
+        throw new Error('Canceled invoices cannot be sent by email.');
+    }
+
     const isQuoteSend = sendType === 'quote';
     const isReminderSend = sendType === 'reminder';
     const templateType = isQuoteSend ? 'quote' : 'invoice';

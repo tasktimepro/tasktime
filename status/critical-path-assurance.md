@@ -31,7 +31,7 @@ Do not mark this assurance phase complete while a Critical or High finding remai
 - [x] Add proactive cross-tab close coordination and post-delete verification.
 - [x] Ensure automatic/Drive backups refresh every local and remote lazy document or clearly fail as incomplete; agent backup completeness remains tied to its explicit cloud-refresh option.
 - [x] Stop claiming account/backup deletion succeeded when any Drive deletion failed; verify before revoking access.
-- [x] Cover advertised backup versions 1.0, 1.1, 1.3, and 1.4 plus legacy persisted invoice shapes.
+- [x] Cover advertised backup versions 1.0, 1.1, 1.3, 1.4, and 1.5 plus legacy persisted invoice shapes.
 - [x] Provide a safe historical-document discovery fallback where `indexedDB.databases()` is unavailable.
 - [x] Add rejected-import-no-mutation, blocked-delete, relationship, legacy, and complete-backup tests; in-process and crash-recovery rollback are covered.
 

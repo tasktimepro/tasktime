@@ -16,6 +16,10 @@ Callers must not create a second persistence layer. Hook return shapes may evolv
 
 `useExpenses` retains synchronous raw create/update methods for controlled internal applications, while user-facing paid or payment-sensitive mutations use `createExpenseWithPaymentSnapshot` and `updateExpenseWithPaymentSnapshot`. Those asynchronous methods prepare required cross-currency evidence before committing. `deleteExpense` rejects billed/invoice-linked and tax-claimed expenses on every UI call path.
 
+`useInvoices.cancelInvoice` and the agent `cancel_invoice` command are adapters over one shared cancellation application. The operation accepts `invoiceId`, a trimmed 1–500 character `reason`, a stable `operationId`, and an optional finite `canceledAt`; adapters additionally require exact invoice-number confirmation and agent approval. It returns the retained canceled invoice plus stable counts for released time entries, deleted adjustment entries, released expenses, released quoted tasks, restored task cutoffs, and retained project links, with `retainedInvoiceNumber: true` and retry state through `alreadyApplied`. The operation rejects missing, draft, paid, and conflicting already-canceled invoices without partial product mutation and replays the same persisted operation idempotently.
+
+`useInvoices.markAsUnpaid` and the agent `mark_invoice_unpaid` command are payment-correction boundaries, not refund operations. They accept only an invoice whose current persisted status is `paid`, clear its payment evidence, and preserve every billing-source claim. Missing, non-paid, and canceled invoices fail without mutation; callers cannot use this transition to reopen or alter a sent, overdue, draft, or canceled invoice.
+
 ## Persisted Yjs boundary
 
 - Managed document names: `core`, `entries-active`, `entries-{year}`, `tasks-archived`, `expenses-archived`, `invoices-archived`.
@@ -25,9 +29,9 @@ Callers must not create a second persistence layer. Hook return shapes may evolv
 
 ## Backup JSON
 
-Current export version: `1.4`.
+Current export version: `1.5`.
 
-Supported import versions: `1.0`, `1.1`, `1.3`, `1.4`.
+Supported import versions: `1.0`, `1.1`, `1.3`, `1.4`, `1.5`.
 
 Top-level payload:
 
@@ -93,7 +97,7 @@ Command groups include:
 - timers and time entries
 - planner attachments, goals, and project notes
 - expenses, recurrences, categories, and tax periods
-- invoice/quote preview, drafts, finalization, payments, undo, PDF, and email
+- invoice/quote preview, drafts, finalization, payments, cancellation, undo, PDF, and email
 - business information/assets, payment methods, invoice/email templates, preferences
 - reports, accountant/export outputs, dashboards, and unbilled queries
 - Drive sync/backup/import/account data operations
@@ -104,6 +108,8 @@ The authoritative command-name/metadata catalog is generated from `src/agent/com
 `stop_timer` accepts an optional `idempotencyKey` and also converges concurrent stops through deterministic timer-instance entry identity. Manual time-entry commands validate complete local history and source/target billing rules before mutation. Generic `update_task` requests are normalized through task-state invariants; recurring completion still requires the occurrence-aware `complete_task` command. Create commands return `CONFLICT` for an existing persisted ID and must not replace the prior record.
 
 `find_unbilled_time`, dashboard/project unbilled summaries, and recent-entry billing state load complete local task, time-entry, and invoice history. Unbilled results use canonical invoice eligibility and legacy finalized-invoice evidence; entry summaries preserve `durationMs` as actual elapsed time and add `billableDurationMs` for invoice calculations.
+
+`cancel_invoice` is billing-scoped and approval-required. Its closed input contains `invoiceId`, `reason`, `confirmCancel: true`, exact `confirmationText`, optional finite `canceledAt`, and optional retry-safe `idempotencyKey`. Missing invoices return `NOT_FOUND`; invalid reason/confirmation returns `INVALID_INPUT`; draft, paid, terminal, or conflicting operation state returns `CONFLICT`; unavailable complete history returns a sanitized retry-safe error. Responses expose documented invoice summaries and release counts, never raw Yjs maps or journal records. Invoice/report status filters add `canceled` without renaming or changing existing defaults.
 
 ## Local bridge process
 

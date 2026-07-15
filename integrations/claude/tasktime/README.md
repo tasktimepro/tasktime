@@ -6,6 +6,8 @@ TaskTime Pro is a free, open-source, local-first work manager for freelancers, c
 
 The plugin launches the same-device TaskTime Pro agent bridge, and the user must still pair the visible TaskTime Pro browser app from Account > Agent Access before local data is readable or mutable.
 
+The billing-scoped bridge can cancel an eligible finalized unpaid invoice only with explicit TaskTime Pro approval, a reason, and exact invoice-number confirmation; the invoice remains as a numbered audit record.
+
 ## Install
 
 Add the TaskTime Pro marketplace in Claude Code:

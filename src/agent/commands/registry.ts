@@ -123,6 +123,7 @@ import {
     updateTaxReturnPeriodCommand,
 } from './tax';
 import {
+    cancelInvoiceCommand,
     createInvoiceDraftFromUnbilledWorkCommand,
     exportInvoicePdfCommand,
     exportProjectQuotePdfCommand,
@@ -263,6 +264,7 @@ export type AgentCommandName =
     | 'finalize_invoice'
     | 'mark_invoice_paid'
     | 'mark_invoice_unpaid'
+    | 'cancel_invoice'
     | 'undo_latest_invoice'
     | 'export_invoice_pdf'
     | 'preview_project_quote'
@@ -951,6 +953,13 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         scopes: ['read', 'write', 'billing'],
         requiresApproval: true,
         handler: markInvoiceUnpaidCommand,
+    },
+    cancel_invoice: {
+        name: 'cancel_invoice',
+        description: 'Cancel a finalized unpaid invoice after explicit confirmation, preserving its number and audit record while releasing only source claims owned by that invoice.',
+        scopes: ['read', 'write', 'billing'],
+        requiresApproval: true,
+        handler: cancelInvoiceCommand,
     },
     undo_latest_invoice: {
         name: 'undo_latest_invoice',

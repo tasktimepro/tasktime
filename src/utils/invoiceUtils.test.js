@@ -11,6 +11,7 @@ import {
     getInvoiceProjectIds,
     getInvoiceProjectRevenueBreakdown,
     getInvoiceProjectTitle,
+    getInvoiceStatus,
     getLatestUndoableInvoice,
     getInvoicePaidAtTimestamp,
     getInvoicePaymentCurrencySnapshot,
@@ -19,6 +20,9 @@ import {
     getLatestInvoiceForProject,
     getNextSequentialNumberForTemplate,
     getPaidInvoiceConvertedAmount,
+    isInvoiceOutstanding,
+    isInvoiceRevenueBearing,
+    matchesInvoiceStatusFilter,
     normalizeInvoiceRecord,
     resolveCurrentInvoiceTemplate,
 } from './invoiceUtils'
@@ -146,6 +150,44 @@ describe('invoiceUtils', () => {
         expect(getNextSequentialNumberForTemplate(template, invoices, { excludeInvoiceId: 'inv-2' })).toBe(5)
         expect(getNextSequentialNumberForTemplate({ currentSequentialNumber: 8 }, invoices)).toBe(8)
         expect(getNextSequentialNumberForTemplate(template, [{ id: 'inv-empty', templateId: 'tpl-1', invoiceNumber: 'BAD' }])).toBe(3)
+    })
+
+    it('characterizes finalized lifecycle precedence and retained-number consumption', () => {
+
+        const referenceDate = new Date('2026-07-14T12:00:00Z')
+        const template = {
+            id: 'tpl-1',
+            currentSequentialNumber: 4,
+            useSequentialNumbers: true,
+            invoiceNumberFormat: 'INV-{sequential}'
+        }
+        const invoices = [
+            { id: 'draft', templateId: 'tpl-1', invoiceNumber: 'INV-4', status: 'draft', dueDate: '2026-07-01' },
+            { id: 'sent', templateId: 'tpl-1', invoiceNumber: 'INV-5', status: 'sent', dueDate: '2026-07-30' },
+            { id: 'overdue', templateId: 'tpl-1', invoiceNumber: 'INV-6', status: 'sent', dueDate: '2026-07-01' },
+            { id: 'paid', templateId: 'tpl-1', invoiceNumber: 'INV-7', status: 'paid', dueDate: '2026-07-01', paidAt: 1 },
+            {
+                id: 'canceled',
+                templateId: 'tpl-1',
+                invoiceNumber: 'INV-8',
+                status: 'canceled',
+                dueDate: '2026-07-01',
+                canceledAt: 2,
+                cancellationReason: 'Duplicate invoice'
+            },
+        ]
+
+        expect(getInvoiceStatus(invoices[0], referenceDate)).toBe('draft')
+        expect(getInvoiceStatus(invoices[1], referenceDate)).toBe('sent')
+        expect(getInvoiceStatus(invoices[2], referenceDate)).toBe('overdue')
+        expect(getInvoiceStatus(invoices[3], referenceDate)).toBe('paid')
+        expect(getInvoiceStatus(invoices[4], referenceDate)).toBe('canceled')
+        expect(getNextSequentialNumberForTemplate(template, invoices)).toBe(9)
+        expect(normalizeInvoiceRecord(invoices[4], referenceDate)).toEqual(expect.objectContaining({
+            status: 'canceled',
+            canceledAt: 2,
+            cancellationReason: 'Duplicate invoice'
+        }))
     })
 
     it('uses date fallbacks when determining the latest invoice for a project', () => {
@@ -525,6 +567,39 @@ describe('invoiceUtils', () => {
         expect(getInvoiceStatusAfterMarkingUnpaid({ status: 'sent', dueDate: '2026-03-01' }, new Date('2026-02-01'))).toBe('sent')
     })
 
+    it('keeps lifecycle filters mutually exclusive for canceled invoices', () => {
+
+        const referenceDate = new Date('2026-02-01')
+        const fixtures = {
+            draft: { status: 'draft', dueDate: '2026-01-01' },
+            sent: { status: 'sent', dueDate: '2026-03-01' },
+            overdue: { status: 'sent', dueDate: '2026-01-01' },
+            paid: { status: 'paid', paidAt: 1, dueDate: '2026-01-01' },
+            canceled: {
+                status: 'canceled',
+                canceledAt: 2,
+                cancellationReason: 'Duplicate invoice',
+                dueDate: '2026-01-01',
+            },
+        }
+
+        expect(isInvoiceOutstanding(fixtures.draft, referenceDate)).toBe(false)
+        expect(isInvoiceOutstanding(fixtures.sent, referenceDate)).toBe(true)
+        expect(isInvoiceOutstanding(fixtures.overdue, referenceDate)).toBe(true)
+        expect(isInvoiceOutstanding(fixtures.paid, referenceDate)).toBe(false)
+        expect(isInvoiceOutstanding(fixtures.canceled, referenceDate)).toBe(false)
+        expect(isInvoiceRevenueBearing(fixtures.draft)).toBe(false)
+        expect(isInvoiceRevenueBearing(fixtures.sent)).toBe(true)
+        expect(isInvoiceRevenueBearing(fixtures.paid)).toBe(true)
+        expect(isInvoiceRevenueBearing(fixtures.canceled)).toBe(false)
+        expect(matchesInvoiceStatusFilter(fixtures.canceled, 'canceled', referenceDate)).toBe(true)
+        expect(matchesInvoiceStatusFilter(fixtures.canceled, 'overdue', referenceDate)).toBe(false)
+        expect(matchesInvoiceStatusFilter(fixtures.canceled, 'outstanding', referenceDate)).toBe(false)
+        expect(matchesInvoiceStatusFilter(fixtures.canceled, 'unpaid', referenceDate)).toBe(false)
+        expect(matchesInvoiceStatusFilter(fixtures.canceled, 'non-draft', referenceDate)).toBe(true)
+        expect(matchesInvoiceStatusFilter(fixtures.canceled, 'all', referenceDate)).toBe(true)
+    })
+
     it('only allows undo for the latest unpaid invoice', () => {
 
         const invoices = [
@@ -537,6 +612,12 @@ describe('invoiceUtils', () => {
         expect(canUndoInvoice(invoices[2], invoices)).toBe(true)
         expect(getInvoiceUndoBlockReason(invoices[0], invoices)).toBe('Only the latest unpaid invoice can be undone.')
         expect(getInvoiceUndoBlockReason(invoices[1], invoices)).toBe('Paid invoices cannot be undone.')
+        expect(getInvoiceUndoBlockReason({
+            id: 'inv-canceled',
+            status: 'canceled',
+            canceledAt: 3,
+            cancellationReason: 'Duplicate invoice'
+        }, invoices)).toBe('Canceled invoices cannot be undone.')
     })
 
     it('rolls back template sequence only when the deleted invoice owns the latest number', () => {

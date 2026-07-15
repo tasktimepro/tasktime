@@ -240,6 +240,46 @@ describe('Yjs validation', () => {
         }))
     })
 
+    it('accepts additive canceled invoice metadata and rejects malformed canceled records', () => {
+        const canceledInvoice = {
+            id: 'invoice-canceled',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            invoiceNumber: 'INV-41',
+            date: '2026-07-14',
+            status: 'canceled',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            canceledAt: 1_000,
+            cancellationReason: 'Duplicate invoice',
+            futureField: 'preserved',
+        }
+
+        expect(validateCollectionEntity('invoices', canceledInvoice, 'canceled invoice')).toEqual(canceledInvoice)
+        expect(() => validateCollectionEntity('invoices', {
+            ...canceledInvoice,
+            canceledAt: undefined,
+        }, 'canceled invoice without time')).toThrow(/canceledAt/)
+        expect(() => validateCollectionEntity('invoices', {
+            ...canceledInvoice,
+            cancellationReason: '   ',
+        }, 'canceled invoice without reason')).toThrow(/cancellationReason/)
+        expect(() => validateCollectionEntity('invoices', {
+            ...canceledInvoice,
+            cancellationReason: 'x'.repeat(501),
+        }, 'canceled invoice with long reason')).toThrow(/cancellationReason/)
+
+        expect(validateCollectionEntity('invoices', {
+            ...canceledInvoice,
+            status: 'sent',
+            canceledAt: undefined,
+            cancellationReason: undefined,
+        }, 'historical sent invoice')).toEqual(expect.objectContaining({
+            status: 'sent',
+        }))
+    })
+
     it('normalizes legacy one-time paid expenses instead of dropping them', () => {
         expect(validateCollectionEntity('expenses', {
             id: 'expense-legacy-paid',

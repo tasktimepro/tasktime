@@ -345,7 +345,7 @@ export interface Invoice {
     invoiceNumber: string;
     date: string;
     dueDate?: string | null;
-    status: 'draft' | 'sent' | 'paid' | 'overdue';
+    status: 'draft' | 'sent' | 'paid' | 'overdue' | 'canceled';
     items: InvoiceItem[];
     subtotal: number;
     tax?: number;
@@ -361,6 +361,8 @@ export interface Invoice {
     paymentCurrencySnapshot?: InvoicePaymentCurrencySnapshot | null;
     sentAt?: number | null;
     sentToEmail?: string | null;
+    canceledAt?: number | null;
+    cancellationReason?: string | null;
     brandingSnapshot?: InvoiceBrandingSnapshot | null;
     billingStateSnapshot?: InvoiceBillingStateSnapshot | null;
     billingSelectionSnapshot?: InvoiceBillingSelectionSnapshot | null;

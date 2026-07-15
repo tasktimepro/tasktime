@@ -661,4 +661,87 @@ describe('reportCalculations', () => {
             { currency: 'USD', count: 1, subtotal: 0, tax: 0, total: 100 },
         ]);
     });
+
+    it('retains canceled face value in the register while excluding it from financial summaries', () => {
+        const referenceDate = new Date('2026-07-14T12:00:00Z');
+        const canceledInvoice = {
+            id: 'invoice-canceled',
+            invoiceNumber: 'INV-CANCELED',
+            clientId: 'client-1',
+            businessInfoId: 'business-1',
+            date: '2026-07-01',
+            dueDate: '2026-07-05',
+            status: 'canceled',
+            canceledAt: referenceDate.getTime(),
+            cancellationReason: 'Duplicate invoice',
+            subtotal: 100,
+            tax: 20,
+            total: 120,
+            taxRate: 20,
+            currency: 'EUR',
+        };
+        const sentInvoice = {
+            id: 'invoice-sent',
+            invoiceNumber: 'INV-SENT',
+            clientId: 'client-1',
+            businessInfoId: 'business-1',
+            date: '2026-07-02',
+            dueDate: '2026-07-20',
+            status: 'sent',
+            subtotal: 50,
+            tax: 10,
+            total: 60,
+            taxRate: 20,
+            currency: 'EUR',
+        };
+        const invoices = [canceledInvoice, sentInvoice];
+        const clientsById = new Map([['client-1', { id: 'client-1', title: 'Acme', country: 'SI' }]]);
+        const businessInfosById = new Map([['business-1', { id: 'business-1', businessName: 'Studio', country: 'SI' }]]);
+
+        const register = buildInvoiceRegisterSummary({
+            invoices,
+            clientsById,
+            businessInfosById,
+        });
+        const canceledStatus = register.totalsByStatus.find((row) => row.label === 'canceled');
+        expect(canceledStatus).toEqual({
+            label: 'canceled',
+            count: 1,
+            totalByCurrency: { EUR: 120 },
+        });
+
+        const vat = buildVatReportSummary({
+            invoices,
+            expenses: [],
+            clientsById,
+            businessInfosById,
+        });
+        expect(vat.totals.salesNet).toBe(50);
+        expect(vat.totals.outputTax).toBe(10);
+        expect(vat.geographyBuckets).toEqual([{
+            geography: 'Domestic',
+            currency: 'EUR',
+            total: 60,
+            count: 1,
+        }]);
+
+        expect(buildOutstandingInvoiceSummary(invoices, referenceDate)).toEqual([{
+            bucketLabel: 'Not due',
+            currency: 'EUR',
+            total: 60,
+            count: 1,
+        }]);
+        expect(getInvoiceDaysOverdue(canceledInvoice, referenceDate)).toBe(0);
+
+        const statement = buildClientStatementSummary({
+            invoices,
+            startDate: '2026-07-01',
+            endDate: '2026-07-31',
+            referenceDate,
+        });
+        expect(statement.invoicesIssuedInRange.map((invoice) => invoice.id)).toEqual(['invoice-sent']);
+        expect(statement.outstandingInvoices.map((invoice) => invoice.id)).toEqual(['invoice-sent']);
+        expect(statement.totalsByCurrency.issued).toEqual({ EUR: 60 });
+        expect(statement.totalsByCurrency.closingBalance).toEqual({ EUR: 60 });
+    });
 });

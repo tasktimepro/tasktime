@@ -34,7 +34,7 @@ import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { getCurrentInvoiceHtmlContent, generatePDFBase64 } from '@/utils/pdfUtils.ts';
 import { getCurrencySymbol, normalizeCurrencyCode } from '@/utils/currencyUtils.ts';
 import { usePreferences } from '@/hooks/usePreferences.ts';
-import { getInvoiceTotal } from '@/utils/invoiceUtils.ts';
+import { getInvoiceTotal, isInvoiceCanceled } from '@/utils/invoiceUtils.ts';
 import { toDisplayDate } from '@/utils/dateUtils.ts';
 
 /**
@@ -205,6 +205,11 @@ const EmailPreviewModal = ({
 
         if (!isQuoteSend && invoice.status === 'draft') {
             setError('Finalize this draft before sending it by email.');
+            return;
+        }
+
+        if (!isQuoteSend && isInvoiceCanceled(invoice)) {
+            setError('Canceled invoices cannot be sent by email.');
             return;
         }
 

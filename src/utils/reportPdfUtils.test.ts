@@ -133,6 +133,8 @@ describe('reportPdfUtils', () => {
                     invoiceDate: 'Apr 12, 2026',
                     dueDate: 'Apr 26, 2026',
                     paidDate: 'Apr 20, 2026',
+                    canceledAt: 'Jul 14, 2026, 10:30 AM',
+                    cancellationReason: 'Duplicate <invoice>',
                     status: 'paid',
                     currency: 'EUR',
                     subtotal: 'EUR1,000.00',
@@ -147,6 +149,9 @@ describe('reportPdfUtils', () => {
         expect(html).toContain('INV-001');
         expect(html).toContain('Acme');
         expect(html).toContain('EUR1,220.00');
+        expect(html).toContain('Canceled');
+        expect(html).toContain('Cancellation Reason');
+        expect(html).toContain('Duplicate &lt;invoice&gt;');
     });
 
     it('builds an outstanding invoices report html document with aging and invoice rows', () => {

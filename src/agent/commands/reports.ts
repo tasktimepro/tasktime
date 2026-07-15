@@ -26,8 +26,12 @@ import {
     getInvoiceStatus,
     getInvoiceTotal,
     invoiceBelongsToProject,
+    isInvoiceCanceled,
+    isInvoiceOutstanding,
     isInvoiceOverdue,
     isInvoicePaid,
+    isInvoiceRevenueBearing,
+    matchesInvoiceStatusFilter,
 } from '@/utils/invoiceUtils';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 import { isTimestampStartWithinStoredDateRange } from '@/utils/reportDateBoundary';
@@ -75,7 +79,7 @@ export interface ReportSummaryInput {
     clientId?: string | null;
     projectId?: string | null;
     categoryId?: string | null;
-    invoiceStatus?: 'all' | 'non-draft' | 'paid' | 'unpaid' | 'overdue' | 'draft';
+    invoiceStatus?: 'all' | 'non-draft' | 'paid' | 'unpaid' | 'overdue' | 'draft' | 'canceled';
     expenseStatus?: 'all' | 'paid' | 'unpaid' | 'claimed' | 'unclaimed' | 'excluded';
     incomeDateBasis?: 'invoice-date' | 'paid-date';
     expenseDateBasis?: 'expense-date' | 'paid-date';
@@ -324,30 +328,25 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
         if (clientId !== 'all' && invoice.clientId !== clientId) return false;
         if (projectId !== 'all' && !invoiceBelongsToProject(invoice, projectId)) return false;
 
-        const status = getInvoiceStatus(invoice);
-        if (invoiceStatus === 'non-draft' && status === 'draft') return false;
-        if (invoiceStatus === 'paid' && !isInvoicePaid(invoice)) return false;
-        if (invoiceStatus === 'unpaid' && (isInvoicePaid(invoice) || status === 'draft')) return false;
-        if (invoiceStatus === 'overdue' && !isInvoiceOverdue(invoice)) return false;
-        if (invoiceStatus === 'draft' && status !== 'draft') return false;
-
-        return true;
+        return matchesInvoiceStatusFilter(invoice, invoiceStatus);
     });
     const scopedEntityFilteredInvoices = projectId === 'all'
         ? entityFilteredInvoices
         : entityFilteredInvoices
             .map((invoice) => scopeInvoiceToProject(invoice, projectId, projectsById))
             .filter((invoice): invoice is Invoice => Boolean(invoice));
+    const financialScopedEntityFilteredInvoices = scopedEntityFilteredInvoices.filter(isInvoiceRevenueBearing);
     const filteredInvoices = scopedEntityFilteredInvoices.filter((invoice) => {
         const dateValue = incomeDateBasis === 'paid-date' ? getInvoicePaymentDateString(invoice) : invoice.date;
         return matchesStoredDateRange(dateValue, resolvedRange.startDate, resolvedRange.endDate);
     });
-    const issuedInvoicesInRange = scopedEntityFilteredInvoices.filter((invoice) => matchesStoredDateRange(invoice.date, resolvedRange.startDate, resolvedRange.endDate));
-    const paidInvoicesInRange = scopedEntityFilteredInvoices.filter((invoice) => (
+    const financialFilteredInvoices = filteredInvoices.filter(isInvoiceRevenueBearing);
+    const issuedInvoicesInRange = financialScopedEntityFilteredInvoices.filter((invoice) => matchesStoredDateRange(invoice.date, resolvedRange.startDate, resolvedRange.endDate));
+    const paidInvoicesInRange = financialScopedEntityFilteredInvoices.filter((invoice) => (
         isInvoicePaid(invoice) && matchesStoredDateRange(getInvoicePaymentDateString(invoice), resolvedRange.startDate, resolvedRange.endDate)
     ));
-    const outstandingInvoices = scopedEntityFilteredInvoices.filter((invoice) => (
-        !isInvoicePaid(invoice) && getInvoiceStatus(invoice) !== 'draft' && invoice.date <= resolvedRange.endDate
+    const outstandingInvoices = financialScopedEntityFilteredInvoices.filter((invoice) => (
+        isInvoiceOutstanding(invoice) && invoice.date <= resolvedRange.endDate
     ));
     const overdueInvoices = outstandingInvoices.filter((invoice) => isInvoiceOverdue(invoice, reportReferenceDate));
     const filteredExpenses = data.expenses.filter((expense) => {
@@ -472,14 +471,14 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
     );
     const totalHoursMs = filteredTimeEntries.reduce((sum, entry) => sum + Math.max(0, (entry.end || 0) - entry.start), 0);
     const billableHoursMs = filteredTimeEntries.reduce((sum, entry) => sum + (entry.task?.billable ? getBillableDurationMs(entry) : 0), 0);
-    const vatSummary = buildVatReportSummary({ invoices: filteredInvoices, expenses: filteredExpenses, clientsById, businessInfosById });
+    const vatSummary = buildVatReportSummary({ invoices: financialFilteredInvoices, expenses: filteredExpenses, clientsById, businessInfosById });
     const outstandingSummary = buildOutstandingInvoiceSummary(outstandingInvoices, reportReferenceDate);
     const expenseTotalsSummary = buildExpenseTotalsSummary(filteredExpenses);
     const invoiceRegisterSummary = buildInvoiceRegisterSummary({ invoices: filteredInvoices, clientsById, businessInfosById, preferredCurrency });
-    const statementClientIds = Array.from(new Set(scopedEntityFilteredInvoices.map((invoice) => invoice.clientId).filter(Boolean)));
+    const statementClientIds = Array.from(new Set(financialScopedEntityFilteredInvoices.map((invoice) => invoice.clientId).filter(Boolean)));
     const selectedStatementClientId = clientId !== 'all' ? clientId : (statementClientIds.length === 1 ? statementClientIds[0] : null);
     const statementInvoices = selectedStatementClientId
-        ? scopedEntityFilteredInvoices.filter((invoice) => invoice.clientId === selectedStatementClientId)
+        ? financialScopedEntityFilteredInvoices.filter((invoice) => invoice.clientId === selectedStatementClientId)
         : [];
     const clientStatementSummary = selectedStatementClientId
         ? buildClientStatementSummary({
@@ -573,6 +572,8 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
                 dueDate: invoice.dueDate || '',
                 paidDate: getInvoicePaymentDateString(invoice) || '',
                 status: getInvoiceStatus(invoice, reportReferenceDate),
+                canceledAt: invoice.canceledAt ? toDisplayDate(invoice.canceledAt) : '',
+                cancellationReason: invoice.cancellationReason || '',
                 currency: invoice.currency || preferredCurrency,
                 subtotal: invoice.subtotal || 0,
                 tax: invoice.tax || 0,
@@ -658,7 +659,7 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
                 rows: projectWorkSummary.rows.slice(0, rowLimit),
             } : null,
             projectBreakdown: projectId === 'all'
-                ? filteredInvoices.flatMap((invoice) => getInvoiceProjectRevenueBreakdown(invoice).map((breakdown) => ({
+                ? financialFilteredInvoices.flatMap((invoice) => getInvoiceProjectRevenueBreakdown(invoice).map((breakdown) => ({
                     projectId: breakdown.projectId,
                     projectTitle: breakdown.projectTitle || projectsById.get(breakdown.projectId)?.title || EMPTY_PROJECT,
                     ...getInvoiceReportAmount(invoice, preferredCurrency, breakdown.allocatedTotal || 0),
@@ -764,7 +765,12 @@ export async function exportAccountantPackCommand(context: AgentCommandContext, 
     }];
     const invoicePdfFiles = input.includeInvoicePdfs === false
         ? []
-        : await buildAccountantPackInvoicePdfFiles(context, report, getCurrentInvoiceHtmlContent);
+        : await buildAccountantPackInvoicePdfFiles(
+            context,
+            report,
+            getCurrentInvoiceHtmlContent,
+            input.invoiceStatus === 'canceled'
+        );
     const invoicePdfEntries = await Promise.all(invoicePdfFiles.map(async (file) => ({
         filename: file.filename,
         content: await generatePDFBlob(file.htmlContent),
@@ -1154,14 +1160,16 @@ const buildReviewChecklistRows = (report: any) => {
 const buildAccountantPackInvoicePdfFiles = async (
     context: AgentCommandContext,
     report: any,
-    getCurrentInvoiceHtmlContent: (invoice: any, clients: any[], businessBrandAssets: any[]) => string
+    getCurrentInvoiceHtmlContent: (invoice: any, clients: any[], businessBrandAssets: any[]) => string,
+    includeCanceled: boolean
 ) => {
     const invoiceIds = new Set((report.rows.invoices || []).map((invoice: any) => invoice.id).filter(Boolean));
     const allInvoices = typeof context.store.getAllInvoices === 'function'
         ? await context.store.getAllInvoices()
         : collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent accountant pack invoices');
     const invoices = allInvoices
-        .filter((invoice) => invoiceIds.has(invoice.id) && invoice.invoiceNumber);
+        .filter((invoice) => invoiceIds.has(invoice.id) && invoice.invoiceNumber)
+        .filter((invoice) => includeCanceled || !isInvoiceCanceled(invoice));
     const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent accountant pack clients');
     const businessBrandAssets = collectValidatedEntities<BusinessBrandAsset>('businessBrandAssets', context.store.businessBrandAssets as any, 'agent accountant pack brand assets');
     const usedFilenames = new Set<string>();
@@ -1203,7 +1211,7 @@ const getEmptyReportCsvColumns = (section: ReportSection) => {
         statement: ['section', 'invoiceNumber', 'date', 'dueDate', 'paidDate', 'status', 'currency', 'total'],
         'work-summary': ['task', 'entries', 'totalDurationMs', 'billableDurationMs', 'notes', 'firstWorkedAt', 'lastWorkedAt'],
         tax: ['section', 'label', 'currency', 'grossAmount', 'netAmount', 'taxAmount', 'count'],
-        invoices: ['id', 'invoiceNumber', 'client', 'business', 'invoiceDate', 'dueDate', 'paidDate', 'status', 'currency', 'subtotal', 'tax', 'total', 'project'],
+        invoices: ['id', 'invoiceNumber', 'client', 'business', 'invoiceDate', 'dueDate', 'paidDate', 'status', 'canceledAt', 'cancellationReason', 'currency', 'subtotal', 'tax', 'total', 'project'],
         outstanding: ['id', 'invoiceNumber', 'client', 'dueDate', 'status', 'daysOverdue', 'currency', 'total'],
         expenses: ['id', 'date', 'paidDate', 'title', 'supplier', 'category', 'business', 'client', 'project', 'currency', 'amount', 'taxAmount', 'paymentStatus', 'billingStatus', 'claimStatus'],
         hours: ['project', 'client', 'entries', 'totalHours', 'billableHours', 'unbilledBillableHours'],

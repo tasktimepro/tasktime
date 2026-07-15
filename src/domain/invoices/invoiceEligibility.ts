@@ -1,6 +1,7 @@
 import type { Invoice, Task, TimeEntry } from '@/stores/yjs/types';
 import { isStoredDateWithinBillingRange } from '@/utils/billingPeriodUtils';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
+import { isInvoiceCanceled } from '@/utils/invoiceUtils';
 
 const HOUR_IN_MS = 60 * 60 * 1000;
 
@@ -108,7 +109,11 @@ export const collectLegacyBilledTimeEntryIds = ({
     const taskMap = new Map(tasks.map((task) => [task.id, task]));
     const legacyBilledEntryIds = new Set<string>();
     const sortedInvoices = [...invoices]
-        .filter((invoice) => invoice.status !== 'draft' && !invoice.billingSelectionSnapshot)
+        .filter((invoice) => (
+            invoice.status !== 'draft'
+            && !isInvoiceCanceled(invoice)
+            && !invoice.billingSelectionSnapshot
+        ))
         .sort((left, right) => (left.createdAt || 0) - (right.createdAt || 0));
 
     sortedInvoices.forEach((invoiceRecord) => {

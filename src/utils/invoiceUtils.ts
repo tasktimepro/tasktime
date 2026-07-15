@@ -24,12 +24,14 @@ const PAID_INVOICE_STATUS = 'paid';
 const DRAFT_INVOICE_STATUS = 'draft';
 const SENT_INVOICE_STATUS = 'sent';
 const OVERDUE_INVOICE_STATUS = 'overdue';
+const CANCELED_INVOICE_STATUS = 'canceled';
 
 const INVOICE_STATUS_VALUES = new Set([
     DRAFT_INVOICE_STATUS,
     SENT_INVOICE_STATUS,
     PAID_INVOICE_STATUS,
     OVERDUE_INVOICE_STATUS,
+    CANCELED_INVOICE_STATUS,
 ]);
 
 const getStartOfToday = (referenceDate?: Date) => {
@@ -529,7 +531,11 @@ export const getInvoiceSubtotal = (invoice: any): number => {
 export const getInvoiceStatus = (invoice: any, referenceDate?: Date) => {
     const baseStatus = resolveBaseInvoiceStatus(invoice);
 
-    if (baseStatus === PAID_INVOICE_STATUS || baseStatus === DRAFT_INVOICE_STATUS) {
+    if (
+        baseStatus === PAID_INVOICE_STATUS
+        || baseStatus === DRAFT_INVOICE_STATUS
+        || baseStatus === CANCELED_INVOICE_STATUS
+    ) {
         return baseStatus;
     }
 
@@ -546,6 +552,44 @@ export const getInvoiceStatus = (invoice: any, referenceDate?: Date) => {
 export const isInvoicePaid = (invoice: any) => getInvoiceStatus(invoice) === PAID_INVOICE_STATUS;
 
 export const isInvoiceOverdue = (invoice: any, referenceDate?: Date) => getInvoiceStatus(invoice, referenceDate) === OVERDUE_INVOICE_STATUS;
+
+export const isInvoiceCanceled = (invoice: any) => getInvoiceStatus(invoice) === CANCELED_INVOICE_STATUS;
+
+export const isInvoiceRevenueBearing = (invoice: any): boolean => {
+    const status = getInvoiceStatus(invoice);
+
+    return status !== DRAFT_INVOICE_STATUS && status !== CANCELED_INVOICE_STATUS;
+};
+
+export const isInvoiceOutstanding = (invoice: any, referenceDate?: Date): boolean => {
+    const status = getInvoiceStatus(invoice, referenceDate);
+
+    return status === SENT_INVOICE_STATUS || status === OVERDUE_INVOICE_STATUS;
+};
+
+export const matchesInvoiceStatusFilter = (
+    invoice: any,
+    filter: string | null | undefined,
+    referenceDate?: Date
+): boolean => {
+    if (!filter || filter === 'all') {
+        return true;
+    }
+
+    if (filter === 'outstanding') {
+        return getInvoiceStatus(invoice, referenceDate) === SENT_INVOICE_STATUS;
+    }
+
+    if (filter === 'unpaid') {
+        return isInvoiceOutstanding(invoice, referenceDate);
+    }
+
+    if (filter === 'non-draft') {
+        return getInvoiceStatus(invoice, referenceDate) !== DRAFT_INVOICE_STATUS;
+    }
+
+    return getInvoiceStatus(invoice, referenceDate) === filter;
+};
 
 export const createInvoicePaymentCurrencySnapshot = ({
     invoice,
@@ -710,8 +754,10 @@ export const normalizeInvoiceRecord = (invoice: any, referenceDate?: Date) => {
 };
 
 export const getInvoiceStatusAfterMarkingUnpaid = (invoice: any, referenceDate?: Date) => {
-    if (resolveBaseInvoiceStatus(invoice) === DRAFT_INVOICE_STATUS) {
-        return DRAFT_INVOICE_STATUS;
+    const baseStatus = resolveBaseInvoiceStatus(invoice);
+
+    if (baseStatus === DRAFT_INVOICE_STATUS || baseStatus === CANCELED_INVOICE_STATUS) {
+        return baseStatus;
     }
 
     return isInvoiceOverdue(invoice, referenceDate)
@@ -908,6 +954,10 @@ export const getInvoiceUndoBlockReason = (invoice: any, invoices: any[] | null |
 
     if (!invoice || typeof invoice !== 'object' || !invoice.id) {
         return 'Invoice not found.';
+    }
+
+    if (isInvoiceCanceled(invoice)) {
+        return 'Canceled invoices cannot be undone.';
     }
 
     if (isInvoicePaid(invoice)) {

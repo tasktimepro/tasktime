@@ -10,7 +10,7 @@ import InvoicesList from './InvoicesList';
 import { DEFAULT_CURRENCY, formatCurrency, getCurrencySymbol, getProjectCurrency } from '../utils/currencyUtils.ts';
 import { millisecondsToHours, toDisplayDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceTotal, getPaidInvoiceConvertedAmount, getInvoicesForProject, isInvoicePaid, isMultiProjectInvoice } from '../utils/invoiceUtils.ts';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, getInvoicesForProject, isInvoiceOutstanding, isInvoicePaid, isMultiProjectInvoice } from '../utils/invoiceUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
@@ -307,7 +307,7 @@ const ProjectDashboard = ({
 
         // Calculate pending amount from unpaid invoices
         const pendingAmount = projectInvoices.reduce((total, invoice) => {
-            if (!isInvoicePaid(invoice)) {
+            if (isInvoiceOutstanding(invoice)) {
                 return total + getInvoiceTotal(invoice);
             }
             return total;

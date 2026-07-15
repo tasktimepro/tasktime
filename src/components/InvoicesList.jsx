@@ -7,9 +7,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
-import { Send, Bell, MoreHorizontal, RotateCcw } from 'lucide-react';
+import { Send, Bell, MoreHorizontal, RotateCcw, Ban } from 'lucide-react';
 import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
@@ -22,11 +23,16 @@ import {
     getInvoicePaymentCurrencySnapshot,
     getInvoiceSequenceRollback,
     getInvoiceStatus,
+    getInvoiceStatusAfterMarkingUnpaid,
     getInvoiceTotal,
     isInvoiceOverdue,
     isInvoicePaid,
+    isInvoiceCanceled,
+    isInvoiceOutstanding,
+    matchesInvoiceStatusFilter,
     resolveCurrentInvoiceTemplate,
 } from '../utils/invoiceUtils.ts';
+import { INVOICE_CANCELLATION_REASON_MAX_LENGTH } from '../domain/invoices/invoiceCancellation.ts';
 import Pagination from './Pagination';
 import Modal from './Modal';
 import InvoicePreviewModal from './invoice/InvoicePreviewModal';
@@ -35,6 +41,20 @@ import EmailPreviewModal from './invoice/EmailPreviewModal';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { cn } from '@/lib/utils';
+
+/**
+ * Resolve the list bucket a paid invoice will enter after its payment is corrected.
+ */
+const getInvoiceTabAfterMarkingUnpaid = (invoice) => {
+    const unpaidInvoice = {
+        ...invoice,
+        status: getInvoiceStatusAfterMarkingUnpaid(invoice),
+        paidAt: null,
+        paymentCurrencySnapshot: undefined,
+    };
+
+    return getInvoiceStatus(unpaidInvoice) === 'overdue' ? 'overdue' : 'outstanding';
+};
 
 /**
  * InvoicesList component - Displays saved invoices with edit, download, and preview options
@@ -59,11 +79,17 @@ const InvoicesList = ({
     const [pendingPaymentInvoice, setPendingPaymentInvoice] = useState(null);
     const [paymentDetailsMode, setPaymentDetailsMode] = useState('mark-paid');
     const [isSavingPaymentDetails, setIsSavingPaymentDetails] = useState(false);
+    const [pendingUnpaidInvoice, setPendingUnpaidInvoice] = useState(null);
+    const [isMarkingInvoiceUnpaid, setIsMarkingInvoiceUnpaid] = useState(false);
     const [emailInvoice, setEmailInvoice] = useState(null);
     const [emailSendType, setEmailSendType] = useState('invoice');
     const [pendingUndoInvoice, setPendingUndoInvoice] = useState(null);
     const [undoConfirmationText, setUndoConfirmationText] = useState('');
     const [isUndoingInvoice, setIsUndoingInvoice] = useState(false);
+    const [pendingCancellationInvoice, setPendingCancellationInvoice] = useState(null);
+    const [cancellationReason, setCancellationReason] = useState('');
+    const [cancellationConfirmationText, setCancellationConfirmationText] = useState('');
+    const [isCancelingInvoice, setIsCancelingInvoice] = useState(false);
     const { updateUrl } = useUrlState();
     
     // Yjs hook for invoice updates
@@ -74,6 +100,8 @@ const InvoicesList = ({
         markAsUnpaid,
         undoLatestInvoice,
         canUndoInvoice,
+        cancelInvoice,
+        getInvoiceCancellationBlockReason,
     } = useInvoices();
     const { preferences } = usePreferences();
     const preferredCurrency = normalizeCurrencyCode(preferences.currency);
@@ -82,22 +110,29 @@ const InvoicesList = ({
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
 
     // Keep tabs mutually exclusive: overdue invoices are not also listed as outstanding.
-    const outstandingInvoices = useMemo(() => 
-        activeInvoices.filter((invoice) => !isInvoicePaid(invoice) && !isInvoiceOverdue(invoice)),
+    const outstandingInvoices = useMemo(() =>
+        activeInvoices.filter((invoice) => (
+            matchesInvoiceStatusFilter(invoice, 'outstanding')
+            || matchesInvoiceStatusFilter(invoice, 'draft')
+        )),
     [activeInvoices]);
 
-    const paidInvoices = useMemo(() => 
-        activeInvoices.filter((invoice) => isInvoicePaid(invoice)),
+    const paidInvoices = useMemo(() =>
+        activeInvoices.filter((invoice) => matchesInvoiceStatusFilter(invoice, 'paid')),
     [activeInvoices]);
 
     // Overdue invoices are shown in their own bucket.
-    const overdueInvoices = useMemo(() => 
-        activeInvoices.filter((invoice) => !isInvoicePaid(invoice) && isInvoiceOverdue(invoice)),
+    const overdueInvoices = useMemo(() =>
+        activeInvoices.filter((invoice) => matchesInvoiceStatusFilter(invoice, 'overdue')),
+    [activeInvoices]);
+
+    const canceledInvoices = useMemo(() =>
+        activeInvoices.filter((invoice) => matchesInvoiceStatusFilter(invoice, 'canceled')),
     [activeInvoices]);
     
     // Default to first non-empty tab (overdue -> outstanding -> paid), with optional override via selectedTab
     const defaultTab = useMemo(() => {
-        const validTabs = ['overdue', 'outstanding', 'paid'];
+        const validTabs = ['overdue', 'outstanding', 'paid', 'canceled'];
         if (selectedTab && validTabs.includes(selectedTab)) {
             if (selectedTab !== 'overdue' || overdueInvoices.length > 0) {
                 return selectedTab;
@@ -122,6 +157,7 @@ const InvoicesList = ({
     const [outstandingPage, setOutstandingPage] = useState(1);
     const [paidPage, setPaidPage] = useState(1);
     const [overduePage, setOverduePage] = useState(1);
+    const [canceledPage, setCanceledPage] = useState(1);
     const ITEMS_PER_PAGE = 8;
 
     // Calculate paginated invoices for each tab
@@ -140,6 +176,11 @@ const InvoicesList = ({
         return overdueInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [overdueInvoices, overduePage]);
 
+    const paginatedCanceledInvoices = useMemo(() => {
+        const startIndex = (canceledPage - 1) * ITEMS_PER_PAGE;
+        return canceledInvoices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [canceledInvoices, canceledPage]);
+
     // Calculate total pages for each tab
     const outstandingTotalPages = useMemo(() => 
         Math.ceil(outstandingInvoices.length / ITEMS_PER_PAGE) || 1,
@@ -152,6 +193,10 @@ const InvoicesList = ({
     const overdueTotalPages = useMemo(() => 
         Math.ceil(overdueInvoices.length / ITEMS_PER_PAGE) || 1,
     [overdueInvoices.length]);
+
+    const canceledTotalPages = useMemo(() =>
+        Math.ceil(canceledInvoices.length / ITEMS_PER_PAGE) || 1,
+    [canceledInvoices.length]);
     
     // Handle page change for outstanding invoices
     const handleOutstandingPageChange = (pageNumber) => {
@@ -174,8 +219,13 @@ const InvoicesList = ({
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const handleCanceledPageChange = (pageNumber) => {
+        setCanceledPage(pageNumber);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     // Handle tab change
-    const handleTabChange = (tab) => {
+    const handleTabChange = useCallback((tab) => {
         setActiveTab(tab);
         // Update URL to reflect the selected tab, preserving other parameters
         const currentParams = new URLSearchParams(window.location.search);
@@ -184,7 +234,7 @@ const InvoicesList = ({
             tab,
             section: section || 'invoices' // Preserve the current section
         });
-    };
+    }, [updateUrl]);
 
     /**
      * Handle invoice download
@@ -277,6 +327,87 @@ const InvoicesList = ({
             setIsUndoingInvoice(false);
         }
     }, [emailInvoice, pendingUndoInvoice, selectedInvoice, showError, showSuccess, undoConfirmationText, undoLatestInvoice]);
+
+    const handleOpenCancellationModal = useCallback((invoice) => {
+        const blockReason = getInvoiceCancellationBlockReason(invoice);
+
+        if (blockReason) {
+            showError(blockReason);
+            return;
+        }
+
+        setPendingCancellationInvoice(invoice);
+        setCancellationReason('');
+        setCancellationConfirmationText('');
+    }, [getInvoiceCancellationBlockReason, showError]);
+
+    const handleCloseCancellationModal = useCallback(() => {
+        if (isCancelingInvoice) {
+            return;
+        }
+
+        setPendingCancellationInvoice(null);
+        setCancellationReason('');
+        setCancellationConfirmationText('');
+    }, [isCancelingInvoice]);
+
+    const handleConfirmCancellation = useCallback(async () => {
+        if (!pendingCancellationInvoice || isCancelingInvoice) {
+            return;
+        }
+
+        const normalizedReason = cancellationReason.trim();
+        const expectedConfirmation = pendingCancellationInvoice.invoiceNumber || '';
+        const inputsAreValid = normalizedReason.length > 0
+            && normalizedReason.length <= INVOICE_CANCELLATION_REASON_MAX_LENGTH
+            && cancellationConfirmationText === expectedConfirmation;
+
+        if (!inputsAreValid) {
+            showError('Enter a cancellation reason and type the exact invoice number to confirm.');
+            return;
+        }
+
+        setIsCancelingInvoice(true);
+
+        try {
+            const invoiceToCancel = pendingCancellationInvoice;
+            const result = await cancelInvoice(invoiceToCancel.id, { reason: normalizedReason });
+            const canceledInvoice = result?.invoice || {
+                ...invoiceToCancel,
+                status: 'canceled',
+                cancellationReason: normalizedReason,
+            };
+
+            if (selectedInvoice?.id === invoiceToCancel.id) {
+                setSelectedInvoice(canceledInvoice);
+            }
+
+            if (emailInvoice?.id === invoiceToCancel.id) {
+                setEmailInvoice(null);
+            }
+
+            if (pendingPaymentInvoice?.id === invoiceToCancel.id) {
+                setPendingPaymentInvoice(null);
+            }
+
+            if (pendingPaidEditInvoice?.id === invoiceToCancel.id) {
+                setPendingPaidEditInvoice(null);
+            }
+
+            setPendingCancellationInvoice(null);
+            setCancellationReason('');
+            setCancellationConfirmationText('');
+            handleTabChange('canceled');
+
+            showSuccess(
+                `Invoice ${canceledInvoice.invoiceNumber || invoiceToCancel.invoiceNumber} canceled. ${result?.releasedTimeEntryCount || 0} billed entr${result?.releasedTimeEntryCount === 1 ? 'y' : 'ies'} restored, ${result?.deletedAdjustmentCount || 0} invoice adjustment${result?.deletedAdjustmentCount === 1 ? '' : 's'} removed, ${result?.releasedExpenseCount || 0} expense${result?.releasedExpenseCount === 1 ? '' : 's'} unbilled, and ${result?.releasedQuotedTaskCount || 0} quoted task${result?.releasedQuotedTaskCount === 1 ? '' : 's'} released. Invoice number retained.`
+            );
+        } catch (error) {
+            showError(error.message || 'Unable to cancel this invoice.');
+        } finally {
+            setIsCancelingInvoice(false);
+        }
+    }, [cancelInvoice, cancellationConfirmationText, cancellationReason, emailInvoice, handleTabChange, isCancelingInvoice, pendingCancellationInvoice, pendingPaidEditInvoice, pendingPaymentInvoice, selectedInvoice, showError, showSuccess]);
 
     /**
      * Handle invoice edit
@@ -391,27 +522,70 @@ const InvoicesList = ({
         }
     }, [handleAfterMarkPaid, markAsPaid, paymentDetailsMode, pendingPaymentInvoice, showError, showSuccess, updatePaymentDetails]);
 
-    /**
-     * Handle payment processed toggle
-     */
-    const handleInvoiceStatusToggle = async (invoice) => {
-        const nextPaidState = !isInvoicePaid(invoice);
+    const handleOpenMarkUnpaidModal = useCallback((invoice) => {
+        if (!isInvoicePaid(invoice) || isInvoiceCanceled(invoice)) {
+            showError('Only paid invoices can be marked as unpaid.');
+            return;
+        }
+
+        setPendingUnpaidInvoice(invoice);
+    }, [showError]);
+
+    const handleCloseMarkUnpaidModal = useCallback(() => {
+        if (isMarkingInvoiceUnpaid) {
+            return;
+        }
+
+        setPendingUnpaidInvoice(null);
+    }, [isMarkingInvoiceUnpaid]);
+
+    const handleConfirmMarkUnpaid = useCallback(async () => {
+        if (!pendingUnpaidInvoice || isMarkingInvoiceUnpaid) {
+            return;
+        }
+
+        const invoiceToUpdate = pendingUnpaidInvoice;
+        setIsMarkingInvoiceUnpaid(true);
 
         try {
-            if (nextPaidState) {
-                if (invoiceNeedsPaymentDetails(invoice)) {
-                    openPaymentDetailsModal(invoice, 'mark-paid');
-                    return;
-                }
+            const updatedInvoice = await markAsUnpaid(invoiceToUpdate.id);
 
-                await markAsPaid(invoice.id);
-                handleAfterMarkPaid(invoice);
-            } else {
-                markAsUnpaid(invoice.id);
+            if (!updatedInvoice) {
+                throw new Error('Invoice could not be found. Refresh the list and try again.');
             }
+
+            const nextTab = getInvoiceTabAfterMarkingUnpaid(invoiceToUpdate);
+            setPendingUnpaidInvoice(null);
+            handleTabChange(nextTab);
+            showSuccess(
+                `Invoice ${invoiceToUpdate.invoiceNumber} marked as unpaid. Recorded payment details were cleared.`
+            );
+        } catch (error) {
+            showError(error.message || 'Unable to mark this invoice as unpaid.');
+        } finally {
+            setIsMarkingInvoiceUnpaid(false);
+        }
+    }, [handleTabChange, isMarkingInvoiceUnpaid, markAsUnpaid, pendingUnpaidInvoice, showError, showSuccess]);
+
+    /**
+     * Mark an unpaid finalized invoice as paid.
+     */
+    const handleMarkPaid = async (invoice) => {
+        if (isInvoiceCanceled(invoice)) {
+            showError('Canceled invoices are read-only historical records.');
+            return;
+        }
+
+        try {
+            if (invoiceNeedsPaymentDetails(invoice)) {
+                openPaymentDetailsModal(invoice, 'mark-paid');
+                return;
+            }
+
+            await markAsPaid(invoice.id);
+            handleAfterMarkPaid(invoice);
         } catch (error) {
             showError(error.message || 'Unable to update invoice payment status.');
-            return;
         }
     };
 
@@ -420,14 +594,17 @@ const InvoicesList = ({
         <div className="text-center py-8">
             <DocumentTextIcon className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-sm font-medium text-foreground">
-                {tabType === 'outstanding' ? 'No outstanding invoices' : 
-                 tabType === 'overdue' ? 'No overdue invoices' : 'No paid invoices'}
+                {tabType === 'outstanding' ? 'No outstanding invoices' :
+                 tabType === 'overdue' ? 'No overdue invoices' :
+                 tabType === 'canceled' ? 'No canceled invoices' : 'No paid invoices'}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
                 {tabType === 'outstanding' 
                     ? 'You have no current invoices awaiting payment.'
                     : tabType === 'overdue'
                     ? 'All your invoices are up to date.'
+                    : tabType === 'canceled'
+                    ? 'Canceled invoices remain here as read-only historical records.'
                     : 'No invoices have been marked as paid yet.'
                 }
             </p>
@@ -450,6 +627,12 @@ const InvoicesList = ({
             totalPages = outstandingTotalPages;
             handlePageChange = handleOutstandingPageChange;
             totalInvoices = outstandingInvoices.length;
+        } else if (activeTab === 'canceled') {
+            currentInvoices = paginatedCanceledInvoices;
+            currentPage = canceledPage;
+            totalPages = canceledTotalPages;
+            handlePageChange = handleCanceledPageChange;
+            totalInvoices = canceledInvoices.length;
         } else {
             currentInvoices = paginatedPaidInvoices;
             currentPage = paidPage;
@@ -476,7 +659,9 @@ const InvoicesList = ({
                         const invoiceStatus = getInvoiceStatus(invoice);
                         const invoiceIsPaid = isInvoicePaid(invoice);
                         const invoiceIsOverdue = isInvoiceOverdue(invoice);
-                        const invoiceCanBeUndone = canUndoInvoice(invoice);
+                        const invoiceIsCanceled = isInvoiceCanceled(invoice);
+                        const invoiceCanBeUndone = !invoiceIsCanceled && canUndoInvoice(invoice);
+                        const invoiceCanBeCanceled = isInvoiceOutstanding(invoice);
                         const invoiceHasEditablePaymentDetails = invoiceNeedsPaymentDetails(invoice);
 
                         return (
@@ -496,7 +681,7 @@ const InvoicesList = ({
                                             </h3>
                                         </div>
                                         <div className={cn('flex flex-wrap gap-2', isMobileLayout && 'w-full')}>
-                                            {invoiceIsPaid ? (
+                                            {invoiceIsCanceled ? null : invoiceIsPaid ? (
                                                 <Badge variant="success">
                                                     <CheckIcon className="h-3 w-3 mr-1" />
                                                     Paid <span className="mx-1">•</span>
@@ -552,6 +737,14 @@ const InvoicesList = ({
                                             }`}>
                                                 Due: {toDisplayDate(invoice.dueDate)}
                                             </p>
+                                        )}
+                                        {invoiceIsCanceled && (
+                                            <Notice
+                                                className="mt-2"
+                                                compact
+                                                title="Cancellation reason"
+                                                description={invoice.cancellationReason}
+                                            />
                                         )}
                                         <div className="mt-1 text-xs text-muted-foreground break-words">
                                             <p>
@@ -630,9 +823,9 @@ const InvoicesList = ({
 
                                     {/* Action buttons - right side */}
                                     <div className={cn('flex items-center gap-2', isMobileLayout ? 'w-full flex-wrap justify-end' : 'justify-end')}>
-                                        {!invoiceIsPaid && (
+                                        {!invoiceIsPaid && !invoiceIsCanceled && (
                                             <Button
-                                                onClick={() => handleInvoiceStatusToggle(invoice)}
+                                                onClick={() => handleMarkPaid(invoice)}
                                                 size="sm"
                                                 leadingIcon={CheckIcon}
                                             >
@@ -641,7 +834,7 @@ const InvoicesList = ({
                                         )}
 
                                         {/* Email actions: Send Invoice or Send Reminder */}
-                                        {!invoiceIsPaid && !invoice.sentAt && (
+                                        {!invoiceIsPaid && !invoiceIsCanceled && !invoice.sentAt && (
                                             <Button
                                                 onClick={() => handleOpenEmailModal(invoice, 'invoice')}
                                                 variant="ghost"
@@ -690,13 +883,22 @@ const InvoicesList = ({
                                                     <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                                                     <span>Download</span>
                                                 </DropdownMenuItem>
-                                                {invoiceIsPaid && invoiceHasEditablePaymentDetails && (
+                                                {!invoiceIsCanceled && invoiceIsPaid && invoiceHasEditablePaymentDetails && (
                                                     <DropdownMenuItem
                                                         onClick={() => openPaymentDetailsModal(invoice, 'edit-payment')}
                                                         className="cursor-pointer hover:bg-accent focus:bg-accent"
                                                     >
                                                         <CheckIcon className="h-4 w-4 mr-2" />
                                                         <span>Edit payment details</span>
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {!invoiceIsCanceled && invoiceIsPaid && (
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleOpenMarkUnpaidModal(invoice)}
+                                                        className="status-danger-action cursor-pointer"
+                                                    >
+                                                        <RotateCcw className="h-4 w-4 mr-2" />
+                                                        <span>Mark as unpaid</span>
                                                     </DropdownMenuItem>
                                                 )}
                                                 {invoiceStatus === 'draft' && (
@@ -715,6 +917,15 @@ const InvoicesList = ({
                                                     >
                                                         <RotateCcw className="h-4 w-4 mr-2" />
                                                         <span>Undo</span>
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {invoiceCanBeCanceled && (
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleOpenCancellationModal(invoice)}
+                                                        className="status-danger-action cursor-pointer"
+                                                    >
+                                                        <Ban className="h-4 w-4 mr-2" />
+                                                        <span>Cancel invoice</span>
                                                     </DropdownMenuItem>
                                                 )}
                                             </DropdownMenuContent>
@@ -830,6 +1041,16 @@ const InvoicesList = ({
                     >
                         Paid ({paidInvoices.length})
                     </TabsTrigger>
+                    <TabsTrigger
+                        value="canceled"
+                        className={cn(
+                            isMobileLayout
+                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                        )}
+                    >
+                        Canceled ({canceledInvoices.length})
+                    </TabsTrigger>
                 </TabsList>
             </Tabs>
 
@@ -893,6 +1114,157 @@ const InvoicesList = ({
                     description="Use Edit payment details instead when you only need to reconcile the received conversion."
                     variant="warning"
                 />
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingUnpaidInvoice)}
+                onClose={handleCloseMarkUnpaidModal}
+                title="Mark Invoice as Unpaid?"
+                description="Correct a mistakenly recorded invoice payment."
+                footer={(
+                    <div className="flex flex-wrap justify-end gap-3">
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmMarkUnpaid}
+                            loading={isMarkingInvoiceUnpaid}
+                            loadingText="Marking as Unpaid"
+                        >
+                            Mark as Unpaid
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleCloseMarkUnpaidModal}
+                            disabled={isMarkingInvoiceUnpaid}
+                        >
+                            Keep Paid
+                        </Button>
+                    </div>
+                )}
+            >
+                {pendingUnpaidInvoice && (
+                    <div className="space-y-4">
+                        <Notice
+                            variant="warning"
+                            title="Use this only to correct a mistakenly recorded payment."
+                        >
+                            <div className="space-y-2">
+                                <p>The recorded payment date and currency conversion snapshot will be removed.</p>
+                                <p>This does not record or issue a refund.</p>
+                            </div>
+                        </Notice>
+
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                            <p>
+                                Invoice: <span className="font-medium text-foreground">{pendingUnpaidInvoice.invoiceNumber}</span>
+                            </p>
+                            <p>
+                                The invoice remains finalized and its billed time and expenses stay linked. It will return to {getInvoiceTabAfterMarkingUnpaid(pendingUnpaidInvoice) === 'overdue' ? 'Overdue' : 'Outstanding'}.
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingCancellationInvoice)}
+                onClose={handleCloseCancellationModal}
+                title="Cancel Invoice?"
+                size="lg"
+                footer={(
+                    <div className="flex flex-wrap justify-end gap-3">
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmCancellation}
+                            loading={isCancelingInvoice}
+                            loadingText="Canceling Invoice"
+                            disabled={
+                                !cancellationReason.trim()
+                                || cancellationReason.trim().length > INVOICE_CANCELLATION_REASON_MAX_LENGTH
+                                || cancellationConfirmationText !== (pendingCancellationInvoice?.invoiceNumber || '')
+                            }
+                        >
+                            Cancel Invoice
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleCloseCancellationModal}
+                            disabled={isCancelingInvoice}
+                        >
+                            Keep Invoice
+                        </Button>
+                    </div>
+                )}
+            >
+                {pendingCancellationInvoice && (
+                    <div className="space-y-4">
+                        <Notice
+                            variant="warning"
+                            title="The invoice will remain as a canceled historical record."
+                            description="Its invoice number stays permanently used. This does not issue a refund or credit note."
+                        />
+
+                        <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2 sm:gap-x-6">
+                            <p>Invoice: <span className="font-medium text-foreground">{pendingCancellationInvoice.invoiceNumber}</span></p>
+                            <p>Date: <span className="font-medium text-foreground">{toDisplayDate(pendingCancellationInvoice.date) || '—'}</span></p>
+                            <p>
+                                Client: <span className="font-medium text-foreground">
+                                    {pendingCancellationInvoice.clientId
+                                        ? clients.find((candidate) => candidate.id === pendingCancellationInvoice.clientId)?.clientName || pendingCancellationInvoice.client?.name || 'Unknown'
+                                        : pendingCancellationInvoice.client?.name || 'Unknown'}
+                                </span>
+                            </p>
+                            <p>
+                                Original total: <span className="font-medium text-foreground sensitive-data">
+                                    {getCurrencySymbol(pendingCancellationInvoice.currency || preferredCurrency)}{getInvoiceTotal(pendingCancellationInvoice).toFixed(2)} {pendingCancellationInvoice.currency || preferredCurrency}
+                                </span>
+                            </p>
+                        </div>
+
+                        <Notice title="Cancellation effects">
+                            <ul className="list-disc space-y-1 pl-5">
+                                <li>Billed time and linked expenses become available to invoice again.</li>
+                                <li>Invoice-only adjustment entries are removed.</li>
+                                <li>Revenue, tax, payment, outstanding, and overdue reports stop counting this invoice.</li>
+                            </ul>
+                        </Notice>
+
+                        <Notice
+                            variant="destructive"
+                            title="Accounting correction may still be required"
+                            description="If this invoice was paid or already tax-accounted, use the appropriate credit-note or refund process outside TaskTime Pro."
+                        />
+
+                        <div className="space-y-2">
+                            <Label htmlFor="invoice-cancellation-reason">Cancellation reason</Label>
+                            <Textarea
+                                id="invoice-cancellation-reason"
+                                value={cancellationReason}
+                                onChange={(event) => setCancellationReason(event.target.value)}
+                                maxLength={INVOICE_CANCELLATION_REASON_MAX_LENGTH}
+                                rows={4}
+                                disabled={isCancelingInvoice}
+                                placeholder="Explain why this invoice is being canceled"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                {cancellationReason.length}/{INVOICE_CANCELLATION_REASON_MAX_LENGTH} characters
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="cancel-invoice-confirmation" className="block">
+                                Type <strong>{pendingCancellationInvoice.invoiceNumber}</strong> to confirm:
+                            </Label>
+                            <Input
+                                id="cancel-invoice-confirmation"
+                                type="text"
+                                value={cancellationConfirmationText}
+                                onChange={(event) => setCancellationConfirmationText(event.target.value)}
+                                placeholder={pendingCancellationInvoice.invoiceNumber}
+                                disabled={isCancelingInvoice}
+                            />
+                        </div>
+                    </div>
+                )}
             </Modal>
 
             <Modal

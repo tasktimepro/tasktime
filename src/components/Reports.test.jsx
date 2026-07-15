@@ -103,8 +103,18 @@ const createDefaultExpenses = () => [
         taxRate: 20,
     },
 ];
+const createDefaultTimeEntries = () => [
+    {
+        id: 'entry-1',
+        taskId: 'task-1',
+        start: new Date('2026-04-10T08:00:00Z').getTime(),
+        end: new Date('2026-04-10T10:00:00Z').getTime(),
+        billedInvoiceId: null,
+    },
+];
 const mockInvoices = createDefaultInvoices();
 const mockExpenses = createDefaultExpenses();
+const mockTimeEntries = createDefaultTimeEntries();
 const mockConvertToCurrency = vi.fn((amountsByCurrency) => ({
     amounts: amountsByCurrency,
     hadConversionError: false,
@@ -160,15 +170,7 @@ vi.mock('@/hooks/useExpenses.ts', () => ({
 
 vi.mock('@/hooks/useTimeEntries.ts', () => ({
     useTimeEntries: () => ({
-        entries: [
-            {
-                id: 'entry-1',
-                taskId: 'task-1',
-                start: new Date('2026-04-10T08:00:00Z').getTime(),
-                end: new Date('2026-04-10T10:00:00Z').getTime(),
-                billedInvoiceId: null,
-            },
-        ],
+        entries: mockTimeEntries,
         isLoading: mockLoadingTimeEntries,
         isLoadingMore: mockLoadingHistoricalEntries,
     }),
@@ -326,6 +328,7 @@ describe('Reports', () => {
         }));
         mockInvoices.splice(0, mockInvoices.length, ...createDefaultInvoices());
         mockExpenses.splice(0, mockExpenses.length, ...createDefaultExpenses());
+        mockTimeEntries.splice(0, mockTimeEntries.length, ...createDefaultTimeEntries());
         mockTaxReturnPeriods.splice(0, mockTaxReturnPeriods.length, {
             id: 'period-1',
             title: 'April 2026 VAT return',
@@ -412,6 +415,36 @@ describe('Reports', () => {
 
         expect(within(issuedCard).getByText('€1830.00')).toHaveClass('sensitive-data');
         expect(within(receivedCard).getByText('€1220.00')).toHaveClass('sensitive-data');
+    });
+
+    it('keeps canceled invoice face value out of overview financial totals', () => {
+        mockInvoices.push({
+            id: 'invoice-canceled',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            businessInfoId: 'business-1',
+            invoiceNumber: 'INV-CANCELED',
+            date: '2026-04-19',
+            dueDate: '2026-04-25',
+            status: 'canceled',
+            canceledAt: new Date('2026-05-01T10:00:00Z').getTime(),
+            cancellationReason: 'Duplicate invoice',
+            subtotal: 1000,
+            tax: 220,
+            total: 1220,
+            currency: 'EUR',
+        });
+
+        render(<Reports />);
+
+        const issuedCard = screen.getByRole('heading', { name: 'Issued' }).closest('div.rounded-lg');
+        const outputTaxCard = screen.getByRole('heading', { name: 'Output Tax' }).closest('div.rounded-lg');
+        const outstandingCard = screen.getByRole('heading', { name: 'Outstanding' }).closest('div.rounded-lg');
+
+        expect(within(issuedCard).getByText('€1830.00')).toBeInTheDocument();
+        expect(within(outputTaxCard).getByText('€330.00')).toBeInTheDocument();
+        expect(within(outstandingCard).getByText('€610.00')).toBeInTheDocument();
+        expect(within(issuedCard).queryByText('€3050.00')).not.toBeInTheDocument();
     });
 
     it('counts paid invoices without paidAt in the overview received totals', () => {
@@ -605,6 +638,21 @@ describe('Reports', () => {
 
     it('exports an accountant pack from the current filtered slice', async () => {
         mockSection = 'monthly';
+        mockInvoices.push({
+            id: 'invoice-canceled',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            businessInfoId: 'business-1',
+            invoiceNumber: 'INV-CANCELED',
+            date: '2026-04-19',
+            status: 'canceled',
+            canceledAt: new Date('2026-05-01T10:00:00Z').getTime(),
+            cancellationReason: 'Duplicate invoice',
+            subtotal: 100,
+            tax: 20,
+            total: 120,
+            currency: 'EUR',
+        });
 
         render(<Reports />);
 
@@ -629,6 +677,9 @@ describe('Reports', () => {
                 expect.objectContaining({ filename: 'invoice-INV-002.pdf' }),
                 expect.objectContaining({ filename: 'invoice-INV-003.pdf' }),
             ]),
+        );
+        expect(mockDownloadZipFile.mock.calls[0][1]).not.toEqual(
+            expect.arrayContaining([expect.objectContaining({ filename: 'invoice-INV-CANCELED.pdf' })])
         );
     });
 
@@ -804,6 +855,58 @@ describe('Reports', () => {
         expect(screen.getByText('By currency')).toBeInTheDocument();
     });
 
+    it('retains cancellation metadata in the invoice register and CSV export', () => {
+        mockSection = 'invoices';
+        mockInvoices.push({
+            id: 'invoice-canceled',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            businessInfoId: 'business-1',
+            invoiceNumber: 'INV-CANCELED',
+            date: '2026-04-19',
+            status: 'canceled',
+            canceledAt: new Date('2026-05-01T10:00:00Z').getTime(),
+            cancellationReason: 'Duplicate invoice',
+            subtotal: 100,
+            tax: 20,
+            total: 120,
+            currency: 'EUR',
+        });
+
+        render(<Reports />);
+
+        expect(screen.getByText('INV-CANCELED')).toBeInTheDocument();
+        expect(screen.getByText('Duplicate invoice')).toBeInTheDocument();
+        expect(screen.getByText(/canceled face value, not revenue/i)).toBeInTheDocument();
+        const canceledBadge = screen.getAllByText('canceled').find((element) => element.classList.contains('inline-flex'));
+        expect(canceledBadge).toHaveClass(
+            'status-danger-border',
+            'status-danger-surface',
+            'status-danger-text',
+        );
+        const cancellationNotice = screen.getByText('Duplicate invoice').closest('.rounded-md');
+        expect(cancellationNotice).toHaveClass('border-border', 'bg-muted', 'text-foreground');
+        expect(cancellationNotice).not.toHaveClass('status-danger-border', 'status-danger-surface');
+        expect(within(cancellationNotice).getByText(/^Canceled/)).not.toHaveClass('status-danger-text-strong');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+
+        expect(mockBuildCsvContent).toHaveBeenCalledWith(
+            expect.arrayContaining([
+                { key: 'canceledAt', header: 'Canceled At' },
+                { key: 'cancellationReason', header: 'Cancellation Reason' },
+            ]),
+            expect.arrayContaining([
+                expect.objectContaining({
+                    invoiceNumber: 'INV-CANCELED',
+                    cancellationReason: 'Duplicate invoice',
+                    status: 'canceled',
+                    total: 120,
+                }),
+            ]),
+        );
+    });
+
     it('marks invoice tab monetary values as sensitive data for blur hiding', () => {
         mockSection = 'invoices';
 
@@ -813,6 +916,16 @@ describe('Reports', () => {
 
         expect(within(invoiceRow).getByText('€1220.00')).toHaveClass('sensitive-data');
         expect(within(invoiceRow).getByText('€220.00')).toHaveClass('sensitive-data');
+    });
+
+    it('shows seconds in Hours report total and billable durations', () => {
+        mockSection = 'hours';
+        mockTimeEntries[0].end += 5_000;
+
+        render(<Reports />);
+
+        expect(screen.getByText('2h 5s')).toBeInTheDocument();
+        expect(screen.getByText('Billable 2h 5s')).toBeInTheDocument();
     });
 
     it('renders the client statement tab when the current slice resolves to one client', () => {

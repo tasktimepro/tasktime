@@ -11,7 +11,7 @@ import { DEFAULT_CURRENCY, fetchExchangeRates, formatCurrency, getCurrencySymbol
 import { millisecondsToHours, formatDuration, toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { getInvoiceTotal, getPaidInvoiceConvertedAmount, invoiceBelongsToProject, isInvoicePaid } from '../utils/invoiceUtils.ts';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, invoiceBelongsToProject, isInvoiceOutstanding, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
@@ -256,7 +256,7 @@ const ClientDashboard = ({
 
         // Calculate pending amount from unpaid invoices
         const pendingAmount = clientInvoices.reduce((total, invoice) => {
-            if (!isInvoicePaid(invoice)) {
+            if (isInvoiceOutstanding(invoice)) {
                 return total + getInvoiceTotal(invoice);
             }
             return total;

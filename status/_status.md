@@ -31,6 +31,13 @@ The repository now has a zero-diagnostic TypeScript baseline enforced by the rel
 - [x] Passed unit/integration coverage, lint, production build, browser/PWA smoke, and packaged live-agent gates.
 - [x] Established and enforced a zero-diagnostic repository-wide TypeScript release baseline.
 
+**Invoice cancellation — July 2026**
+
+- [x] Delivered the six-slice terminal cancellation lifecycle across Yjs recovery, browser UI, reports/exports, backups, and agent surfaces.
+- [x] Preserved invoice audit records and numbering while conditionally releasing only source work still owned by the canceled invoice.
+- [x] Hardened first-commit eligibility, persisted-plan validation, late-arriving source reconciliation, protected later billing, and paid-only mark-as-unpaid behavior during pre-ship review.
+- [x] Passed the full release gate and packaged live-agent cancellation smoke; prepared release metadata remains uncommitted and unpublished.
+
 ## Blockers and open questions
 
 - See `spec/ambiguities.md`. Remaining decisions concern future product work or compatibility-policy evolution; none blocks the completed assurance slice.

@@ -136,4 +136,33 @@ describe('invoiceEligibility', () => {
             invoices: [legacyInvoice({ billingPeriodEnd: undefined })],
         }).map((candidate) => candidate.id)).toEqual(['entry-unbilled']);
     });
+
+    it('does not treat a canceled legacy invoice as active billing evidence', () => {
+        const entry: TimeEntry = {
+            id: 'entry-canceled-legacy',
+            taskId: 'task-1',
+            start: new Date(2026, 4, 1, 9).getTime(),
+            end: new Date(2026, 4, 1, 11).getTime(),
+            createdAt: 15_000,
+        };
+
+        expect(collectLegacyBilledTimeEntryIds({
+            tasks: [task],
+            timeEntries: [entry],
+            invoices: [legacyInvoice({
+                status: 'canceled',
+                canceledAt: 30_000,
+                cancellationReason: 'Duplicate invoice',
+            })],
+        })).toEqual(new Set());
+        expect(getInvoiceEligibleTimeEntries({
+            tasks: [task],
+            timeEntries: [entry],
+            invoices: [legacyInvoice({
+                status: 'canceled',
+                canceledAt: 30_000,
+                cancellationReason: 'Duplicate invoice',
+            })],
+        }).map((candidate) => candidate.id)).toEqual(['entry-canceled-legacy']);
+    });
 });

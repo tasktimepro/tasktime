@@ -117,6 +117,7 @@ vi.mock('@/utils/currencyUtils.ts', () => ({
 
 vi.mock('@/utils/invoiceUtils.ts', () => ({
     getInvoiceTotal: (inv) => inv.total || 0,
+    isInvoiceCanceled: (inv) => inv?.status === 'canceled',
 }));
 
 vi.mock('@/utils/dateUtils.ts', () => ({
@@ -276,6 +277,29 @@ describe('EmailPreviewModal', () => {
         render(<EmailPreviewModal {...defaultProps} />);
 
         expect(screen.getByText(/Cloud sync required/)).toBeTruthy();
+    });
+
+    it('blocks canceled invoices before generating or sending an email', async () => {
+        const user = userEvent.setup();
+
+        mockEmailTemplates = [mockDefaultTemplate];
+        render(
+            <EmailPreviewModal
+                {...defaultProps}
+                invoice={{
+                    ...invoice,
+                    status: 'canceled',
+                    canceledAt: 2,
+                    cancellationReason: 'Duplicate invoice',
+                }}
+            />
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Send Invoice' }));
+
+        expect(screen.getByText('Canceled invoices cannot be sent by email.')).toBeTruthy();
+        expect(mockGeneratePDFBase64).not.toHaveBeenCalled();
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
     });
 
     it('resolves the clientName placeholder from the contact person', () => {

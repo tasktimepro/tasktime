@@ -286,6 +286,16 @@ describe('MCP bridge tool definitions', () => {
         expect(fullTools.map((tool) => tool.name)).not.toContain('export_invoice_pdf');
         expect(fullTools.map((tool) => tool.name)).not.toContain('send_invoice_email');
         expect(billingTools.map((tool) => tool.name)).toContain('finalize_invoice');
+        expect(billingTools.map((tool) => tool.name)).toContain('cancel_invoice');
+        expect(billingTools.find((tool) => tool.name === 'cancel_invoice')?.inputSchema).toEqual(expect.objectContaining({
+            required: ['invoiceId', 'reason', 'confirmCancel', 'confirmationText'],
+            additionalProperties: false,
+            properties: expect.objectContaining({
+                reason: expect.objectContaining({ minLength: 1, maxLength: 500 }),
+                canceledAt: expect.any(Object),
+                idempotencyKey: expect.any(Object),
+            }),
+        }));
         expect(exportTools.map((tool) => tool.name)).toContain('create_drive_backup');
         expect(exportTools.map((tool) => tool.name)).toContain('download_drive_backup_json');
         expect(exportTools.map((tool) => tool.name)).toContain('export_accountant_pack');

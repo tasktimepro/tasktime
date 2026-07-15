@@ -73,6 +73,8 @@ type ProjectWorkSummaryPdfInput = {
 
 type InvoiceReportRow = {
     business: string;
+    canceledAt?: string;
+    cancellationReason?: string;
     client: string;
     currency: string;
     dueDate: string;
@@ -511,13 +513,15 @@ export const buildInvoicesReportHtml = ({
             <td>${escapeHtml(row.invoiceDate)}</td>
             <td>${escapeHtml(row.dueDate)}</td>
             <td>${escapeHtml(row.paidDate)}</td>
+            <td>${escapeHtml(row.canceledAt || '')}</td>
+            <td>${escapeHtml(row.cancellationReason || '')}</td>
             <td>${escapeHtml(row.status)}</td>
             <td>${escapeHtml(row.currency)}</td>
             <td>${escapeHtml(row.subtotal)}</td>
             <td>${escapeHtml(row.tax)}</td>
             <td>${escapeHtml(row.total)}</td>
         </tr>
-    `).join('') : '<tr><td colspan="11">No invoices in this period</td></tr>';
+    `).join('') : '<tr><td colspan="13">No invoices in this period</td></tr>';
 
     const summarySectionsHtml = summarySections.length > 0 ? `
         <section style="margin-bottom: 24px;">
@@ -557,6 +561,8 @@ export const buildInvoicesReportHtml = ({
                             <th>Issued</th>
                             <th>Due</th>
                             <th>Paid</th>
+                            <th>Canceled</th>
+                            <th>Cancellation Reason</th>
                             <th>Status</th>
                             <th>Currency</th>
                             <th>Subtotal</th>

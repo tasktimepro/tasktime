@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
 import { DEFAULT_CURRENCY, getCurrencySymbol } from '../../utils/currencyUtils.ts';
-import { getInvoiceTotal } from '../../utils/invoiceUtils.ts';
+import { getInvoiceTotal, isInvoiceCanceled } from '../../utils/invoiceUtils.ts';
 
 const A4_PREVIEW_WIDTH_PX = 794;
 const A4_PREVIEW_HEIGHT_PX = 1123;
@@ -35,6 +35,7 @@ const InvoicePreviewModal = ({
     downloadLabel = 'Download PDF'
 }) => {
     const isQuoteMode = invoice?.documentMode === 'quote';
+    const isCanceled = !isQuoteMode && isInvoiceCanceled(invoice);
     const previewHtml = htmlContent || invoice?.htmlContent || '';
     const previewTitle = title || (invoice ? `${isQuoteMode ? 'Quote' : 'Invoice'} Preview - ${invoice.invoiceNumber}` : `${isQuoteMode ? 'Quote' : 'Invoice'} Preview`);
     const modalContentRef = useRef(null);
@@ -141,6 +142,13 @@ const InvoicePreviewModal = ({
         >
             {previewHtml ? (
                 <div className="space-y-3">
+                    {isCanceled && (
+                        <Notice
+                            variant="destructive"
+                            title="Canceled invoice"
+                            description={`This is a read-only historical record${invoice?.canceledAt ? ` canceled ${toDisplayDate(invoice.canceledAt, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}. ${invoice?.cancellationReason || ''}`.trim()}
+                        />
+                    )}
                     <Notice
                         compact
                         title="Preview note"

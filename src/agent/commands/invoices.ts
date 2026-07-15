@@ -9,6 +9,9 @@ import {
     getInvoiceSequenceRollback,
     getInvoiceUndoBlockReason,
     getNextSequentialNumberForTemplate,
+    isInvoiceCanceled,
+    isInvoicePaid,
+    matchesInvoiceStatusFilter,
     resolveCurrentInvoiceTemplate,
 } from '@/utils/invoiceUtils';
 import { normalizeCurrencyCode } from '@/utils/currencyUtils';
@@ -21,6 +24,13 @@ import {
 import {
     buildInvoiceFinalizationApplication,
 } from '@/domain/invoices/invoiceFinalizationApplication';
+import {
+    buildInvoiceCancellationApplication,
+    buildInvoiceCancellationResult,
+    getInvoiceCancellationBlockReason,
+    normalizeInvoiceCancellationReason,
+    type InvoiceCancellationResult,
+} from '@/domain/invoices/invoiceCancellation';
 import { buildInvoiceBillingSelectionSnapshot } from '@/domain/invoices/invoiceBillingSelection';
 import {
     isInvoiceBillingOperation,
@@ -73,6 +83,8 @@ export interface InvoiceSummary {
     total: number;
     createdAt?: number;
     updatedAt?: number;
+    canceledAt?: number;
+    cancellationReason?: string;
 }
 
 export interface PreviewInvoiceFromUnbilledWorkInput {
@@ -120,6 +132,15 @@ export interface MarkInvoiceUnpaidInput {
     invoiceId: string;
     confirmUnpaid: boolean;
     referenceAt?: number;
+    idempotencyKey?: string;
+}
+
+export interface CancelInvoiceInput {
+    invoiceId: string;
+    reason: string;
+    confirmCancel: boolean;
+    confirmationText: string;
+    canceledAt?: number;
     idempotencyKey?: string;
 }
 
@@ -332,6 +353,8 @@ function summarizeInvoice(invoice: Invoice): InvoiceSummary {
     if (invoice.dueDate) summary.dueDate = invoice.dueDate;
     if (invoice.createdAt) summary.createdAt = invoice.createdAt;
     if (invoice.updatedAt) summary.updatedAt = invoice.updatedAt;
+    if (invoice.canceledAt) summary.canceledAt = invoice.canceledAt;
+    if (invoice.cancellationReason) summary.cancellationReason = invoice.cancellationReason;
 
     return summary;
 }
@@ -435,7 +458,7 @@ export function listInvoicesCommand(context: AgentCommandContext, input: ListInv
     return collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent list invoices')
         .filter((invoice) => !input.clientId || invoice.clientId === input.clientId)
         .filter((invoice) => !input.projectId || invoiceMatchesProject(invoice, input.projectId))
-        .filter((invoice) => !input.status || invoice.status === input.status)
+        .filter((invoice) => !input.status || matchesInvoiceStatusFilter(invoice, input.status))
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0) || (b.date || '').localeCompare(a.date || ''))
         .slice(0, getLimit(input.limit))
         .map(summarizeInvoice);
@@ -827,6 +850,11 @@ export function markInvoicePaidCommand(
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
+        if (isInvoiceCanceled(invoice)) {
+            throw new AgentCommandError('CONFLICT', 'Canceled invoices cannot be marked paid.', {
+                invoiceId,
+            });
+        }
         if (invoice.status === 'draft') {
             throw new AgentCommandError('CONFLICT', 'Draft invoices must be finalized before they can be marked paid.', {
                 invoiceId,
@@ -882,6 +910,16 @@ export function markInvoiceUnpaidCommand(
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
+        if (isInvoiceCanceled(invoice)) {
+            throw new AgentCommandError('CONFLICT', 'Canceled invoices cannot be marked unpaid.', {
+                invoiceId,
+            });
+        }
+        if (!isInvoicePaid(invoice)) {
+            throw new AgentCommandError('CONFLICT', 'Only paid invoices can be marked as unpaid.', {
+                invoiceId,
+            });
+        }
         const updatedAt = getNow(context);
         const referenceAt = typeof input.referenceAt === 'number' && Number.isFinite(input.referenceAt)
             ? input.referenceAt
@@ -896,6 +934,179 @@ export function markInvoiceUnpaidCommand(
             invoice: updatedInvoice,
             paymentCurrencySnapshotCleared: Boolean(invoice.paymentCurrencySnapshot),
         };
+    });
+}
+
+export function cancelInvoiceCommand(
+    context: AgentCommandContext,
+    input: CancelInvoiceInput
+): Promise<InvoiceCancellationResult> {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'write');
+    assertPermission(context, 'billing');
+
+    return withIdempotency(context, input.idempotencyKey, async () => {
+        if (input.confirmCancel !== true) {
+            throw new AgentCommandError('INVALID_INPUT', 'Invoice cancellation requires confirmCancel: true.');
+        }
+
+        const invoiceId = requireString(input.invoiceId, 'invoiceId');
+        let cancellationReason: string;
+
+        try {
+            cancellationReason = normalizeInvoiceCancellationReason(input.reason);
+        } catch (error) {
+            throw new AgentCommandError('INVALID_INPUT', error instanceof Error ? error.message : 'Invalid cancellation reason.');
+        }
+
+        if (input.canceledAt !== undefined && (!Number.isFinite(input.canceledAt) || input.canceledAt <= 0)) {
+            throw new AgentCommandError('INVALID_INPUT', 'canceledAt must be a finite positive timestamp.');
+        }
+
+        const persistedOperation = input.idempotencyKey
+            ? readEntity<InvoiceBillingOperation>(context.store.invoiceBillingOperations.get(input.idempotencyKey))
+            : null;
+        const replayedOperation = isInvoiceBillingOperation(persistedOperation) ? persistedOperation : null;
+
+        if (persistedOperation && !replayedOperation) {
+            throw new AgentCommandError('CONFLICT', 'The persisted billing operation is invalid and cannot be replayed safely.', {
+                idempotencyKey: input.idempotencyKey,
+            });
+        }
+
+        if (replayedOperation) {
+            if (replayedOperation.kind !== 'cancel' || replayedOperation.invoiceId !== invoiceId) {
+                throw new AgentCommandError('CONFLICT', 'The idempotency key belongs to a different billing operation.', {
+                    idempotencyKey: input.idempotencyKey,
+                });
+            }
+
+            const expectedConfirmation = replayedOperation.invoice.invoiceNumber || '';
+
+            if (input.confirmationText !== expectedConfirmation) {
+                throw new AgentCommandError(
+                    'INVALID_INPUT',
+                    `confirmationText must exactly match invoice number ${expectedConfirmation}.`,
+                    { invoiceId }
+                );
+            }
+
+            if (
+                cancellationReason !== replayedOperation.desiredInvoice.cancellationReason
+                || (input.canceledAt !== undefined && input.canceledAt !== replayedOperation.desiredInvoice.canceledAt)
+            ) {
+                throw new AgentCommandError('CONFLICT', 'The idempotency key belongs to a cancellation with different input.', {
+                    idempotencyKey: input.idempotencyKey,
+                });
+            }
+
+            const replay = await context.store.commitInvoiceCancellation({
+                operationId: replayedOperation.operationId,
+                invoice: replayedOperation.invoice,
+                desiredInvoice: replayedOperation.desiredInvoice,
+                application: replayedOperation.application,
+                createdAt: replayedOperation.createdAt,
+            });
+
+            return buildInvoiceCancellationResult({
+                desiredInvoice: replay.invoice,
+                application: replay.operation.application,
+                alreadyApplied: replay.alreadyApplied,
+            });
+        }
+
+        const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
+        const expectedConfirmation = invoice.invoiceNumber || '';
+
+        if (input.confirmationText !== expectedConfirmation) {
+            throw new AgentCommandError(
+                'INVALID_INPUT',
+                `confirmationText must exactly match invoice number ${expectedConfirmation}.`,
+                { invoiceId }
+            );
+        }
+
+        const blockReason = getInvoiceCancellationBlockReason(invoice);
+
+        if (blockReason) {
+            throw new AgentCommandError('CONFLICT', blockReason, { invoiceId });
+        }
+
+        const canceledAt = input.canceledAt ?? getNow(context);
+        let taskMaps: Array<any>;
+        let expenseMaps: Array<any>;
+        let entryMaps: Array<any>;
+
+        try {
+            [taskMaps, expenseMaps, entryMaps] = await Promise.all([
+                collectTaskMapsForInvoiceFinalization(context),
+                collectExpenseMapsForInvoiceFinalization(context),
+                collectEntryMapsForInvoiceFinalization(context),
+            ]);
+        } catch {
+            throw new AgentCommandError('UNAVAILABLE', 'Unable to load complete invoice source history for safe cancellation.', {
+                invoiceId,
+                retryable: true,
+            });
+        }
+
+        const entries = entryMaps.flatMap((entryMap) => collectValidatedEntities<TimeEntry>(
+            'timeEntries',
+            entryMap as any,
+            'agent invoice cancellation time entries'
+        ));
+        const tasks = taskMaps.flatMap((taskMap) => collectEntities<Task>(taskMap as any));
+        const expenses = expenseMaps.flatMap((expenseMap) => collectEntities<Expense>(expenseMap as any));
+        const cancellation = buildInvoiceCancellationApplication({
+            invoice,
+            entries,
+            expenses,
+            tasks,
+            projects: collectEntities<Project>(context.store.projects as any),
+            reason: cancellationReason,
+            canceledAt,
+        });
+
+        try {
+            const committed = await context.store.commitInvoiceCancellation({
+                operationId: input.idempotencyKey || getId(context),
+                invoice,
+                desiredInvoice: cancellation.desiredInvoice,
+                application: cancellation.application,
+                createdAt: canceledAt,
+            });
+
+            return buildInvoiceCancellationResult({
+                desiredInvoice: committed.invoice,
+                application: committed.operation.application,
+                alreadyApplied: committed.alreadyApplied,
+            });
+        } catch (error) {
+            const reason = error instanceof Error ? error.message : 'cancellation commit failed';
+            const currentInvoice = readEntity<Invoice>(context.store.invoices.get(invoiceId));
+
+            if (!currentInvoice) {
+                throw new AgentCommandError('NOT_FOUND', 'Invoice not found.', { invoiceId });
+            }
+
+            const currentBlockReason = getInvoiceCancellationBlockReason(currentInvoice);
+
+            if (currentBlockReason) {
+                throw new AgentCommandError('CONFLICT', currentBlockReason, { invoiceId });
+            }
+
+            if (/conflict/i.test(reason)) {
+                throw new AgentCommandError('CONFLICT', 'Invoice cancellation conflicts with another billing operation.', {
+                    invoiceId,
+                });
+            }
+
+            throw new AgentCommandError('UNAVAILABLE', 'Invoice cancellation could not be completed safely.', {
+                invoiceId,
+                retryable: true,
+            });
+        }
     });
 }
 

@@ -425,6 +425,37 @@ describe('useInvoices', () => {
         })
     })
 
+    it('refuses to mark a currently unpaid invoice unpaid again', () => {
+        const update = vi.fn()
+        const sentInvoice = {
+            id: 'sent-invoice',
+            status: 'sent',
+            total: 100,
+            clientId: 'c1',
+            projectId: 'p1',
+        }
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createTestYMap(), preferences: mockPreferences },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [sentInvoice],
+            isLoading: false,
+            get: vi.fn(() => sentInvoice),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        expect(() => result.current.markAsUnpaid('sent-invoice')).toThrow(
+            'Only paid invoices can be marked as unpaid.'
+        )
+        expect(update).not.toHaveBeenCalled()
+    })
+
     it('returns undefined when markAsPaid or markAsUnpaid target a missing invoice', async () => {
         mockUseYjs.mockReturnValue({
             store: { archivedInvoicesSync: createTestYMap(), preferences: mockPreferences },
@@ -445,6 +476,41 @@ describe('useInvoices', () => {
 
         await expect(result.current.markAsPaid('missing')).resolves.toBeUndefined()
         expect(result.current.markAsUnpaid('missing')).toBeUndefined()
+    })
+
+    it('keeps canceled invoices terminal across payment and sent helpers', async () => {
+        const update = vi.fn()
+        const canceledInvoice = {
+            id: 'canceled-invoice',
+            status: 'canceled',
+            canceledAt: 2,
+            cancellationReason: 'Duplicate invoice',
+            total: 100,
+            currency: 'USD',
+        }
+        mockUseYjs.mockReturnValue({
+            store: { archivedInvoicesSync: createTestYMap(), preferences: mockPreferences },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [canceledInvoice],
+            isLoading: false,
+            get: vi.fn(() => canceledInvoice),
+            create: vi.fn(),
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        expect(() => result.current.markAsSent('canceled-invoice')).toThrow('Canceled invoices are read-only historical records.')
+        expect(() => result.current.updateInvoice('canceled-invoice', { notes: 'Changed' })).toThrow('Canceled invoices are read-only historical records.')
+        await expect(result.current.markAsPaid('canceled-invoice')).rejects.toThrow('Canceled invoices are read-only historical records.')
+        await expect(result.current.updatePaymentDetails('canceled-invoice')).rejects.toThrow('Canceled invoices are read-only historical records.')
+        expect(() => result.current.markAsUnpaid('canceled-invoice')).toThrow('Canceled invoices are read-only historical records.')
+        expect(result.current.totals).toEqual({ outstanding: 0, paid: 0, total: 0 })
+        expect(update).not.toHaveBeenCalled()
     })
 
     it('marks same-currency invoices paid without storing a snapshot when exchange rates are unavailable', async () => {
@@ -1061,6 +1127,287 @@ describe('useInvoices', () => {
         expect(readStored(tasksMap, 'task-1')).toEqual(expect.objectContaining({
             lastBilledAt: invoiceEntryStart - 1,
         }))
+    })
+
+    it('cancels through the shared operation after loading complete billing history', async () => {
+        const coreDoc = new Y.Doc()
+        const activeEntries = createTestYMap({
+            'entry-active': {
+                id: 'entry-active',
+                taskId: 'task-1',
+                start: 100,
+                end: 200,
+                billedInvoiceId: 'inv-cancel',
+                billedAt: 500,
+                billedHourlyRate: 100,
+            },
+        }, undefined, 'timeEntries')
+        const historicalEntries = createTestYMap({
+            'entry-historical': {
+                id: 'entry-historical',
+                taskId: 'task-1',
+                start: 10,
+                end: 20,
+                billedInvoiceId: 'inv-cancel',
+                billedAt: 500,
+                billedHourlyRate: 100,
+            },
+        }, undefined, 'timeEntries')
+        const tasksMap = createTestYMap({
+            'task-1': {
+                id: 'task-1',
+                title: 'Active task',
+                lastBilledAt: 200,
+            },
+        }, coreDoc, 'tasks')
+        const archivedTasksMap = createTestYMap({
+            'task-quote': {
+                id: 'task-quote',
+                title: 'Archived quoted task',
+                estimatedFlatAmount: null,
+                quotedAmountBilling: {
+                    invoiceId: 'inv-cancel',
+                    billedAt: 500,
+                    total: 300,
+                },
+            },
+        })
+        const expensesMap = createTestYMap({}, coreDoc, 'expenses')
+        const archivedExpensesMap = createTestYMap({
+            'expense-archived': {
+                id: 'expense-archived',
+                title: 'Archived billed expense',
+                date: '2025-07-14',
+                amount: 25,
+                currency: 'EUR',
+                paymentStatus: 'paid',
+                billingStatus: 'billed',
+                isPersonal: false,
+                billable: true,
+                isRecurring: false,
+                taxExempt: false,
+                taxClaimed: true,
+                invoiceId: 'inv-cancel',
+                billedAt: 500,
+            },
+        })
+        const projectsMap = createTestYMap({
+            'project-1': {
+                id: 'project-1',
+                title: 'Project',
+                invoiceIds: ['inv-cancel'],
+            },
+        }, coreDoc, 'projects')
+        const invoice = {
+            id: 'inv-cancel',
+            invoiceNumber: 'INV-41',
+            clientId: 'client-1',
+            projectId: 'project-1',
+            date: '2026-07-14',
+            dueDate: '2026-07-31',
+            status: 'sent',
+            subtotal: 100,
+            total: 100,
+            items: [],
+            createdAt: 500,
+        }
+        const invoicesMap = createTestYMap({ 'inv-cancel': invoice }, coreDoc, 'invoices')
+        const commitInvoiceCancellation = vi.fn(async ({ desiredInvoice, application }) => ({
+            invoice: desiredInvoice,
+            operation: { desiredInvoice, application },
+            alreadyApplied: false,
+        }))
+        const store = {
+            archivedInvoicesSync: createTestYMap(),
+            archivedTasks: null,
+            archivedExpenses: null,
+            preferences: mockPreferences,
+            tasks: tasksMap,
+            expenses: expensesMap,
+            projects: projectsMap,
+            invoiceTemplates: createTestYMap({}, coreDoc, 'invoiceTemplates'),
+            invoices: invoicesMap,
+            activeTimeEntries: activeEntries,
+            coreDoc,
+            getAllTimeEntries: () => [
+                ...Array.from(activeEntries.values()),
+                ...Array.from(historicalEntries.values()),
+            ],
+            commitInvoiceCancellation,
+        }
+        const loadArchivedTasks = vi.fn(async () => {
+            store.archivedTasks = archivedTasksMap
+            return archivedTasksMap
+        })
+        const loadArchivedExpenses = vi.fn(async () => {
+            store.archivedExpenses = archivedExpensesMap
+            return archivedExpensesMap
+        })
+        const loadEntriesForYear = vi.fn(async () => historicalEntries)
+
+        mockUseYjs.mockReturnValue({
+            store,
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks,
+            loadArchivedExpenses,
+            loadEntriesForYear,
+            getAvailableYears: vi.fn(async () => [2025]),
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [invoice],
+            isLoading: false,
+            get: vi.fn((id) => readStored(invoicesMap, id)),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+        let cancellationResult
+
+        await act(async () => {
+            cancellationResult = await result.current.cancelInvoice('inv-cancel', {
+                reason: '  Duplicate invoice  ',
+                canceledAt: 1_000,
+                operationId: 'cancel-1',
+            })
+        })
+
+        expect(loadArchivedTasks).toHaveBeenCalledOnce()
+        expect(loadArchivedExpenses).toHaveBeenCalledOnce()
+        expect(loadEntriesForYear).toHaveBeenCalledWith(2025)
+        expect(commitInvoiceCancellation).toHaveBeenCalledWith(expect.objectContaining({
+            operationId: 'cancel-1',
+            createdAt: 1_000,
+            desiredInvoice: expect.objectContaining({
+                id: 'inv-cancel',
+                status: 'canceled',
+                cancellationReason: 'Duplicate invoice',
+                canceledAt: 1_000,
+            }),
+            application: expect.objectContaining({
+                releasedTimeEntryCount: 2,
+                releasedExpenseCount: 1,
+                releasedQuotedTaskCount: 1,
+                retainedProjectLinkCount: 1,
+            }),
+        }))
+        expect(cancellationResult).toEqual(expect.objectContaining({
+            invoice: expect.objectContaining({ status: 'canceled' }),
+            releasedTimeEntryCount: 2,
+            releasedExpenseCount: 1,
+            releasedQuotedTaskCount: 1,
+            retainedProjectLinkCount: 1,
+            retainedInvoiceNumber: true,
+            alreadyApplied: false,
+        }))
+        expect(result.current.getInvoiceCancellationBlockReason('inv-cancel')).toBeNull()
+        expect(result.current.getInvoiceCancellationBlockReason(invoice)).toBeNull()
+    })
+
+    it('resumes a persisted cancellation operation without rebuilding history', async () => {
+        const invoice = {
+            id: 'inv-resume',
+            invoiceNumber: 'INV-42',
+            clientId: 'client-1',
+            projectId: 'project-1',
+            date: '2026-07-14',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        }
+        const desiredInvoice = {
+            ...invoice,
+            status: 'canceled',
+            canceledAt: 2_000,
+            cancellationReason: 'Duplicate invoice',
+            updatedAt: 2_000,
+        }
+        const application = {
+            entriesToDelete: [],
+            entriesToClear: [],
+            expenseUpdatesToUnbill: [],
+            quotedTaskUpdates: [],
+            taskCutoffUpdates: [],
+            invoiceUpdates: {
+                status: 'canceled',
+                canceledAt: 2_000,
+                cancellationReason: 'Duplicate invoice',
+                updatedAt: 2_000,
+            },
+            releasedTimeEntryCount: 0,
+            deletedAdjustmentCount: 0,
+            releasedExpenseCount: 0,
+            releasedQuotedTaskCount: 0,
+            restoredTaskCutoffCount: 0,
+            retainedProjectLinkCount: 1,
+        }
+        const operation = {
+            version: 1,
+            operationId: 'cancel-resume',
+            invoiceId: invoice.id,
+            kind: 'cancel',
+            state: 'prepared',
+            lastCompletedPhase: 'prepared',
+            invoice,
+            desiredInvoice,
+            application,
+            createdAt: 2_000,
+            updatedAt: 2_000,
+        }
+        const commitInvoiceCancellation = vi.fn(async () => ({
+            invoice: desiredInvoice,
+            operation,
+            alreadyApplied: true,
+        }))
+        const loadArchivedTasks = vi.fn()
+        const loadArchivedExpenses = vi.fn()
+        const loadEntriesForYear = vi.fn()
+
+        mockUseYjs.mockReturnValue({
+            store: {
+                archivedInvoicesSync: createTestYMap(),
+                invoiceBillingOperations: createTestYMap({ 'cancel-resume': operation }),
+                preferences: mockPreferences,
+                commitInvoiceCancellation,
+            },
+            isReady: true,
+            loadArchivedInvoices: vi.fn(async () => {}),
+            loadArchivedTasks,
+            loadArchivedExpenses,
+            loadEntriesForYear,
+            getAvailableYears: vi.fn(),
+        })
+        mockUseYjsCollection.mockReturnValue({
+            items: [desiredInvoice],
+            isLoading: false,
+            get: vi.fn(() => desiredInvoice),
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useInvoices())
+
+        await expect(result.current.cancelInvoice('inv-resume', {
+            reason: 'Ignored during replay',
+            operationId: 'cancel-resume',
+        })).resolves.toEqual(expect.objectContaining({
+            invoice: desiredInvoice,
+            alreadyApplied: true,
+        }))
+        expect(commitInvoiceCancellation).toHaveBeenCalledWith({
+            operationId: 'cancel-resume',
+            invoice,
+            desiredInvoice,
+            application,
+            createdAt: 2_000,
+        })
+        expect(loadArchivedTasks).not.toHaveBeenCalled()
+        expect(loadArchivedExpenses).not.toHaveBeenCalled()
+        expect(loadEntriesForYear).not.toHaveBeenCalled()
     })
 
     it('blocks undo for invoices that are not the latest unpaid invoice', async () => {

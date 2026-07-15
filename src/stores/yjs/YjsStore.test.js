@@ -406,6 +406,749 @@ describe('YjsStore reconnect sync tracking', () => {
         }
     )
 
+    it.each(BILLING_OPERATION_PHASES)(
+        'replays invoice cancellation after interruption at %s without unlinking or rewinding',
+        async (failedPhase) => {
+            const store = new YjsStore()
+            await store.initialize()
+
+            store.projects.set('project-cancel', objectToYMap({
+                id: 'project-cancel',
+                title: 'Cancellation project',
+                invoiceIds: ['invoice-cancel'],
+            }))
+            store.tasks.set('task-cancel', objectToYMap({
+                id: 'task-cancel',
+                title: 'Cancellation task',
+                lastBilledAt: 900,
+            }))
+            store.expenses.set('expense-cancel', objectToYMap({
+                id: 'expense-cancel',
+                title: 'Cancellation expense',
+                date: '2026-07-10',
+                amount: 20,
+                currency: 'EUR',
+                paymentStatus: 'paid',
+                billingStatus: 'billed',
+                invoiceId: 'invoice-cancel',
+                billedAt: 1000,
+                isPersonal: false,
+                billable: true,
+                isRecurring: false,
+                taxExempt: false,
+                taxClaimed: true,
+            }))
+            store.invoiceTemplates.set('template-cancel', objectToYMap({
+                id: 'template-cancel',
+                name: 'Cancellation template',
+                currentSequentialNumber: 42,
+                useSequentialNumbers: true,
+            }))
+            store.activeTimeEntries.set('entry-cancel', objectToYMap({
+                id: 'entry-cancel',
+                taskId: 'task-cancel',
+                start: Date.UTC(2026, 6, 10, 8),
+                end: Date.UTC(2026, 6, 10, 9),
+                billedAt: 1000,
+                billedInvoiceId: 'invoice-cancel',
+                billedHourlyRate: 100,
+            }))
+            store.activeTimeEntries.set('entry-other', objectToYMap({
+                id: 'entry-other',
+                taskId: 'task-cancel',
+                start: Date.UTC(2026, 6, 10, 9),
+                end: Date.UTC(2026, 6, 10, 10),
+                billedAt: 1100,
+                billedInvoiceId: 'invoice-other',
+                billedHourlyRate: 100,
+            }))
+            const invoice = {
+                id: 'invoice-cancel',
+                projectId: 'project-cancel',
+                projectIds: ['project-cancel'],
+                clientId: 'client-cancel',
+                templateId: 'template-cancel',
+                invoiceNumber: 'INV-41',
+                date: '2026-07-10',
+                status: 'sent',
+                items: [],
+                subtotal: 100,
+                total: 100,
+                currency: 'EUR',
+            }
+            const desiredInvoice = {
+                ...invoice,
+                status: 'canceled',
+                canceledAt: 2000,
+                cancellationReason: 'Duplicate invoice',
+                paidAt: null,
+                paymentCurrencySnapshot: null,
+                updatedAt: 2000,
+            }
+            const application = {
+                entriesToDelete: [],
+                entriesToClear: [{
+                    entry: readStored(store.activeTimeEntries, 'entry-cancel'),
+                    updates: { billedAt: null, billedInvoiceId: null, billedHourlyRate: null, updatedAt: 2000 },
+                }],
+                expenseUpdatesToUnbill: [{
+                    id: 'expense-cancel',
+                    updates: { billingStatus: 'unbilled', invoiceId: null, billedAt: null, updatedAt: 2000 },
+                }],
+                quotedTaskUpdates: [],
+                taskCutoffUpdates: [{
+                    id: 'task-cancel',
+                    expectedLastBilledAt: 900,
+                    updates: { lastBilledAt: 100, updatedAt: 2000 },
+                }],
+                invoiceUpdates: {
+                    status: 'canceled',
+                    canceledAt: 2000,
+                    cancellationReason: 'Duplicate invoice',
+                    paidAt: null,
+                    paymentCurrencySnapshot: null,
+                    updatedAt: 2000,
+                },
+                releasedTimeEntryCount: 1,
+                deletedAdjustmentCount: 0,
+                releasedExpenseCount: 1,
+                releasedQuotedTaskCount: 0,
+                restoredTaskCutoffCount: 1,
+                retainedProjectLinkCount: 1,
+            }
+            store.invoices.set(invoice.id, objectToYMap(invoice))
+
+            await expect(store.commitInvoiceCancellation({
+                operationId: `cancel-${failedPhase}`,
+                invoice,
+                desiredInvoice,
+                application,
+                createdAt: 2000,
+                onPhase: (phase) => {
+                    if (phase === failedPhase) throw new Error(`interrupt ${phase}`)
+                },
+            })).rejects.toThrow(`interrupt ${failedPhase}`)
+
+            await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+            expect(readStored(store.invoices, invoice.id)).toEqual(expect.objectContaining({
+                status: 'canceled',
+                canceledAt: 2000,
+                cancellationReason: 'Duplicate invoice',
+                total: 100,
+            }))
+            expect(readStored(store.activeTimeEntries, 'entry-cancel')).toEqual(expect.objectContaining({ billedInvoiceId: null }))
+            expect(readStored(store.activeTimeEntries, 'entry-other')).toEqual(expect.objectContaining({ billedInvoiceId: 'invoice-other' }))
+            expect(readStored(store.expenses, 'expense-cancel')).toEqual(expect.objectContaining({
+                invoiceId: null,
+                billingStatus: 'unbilled',
+                taxClaimed: true,
+            }))
+            expect(readStored(store.tasks, 'task-cancel')).toEqual(expect.objectContaining({ lastBilledAt: 100 }))
+            expect(readStored(store.projects, 'project-cancel')).toEqual(expect.objectContaining({ invoiceIds: ['invoice-cancel'] }))
+            expect(readStored(store.invoiceTemplates, 'template-cancel')).toEqual(expect.objectContaining({ currentSequentialNumber: 42 }))
+            expect(readStored(store.invoiceBillingOperations, `cancel-${failedPhase}`)).toEqual(expect.objectContaining({ state: 'complete' }))
+
+            const before = new Map(Array.from(docs.entries()).map(([name, doc]) => [
+                name,
+                Array.from(Y.encodeStateVector(doc)),
+            ]))
+
+            await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+            const after = new Map(Array.from(docs.entries()).map(([name, doc]) => [
+                name,
+                Array.from(Y.encodeStateVector(doc)),
+            ]))
+            expect(after).toEqual(before)
+
+            store.destroy()
+        }
+    )
+
+    it('publishes cancellation metadata atomically to Yjs observers', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const invoice = {
+            id: 'invoice-cancel-atomic',
+            projectId: null,
+            clientId: 'client-cancel',
+            invoiceNumber: 'INV-ATOMIC',
+            date: '2026-07-10',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        }
+        const invoiceUpdates = {
+            status: 'canceled',
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+            updatedAt: 2000,
+        }
+        const observedInvoices = []
+        const observer = () => observedInvoices.push(readStored(store.invoices, invoice.id))
+
+        store.invoices.set(invoice.id, objectToYMap(invoice))
+        store.invoices.observeDeep(observer)
+
+        await store.commitInvoiceCancellation({
+            operationId: 'cancel-atomic',
+            invoice,
+            desiredInvoice: { ...invoice, ...invoiceUpdates },
+            application: {
+                entriesToDelete: [],
+                entriesToClear: [],
+                expenseUpdatesToUnbill: [],
+                quotedTaskUpdates: [],
+                taskCutoffUpdates: [],
+                invoiceUpdates,
+                releasedTimeEntryCount: 0,
+                deletedAdjustmentCount: 0,
+                releasedExpenseCount: 0,
+                releasedQuotedTaskCount: 0,
+                restoredTaskCutoffCount: 0,
+                retainedProjectLinkCount: 0,
+            },
+            createdAt: 2000,
+        })
+
+        store.invoices.unobserveDeep(observer)
+        expect(observedInvoices).toHaveLength(1)
+        expect(observedInvoices[0]).toEqual(expect.objectContaining({
+            status: 'canceled',
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+        }))
+
+        store.destroy()
+    })
+
+    it('revalidates current payment state before persisting a new cancellation operation', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const originalInvoice = {
+            id: 'invoice-cancel-race',
+            projectId: null,
+            clientId: 'client-cancel',
+            invoiceNumber: 'INV-RACE',
+            date: '2026-07-10',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        }
+        const paidInvoice = {
+            ...originalInvoice,
+            status: 'paid',
+            paidAt: 1900,
+            paymentCurrencySnapshot: {
+                capturedAt: 1900,
+                sourceCurrency: 'EUR',
+                sourceAmount: 100,
+                preferredCurrencyAtPayment: 'USD',
+                preferredCurrencyAmount: 110,
+            },
+        }
+        const invoiceUpdates = {
+            status: 'canceled',
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+            updatedAt: 2000,
+        }
+        const application = {
+            entriesToDelete: [],
+            entriesToClear: [],
+            expenseUpdatesToUnbill: [],
+            quotedTaskUpdates: [],
+            taskCutoffUpdates: [],
+            invoiceUpdates,
+            releasedTimeEntryCount: 0,
+            deletedAdjustmentCount: 0,
+            releasedExpenseCount: 0,
+            releasedQuotedTaskCount: 0,
+            restoredTaskCutoffCount: 0,
+            retainedProjectLinkCount: 0,
+        }
+        store.invoices.set(originalInvoice.id, objectToYMap(paidInvoice))
+
+        await expect(store.commitInvoiceCancellation({
+            operationId: 'cancel-race',
+            invoice: originalInvoice,
+            desiredInvoice: { ...originalInvoice, ...invoiceUpdates },
+            application,
+            createdAt: 2000,
+        })).rejects.toThrow('Paid invoices cannot be canceled')
+
+        expect(store.invoiceBillingOperations.has('cancel-race')).toBe(false)
+        expect(readStored(store.invoices, originalInvoice.id)).toEqual(expect.objectContaining({
+            status: 'paid',
+            paidAt: 1900,
+            paymentCurrencySnapshot: expect.objectContaining({ capturedAt: 1900 }),
+        }))
+        store.destroy()
+    })
+
+    it('rejects out-of-contract cancellation journal mutations before persistence', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const invoice = {
+            id: 'invoice-cancel-invalid-operation',
+            projectId: null,
+            clientId: 'client-cancel',
+            invoiceNumber: 'INV-INVALID',
+            date: '2026-07-10',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        }
+        const invoiceUpdates = {
+            status: 'canceled',
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+            updatedAt: 2000,
+            total: 0,
+        }
+        store.invoices.set(invoice.id, objectToYMap(invoice))
+
+        await expect(store.commitInvoiceCancellation({
+            operationId: 'cancel-invalid-operation',
+            invoice,
+            desiredInvoice: {
+                ...invoice,
+                status: 'canceled',
+                canceledAt: 2000,
+                cancellationReason: 'Duplicate invoice',
+                paidAt: null,
+                paymentCurrencySnapshot: null,
+                updatedAt: 2000,
+            },
+            application: {
+                entriesToDelete: [],
+                entriesToClear: [],
+                expenseUpdatesToUnbill: [],
+                quotedTaskUpdates: [],
+                taskCutoffUpdates: [],
+                invoiceUpdates,
+                releasedTimeEntryCount: 0,
+                deletedAdjustmentCount: 0,
+                releasedExpenseCount: 0,
+                releasedQuotedTaskCount: 0,
+                restoredTaskCutoffCount: 0,
+                retainedProjectLinkCount: 0,
+            },
+            createdAt: 2000,
+        })).rejects.toThrow('invalid persisted input')
+
+        expect(store.invoiceBillingOperations.has('cancel-invalid-operation')).toBe(false)
+        expect(readStored(store.invoices, invoice.id)).toEqual(expect.objectContaining({
+            status: 'sent',
+            total: 100,
+        }))
+        store.destroy()
+    })
+
+    it('releases owned source markers that arrive after cancellation preparation', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const invoice = {
+            id: 'invoice-cancel-late-source',
+            projectId: null,
+            clientId: 'client-cancel',
+            invoiceNumber: 'INV-LATE',
+            date: '2026-07-10',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            billingStateSnapshot: {
+                version: 1,
+                capturedAt: 1000,
+                taskLastBilledAt: { 'task-late': 50 },
+            },
+            billingSelectionSnapshot: {
+                version: 1,
+                capturedAt: 1000,
+                invoiceCurrency: 'EUR',
+                entries: [{
+                    entryId: 'entry-late',
+                    taskId: 'task-late',
+                    start: 100,
+                    end: 200,
+                    actualDurationMs: 100,
+                    billableDurationMs: 100,
+                    billedHourlyRate: 100,
+                }],
+                tasks: [],
+                expenses: [],
+            },
+        }
+        const invoiceUpdates = {
+            status: 'canceled',
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+            updatedAt: 2000,
+        }
+        const application = {
+            entriesToDelete: [],
+            entriesToClear: [],
+            expenseUpdatesToUnbill: [],
+            quotedTaskUpdates: [],
+            taskCutoffUpdates: [],
+            invoiceUpdates,
+            releasedTimeEntryCount: 0,
+            deletedAdjustmentCount: 0,
+            releasedExpenseCount: 0,
+            releasedQuotedTaskCount: 0,
+            restoredTaskCutoffCount: 0,
+            retainedProjectLinkCount: 0,
+        }
+        store.invoices.set(invoice.id, objectToYMap(invoice))
+
+        await store.commitInvoiceCancellation({
+            operationId: 'cancel-late-source',
+            invoice,
+            desiredInvoice: { ...invoice, ...invoiceUpdates },
+            application,
+            createdAt: 2000,
+        })
+
+        store.activeTimeEntries.set('entry-late', objectToYMap({
+            id: 'entry-late',
+            taskId: 'task-late',
+            start: 100,
+            end: 200,
+            billedAt: 1000,
+            billedInvoiceId: invoice.id,
+            billedHourlyRate: 100,
+        }))
+        store.activeTimeEntries.set('entry-late-adjustment', objectToYMap({
+            id: 'entry-late-adjustment',
+            taskId: 'task-late',
+            start: 200,
+            end: 220,
+            source: 'invoice-adjustment',
+            billedAt: 1000,
+            billedInvoiceId: invoice.id,
+            billedHourlyRate: 100,
+        }))
+        store.expenses.set('expense-late', objectToYMap({
+            id: 'expense-late',
+            title: 'Late expense',
+            date: '2026-07-10',
+            amount: 10,
+            currency: 'EUR',
+            paymentStatus: 'paid',
+            billingStatus: 'billed',
+            invoiceId: invoice.id,
+            billedAt: 1000,
+            taxClaimed: true,
+            isPersonal: false,
+            billable: true,
+            isRecurring: false,
+            taxExempt: false,
+        }))
+        store.tasks.set('task-late', objectToYMap({
+            id: 'task-late',
+            title: 'Late task',
+            estimatedFlatAmount: null,
+            lastBilledAt: 200,
+            quotedAmountBilling: { invoiceId: invoice.id, billedAt: 1000, total: 300 },
+            updatedAt: 1000,
+        }))
+
+        await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+        expect(readStored(store.activeTimeEntries, 'entry-late')).toEqual(expect.objectContaining({
+            billedAt: null,
+            billedInvoiceId: null,
+            billedHourlyRate: null,
+        }))
+        expect(store.activeTimeEntries.has('entry-late-adjustment')).toBe(false)
+        expect(readStored(store.expenses, 'expense-late')).toEqual(expect.objectContaining({
+            billingStatus: 'unbilled',
+            invoiceId: null,
+            billedAt: null,
+            paymentStatus: 'paid',
+            taxClaimed: true,
+        }))
+        expect(readStored(store.tasks, 'task-late')).toEqual(expect.objectContaining({
+            estimatedFlatAmount: 300,
+            lastBilledAt: 50,
+            quotedAmountBilling: null,
+        }))
+        expect(readStored(store.invoiceBillingOperations, 'cancel-late-source')).toEqual(expect.objectContaining({
+            application: expect.objectContaining({
+                releasedTimeEntryCount: 0,
+                releasedExpenseCount: 0,
+                releasedQuotedTaskCount: 0,
+            }),
+        }))
+
+        store.activeTimeEntries.set('entry-late', objectToYMap({
+            ...readStored(store.activeTimeEntries, 'entry-late'),
+            billedAt: 2500,
+            billedInvoiceId: 'invoice-newer',
+            billedHourlyRate: 120,
+        }))
+        store.expenses.set('expense-late', objectToYMap({
+            ...readStored(store.expenses, 'expense-late'),
+            billingStatus: 'billed',
+            invoiceId: 'invoice-newer',
+            billedAt: 2500,
+        }))
+        store.tasks.set('task-late', objectToYMap({
+            ...readStored(store.tasks, 'task-late'),
+            lastBilledAt: 999,
+            quotedAmountBilling: { invoiceId: 'invoice-newer', billedAt: 2500, total: 400 },
+        }))
+        const before = new Map(Array.from(docs.entries()).map(([name, doc]) => [
+            name,
+            Array.from(Y.encodeStateVector(doc)),
+        ]))
+
+        await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+        const after = new Map(Array.from(docs.entries()).map(([name, doc]) => [
+            name,
+            Array.from(Y.encodeStateVector(doc)),
+        ]))
+        expect(after).toEqual(before)
+        expect(readStored(store.activeTimeEntries, 'entry-late')).toEqual(expect.objectContaining({ billedInvoiceId: 'invoice-newer' }))
+        expect(readStored(store.expenses, 'expense-late')).toEqual(expect.objectContaining({ invoiceId: 'invoice-newer' }))
+        expect(readStored(store.tasks, 'task-late')).toEqual(expect.objectContaining({
+            lastBilledAt: 999,
+            quotedAmountBilling: expect.objectContaining({ invoiceId: 'invoice-newer' }),
+        }))
+        store.destroy()
+    })
+
+    it('does not recreate an explicitly deleted canceled invoice during completed replay', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const invoice = {
+            id: 'invoice-cancel-deleted',
+            projectId: null,
+            clientId: 'client-cancel',
+            invoiceNumber: 'INV-99',
+            date: '2026-07-10',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        }
+        const desiredInvoice = {
+            ...invoice,
+            status: 'canceled',
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+            updatedAt: 2000,
+        }
+        const application = {
+            entriesToDelete: [],
+            entriesToClear: [],
+            expenseUpdatesToUnbill: [],
+            quotedTaskUpdates: [],
+            taskCutoffUpdates: [],
+            invoiceUpdates: {
+                status: 'canceled',
+                canceledAt: 2000,
+                cancellationReason: 'Duplicate invoice',
+                updatedAt: 2000,
+            },
+            releasedTimeEntryCount: 0,
+            deletedAdjustmentCount: 0,
+            releasedExpenseCount: 0,
+            releasedQuotedTaskCount: 0,
+            restoredTaskCutoffCount: 0,
+            retainedProjectLinkCount: 0,
+        }
+        store.invoices.set(invoice.id, objectToYMap(invoice))
+
+        await store.commitInvoiceCancellation({
+            operationId: 'cancel-deleted',
+            invoice,
+            desiredInvoice,
+            application,
+            createdAt: 2000,
+        })
+        store.invoices.delete(invoice.id)
+
+        await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+        expect(store.invoices.has(invoice.id)).toBe(false)
+        store.destroy()
+    })
+
+    it('retries the same cancellation and preserves sources claimed after preparation', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const invoice = {
+            id: 'invoice-cancel-retry',
+            projectId: null,
+            clientId: 'client-cancel',
+            invoiceNumber: 'INV-100',
+            date: '2026-07-10',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        }
+        const desiredInvoice = {
+            ...invoice,
+            status: 'canceled',
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+            updatedAt: 2000,
+        }
+        const application = {
+            entriesToDelete: [],
+            entriesToClear: [{
+                entry: { id: 'entry-retry', billedInvoiceId: invoice.id },
+                updates: { billedAt: null, billedInvoiceId: null, billedHourlyRate: null, updatedAt: 2000 },
+            }],
+            expenseUpdatesToUnbill: [{
+                id: 'expense-retry',
+                updates: { billingStatus: 'unbilled', invoiceId: null, billedAt: null, updatedAt: 2000 },
+            }],
+            quotedTaskUpdates: [{
+                id: 'task-retry',
+                updates: { estimatedFlatAmount: 100, quotedAmountBilling: null, updatedAt: 2000 },
+            }],
+            taskCutoffUpdates: [{
+                id: 'task-retry',
+                expectedLastBilledAt: 100,
+                updates: { lastBilledAt: null, updatedAt: 2000 },
+            }],
+            invoiceUpdates: {
+                status: 'canceled',
+                canceledAt: 2000,
+                cancellationReason: 'Duplicate invoice',
+                updatedAt: 2000,
+            },
+            releasedTimeEntryCount: 1,
+            deletedAdjustmentCount: 0,
+            releasedExpenseCount: 1,
+            releasedQuotedTaskCount: 1,
+            restoredTaskCutoffCount: 1,
+            retainedProjectLinkCount: 0,
+        }
+        store.invoices.set(invoice.id, objectToYMap(invoice))
+        store.activeTimeEntries.set('entry-retry', objectToYMap({
+            id: 'entry-retry',
+            taskId: 'task-retry',
+            start: 10,
+            end: 20,
+            billedInvoiceId: invoice.id,
+            billedAt: 1000,
+        }))
+        store.expenses.set('expense-retry', objectToYMap({
+            id: 'expense-retry',
+            title: 'Retry expense',
+            date: '2026-07-10',
+            amount: 10,
+            currency: 'EUR',
+            paymentStatus: 'unpaid',
+            billingStatus: 'billed',
+            invoiceId: invoice.id,
+            isPersonal: false,
+            billable: true,
+            isRecurring: false,
+            taxExempt: false,
+        }))
+        store.tasks.set('task-retry', objectToYMap({
+            id: 'task-retry',
+            title: 'Retry task',
+            lastBilledAt: 100,
+            quotedAmountBilling: { invoiceId: invoice.id, billedAt: 1000, total: 100 },
+        }))
+
+        await expect(store.commitInvoiceCancellation({
+            operationId: 'cancel-retry',
+            invoice,
+            desiredInvoice,
+            application,
+            createdAt: 2000,
+            onPhase: (phase) => {
+                if (phase === 'prepared') throw new Error('interrupt prepared')
+            },
+        })).rejects.toThrow('interrupt prepared')
+
+        store.activeTimeEntries.set('entry-retry', objectToYMap({
+            ...readStored(store.activeTimeEntries, 'entry-retry'),
+            billedInvoiceId: 'invoice-newer',
+        }))
+        store.expenses.set('expense-retry', objectToYMap({
+            ...readStored(store.expenses, 'expense-retry'),
+            invoiceId: 'invoice-newer',
+        }))
+        store.tasks.set('task-retry', objectToYMap({
+            ...readStored(store.tasks, 'task-retry'),
+            lastBilledAt: 999,
+            quotedAmountBilling: { invoiceId: 'invoice-newer', billedAt: 1900, total: 200 },
+        }))
+
+        const firstRetry = await store.commitInvoiceCancellation({
+            operationId: 'cancel-retry',
+            invoice,
+            desiredInvoice,
+            application,
+            createdAt: 2000,
+        })
+        const before = Array.from(Y.encodeStateVector(store.coreDoc))
+        const settledRetry = await store.commitInvoiceCancellation({
+            operationId: 'cancel-retry',
+            invoice,
+            desiredInvoice,
+            application,
+            createdAt: 2000,
+        })
+
+        expect(firstRetry.alreadyApplied).toBe(false)
+        expect(settledRetry.alreadyApplied).toBe(true)
+        expect(Array.from(Y.encodeStateVector(store.coreDoc))).toEqual(before)
+        expect(readStored(store.activeTimeEntries, 'entry-retry')).toEqual(expect.objectContaining({ billedInvoiceId: 'invoice-newer' }))
+        expect(readStored(store.expenses, 'expense-retry')).toEqual(expect.objectContaining({ invoiceId: 'invoice-newer' }))
+        expect(readStored(store.tasks, 'task-retry')).toEqual(expect.objectContaining({
+            lastBilledAt: 999,
+            quotedAmountBilling: expect.objectContaining({ invoiceId: 'invoice-newer' }),
+        }))
+
+        await expect(store.commitInvoiceCancellation({
+            operationId: 'cancel-conflict',
+            invoice,
+            desiredInvoice: {
+                ...desiredInvoice,
+                canceledAt: 3000,
+                cancellationReason: 'Different reason',
+            },
+            application: {
+                ...application,
+                invoiceUpdates: {
+                    ...application.invoiceUpdates,
+                    canceledAt: 3000,
+                    cancellationReason: 'Different reason',
+                },
+            },
+            createdAt: 3000,
+        })).rejects.toThrow('canceled by a conflicting operation')
+        expect(readStored(store.invoices, invoice.id)).toEqual(expect.objectContaining({
+            canceledAt: 2000,
+            cancellationReason: 'Duplicate invoice',
+        }))
+
+        store.destroy()
+    })
+
     it('hands disconnected local edits to Drive on reconnect', async () => {
         const store = new YjsStore()
         await store.initialize()
@@ -1298,6 +2041,84 @@ describe('YjsStore timer reconciliation', () => {
         store.destroy()
     })
 
+    it('replacement-restores canceled invoices in core with retained project identity and no portable billing journal', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const canceledAt = Date.parse('2026-07-14T10:30:00Z')
+
+        store.projects.set('project-original', objectToYMap({
+            id: 'project-original',
+            title: 'Original project',
+        }))
+        store.invoiceBillingOperations.set('operation-original', objectToYMap({
+            version: 1,
+            operationId: 'operation-original',
+            invoiceId: 'invoice-original',
+            kind: 'cancel',
+            state: 'complete',
+            lastCompletedPhase: 'complete',
+            createdAt: 1,
+            updatedAt: 1,
+        }))
+
+        await store.replaceAllDataWithBackup({
+            projects: [{
+                id: 'project-canceled',
+                title: 'Canceled invoice project',
+                invoiceIds: ['invoice-canceled'],
+            }],
+            clients: [{ id: 'client-canceled', title: 'Canceled invoice client' }],
+            invoices: [{
+                id: 'invoice-canceled',
+                projectId: 'project-canceled',
+                projectIds: ['project-canceled'],
+                clientId: 'client-canceled',
+                invoiceNumber: 'INV-CANCELED',
+                date: '2025-01-01',
+                dueDate: '2025-01-31',
+                status: 'canceled',
+                canceledAt,
+                cancellationReason: 'Duplicate invoice',
+                items: [],
+                subtotal: 100,
+                tax: 20,
+                total: 120,
+                currency: 'EUR',
+            }],
+        })
+
+        expect(store.projects.has('project-original')).toBe(false)
+        expect(store.projects.get('project-canceled').toJSON()).toEqual(expect.objectContaining({
+            invoiceIds: ['invoice-canceled'],
+        }))
+        expect(store.invoices.get('invoice-canceled').toJSON()).toEqual(expect.objectContaining({
+            invoiceNumber: 'INV-CANCELED',
+            status: 'canceled',
+            canceledAt,
+            cancellationReason: 'Duplicate invoice',
+            total: 120,
+        }))
+        expect((await store.loadArchivedInvoices()).has('invoice-canceled')).toBe(false)
+        expect(store.invoiceBillingOperations.size).toBe(0)
+
+        const exported = await store.exportBackupData({
+            backupType: 'manual',
+            exportDate: '2026-07-14T11:00:00.000Z',
+        })
+        expect(exported).toEqual(expect.objectContaining({
+            version: '1.5',
+            invoices: [expect.objectContaining({
+                id: 'invoice-canceled',
+                status: 'canceled',
+                canceledAt,
+                cancellationReason: 'Duplicate invoice',
+            })],
+        }))
+        expect(exported).not.toHaveProperty('invoiceBillingOperations')
+
+        store.destroy()
+    })
+
     it('recovers a durably journaled workspace after the browser stopped mid-restore', async () => {
         const partialCore = new Y.Doc()
         partialCore.getMap('projects').set('project-partial', objectToYMap({
@@ -1672,6 +2493,99 @@ describe('YjsStore task hierarchy archiving', () => {
         expect(archivedMap.has('invoice-1')).toBe(false)
         expect(activeMap.get('invoice-1').get('status')).toBe('sent')
         expect(activeMap.get('invoice-1').get('_archiveTransition').targetDoc).toBe('core')
+
+        store.destroy()
+    })
+
+    it('keeps a journaled cancellation in core when a newer stale paid archive copy replays', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const originalInvoice = {
+            id: 'invoice-canceled-archive-replay',
+            projectId: null,
+            clientId: 'client-1',
+            invoiceNumber: 'INV-CANCELED-ARCHIVE',
+            date: '2020-01-02',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 120,
+            updatedAt: 100,
+        }
+        const desiredInvoice = {
+            ...originalInvoice,
+            status: 'canceled',
+            canceledAt: 200,
+            cancellationReason: 'Duplicate invoice',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+            updatedAt: 200,
+        }
+        const invoiceUpdates = {
+            status: 'canceled',
+            canceledAt: 200,
+            cancellationReason: 'Duplicate invoice',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+            updatedAt: 200,
+        }
+        const application = {
+            entriesToDelete: [],
+            entriesToClear: [],
+            expenseUpdatesToUnbill: [],
+            quotedTaskUpdates: [],
+            taskCutoffUpdates: [],
+            invoiceUpdates,
+            releasedTimeEntryCount: 0,
+            deletedAdjustmentCount: 0,
+            releasedExpenseCount: 0,
+            releasedQuotedTaskCount: 0,
+            restoredTaskCutoffCount: 0,
+            retainedProjectLinkCount: 0,
+        }
+
+        store.invoiceBillingOperations.set('cancel-archive-replay', objectToYMap({
+            version: 1,
+            operationId: 'cancel-archive-replay',
+            invoiceId: originalInvoice.id,
+            kind: 'cancel',
+            state: 'complete',
+            invoice: originalInvoice,
+            desiredInvoice,
+            application,
+            createdAt: 200,
+            updatedAt: 200,
+            lastCompletedPhase: 'complete',
+        }))
+        const activeMap = docs.get('core').getMap('invoices')
+        activeMap.set(originalInvoice.id, objectToYMap(desiredInvoice))
+        const archivedDoc = new Y.Doc()
+        docs.set('invoices-archived', archivedDoc)
+        archivedDoc.getMap('invoices').set(originalInvoice.id, objectToYMap({
+            ...originalInvoice,
+            status: 'paid',
+            paidAt: Date.UTC(2020, 0, 10),
+            paymentCurrencySnapshot: {
+                capturedAt: 300,
+                sourceCurrency: 'EUR',
+                sourceAmount: 120,
+                preferredCurrencyAtPayment: 'EUR',
+                preferredCurrencyAmount: 120,
+            },
+            updatedAt: 300,
+        }))
+
+        const archivedMap = await store.loadArchivedInvoices()
+
+        expect(archivedMap.has(originalInvoice.id)).toBe(false)
+        expect(readStored(activeMap, originalInvoice.id)).toEqual(expect.objectContaining({
+            status: 'canceled',
+            canceledAt: 200,
+            cancellationReason: 'Duplicate invoice',
+            paidAt: null,
+            paymentCurrencySnapshot: null,
+            total: 120,
+        }))
 
         store.destroy()
     })

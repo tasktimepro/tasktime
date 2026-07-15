@@ -7,6 +7,7 @@ import {
     hasExplicitBillingMarker,
 } from '@/domain/invoices/invoiceEligibility';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
+import { isInvoiceOutstanding } from '@/utils/invoiceUtils';
 import { assertPermission, assertReady, readRequiredEntity } from './shared';
 
 const DEFAULT_RESULT_LIMIT = 25;
@@ -250,7 +251,7 @@ export function getClientOverviewCommand(context: AgentCommandContext, input: { 
         billableExpenseCount: expenses.filter((expense) => expense.billable).length,
         unbilledExpenseCount: expenses.filter((expense) => expense.billable && expense.billingStatus !== 'billed').length,
         draftInvoiceCount: invoices.filter((invoice) => invoice.status === 'draft').length,
-        openInvoiceTotal: invoices.filter((invoice) => invoice.status !== 'paid').reduce((total, invoice) => total + (invoice.total || 0), 0),
+        openInvoiceTotal: invoices.filter((invoice) => isInvoiceOutstanding(invoice)).reduce((total, invoice) => total + (invoice.total || 0), 0),
     };
 }
 

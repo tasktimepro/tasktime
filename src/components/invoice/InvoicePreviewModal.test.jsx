@@ -130,4 +130,24 @@ describe('InvoicePreviewModal', () => {
 
         expect(onDownload).toHaveBeenCalledTimes(1);
     });
+
+    it('identifies canceled invoices as read-only historical records', () => {
+        render(
+            <InvoicePreviewModal
+                isOpen
+                onClose={vi.fn()}
+                invoice={{
+                    invoiceNumber: 'INV-CANCELED',
+                    status: 'canceled',
+                    canceledAt: new Date('2026-07-14T08:30:00Z').getTime(),
+                    cancellationReason: 'Duplicate invoice',
+                }}
+                htmlContent={'<div><h1>CANCELED</h1><p>Invoice: #INV-CANCELED</p></div>'}
+            />
+        );
+
+        expect(screen.getByText('Canceled invoice')).toBeInTheDocument();
+        expect(screen.getByText(/read-only historical record/i)).toBeInTheDocument();
+        expect(screen.getByText(/Duplicate invoice/)).toBeInTheDocument();
+    });
 });

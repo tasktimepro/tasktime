@@ -662,6 +662,43 @@ describe('createInvoiceHTML', () => {
         expect(html).toBe('<div>Invoice: #INV-0200</div>')
     })
 
+    it('adds cancellation treatment after selecting matching stored html', () => {
+
+        const html = getCurrentInvoiceHtmlContent({
+            invoiceNumber: 'INV-CANCELED-CACHED',
+            htmlContent: '<div class="invoice-document">Invoice: #INV-CANCELED-CACHED</div>',
+            status: 'canceled',
+            canceledAt: new Date('2026-07-14T08:30:00Z').getTime(),
+            cancellationReason: 'Duplicate <invoice> & superseded',
+        })
+
+        expect(html).toContain('CANCELED')
+        expect(html).toContain('Duplicate &lt;invoice&gt; &amp; superseded')
+        expect(html).not.toContain('Duplicate <invoice>')
+        expect(html).toContain('Invoice: #INV-CANCELED-CACHED')
+    })
+
+    it('adds cancellation treatment to rebuilt invoice html exactly once', () => {
+
+        const invoice = {
+            invoiceNumber: 'INV-CANCELED-REBUILT',
+            htmlContent: '<div>Invoice: #STALE</div>',
+            client: { name: 'Client' },
+            tasks: [],
+            totalAmount: 0,
+            currency: 'USD',
+            status: 'canceled',
+            canceledAt: new Date('2026-07-14T08:30:00Z').getTime(),
+            cancellationReason: 'Issued in error',
+        }
+        const first = getCurrentInvoiceHtmlContent(invoice)
+        const second = getCurrentInvoiceHtmlContent({ ...invoice, htmlContent: first })
+
+        expect(first).toContain('Invoice: #INV-CANCELED-REBUILT')
+        expect(first.match(/data-invoice-cancellation/g)).toHaveLength(1)
+        expect(second.match(/data-invoice-cancellation/g)).toHaveLength(1)
+    })
+
     it('reuses stored html when no invoice number is set yet', () => {
 
         const html = getCurrentInvoiceHtmlContent({

@@ -34,7 +34,7 @@ The Yjs store is split into documents so current work stays loaded and historica
 1. Create clients and projects, organize tasks/subtasks, and plan work by week.
 2. Start, pause, resume, and stop one timer per project; stopping creates one time entry.
 3. Record expenses and recurrences, organize tax-return periods, and track paid/claimed states.
-4. Generate invoice drafts or quotes from unbilled work and expenses, finalize them, record payments, export/send documents, and undo supported billing operations.
+4. Generate invoice drafts or quotes from unbilled work and expenses, finalize them, record payments, cancel finalized unpaid invoices as retained audit records, export/send valid documents, and undo supported billing operations.
 5. Review dashboard metrics and reports, then export CSV, PDF, ZIP, backup, or accountant artifacts.
 6. Optionally connect Google Drive using manual, backup, or bidirectional sync modes.
 7. Optionally pair a same-device agent bridge and grant scoped business-action access.
@@ -44,6 +44,9 @@ The Yjs store is split into documents so current work stays loaded and historica
 - Local data remains usable offline; cloud features are optional.
 - Schema changes are additive or explicitly migrated and tested against historical data.
 - UI badges, invoice composition, and agent invoice commands share the same read-only eligibility operation, including conservative support for finalized legacy invoices with markerless source entries.
+- Browser and agent cancellation adapters share one journaled source-release operation. Cancellation revalidates current eligibility before the first journal write; retains the invoice number, original snapshots, and project links; releases only sources still owned by that invoice across active/historical/archive documents; never rewinds numbering; and conditionally converges late-arriving same-invoice claims after partial failure or stale Drive/archive replay without overwriting later billing.
+- Canceled invoices remain read-only audit records in `core`, are unmistakably marked in retained PDFs, and contribute zero to payment, revenue, output-tax, profit, outstanding, aging, statement, and project-allocation calculations. Portable backup `1.5` preserves the record while continuing to import every previously supported backup version.
+- Mark-as-unpaid is a paid-invoice correction only: it clears payment evidence while retaining billing-source claims and cannot reopen a sent, overdue, draft, or canceled invoice.
 - UI hooks and agent commands share domain operations for timer lifecycle/recovered stops, protected manual time-entry mutations, task completion/recurrence state, duplicate-safe entity identity, protected expense deletion, and relationship-safe project/client/task writes.
 - Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.

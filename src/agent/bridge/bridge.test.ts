@@ -343,6 +343,7 @@ describe('agent bridge audit log', () => {
         });
 
         expect(getBridgeAuditCommandCategory('finalize_invoice')).toBe('billing');
+        expect(getBridgeAuditCommandCategory('cancel_invoice')).toBe('billing');
         expect(getBridgeAuditCommandCategory('export_invoice_pdf')).toBe('export');
         expect(getBridgeAuditCommandCategory('export_report_csv')).toBe('export');
         expect(getBridgeAuditCommandCategory('send_invoice_email')).toBe('email');

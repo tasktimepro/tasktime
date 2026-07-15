@@ -43,11 +43,15 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **BILL-5:** Undoing the latest supported invoice must restore eligible source state exactly once without damaging later unrelated work.
 - **BILL-6:** Quotes must not create invoice billing records merely by previewing/exporting/sending them.
 - **BILL-7:** PDF/email/export output must reflect the same finalized or preview data shown in the product.
+- **BILL-8:** Canceling a finalized unpaid invoice must retain its immutable invoice record, number, totals, snapshots, and project links while terminally marking it canceled and releasing only source records still claimed by that invoice.
+- **BILL-9:** Cancellation requires a non-empty reason and exact invoice-number confirmation, is idempotent and replay-safe, never rewinds numbering, and rejects drafts, paid invoices, repeated cancellation under a different operation, and all uncancel attempts.
+- **BILL-10:** Canceled invoices are non-payable, non-emailable, immutable outside explicit deletion cascades, and visibly canceled in every retained invoice document; credit notes, refunds, partial cancellation, filed-tax adjustment, and cancellation notices are separate future workflows.
 
 ## Reports and export/import
 
 - **REPORT-1:** Report totals must derive from the same canonical time, expense, invoice, payment, tax, date, client, project, and currency semantics used elsewhere.
 - **REPORT-2:** Filters and date ranges must apply consistently to on-screen summaries and exported CSV/PDF/accountant packs.
+- **REPORT-3:** Canceled invoices remain available as audit rows with original face value and cancellation metadata but contribute zero to revenue, payment, output-tax, profit, outstanding, overdue, aging, and client-statement totals.
 - **BACKUP-1:** Export a portable backup containing supported account data without secret credentials.
 - **BACKUP-2:** Preview imports before mutation and restore valid supported backups without breaking relationships.
 - **BACKUP-3:** Keep public compatibility fixtures and regression tests for representative older backup shapes.

@@ -7,7 +7,7 @@ description: >-
   installed, and stores work records in the browser. This first-party TaskTime
   Pro skill lets same-device agents operate the app through scoped access and
   approval controls.
-version: 1.0.9
+version: 1.1.0
 metadata:
   openclaw:
     requires:
@@ -73,10 +73,10 @@ Trusted chat approvals default to until revoked for stable same-device managed a
 
 1. Use MCP tools for TaskTime Pro data work. Use browser UI automation only for visual validation or unsupported workflows.
 2. Inspect before changing data. Start with list, preview, or read tools before write, billing, export, email, restore, or delete tools.
-3. For invoice and quote work, preview unbilled work before creating drafts, finalizing invoices, exporting PDFs, or sending email.
+3. For invoice and quote work, preview unbilled work before creating drafts, finalizing invoices, exporting PDFs, or sending email. Before canceling an eligible unpaid invoice, inspect it and explain that cancellation is terminal, retains its number, and releases its owned source work.
 4. For navigation work, use `open_*` view tools to bring the user to the relevant visible app screen for review.
 5. For approval-gated actions, use a valid exact-input TaskTime Pro approval token created through `tasktime/create_approval_token`, or let the browser-visible approval prompt handle the action. Do not reuse tokens for changed inputs.
-6. Keep the user in control for invoice finalization, email sending, export, account data deletion, restore, sync wiping, and cascade deletes.
+6. Keep the user in control for invoice finalization or cancellation, email sending, export, account data deletion, restore, sync wiping, and cascade deletes.
 
 ## Useful First Tools
 
@@ -86,6 +86,7 @@ Trusted chat approvals default to until revoked for stable same-device managed a
 - `create_project`, `create_client`, and `create_task` for normal setup and planning.
 - `list_expenses` and expense category tools for expense review and entry.
 - `find_unbilled_time` and `preview_invoice_from_unbilled_work` before invoice drafting.
+- `list_invoices` before `cancel_invoice`; cancel only finalized unpaid invoices with the required reason, exact invoice-number confirmation, billing scope, and TaskTime Pro approval.
 - `create_invoice_draft`, `preview_project_quote`, and invoice/quote email tools only within granted scopes and approval rules.
 - `open_project_view`, `open_invoice_view`, `open_reports_view`, and other navigation tools to put the user on review screens.
 

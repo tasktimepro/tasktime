@@ -57,13 +57,22 @@ import type {
     ArchiveTransition,
 } from './types';
 import type { InvoiceFinalizationApplicationPlan } from '@/domain/invoices/invoiceFinalizationApplication';
-import type { InvoiceUndoApplicationPlan } from '@/domain/invoices/invoiceUndoApplication';
 import {
+    buildInvoiceSourceReleaseApplication,
+    type InvoiceUndoApplicationPlan,
+} from '@/domain/invoices/invoiceUndoApplication';
+import {
+    getInvoiceCancellationBlockReason,
+    type InvoiceCancellationApplicationPlan,
+} from '@/domain/invoices/invoiceCancellation';
+import {
+    createInvoiceCancellationOperation,
     createInvoiceFinalizationOperation,
     createInvoiceUndoOperation,
     isInvoiceBillingOperation,
     type InvoiceBillingOperation,
     type InvoiceBillingOperationPhase,
+    type InvoiceCancellationOperation,
 } from '@/domain/invoices/invoiceBillingOperation';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -872,6 +881,41 @@ export class YjsStore {
     private reconcileInvoiceArchives(archivedMap: Y.Map<string, Invoice>): void {
         const currentYear = new Date().getFullYear();
         const activeMap = this._coreDoc!.getMap('invoices') as Y.Map<string, Invoice>;
+        const operationMap = this.getExistingInvoiceBillingOperations();
+        const cancellationByInvoice = new Map<string, InvoiceCancellationOperation>();
+
+        if (operationMap) {
+            collectEntities<InvoiceBillingOperation>(operationMap as any)
+                .filter(isInvoiceBillingOperation)
+                .filter((operation): operation is InvoiceCancellationOperation => operation.kind === 'cancel')
+                .sort((left, right) => (
+                    left.createdAt - right.createdAt
+                    || left.operationId.localeCompare(right.operationId)
+                ))
+                .forEach((operation) => {
+                    if (!cancellationByInvoice.has(operation.invoiceId)) {
+                        cancellationByInvoice.set(operation.invoiceId, operation);
+                    }
+                });
+        }
+
+        // A terminal cancellation journal wins over a fresher stale paid copy
+        // that reappears in the archived document. Only resolve duplicates:
+        // an explicitly deleted invoice must not be recreated from the journal.
+        for (const [invoiceId, operation] of cancellationByInvoice) {
+            if (!activeMap.has(invoiceId) || !archivedMap.has(invoiceId)) continue;
+
+            const transition: ArchiveTransition = {
+                operationId: generateId(),
+                targetDoc: 'core',
+                changedAt: Date.now(),
+            };
+            (activeMap as any).set(invoiceId, objectToYMap({
+                ...operation.desiredInvoice,
+                _archiveTransition: transition,
+            } as unknown as Record<string, unknown>));
+            archivedMap.delete(invoiceId);
+        }
 
         this.reconcileOneWayArchive(
             activeMap,
@@ -1463,6 +1507,110 @@ export class YjsStore {
         await this.applyInvoiceBillingOperation(operation, onPhase);
     }
 
+    /** Persist and apply terminal cancellation without unlinking or rewinding. */
+    async commitInvoiceCancellation({
+        operationId,
+        invoice,
+        desiredInvoice,
+        application,
+        createdAt = Date.now(),
+        onPhase,
+    }: {
+        operationId: string;
+        invoice: Invoice;
+        desiredInvoice: Invoice;
+        application: InvoiceCancellationApplicationPlan;
+        createdAt?: number;
+        onPhase?: (phase: InvoiceBillingOperationPhase) => void;
+    }): Promise<{
+        invoice: Invoice;
+        operation: InvoiceCancellationOperation;
+        alreadyApplied: boolean;
+    }> {
+        const requestedOperation = createInvoiceCancellationOperation({
+            operationId,
+            invoice,
+            desiredInvoice,
+            application,
+            createdAt,
+        });
+
+        if (!isInvoiceBillingOperation(requestedOperation)) {
+            throw new Error(`Invoice cancellation operation ${operationId} has invalid persisted input.`);
+        }
+
+        const existing = readEntity<InvoiceBillingOperation>(
+            this.invoiceBillingOperations.get(operationId)
+        );
+        let operation = requestedOperation;
+        let alreadyApplied = false;
+
+        if (existing) {
+            if (!isInvoiceBillingOperation(existing)
+                || existing.kind !== 'cancel'
+                || existing.invoiceId !== invoice.id) {
+                throw new Error(`Invoice billing operation ${operationId} has conflicting persisted input.`);
+            }
+
+            if (
+                existing.desiredInvoice.canceledAt !== desiredInvoice.canceledAt
+                || existing.desiredInvoice.cancellationReason !== desiredInvoice.cancellationReason
+            ) {
+                throw new Error(`Invoice cancellation operation ${operationId} has conflicting persisted input.`);
+            }
+
+            operation = existing;
+            alreadyApplied = existing.state === 'complete';
+        } else {
+            const currentInvoice = readEntity<Invoice>(this.invoices.get(invoice.id));
+
+            if (
+                currentInvoice?.status === 'canceled'
+                && (
+                    currentInvoice.canceledAt !== desiredInvoice.canceledAt
+                    || currentInvoice.cancellationReason !== desiredInvoice.cancellationReason
+                )
+            ) {
+                throw new Error(`Invoice ${invoice.id} was canceled by a conflicting operation.`);
+            }
+
+            const blockReason = getInvoiceCancellationBlockReason(currentInvoice);
+
+            if (blockReason) {
+                throw new Error(blockReason);
+            }
+
+            if (currentInvoice?.invoiceNumber !== invoice.invoiceNumber) {
+                throw new Error(`Invoice ${invoice.id} changed before cancellation could be persisted.`);
+            }
+
+            this.persistInvoiceBillingOperation(operation);
+        }
+
+        onPhase?.('prepared');
+        await this.applyInvoiceBillingOperation(operation, onPhase);
+
+        const canceledInvoice = readEntity<Invoice>(this.invoices.get(invoice.id));
+
+        if (!canceledInvoice) {
+            throw new Error(`Invoice ${invoice.id} was removed before cancellation completed.`);
+        }
+
+        if (
+            canceledInvoice.status !== 'canceled'
+            || canceledInvoice.canceledAt !== operation.desiredInvoice.canceledAt
+            || canceledInvoice.cancellationReason !== operation.desiredInvoice.cancellationReason
+        ) {
+            throw new Error(`Invoice ${invoice.id} was canceled by a conflicting operation.`);
+        }
+
+        return {
+            invoice: canceledInvoice,
+            operation,
+            alreadyApplied,
+        };
+    }
+
     /**
      * Replay journaled billing operations in deterministic order. Completed
      * records are included after cloud sync because another document's update
@@ -1573,40 +1721,167 @@ export class YjsStore {
             entryMaps.push(await this.loadEntriesForYear(year));
         }
 
-        if (operation.kind === 'finalize') {
-            this.applyFinalizationEntryPhase(operation, entryMaps);
+        const operationToApply: InvoiceBillingOperation = operation.kind === 'cancel'
+            ? {
+                ...operation,
+                application: this.buildCancellationReplayApplication(
+                    operation,
+                    entryMaps,
+                    expenseMaps,
+                    taskMaps,
+                ),
+            }
+            : operation;
+
+        if (operationToApply.kind === 'finalize') {
+            this.applyFinalizationEntryPhase(operationToApply, entryMaps);
         } else {
-            this.applyUndoEntryPhase(operation, entryMaps);
+            this.applySourceReleaseEntryPhase(operationToApply, entryMaps);
         }
         this.updateInvoiceBillingOperationPhase(operation, 'entries-applied');
         onPhase?.('entries-applied');
 
-        if (operation.kind === 'finalize') {
-            this.applyFinalizationExpensePhase(operation, expenseMaps);
+        if (operationToApply.kind === 'finalize') {
+            this.applyFinalizationExpensePhase(operationToApply, expenseMaps);
         } else {
-            this.applyUndoExpensePhase(operation, expenseMaps);
+            this.applySourceReleaseExpensePhase(operationToApply, expenseMaps);
         }
         this.updateInvoiceBillingOperationPhase(operation, 'expenses-applied');
         onPhase?.('expenses-applied');
 
-        if (operation.kind === 'finalize') {
-            this.applyFinalizationTaskPhase(operation, taskMaps);
+        if (operationToApply.kind === 'finalize') {
+            this.applyFinalizationTaskPhase(operationToApply, taskMaps);
         } else {
-            this.applyUndoTaskPhase(operation, taskMaps);
+            this.applySourceReleaseTaskPhase(operationToApply, taskMaps);
         }
         this.updateInvoiceBillingOperationPhase(operation, 'tasks-applied');
         onPhase?.('tasks-applied');
 
-        this.applyInvoiceBillingCorePhase(operation);
+        this.applyInvoiceBillingCorePhase(operationToApply);
         this.updateInvoiceBillingOperationPhase(operation, 'core-links-applied');
         onPhase?.('core-links-applied');
 
-        this.applyInvoiceBillingInvoicePhase(operation);
+        this.applyInvoiceBillingInvoicePhase(operationToApply);
         this.updateInvoiceBillingOperationPhase(operation, 'invoice-applied');
         onPhase?.('invoice-applied');
 
         this.updateInvoiceBillingOperationPhase(operation, 'complete', 'complete');
         onPhase?.('complete');
+    }
+
+    /**
+     * Extend a persisted cancellation plan with source records that became
+     * visible only after preparation. Result counts remain the original,
+     * stable counts, while current-owner checks keep replay conditional.
+     */
+    private buildCancellationReplayApplication(
+        operation: InvoiceCancellationOperation,
+        entryMaps: Array<Y.Map<string, TimeEntry>>,
+        expenseMaps: Array<Y.Map<string, Expense>>,
+        taskMaps: Array<Y.Map<string, Task>>,
+    ): InvoiceCancellationApplicationPlan {
+        const uniqueById = <T extends { id: string }>(items: T[]): T[] => {
+            const unique = new Map<string, T>();
+
+            items.forEach((item) => {
+                if (!unique.has(item.id)) unique.set(item.id, item);
+            });
+
+            return Array.from(unique.values());
+        };
+        const entries = uniqueById(entryMaps.flatMap((entryMap) => (
+            collectValidatedEntities<TimeEntry>(
+                'timeEntries',
+                entryMap as any,
+                'invoice cancellation replay time entries',
+            )
+        )));
+        const expenses = uniqueById(expenseMaps.flatMap((expenseMap) => (
+            collectValidatedEntities<Expense>(
+                'expenses',
+                expenseMap as any,
+                'invoice cancellation replay expenses',
+            )
+        )));
+        const tasks = uniqueById(taskMaps.flatMap((taskMap) => (
+            collectValidatedEntities<Task>(
+                'tasks',
+                taskMap as any,
+                'invoice cancellation replay tasks',
+            )
+        )));
+        const releasedAt = operation.desiredInvoice.canceledAt ?? operation.createdAt;
+        const replayApplication = buildInvoiceSourceReleaseApplication({
+            invoice: operation.invoice,
+            invoiceId: operation.invoiceId,
+            entries,
+            expenses,
+            tasks,
+            releasedAt,
+        }).application;
+        const expectedFinalCutoffs = new Map<string, number>();
+        const rememberFinalCutoff = (taskId: unknown, end: unknown) => {
+            if (typeof taskId !== 'string' || typeof end !== 'number' || !Number.isFinite(end)) return;
+
+            expectedFinalCutoffs.set(taskId, Math.max(expectedFinalCutoffs.get(taskId) ?? 0, end));
+        };
+
+        operation.invoice.billingSelectionSnapshot?.entries?.forEach((entry) => {
+            rememberFinalCutoff(entry.taskId, entry.end);
+        });
+        entries.forEach((entry) => {
+            if (entry.billedInvoiceId === operation.invoiceId && entry.source !== 'invoice-adjustment') {
+                rememberFinalCutoff(entry.taskId, entry.end);
+            }
+        });
+
+        replayApplication.taskCutoffUpdates = replayApplication.taskCutoffUpdates.filter(({ id }) => {
+            const task = tasks.find((candidate) => candidate.id === id);
+            const expectedFinalCutoff = expectedFinalCutoffs.get(id);
+
+            return expectedFinalCutoff !== undefined && task?.lastBilledAt === expectedFinalCutoff;
+        });
+
+        const mergeById = <T>(
+            prepared: T[],
+            replay: T[],
+            getId: (value: T) => string,
+        ): T[] => {
+            const merged = new Map<string, T>();
+
+            prepared.forEach((value) => merged.set(getId(value), value));
+            replay.forEach((value) => merged.set(getId(value), value));
+            return Array.from(merged.values());
+        };
+
+        return {
+            ...operation.application,
+            entriesToDelete: mergeById(
+                operation.application.entriesToDelete,
+                replayApplication.entriesToDelete,
+                (entry) => entry.id,
+            ),
+            entriesToClear: mergeById(
+                operation.application.entriesToClear,
+                replayApplication.entriesToClear,
+                ({ entry }) => entry.id,
+            ),
+            expenseUpdatesToUnbill: mergeById(
+                operation.application.expenseUpdatesToUnbill,
+                replayApplication.expenseUpdatesToUnbill,
+                ({ id }) => id,
+            ),
+            quotedTaskUpdates: mergeById(
+                operation.application.quotedTaskUpdates,
+                replayApplication.quotedTaskUpdates,
+                ({ id }) => id,
+            ),
+            taskCutoffUpdates: mergeById(
+                operation.application.taskCutoffUpdates,
+                replayApplication.taskCutoffUpdates,
+                ({ id }) => id,
+            ),
+        };
     }
 
     private applyFinalizationEntryPhase(
@@ -1636,8 +1911,8 @@ export class YjsStore {
         });
     }
 
-    private applyUndoEntryPhase(
-        operation: Extract<InvoiceBillingOperation, { kind: 'undo' }>,
+    private applySourceReleaseEntryPhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'undo' | 'cancel' }>,
         entryMaps: Array<Y.Map<string, TimeEntry>>,
     ): void {
         const locate = (id: string) => entryMaps.find((entryMap) => entryMap.has(id));
@@ -1646,13 +1921,23 @@ export class YjsStore {
             const map = locate(entry.id);
             const current = map ? readEntity<TimeEntry>(map.get(entry.id)) : null;
 
-            if (map && current?.billedInvoiceId === operation.invoiceId) map.delete(entry.id);
+            if (
+                map
+                && current?.billedInvoiceId === operation.invoiceId
+                && current.source === 'invoice-adjustment'
+            ) {
+                map.delete(entry.id);
+            }
         });
         operation.application.entriesToClear.forEach(({ entry, updates }) => {
             const map = locate(entry.id);
             const current = map ? readEntity<TimeEntry>(map.get(entry.id)) : null;
 
-            if (map && current?.billedInvoiceId === operation.invoiceId) {
+            if (
+                map
+                && current?.billedInvoiceId === operation.invoiceId
+                && current.source !== 'invoice-adjustment'
+            ) {
                 this.updateEntityFieldsIfChanged(map as any, entry.id, updates);
             }
         });
@@ -1672,8 +1957,8 @@ export class YjsStore {
         });
     }
 
-    private applyUndoExpensePhase(
-        operation: Extract<InvoiceBillingOperation, { kind: 'undo' }>,
+    private applySourceReleaseExpensePhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'undo' | 'cancel' }>,
         expenseMaps: Array<Y.Map<string, Expense>>,
     ): void {
         operation.application.expenseUpdatesToUnbill.forEach(({ id, updates }) => {
@@ -1711,8 +1996,8 @@ export class YjsStore {
         });
     }
 
-    private applyUndoTaskPhase(
-        operation: Extract<InvoiceBillingOperation, { kind: 'undo' }>,
+    private applySourceReleaseTaskPhase(
+        operation: Extract<InvoiceBillingOperation, { kind: 'undo' | 'cancel' }>,
         taskMaps: Array<Y.Map<string, Task>>,
     ): void {
         operation.application.quotedTaskUpdates.forEach(({ id, updates }) => {
@@ -1759,6 +2044,10 @@ export class YjsStore {
                 return;
             }
 
+            if (operation.kind === 'cancel') {
+                return;
+            }
+
             operation.application.projectUnlinkUpdates.forEach(({ id, updates }) => {
                 const project = readEntity<Project>(this.projects.get(id));
                 if (!project) return;
@@ -1789,6 +2078,34 @@ export class YjsStore {
         }
 
         const current = readEntity<Invoice>(this.invoices.get(operation.invoiceId));
+
+        if (operation.kind === 'cancel') {
+            if (!current) {
+                return;
+            }
+
+            if (
+                current.status === 'canceled'
+                && (
+                    current.canceledAt !== operation.desiredInvoice.canceledAt
+                    || current.cancellationReason !== operation.desiredInvoice.cancellationReason
+                )
+            ) {
+                return;
+            }
+
+            // Canceled invoices require status, timestamp, and reason together.
+            // Publish the field-level CRDT updates in one transaction so React
+            // observers never receive an invalid intermediate canceled record.
+            this.coreDoc.transact(() => {
+                this.updateEntityFieldsIfChanged(
+                    this.invoices as any,
+                    operation.invoiceId,
+                    operation.application.invoiceUpdates,
+                );
+            });
+            return;
+        }
 
         if (!current) {
             (this.invoices as any).set(

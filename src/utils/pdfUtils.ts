@@ -2,6 +2,8 @@ import html2pdf from 'html2pdf.js';
 import DOMPurify from 'dompurify';
 import { DEFAULT_CURRENCY, getCurrencySymbol } from './currencyUtils';
 import { formatBillingPeriodLabel } from './billingPeriodUtils';
+import { toDisplayDate } from './dateUtils';
+import { isInvoiceCanceled } from './invoiceUtils';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import type {
     InvoiceBrandingSnapshot,
@@ -169,6 +171,9 @@ type StoredInvoice = InvoiceData & {
     clientId?: string | null;
     invoiceNumber?: string;
     htmlContent?: string | null;
+    status?: 'draft' | 'sent' | 'paid' | 'overdue' | 'canceled';
+    canceledAt?: number | null;
+    cancellationReason?: string | null;
 };
 
 type StoredBusinessBrandAsset = {
@@ -1541,9 +1546,50 @@ export const getCurrentInvoiceHtmlContent = (
     businessBrandAssets: StoredBusinessBrandAsset[] = []
 ): string => {
     const storedHtml = invoice?.htmlContent;
-    if (storedHtml && (!invoice?.invoiceNumber || storedHtml.includes(invoice.invoiceNumber))) {
-        return storedHtml;
+    const currentHtml = storedHtml && (!invoice?.invoiceNumber || storedHtml.includes(invoice.invoiceNumber))
+        ? storedHtml
+        : buildInvoiceHtmlContent(invoice, clients, businessBrandAssets);
+
+    return applyInvoiceCancellationTreatment(currentHtml, invoice);
+};
+
+const escapeInvoiceCancellationHtml = (value: string): string => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const applyInvoiceCancellationTreatment = (html: string, invoice: StoredInvoice): string => {
+    if (!isInvoiceCanceled(invoice) || html.includes('data-invoice-cancellation')) {
+        return html;
     }
 
-    return buildInvoiceHtmlContent(invoice, clients, businessBrandAssets);
+    const canceledAtLabel = invoice.canceledAt
+        ? toDisplayDate(invoice.canceledAt, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        })
+        : '';
+    const cancellationReason = typeof invoice.cancellationReason === 'string'
+        ? invoice.cancellationReason.trim().slice(0, 500)
+        : '';
+    const safeCanceledAt = escapeInvoiceCancellationHtml(canceledAtLabel);
+    const safeReason = escapeInvoiceCancellationHtml(cancellationReason);
+    const reasonMarkup = safeReason
+        ? `<p style="margin: 6px 0 0; font-size: 12px; line-height: 1.5;"><strong>Reason:</strong> ${safeReason}</p>`
+        : '';
+
+    return `
+        <div data-invoice-cancellation="true" style="box-sizing: border-box; width: 100%; border: 4px solid #b91c1c; background: #fef2f2; color: #7f1d1d; padding: 16px 20px; margin: 0 0 20px; text-align: center; page-break-inside: avoid;">
+            <div style="font-size: 28px; font-weight: 800; letter-spacing: 0.18em;">CANCELED</div>
+            ${safeCanceledAt ? `<p style="margin: 6px 0 0; font-size: 12px;"><strong>Canceled:</strong> ${safeCanceledAt}</p>` : ''}
+            ${reasonMarkup}
+            <p style="margin: 8px 0 0; font-size: 11px;">Historical record — not payable.</p>
+        </div>
+        ${html}
+    `;
 };

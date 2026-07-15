@@ -36,8 +36,8 @@ import { REPORT_PERIOD_OPTIONS, getDateRangeLabel, getDefaultCustomRange, getDef
 import { ACCOUNTANT_PACK_MANIFEST_COLUMNS, buildAccountantPackManifestRows } from '@/utils/reportPackUtils';
 import { downloadZipFile } from '@/utils/reportZipUtils';
 import { formatCurrency, getProjectCurrency } from '@/utils/currencyUtils';
-import { formatDuration, millisecondsToHours, parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils';
-import { getInvoicePaidAtTimestamp, getInvoiceProjectFinancials, getInvoiceProjectRevenueBreakdown, getInvoiceProjectTitle, getInvoiceStatus, getInvoiceTotal, invoiceBelongsToProject, isInvoiceOverdue, isInvoicePaid } from '@/utils/invoiceUtils';
+import { formatDuration, formatDurationWithSeconds, millisecondsToHours, parseStoredDate, toDisplayDate, toStorageDate } from '@/utils/dateUtils';
+import { getInvoicePaidAtTimestamp, getInvoiceProjectFinancials, getInvoiceProjectRevenueBreakdown, getInvoiceProjectTitle, getInvoiceStatus, getInvoiceTotal, invoiceBelongsToProject, isInvoiceOverdue, isInvoicePaid, isInvoiceRevenueBearing, matchesInvoiceStatusFilter } from '@/utils/invoiceUtils';
 import { buildMonthlyReportHtml, exportClientStatementPdf, exportExpensesReportPdf, exportInvoicesReportPdf, exportMonthlyReportPdf, exportOutstandingReportPdf, exportProjectWorkSummaryPdf } from '@/utils/reportPdfUtils';
 import { generatePDFBlob, getCurrentInvoiceHtmlContent } from '@/utils/pdfUtils.ts';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
@@ -197,6 +197,7 @@ const getInvoicePaymentDisplayDate = (invoice) => {
 const getStatusBadgeVariant = (status) => {
     if (status === 'paid') return 'success';
     if (status === 'overdue') return 'error';
+    if (status === 'canceled') return 'error';
     if (status === 'draft') return 'warning';
     return 'secondary';
 };
@@ -317,6 +318,8 @@ const INVOICES_EXPORT_COLUMNS = [
     { key: 'invoiceDate', header: 'Invoice Date' },
     { key: 'dueDate', header: 'Due Date' },
     { key: 'paidDate', header: 'Paid Date' },
+    { key: 'canceledAt', header: 'Canceled At' },
+    { key: 'cancellationReason', header: 'Cancellation Reason' },
     { key: 'status', header: 'Status' },
     { key: 'currency', header: 'Currency' },
     { key: 'subtotal', header: 'Subtotal' },
@@ -674,20 +677,7 @@ function Reports({ onReadyChange = null }) {
                 return false;
             }
 
-            const status = getInvoiceStatus(invoice);
-            if (invoiceStatus === 'non-draft' && status === 'draft') {
-                return false;
-            }
-            if (invoiceStatus === 'paid' && !isInvoicePaid(invoice)) {
-                return false;
-            }
-            if (invoiceStatus === 'unpaid' && (isInvoicePaid(invoice) || status === 'draft')) {
-                return false;
-            }
-            if (invoiceStatus === 'overdue' && !isInvoiceOverdue(invoice)) {
-                return false;
-            }
-            if (invoiceStatus === 'draft' && status !== 'draft') {
+            if (!matchesInvoiceStatusFilter(invoice, invoiceStatus)) {
                 return false;
             }
 
@@ -705,13 +695,17 @@ function Reports({ onReadyChange = null }) {
             .filter(Boolean);
     }, [entityFilteredInvoices, projectId, projectsById]);
 
+    const financialScopedEntityFilteredInvoices = useMemo(() => {
+        return scopedEntityFilteredInvoices.filter((invoice) => isInvoiceRevenueBearing(invoice));
+    }, [scopedEntityFilteredInvoices]);
+
     const statementClientIds = useMemo(() => {
         return Array.from(new Set(
-            scopedEntityFilteredInvoices
+            financialScopedEntityFilteredInvoices
                 .map((invoice) => invoice.clientId)
                 .filter(Boolean)
         ));
-    }, [scopedEntityFilteredInvoices]);
+    }, [financialScopedEntityFilteredInvoices]);
 
     const selectedStatementClientId = clientId !== 'all'
         ? clientId
@@ -724,8 +718,8 @@ function Reports({ onReadyChange = null }) {
             return [];
         }
 
-        return scopedEntityFilteredInvoices.filter((invoice) => invoice.clientId === selectedStatementClientId);
-    }, [scopedEntityFilteredInvoices, selectedStatementClientId]);
+        return financialScopedEntityFilteredInvoices.filter((invoice) => invoice.clientId === selectedStatementClientId);
+    }, [financialScopedEntityFilteredInvoices, selectedStatementClientId]);
 
     const filteredInvoices = useMemo(() => {
         return scopedEntityFilteredInvoices.filter((invoice) => {
@@ -737,29 +731,33 @@ function Reports({ onReadyChange = null }) {
         });
     }, [incomeDateBasis, resolvedRange.endDate, resolvedRange.startDate, scopedEntityFilteredInvoices]);
 
+    const financialFilteredInvoices = useMemo(() => {
+        return filteredInvoices.filter((invoice) => isInvoiceRevenueBearing(invoice));
+    }, [filteredInvoices]);
+
     const issuedInvoicesInRange = useMemo(() => {
-        return scopedEntityFilteredInvoices.filter((invoice) => matchesStoredDateRange(invoice.date, resolvedRange.startDate, resolvedRange.endDate));
-    }, [resolvedRange.endDate, resolvedRange.startDate, scopedEntityFilteredInvoices]);
+        return financialScopedEntityFilteredInvoices.filter((invoice) => matchesStoredDateRange(invoice.date, resolvedRange.startDate, resolvedRange.endDate));
+    }, [financialScopedEntityFilteredInvoices, resolvedRange.endDate, resolvedRange.startDate]);
 
     const paidInvoicesInRange = useMemo(() => {
-        return scopedEntityFilteredInvoices.filter((invoice) => {
+        return financialScopedEntityFilteredInvoices.filter((invoice) => {
             if (!isInvoicePaid(invoice)) {
                 return false;
             }
 
             return matchesStoredDateRange(getInvoicePaymentDateString(invoice), resolvedRange.startDate, resolvedRange.endDate);
         });
-    }, [resolvedRange.endDate, resolvedRange.startDate, scopedEntityFilteredInvoices]);
+    }, [financialScopedEntityFilteredInvoices, resolvedRange.endDate, resolvedRange.startDate]);
 
     const outstandingInvoices = useMemo(() => {
-        return scopedEntityFilteredInvoices.filter((invoice) => {
-            if (isInvoicePaid(invoice) || getInvoiceStatus(invoice) === 'draft') {
+        return financialScopedEntityFilteredInvoices.filter((invoice) => {
+            if (!matchesInvoiceStatusFilter(invoice, 'unpaid')) {
                 return false;
             }
 
             return invoice.date <= resolvedRange.endDate;
         });
-    }, [resolvedRange.endDate, scopedEntityFilteredInvoices]);
+    }, [financialScopedEntityFilteredInvoices, resolvedRange.endDate]);
 
     const overdueInvoices = useMemo(() => {
         return outstandingInvoices.filter((invoice) => isInvoiceOverdue(invoice, reportReferenceDate));
@@ -1082,25 +1080,25 @@ function Reports({ onReadyChange = null }) {
     const missingDataReviewCount = useMemo(() => {
         let count = 0;
 
-        count += filteredInvoices.filter((invoice) => !invoice.businessInfoId).length;
-        count += filteredInvoices.filter((invoice) => {
+        count += financialFilteredInvoices.filter((invoice) => !invoice.businessInfoId).length;
+        count += financialFilteredInvoices.filter((invoice) => {
             const client = clientsById.get(invoice.clientId);
             return client && !client.country;
         }).length;
         count += filteredExpenses.filter((expense) => !expense.isTaxExempt && !expense.taxLabel && typeof expense.taxRate !== 'number').length;
 
         return count;
-    }, [clientsById, filteredExpenses, filteredInvoices]);
+    }, [clientsById, filteredExpenses, financialFilteredInvoices]);
 
     const metadataReviewRows = useMemo(() => {
         return [
             {
                 label: 'Invoices without business profile',
-                count: filteredInvoices.filter((invoice) => !invoice.businessInfoId).length,
+                count: financialFilteredInvoices.filter((invoice) => !invoice.businessInfoId).length,
             },
             {
                 label: 'Invoices without client country',
-                count: filteredInvoices.filter((invoice) => {
+                count: financialFilteredInvoices.filter((invoice) => {
                     const client = clientsById.get(invoice.clientId);
                     return client && !client.country;
                 }).length,
@@ -1110,7 +1108,7 @@ function Reports({ onReadyChange = null }) {
                 count: filteredExpenses.filter((expense) => !expense.isTaxExempt && !expense.taxLabel && typeof expense.taxRate !== 'number').length,
             },
         ].filter((row) => row.count > 0);
-    }, [clientsById, filteredExpenses, filteredInvoices]);
+    }, [clientsById, filteredExpenses, financialFilteredInvoices]);
 
     const revenueIssuedByCurrency = useMemo(() => {
         return sumInvoiceReportAmountsByCurrency(issuedInvoicesInRange, preferredCurrency);
@@ -1165,7 +1163,7 @@ function Reports({ onReadyChange = null }) {
 
     const topClientBreakdown = useMemo(() => {
         return buildBreakdownRows({
-            items: filteredInvoices,
+            items: financialFilteredInvoices,
             getLabel: (invoice) => clientsById.get(invoice.clientId)?.title || EMPTY_CLIENT,
             getAmount: (invoice) => {
                 return getInvoiceReportAmount(invoice, preferredCurrency).amount;
@@ -1177,11 +1175,11 @@ function Reports({ onReadyChange = null }) {
             currencyDisplayMode,
             preferredCurrency,
         });
-    }, [clientsById, convertToCurrency, currencyDisplayMode, filteredInvoices, preferredCurrency]);
+    }, [clientsById, convertToCurrency, currencyDisplayMode, financialFilteredInvoices, preferredCurrency]);
 
     const topProjectBreakdown = useMemo(() => {
         const projectRevenueRows = projectId === 'all'
-            ? filteredInvoices.flatMap((invoice) => {
+            ? financialFilteredInvoices.flatMap((invoice) => {
                 const breakdowns = getInvoiceProjectRevenueBreakdown(invoice);
 
                 if (breakdowns.length === 0) {
@@ -1199,7 +1197,7 @@ function Reports({ onReadyChange = null }) {
                     ...getInvoiceReportAmount(invoice, preferredCurrency, breakdown.allocatedTotal || 0),
                 }));
             })
-            : filteredInvoices.map((invoice) => {
+            : financialFilteredInvoices.map((invoice) => {
                 const invoiceAmount = getInvoiceReportAmount(invoice, preferredCurrency);
 
                 return {
@@ -1218,7 +1216,7 @@ function Reports({ onReadyChange = null }) {
             currencyDisplayMode,
             preferredCurrency,
         });
-    }, [convertToCurrency, currencyDisplayMode, filteredInvoices, preferredCurrency, projectId, projectsById]);
+    }, [convertToCurrency, currencyDisplayMode, financialFilteredInvoices, preferredCurrency, projectId, projectsById]);
 
     const topExpenseCategoryBreakdown = useMemo(() => {
         return buildBreakdownRows({
@@ -1267,12 +1265,12 @@ function Reports({ onReadyChange = null }) {
 
     const vatSummary = useMemo(() => {
         return buildVatReportSummary({
-            invoices: filteredInvoices,
+            invoices: financialFilteredInvoices,
             expenses: filteredExpenses,
             clientsById,
             businessInfosById,
         });
-    }, [businessInfosById, clientsById, filteredExpenses, filteredInvoices]);
+    }, [businessInfosById, clientsById, filteredExpenses, financialFilteredInvoices]);
 
     const vatReviewItems = useMemo(() => {
         return [
@@ -1394,6 +1392,8 @@ function Reports({ onReadyChange = null }) {
             invoiceDate: invoice.date,
             dueDate: invoice.dueDate || '',
             paidDate: getInvoicePaymentDateString(invoice) || '',
+            canceledAt: invoice.canceledAt ? toDisplayDate(invoice.canceledAt, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '',
+            cancellationReason: invoice.cancellationReason || '',
             status: getInvoiceStatus(invoice),
             currency: invoice.currency || preferredCurrency,
             subtotal: invoice.subtotal || 0,
@@ -2045,7 +2045,10 @@ function Reports({ onReadyChange = null }) {
         const usedFilenames = new Set();
 
         return filteredInvoices
-            .filter((invoice) => invoice.invoiceNumber)
+            .filter((invoice) => (
+                invoice.invoiceNumber
+                && (getInvoiceStatus(invoice) !== 'canceled' || invoiceStatus === 'canceled')
+            ))
             .map((invoice) => {
                 const baseFilename = `invoice-${sanitizeInvoiceFilePart(invoice.invoiceNumber)}`;
                 let filename = `${baseFilename}.pdf`;
@@ -2065,7 +2068,7 @@ function Reports({ onReadyChange = null }) {
                     htmlContent: getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets),
                 };
             });
-    }, [businessBrandAssets, clients, filteredInvoices]);
+    }, [businessBrandAssets, clients, filteredInvoices, invoiceStatus]);
 
     const accountantPackManifestRows = useMemo(() => {
         return buildAccountantPackManifestRows({
@@ -2993,6 +2996,8 @@ function Reports({ onReadyChange = null }) {
                                             invoiceDate: row.invoiceDate ? toDisplayDate(row.invoiceDate) : '',
                                             dueDate: row.dueDate ? toDisplayDate(row.dueDate) : '',
                                             paidDate: row.paidDate ? toDisplayDate(row.paidDate) : '',
+                                            canceledAt: row.canceledAt,
+                                            cancellationReason: row.cancellationReason,
                                             status: row.status,
                                             currency: row.currency,
                                             subtotal: formatCurrency(row.subtotal, row.currency),
@@ -3027,7 +3032,9 @@ function Reports({ onReadyChange = null }) {
                                                             }))}
                                                         </p>
                                                     </div>
-                                                    <p className="mt-1 text-xs text-muted-foreground">{row.count} invoices</p>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {row.count} invoices{row.label === 'canceled' ? ' • canceled face value, not revenue' : ''}
+                                                    </p>
                                                 </div>
                                             ))}
                                         </div>
@@ -3123,6 +3130,16 @@ function Reports({ onReadyChange = null }) {
                                                     <p className="mt-1 text-xs text-muted-foreground">
                                                         Issued {toDisplayDate(invoice.date)}{invoice.dueDate ? ` • Due ${toDisplayDate(invoice.dueDate)}` : ''}
                                                     </p>
+                                                    {status === 'canceled' && (
+                                                        <Notice
+                                                            className="mt-2"
+                                                            compact
+                                                            title={`Canceled${invoice.canceledAt ? ` ${toDisplayDate(invoice.canceledAt, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}`}
+                                                        >
+                                                            <p className="break-words">{invoice.cancellationReason || 'No cancellation reason recorded'}</p>
+                                                            <p className="mt-1">Original face value retained for audit; excluded from financial totals.</p>
+                                                        </Notice>
+                                                    )}
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="text-sm font-semibold text-foreground">{renderSensitiveValue(formatCurrency(getInvoiceTotal(invoice), invoice.currency || preferredCurrency))}</p>
@@ -3523,8 +3540,8 @@ function Reports({ onReadyChange = null }) {
                                             <p className="mt-1 text-xs text-muted-foreground">{row.entriesCount} entries</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-semibold text-foreground">{formatDuration(row.totalMs)}</p>
-                                            <p className="text-xs text-muted-foreground">Billable {formatDuration(row.billableMs)}</p>
+                                            <p className="text-sm font-semibold text-foreground">{formatDurationWithSeconds(row.totalMs)}</p>
+                                            <p className="text-xs text-muted-foreground">Billable {formatDurationWithSeconds(row.billableMs)}</p>
                                         </div>
                                     </div>
                                 ))}

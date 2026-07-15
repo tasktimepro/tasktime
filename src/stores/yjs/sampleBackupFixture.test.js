@@ -180,6 +180,58 @@ const fixtures = [
             archivedExpenses: [],
         },
     },
+    {
+        fileName: 'tasktime-canceled-invoice-v1.5.json',
+        label: 'canceled invoice fixture',
+        version: '1.5',
+        exportDate: '2026-07-14T10:00:00.000Z',
+        expected: {
+            preferences: { currency: 'EUR' },
+            projects: ['project-canceled-synthetic', 'project-canceled-expense'],
+            clients: ['client-canceled-synthetic'],
+            businessInfos: [],
+            recurrences: [],
+            attachments: [],
+            activeTasks: ['task-canceled-synthetic'],
+            archivedTasks: [],
+            activeEntries: ['entry-canceled-synthetic'],
+            historicalEntries: [],
+            activeInvoices: ['invoice-canceled-synthetic'],
+            archivedInvoices: [],
+            activeExpenses: ['expense-canceled-synthetic'],
+            archivedExpenses: [],
+            invoiceRecords: [{
+                id: 'invoice-canceled-synthetic',
+                invoiceNumber: 'SYN-CAN-001',
+                status: 'canceled',
+                canceledAt: 1784025000000,
+                cancellationReason: 'Duplicate invoice created during a synthetic test',
+                total: 360,
+            }],
+            projectInvoiceLinks: [
+                {
+                    id: 'project-canceled-synthetic',
+                    invoiceIds: ['invoice-canceled-synthetic'],
+                },
+                {
+                    id: 'project-canceled-expense',
+                    invoiceIds: ['invoice-canceled-synthetic'],
+                },
+            ],
+            invoiceTemplateRecords: [{
+                id: 'template-canceled-synthetic',
+                currentSequentialNumber: 2,
+            }],
+            expenseRecords: [{
+                id: 'expense-canceled-synthetic',
+                billingStatus: 'unbilled',
+                invoiceId: null,
+                billedAt: null,
+                taxClaimStatus: 'claimed',
+                taxClaimPeriodId: 'tax-period-canceled-synthetic',
+            }],
+        },
+    },
 ]
 
 describe('backup fixtures', () => {
@@ -256,6 +308,18 @@ describe('backup fixtures', () => {
                 expect(store.invoices.has(id)).toBe(true)
             })
 
+            fixture.expected.invoiceRecords?.forEach((expectedInvoice) => {
+                expect(store.invoices.get(expectedInvoice.id)?.toJSON()).toEqual(expect.objectContaining(expectedInvoice))
+            })
+
+            fixture.expected.projectInvoiceLinks?.forEach((expectedProject) => {
+                expect(store.projects.get(expectedProject.id)?.toJSON()).toEqual(expect.objectContaining(expectedProject))
+            })
+
+            fixture.expected.invoiceTemplateRecords?.forEach((expectedTemplate) => {
+                expect(store.invoiceTemplates.get(expectedTemplate.id)?.toJSON()).toEqual(expect.objectContaining(expectedTemplate))
+            })
+
             if (fixture.expected.archivedInvoices.length > 0) {
                 const archivedInvoices = await store.loadArchivedInvoices()
                 fixture.expected.archivedInvoices.forEach((id) => {
@@ -265,6 +329,10 @@ describe('backup fixtures', () => {
 
             fixture.expected.activeExpenses.forEach((id) => {
                 expect(store.expenses.has(id)).toBe(true)
+            })
+
+            fixture.expected.expenseRecords?.forEach((expectedExpense) => {
+                expect(store.expenses.get(expectedExpense.id)?.toJSON()).toEqual(expect.objectContaining(expectedExpense))
             })
 
             if (fixture.expected.archivedExpenses.length > 0) {

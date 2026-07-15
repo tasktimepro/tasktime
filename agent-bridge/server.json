@@ -3,7 +3,7 @@
   "name": "pro.tasktime/agent-bridge",
   "title": "TaskTime Pro",
   "description": "First-party local TaskTime Pro tools for tasks, timers, expenses, invoices, reports, and planning.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "websiteUrl": "https://tasktime.pro/agents/",
   "repository": {
     "url": "https://github.com/tasktimepro/tasktime",
@@ -14,7 +14,7 @@
     {
       "registryType": "npm",
       "identifier": "@tasktimepro/agent-bridge",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "runtimeHint": "npx",
       "packageArguments": [
         {

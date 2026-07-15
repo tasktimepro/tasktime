@@ -43,5 +43,6 @@ The detailed finding-by-finding execution checklist and validation state live in
 - Shared UI/agent work and time operations centralized for timer recovery, manual entries, recurring completion/skip state, and relationship-safe work-entity writes
 - Gradual TypeScript migration
 - Test infrastructure improvements
-- Approved product backlog such as task templates and invoice cancellation after ambiguities are resolved
+- Invoice cancellation completed: contract/lifecycle, shared replay-safe source release, browser/PDF safety, report/export parity, agent command parity, and backup `1.5` compatibility delivered and release-gated as six dependency-ordered slices
+- Remaining approved product backlog such as task templates after recorded ambiguities are resolved
 - Continued public-site indexing/SEO and agent distribution maintenance

@@ -193,6 +193,7 @@ function ReportFilters({
                                     <SelectItem value="unpaid">Unpaid only</SelectItem>
                                     <SelectItem value="overdue">Overdue only</SelectItem>
                                     <SelectItem value="draft">Draft only</SelectItem>
+                                    <SelectItem value="canceled">Canceled only</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

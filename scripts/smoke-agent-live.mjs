@@ -394,6 +394,8 @@ async function assertToolExposure(lines, bridge) {
     'preview_invoice_from_unbilled_work',
     'create_invoice_draft',
     'finalize_invoice',
+    'cancel_invoice',
+    'get_report_summary',
     'export_invoice_pdf',
     'send_invoice_email',
   ]) {
@@ -602,6 +604,57 @@ async function runInvoiceLiveSmoke({ lines, bridge, page }) {
   )
   log('verified finalized invoice removed entry from unbilled work')
 
+  const canceledResult = await callToolWithVisibleApproval(lines, bridge, page, 'cancel_invoice', {
+    invoiceId,
+    reason: 'Synthetic live MCP cancellation verification',
+    confirmCancel: true,
+    confirmationText: finalized.invoice.invoiceNumber,
+    idempotencyKey: `invoice-cancel-${testStamp}`,
+  }, 30000)
+  const canceled = payload(canceledResult)
+  assert(canceled.invoice?.id === invoiceId, `cancel_invoice returned wrong invoice: ${JSON.stringify(canceledResult)}`)
+  assert(canceled.invoice?.status === 'canceled', `canceled invoice status mismatch: ${JSON.stringify(canceledResult)}`)
+  assert(canceled.invoice?.invoiceNumber === finalized.invoice.invoiceNumber, `cancel_invoice changed invoice number: ${JSON.stringify(canceledResult)}`)
+  assert(canceled.releasedTimeEntryCount === 1, `cancel_invoice released entry count mismatch: ${JSON.stringify(canceledResult)}`)
+  assert(canceled.retainedInvoiceNumber === true, `cancel_invoice did not report retained numbering: ${JSON.stringify(canceledResult)}`)
+  log('canceled invoice with browser approval')
+
+  const canceledInvoicesResult = await callTool(lines, bridge, 'list_invoices', {
+    clientId,
+    projectId,
+    status: 'canceled',
+    limit: 5,
+  })
+  const canceledInvoice = listFromResult(canceledInvoicesResult, 'invoices').find((invoice) => invoice.id === invoiceId)
+  assert(canceledInvoice?.status === 'canceled', `canceled invoice not found in list_invoices: ${JSON.stringify(canceledInvoicesResult)}`)
+  assert(canceledInvoice?.cancellationReason === 'Synthetic live MCP cancellation verification', `canceled invoice reason missing from list: ${JSON.stringify(canceledInvoicesResult)}`)
+
+  const unbilledAfterCancel = await callTool(lines, bridge, 'find_unbilled_time', {
+    projectId,
+    taskId,
+    limit: 10,
+  })
+  assert(
+    listFromResult(unbilledAfterCancel, 'entries').some((entry) => entry.id === entryId),
+    `manual entry should be unbilled after cancellation: ${JSON.stringify(unbilledAfterCancel)}`
+  )
+
+  const canceledReportResult = await callTool(lines, bridge, 'get_report_summary', {
+    period: 'custom',
+    customStart: entryDate,
+    customEnd: entryDate,
+    clientId,
+    projectId,
+    invoiceStatus: 'canceled',
+    includeRows: true,
+  })
+  const canceledReport = payload(canceledReportResult)
+  assert(canceledReport.counts?.invoices === 1, `canceled report row count mismatch: ${JSON.stringify(canceledReportResult)}`)
+  assert(canceledReport.counts?.issuedInvoices === 0, `canceled invoice counted as issued revenue: ${JSON.stringify(canceledReportResult)}`)
+  assert(canceledReport.counts?.outstandingInvoices === 0, `canceled invoice counted as outstanding: ${JSON.stringify(canceledReportResult)}`)
+  assert(canceledReport.rows?.invoices?.some((invoice) => invoice.id === invoiceId), `canceled report audit row missing: ${JSON.stringify(canceledReportResult)}`)
+  log('verified canceled invoice list, report, and released unbilled source parity')
+
   await assertNavigation(lines, bridge, page, projectId, invoiceProjectTitle)
   await page.getByText(invoiceTaskTitle).waitFor({ timeout: 15000 })
   log('verified client-linked invoice project/task render in the UI')
@@ -614,7 +667,7 @@ async function runInvoiceLiveSmoke({ lines, bridge, page }) {
     invoiceId,
     invoiceNumber: finalized.invoice.invoiceNumber,
     total: finalized.invoice.total,
-    status: finalized.invoice.status,
+    status: canceled.invoice.status,
   }
 }
 

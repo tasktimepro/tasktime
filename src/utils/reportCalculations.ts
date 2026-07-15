@@ -1,7 +1,15 @@
 import { endOfDay, startOfDay } from 'date-fns';
 import { differenceInCalendarDays } from 'date-fns/differenceInCalendarDays';
 import { parseStoredDate } from './dateUtils';
-import { getInvoicePaidAtTimestamp, getInvoiceStatus, getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid } from './invoiceUtils';
+import {
+    getInvoicePaidAtTimestamp,
+    getInvoiceStatus,
+    getInvoiceTotal,
+    getPaidInvoiceConvertedAmount,
+    isInvoiceOutstanding,
+    isInvoicePaid,
+    isInvoiceRevenueBearing,
+} from './invoiceUtils';
 import { getBillableDurationMs } from './timeEntryDurationUtils';
 
 const EU_COUNTRY_CODES = new Set([
@@ -335,6 +343,7 @@ const STATUS_ORDER = new Map([
     ['sent', 1],
     ['paid', 2],
     ['overdue', 3],
+    ['canceled', 4],
 ]);
 
 type InvoiceRegisterSummaryParams = {
@@ -430,8 +439,9 @@ export const buildVatReportSummary = ({
     expenses,
     invoices,
 }: TaxSummaryParams) => {
+    const financialInvoices = invoices.filter((invoice) => isInvoiceRevenueBearing(invoice));
     const includedExpenses = expenses.filter((expense) => getExpenseTaxClaimStatus(expense) !== 'excluded');
-    const salesBuckets = summarizeBuckets(invoices, (invoice) => ({
+    const salesBuckets = summarizeBuckets(financialInvoices, (invoice) => ({
         bucketLabel: getTaxBucketLabel({
             taxLabel: invoice?.taxLabel,
             taxRate: invoice?.taxRate,
@@ -464,7 +474,7 @@ export const buildVatReportSummary = ({
     }));
 
     const geographyMap = new Map();
-    invoices.forEach((invoice) => {
+    financialInvoices.forEach((invoice) => {
         const business = invoice?.businessInfoId ? businessInfosById.get(invoice.businessInfoId) : null;
         const client = invoice?.clientId ? clientsById.get(invoice.clientId) : null;
         const geography = getClientGeographyLabel({
@@ -527,8 +537,8 @@ export const buildVatReportSummary = ({
     const netVatByCurrency = subtractCurrencyTotals(outputTaxByCurrency, inputTaxByCurrency);
 
     const needsReview = {
-        missingInvoiceBusinessInfo: invoices.filter((invoice) => !invoice?.businessInfoId).length,
-        missingClientCountry: invoices.filter((invoice) => {
+        missingInvoiceBusinessInfo: financialInvoices.filter((invoice) => !invoice?.businessInfoId).length,
+        missingClientCountry: financialInvoices.filter((invoice) => {
             const client = invoice?.clientId ? clientsById.get(invoice.clientId) : null;
             return !client?.country;
         }).length,
@@ -575,7 +585,7 @@ export const buildVatReportSummary = ({
 };
 
 export const getInvoiceDaysOverdue = (invoice: any, referenceDate?: Date) => {
-    if (!invoice?.dueDate || isInvoicePaid(invoice)) {
+    if (!invoice?.dueDate || !isInvoiceOutstanding(invoice, referenceDate)) {
         return 0;
     }
 
@@ -621,7 +631,7 @@ export const buildOutstandingInvoiceSummary = (invoices: any[], referenceDate?: 
     const grouped = new Map();
 
     invoices.forEach((invoice) => {
-        if (isInvoicePaid(invoice) || getInvoiceStatus(invoice, referenceDate) === 'draft') {
+        if (!isInvoiceOutstanding(invoice, referenceDate)) {
             return;
         }
 
@@ -671,17 +681,17 @@ export const buildClientStatementSummary = ({
     const rangeEnd = endOfDay(parseStoredDate(endDate) || new Date()).getTime();
     const statementEnd = referenceDate ? new Date(referenceDate).getTime() : rangeEnd;
 
-    const nonDraftInvoices = invoices.filter((invoice) => getInvoiceStatus(invoice, referenceDate) !== 'draft');
-    const invoicesIssuedInRange = nonDraftInvoices
+    const financialInvoices = invoices.filter((invoice) => isInvoiceRevenueBearing(invoice));
+    const invoicesIssuedInRange = financialInvoices
         .filter((invoice) => invoice?.date && invoice.date >= startDate && invoice.date <= endDate)
         .sort((invoiceA, invoiceB) => invoiceA.date.localeCompare(invoiceB.date));
 
-    const openingBalanceInvoices = nonDraftInvoices
+    const openingBalanceInvoices = financialInvoices
         .filter((invoice) => invoice?.date && invoice.date < startDate)
         .filter((invoice) => !isInvoicePaidOnOrBefore(invoice, rangeStart - 1))
         .sort((invoiceA, invoiceB) => invoiceA.date.localeCompare(invoiceB.date));
 
-    const paymentsRecordedInRange = nonDraftInvoices
+    const paymentsRecordedInRange = financialInvoices
         .filter((invoice) => {
             const paidAt = getInvoicePaidAtTimestamp(invoice);
 
@@ -689,7 +699,7 @@ export const buildClientStatementSummary = ({
         })
         .sort((invoiceA, invoiceB) => (getInvoicePaidAtTimestamp(invoiceA) || 0) - (getInvoicePaidAtTimestamp(invoiceB) || 0));
 
-    const outstandingInvoices = nonDraftInvoices
+    const outstandingInvoices = financialInvoices
         .filter((invoice) => invoice?.date && invoice.date <= endDate)
         .filter((invoice) => !isInvoicePaidOnOrBefore(invoice, statementEnd))
         .sort((invoiceA, invoiceB) => {

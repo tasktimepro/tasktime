@@ -1,6 +1,6 @@
 {
   "name": "@tasktimepro/openclaw",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "First-party OpenClaw bundle for TaskTime Pro's free, open-source, local-first work manager.",
   "type": "module",
   "repository": {

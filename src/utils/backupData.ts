@@ -20,8 +20,8 @@ import type {
 import { validateCollectionEntity, validatePreferencesRecord } from '@/stores/yjs/validation';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 
-export const BACKUP_VERSION = '1.4';
-export const SUPPORTED_BACKUP_IMPORT_VERSIONS = Array.from(new Set(['1.0', '1.1', '1.3', BACKUP_VERSION]));
+export const BACKUP_VERSION = '1.5';
+export const SUPPORTED_BACKUP_IMPORT_VERSIONS = Array.from(new Set(['1.0', '1.1', '1.3', '1.4', BACKUP_VERSION]));
 
 export interface BackupPayload {
     version: string;

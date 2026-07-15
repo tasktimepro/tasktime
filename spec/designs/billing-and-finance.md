@@ -29,4 +29,17 @@ Let users understand exactly what will be billed, what changed after finalizatio
 - Exchange rates are USD-relative adapter data cached for up to 24 hours. Finalized invoice selections and paid invoice/expense records preserve the source amount, target amount/currency, and effective rate used at the event; missing required rates fail closed rather than inventing a 1:1 conversion.
 - Reports prefer immutable event snapshots for finalized/paid values. Current rates are used only for live values that do not yet have an applicable stored snapshot, with conversion failure surfaced instead of silently changing currencies.
 
-Destructive or reversal actions name the invoice/expense and state their downstream effects. Cancellation is not designed until `spec/ambiguities.md` is resolved.
+## Payment correction experience
+
+- A paid invoice's three-dot action menu exposes **Mark as unpaid** as an explicitly confirmed correction for a mistakenly recorded payment.
+- The confirmation explains that the recorded payment date and currency-conversion snapshot will be removed, the invoice remains finalized, and its billed time and expenses stay linked. It states plainly that the action does not record or issue a refund.
+- The confirmation cannot be dismissed or submitted twice while saving. On failure it remains open with a visible error; on success it selects the invoice's effective Outstanding or Overdue bucket.
+
+## Cancellation experience
+
+- **Cancel invoice** is available only for sent or overdue unpaid invoices. Drafts remain editable/deletable. A mistakenly recorded payment can first be corrected with **Mark as unpaid**; an actually settled invoice requires a future credit-note/refund workflow and must not use that correction as a refund substitute.
+- The confirmation names the invoice, client, date, currency, and total; explains source release, financial-report exclusion, record retention, and permanent number consumption; requires a 1–500 character reason plus the exact invoice number; and prevents duplicate submission or dismissal while committing.
+- Successful cancellation selects the mutually exclusive Canceled tab and retains a read-only invoice with its original face value and cancellation metadata. Because the bucket and existing card metadata already communicate status and total, the list card uses only a compact neutral cancellation-reason notice; preview and export remain explicitly marked canceled. The success result reports released-source counts without implying a refund, customer notification, credit note, or tax filing adjustment.
+- Canceled records expose only safe preview/download actions. Every document is visibly marked CANCELED; edit, finalize, payment, sent/unpaid transitions, undo, invoice/reminder email, repeated cancel, and uncancel are unavailable.
+
+Destructive or reversal actions name the invoice/expense and state their downstream effects. Cancellation is terminal, explicit, offline-capable, and separate from delete-draft, undo-latest, mark-unpaid, refunds, and credit notes.

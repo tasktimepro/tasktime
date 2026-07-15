@@ -19,7 +19,7 @@
 
 [ ] Drive worker sync updates: tasktime-infra/docs/todo/direct-google-drive-sync-implementation-plan.md
 
-[ ] Invoice cancellation: tasktime-infra/docs/todo/invoice-cancellation-implementation-plan.md
+[x] Invoice cancellation: tasktime-infra/docs/todo/invoice-cancellation-implementation-plan.md
 
 ---
 
@@ -42,10 +42,10 @@
 
 ## Invoice updates
 
-[ ] Cancel invoice implementation that should place invoice in a canceled tab and handled properyly in all the reporting areas necessary!
-    [ ] Also think about about whether currently billed items will become active again/undo billed state?
-    [ ] If you cancel an invoice and there is no other future invoice, should the next one take the same sequential number or not?
-    [ ] Really think about how an invoice cancellation is typically handled in a system like ours and make sure we do the minimal necessities but not overcomplicate things
+[x] Cancel invoice implementation that places retained invoices in a Canceled tab and excludes them from financial reporting.
+    [x] Release only source work still billed by the canceled invoice so it becomes invoice-eligible again.
+    [x] Keep the canceled number permanently consumed; the next invoice uses the next sequential number.
+    [x] Deliver the minimal terminal cancellation workflow while leaving paid corrections, refunds, and credit notes as explicit non-goals.
 
 
 ---

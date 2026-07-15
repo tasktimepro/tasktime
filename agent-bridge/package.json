@@ -1,6 +1,6 @@
 {
   "name": "@tasktimepro/agent-bridge",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "First-party local MCP server for same-device agent access to TaskTime Pro.",
   "mcpName": "pro.tasktime/agent-bridge",
   "type": "module",

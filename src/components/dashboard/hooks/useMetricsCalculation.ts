@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { getLastMonthRange, getThisMonthRange, millisecondsToHours, parseStoredDate } from '../../../utils/dateUtils';
 import { formatCurrency, getProjectCurrency } from '../../../utils/currencyUtils';
-import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoiceOverdue, isInvoicePaid } from '../../../utils/invoiceUtils';
+import { getInvoiceTotal, getPaidInvoiceConvertedAmount, isInvoicePaid, isInvoiceRevenueBearing, matchesInvoiceStatusFilter } from '../../../utils/invoiceUtils';
 import { getBillableDurationMs } from '../../../utils/timeEntryDurationUtils';
 import { isTimestampStartWithinRange } from '../../../utils/reportDateBoundary';
 
@@ -129,6 +129,8 @@ const useMetricsCalculation = ({
 
         // Calculate invoice amounts in the given date range
         const invoicesInRange = invoices.filter(invoice => {
+            if (!isInvoiceRevenueBearing(invoice)) return false;
+
             // Use invoice date for accurate reporting
             const parsedDate = parseStoredDate(invoice.date);
             const invoiceDate = parsedDate ? parsedDate.getTime() : null;
@@ -217,8 +219,8 @@ const useMetricsCalculation = ({
      * Calculate outstanding invoices metrics
      */
     const invoiceMetrics = useMemo(() => {
-        const pastDue = invoices.filter((invoice) => !isInvoicePaid(invoice) && isInvoiceOverdue(invoice));
-        const outstanding = invoices.filter((invoice) => !isInvoicePaid(invoice) && !isInvoiceOverdue(invoice));
+        const pastDue = invoices.filter((invoice) => matchesInvoiceStatusFilter(invoice, 'overdue'));
+        const outstanding = invoices.filter((invoice) => matchesInvoiceStatusFilter(invoice, 'outstanding'));
 
         // Group outstanding invoices by currency first
         const outstandingByCurrency: Record<string, number> = {};

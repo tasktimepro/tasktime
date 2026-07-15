@@ -6,6 +6,8 @@ TaskTime Pro is a free, open-source, local-first work manager for freelancers. C
 
 The bridge does not read or write TaskTime Pro IndexedDB/Yjs data directly. It starts a loopback app-session endpoint, waits for the running TaskTime Pro browser app to pair through Account > Agent Access, and forwards MCP tool calls to the paired browser app.
 
+Billing-scoped tools include approval-gated invoice finalization and cancellation. Cancellation is limited to finalized unpaid invoices, retains the invoice number and audit record, and releases only source work owned by that invoice.
+
 Install and run:
 
 ```bash

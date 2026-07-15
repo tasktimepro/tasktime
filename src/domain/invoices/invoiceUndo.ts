@@ -1,6 +1,6 @@
 import type { Expense, Invoice, Task, TimeEntry } from '@/stores/yjs/types';
 
-export interface InvoiceUndoPlan {
+export interface InvoiceSourceReleasePlan {
     entriesToDelete: TimeEntry[];
     entriesToClear: TimeEntry[];
     expenseIdsToUnbill: string[];
@@ -9,7 +9,7 @@ export interface InvoiceUndoPlan {
     deletedAdjustmentCount: number;
 }
 
-export interface PlanInvoiceUndoInput {
+export interface PlanInvoiceSourceReleaseInput {
     invoice: Invoice;
     invoiceId: string;
     entries: TimeEntry[];
@@ -17,7 +17,7 @@ export interface PlanInvoiceUndoInput {
     tasks: Task[];
 }
 
-export function planInvoiceUndo(input: PlanInvoiceUndoInput): InvoiceUndoPlan {
+export function planInvoiceSourceRelease(input: PlanInvoiceSourceReleaseInput): InvoiceSourceReleasePlan {
     const billedEntries = input.entries.filter((entry) => entry?.billedInvoiceId === input.invoiceId);
     const entriesToDelete = billedEntries.filter((entry) => entry.source === 'invoice-adjustment');
     const entriesToClear = billedEntries.filter((entry) => entry.source !== 'invoice-adjustment');
@@ -105,6 +105,14 @@ export function planInvoiceUndo(input: PlanInvoiceUndoInput): InvoiceUndoPlan {
         clearedTimeEntryCount: entriesToClear.length,
         deletedAdjustmentCount: entriesToDelete.length,
     };
+}
+
+export type InvoiceUndoPlan = InvoiceSourceReleasePlan;
+export type PlanInvoiceUndoInput = PlanInvoiceSourceReleaseInput;
+
+/** Preserve the established undo API while sharing source release with cancellation. */
+export function planInvoiceUndo(input: PlanInvoiceUndoInput): InvoiceUndoPlan {
+    return planInvoiceSourceRelease(input);
 }
 
 export function getInvoiceBillingSnapshotCutoffs(invoice: Invoice | null | undefined): Record<string, unknown> {

@@ -28,7 +28,7 @@ const TOOL_GROUPS = [
     {
         id: 'invoices-quotes',
         title: 'Invoices and Quotes',
-        description: 'Preview, draft, finalize, email, export, and update invoices and project quotes.',
+        description: 'Preview, draft, finalize, cancel, email, export, and update invoices and project quotes.',
     },
     {
         id: 'settings',

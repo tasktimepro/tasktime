@@ -2,6 +2,10 @@
 
 ## Current focus
 
+- [x] Complete all six invoice-cancellation slices: terminal retained records, replay-safe source release, Canceled UI/PDF safety, zero-contribution financial reporting, agent parity, and backup `1.5` compatibility.
+- [x] Expose the existing paid-invoice correction in the browser three-dot menu with explicit confirmation, paid-only eligibility, refund-safe wording, payment-detail clearing, preserved billing-source claims, and Outstanding/Overdue routing.
+- [x] Complete pre-ship hardening for cancellation commit races, persisted-plan field constraints, late-arriving owned claims, protected later billing, and theme-aware canceled-state UI tokens.
+- [x] Prepare the cancellation release scope locally: core app `1.2.0`, backup contract `1.5`, agent bridge/MCP and OpenClaw/Claude bundles `0.3.0`, ClawHub skill `1.1.0`, and Claude marketplace `1.1.0`; no private Worker change, commit, publish, or deployment is authorized.
 - [x] Cross-validate critical persistence and billing specifications against implementation and historical fixtures.
 - [x] Complete the dependency-ordered remediation and release checklist in `status/critical-path-assurance.md`.
 - [ ] Continue gradual TypeScript migration without breaking stable imports or persisted contracts.
@@ -9,7 +13,7 @@
 - [ ] Improve testing infrastructure while preserving the per-file coverage gate for hooks and utilities.
 - [x] Centralize timer lifecycle/recovery, manual time-entry protection, recurring task state, and relationship-bearing work-entity writes across UI and agent surfaces.
 - [x] Fail closed on duplicate entity creates, protect billed/tax-claimed expense deletion, and commit paid cross-currency expense mutations only after snapshot preparation.
-- [x] Align individual dashboard time-entry durations with the seconds-aware task display so sub-minute work never appears as `0m`.
+- [x] Align individual dashboard time-entry and Hours-report total/billable durations with the seconds-aware task display so sub-minute work never appears as `0m`.
 
 ## Production baseline
 

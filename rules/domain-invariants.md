@@ -29,6 +29,8 @@ These invariants summarize critical production contracts. They supplement the de
 - UI badges, invoice composition, and agent preview/draft commands share one invoice-eligibility operation. Neither a task cutoff alone nor entry markers alone may redefine legacy eligibility: exact finalized-invoice evidence may suppress markerless historical entries, while ambiguous or later-arriving work remains eligible.
 - Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval; financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
 - Billing mutations must be explicit, reversible where supported, and idempotent against retries or repeated commands.
+- Cancellation is the terminal void-like exception to ordinary reversibility: only finalized unpaid sent/overdue invoices may be canceled; the retained invoice number, original values/snapshots, and project links are immutable, only sources still owned by that invoice are released, and template numbering is never rewound.
+- Canceled invoices remain audit records but contribute zero to revenue, payment, output-tax, profit, outstanding, overdue, aging, statement, and project-allocation totals. They cannot be edited, paid, emailed, undone, uncanceled, or rendered without an unmistakable canceled treatment.
 - Invoice references use `project.invoiceIds[]`; invoices are separate entities rather than embedded project records.
 - Import/export must preserve supported entity relationships and reject or safely normalize malformed external data without silently losing records.
 

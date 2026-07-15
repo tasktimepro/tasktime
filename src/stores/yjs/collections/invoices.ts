@@ -8,7 +8,7 @@
 import * as Y from 'yjs';
 import type { Invoice } from '../types';
 import { generateId } from '@/utils/idUtils';
-import { invoiceBelongsToProject } from '@/utils/invoiceUtils';
+import { invoiceBelongsToProject, isInvoiceCanceled, isInvoiceOutstanding } from '@/utils/invoiceUtils';
 
 export interface InvoiceHelpers {
 
@@ -109,7 +109,7 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
         },
 
         getUnpaid(): Invoice[] {
-            return getAllInvoices().filter(i => i.status !== 'paid');
+            return getAllInvoices().filter((invoice) => isInvoiceOutstanding(invoice));
         },
 
         create(data: Omit<Invoice, 'id'>): Invoice {
@@ -127,6 +127,9 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
         update(id: string, updates: Partial<Invoice>): Invoice | undefined {
             const existing = invoices.get(id);
             if (!existing) return undefined;
+            if (isInvoiceCanceled(existing)) {
+                throw new Error('Canceled invoices are read-only historical records.');
+            }
 
             const updated = { ...existing, ...updates, updatedAt: Date.now() };
             invoices.set(id, updated);
@@ -138,6 +141,11 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
         },
 
         markPaid(id: string): Invoice | undefined {
+            const existing = this.get(id);
+            if (isInvoiceCanceled(existing)) {
+                throw new Error('Canceled invoices are read-only historical records.');
+            }
+
             return this.update(id, {
                 status: 'paid',
                 paidAt: Date.now(),
@@ -145,6 +153,11 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
         },
 
         markSent(id: string): Invoice | undefined {
+            const existing = this.get(id);
+            if (isInvoiceCanceled(existing)) {
+                throw new Error('Canceled invoices are read-only historical records.');
+            }
+
             return this.update(id, { status: 'sent' });
         },
 

@@ -191,7 +191,7 @@ function u(e, t, n) {
     value: (c) => n?.Parent && c instanceof n.Parent ? !0 : c?._zod?.traits?.has(e)
   }), Object.defineProperty(i, "name", { value: e }), i;
 }
-class ce extends Error {
+class le extends Error {
   constructor() {
     super("Encountered Promise during synchronous parse. Use .parseAsync() instead.");
   }
@@ -256,7 +256,7 @@ function S(e, t, n) {
     configurable: !0
   });
 }
-function oe(e, t, n) {
+function ie(e, t, n) {
   Object.defineProperty(e, t, {
     value: n,
     writable: !0,
@@ -264,7 +264,7 @@ function oe(e, t, n) {
     configurable: !0
   });
 }
-function ne(...e) {
+function re(...e) {
   const t = {};
   for (const n of e) {
     const r = Object.getOwnPropertyDescriptors(n);
@@ -283,7 +283,7 @@ const ln = "captureStackTrace" in Error ? Error.captureStackTrace : (...e) => {
 function ve(e) {
   return typeof e == "object" && e !== null && !Array.isArray(e);
 }
-const $r = rt(() => {
+const Cr = rt(() => {
   if (typeof navigator < "u" && navigator?.userAgent?.includes("Cloudflare"))
     return !1;
   try {
@@ -293,7 +293,7 @@ const $r = rt(() => {
     return !1;
   }
 });
-function pe(e) {
+function ue(e) {
   if (ve(e) === !1)
     return !1;
   const t = e.constructor;
@@ -303,13 +303,13 @@ function pe(e) {
   return !(ve(n) === !1 || Object.prototype.hasOwnProperty.call(n, "isPrototypeOf") === !1);
 }
 function pn(e) {
-  return pe(e) ? { ...e } : Array.isArray(e) ? [...e] : e;
+  return ue(e) ? { ...e } : Array.isArray(e) ? [...e] : e;
 }
-const Cr = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
-function ue(e) {
+const $r = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
+function de(e) {
   return e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-function re(e, t, n) {
+function oe(e, t, n) {
   const r = new e._zod.constr(t ?? e._zod.def);
   return (!t || n?.parent) && (r._zod.parent = e), r;
 }
@@ -340,7 +340,7 @@ function Mr(e, t) {
   const n = e._zod.def, r = n.checks;
   if (r && r.length > 0)
     throw new Error(".pick() cannot be used on object schemas containing refinements");
-  const a = ne(e._zod.def, {
+  const a = re(e._zod.def, {
     get shape() {
       const i = {};
       for (const c in t) {
@@ -348,17 +348,17 @@ function Mr(e, t) {
           throw new Error(`Unrecognized key: "${c}"`);
         t[c] && (i[c] = n.shape[c]);
       }
-      return oe(this, "shape", i), i;
+      return ie(this, "shape", i), i;
     },
     checks: []
   });
-  return re(e, a);
+  return oe(e, a);
 }
 function Zr(e, t) {
   const n = e._zod.def, r = n.checks;
   if (r && r.length > 0)
     throw new Error(".omit() cannot be used on object schemas containing refinements");
-  const a = ne(e._zod.def, {
+  const a = re(e._zod.def, {
     get shape() {
       const i = { ...e._zod.def.shape };
       for (const c in t) {
@@ -366,14 +366,14 @@ function Zr(e, t) {
           throw new Error(`Unrecognized key: "${c}"`);
         t[c] && delete i[c];
       }
-      return oe(this, "shape", i), i;
+      return ie(this, "shape", i), i;
     },
     checks: []
   });
-  return re(e, a);
+  return oe(e, a);
 }
 function Ur(e, t) {
-  if (!pe(t))
+  if (!ue(t))
     throw new Error("Invalid input to extend: expected a plain object");
   const n = e._zod.def.checks;
   if (n && n.length > 0) {
@@ -382,30 +382,30 @@ function Ur(e, t) {
       if (Object.getOwnPropertyDescriptor(a, i) !== void 0)
         throw new Error("Cannot overwrite keys on object schemas containing refinements. Use `.safeExtend()` instead.");
   }
-  const o = ne(e._zod.def, {
+  const o = re(e._zod.def, {
     get shape() {
       const a = { ...e._zod.def.shape, ...t };
-      return oe(this, "shape", a), a;
+      return ie(this, "shape", a), a;
     }
   });
-  return re(e, o);
+  return oe(e, o);
 }
 function qr(e, t) {
-  if (!pe(t))
+  if (!ue(t))
     throw new Error("Invalid input to safeExtend: expected a plain object");
-  const n = ne(e._zod.def, {
+  const n = re(e._zod.def, {
     get shape() {
       const r = { ...e._zod.def.shape, ...t };
-      return oe(this, "shape", r), r;
+      return ie(this, "shape", r), r;
     }
   });
-  return re(e, n);
+  return oe(e, n);
 }
 function Br(e, t) {
-  const n = ne(e._zod.def, {
+  const n = re(e._zod.def, {
     get shape() {
       const r = { ...e._zod.def.shape, ...t._zod.def.shape };
-      return oe(this, "shape", r), r;
+      return ie(this, "shape", r), r;
     },
     get catchall() {
       return t._zod.def.catchall;
@@ -413,13 +413,13 @@ function Br(e, t) {
     checks: []
     // delete existing checks
   });
-  return re(e, n);
+  return oe(e, n);
 }
 function Fr(e, t, n) {
   const o = t._zod.def.checks;
   if (o && o.length > 0)
     throw new Error(".partial() cannot be used on object schemas containing refinements");
-  const i = ne(t._zod.def, {
+  const i = re(t._zod.def, {
     get shape() {
       const c = t._zod.def.shape, p = { ...c };
       if (n)
@@ -437,14 +437,14 @@ function Fr(e, t, n) {
             type: "optional",
             innerType: c[l]
           }) : c[l];
-      return oe(this, "shape", p), p;
+      return ie(this, "shape", p), p;
     },
     checks: []
   });
-  return re(t, i);
+  return oe(t, i);
 }
 function Gr(e, t, n) {
-  const r = ne(t._zod.def, {
+  const r = re(t._zod.def, {
     get shape() {
       const o = t._zod.def.shape, a = { ...o };
       if (n)
@@ -462,12 +462,12 @@ function Gr(e, t, n) {
             type: "nonoptional",
             innerType: o[i]
           });
-      return oe(this, "shape", a), a;
+      return ie(this, "shape", a), a;
     }
   });
-  return re(t, r);
+  return oe(t, r);
 }
-function ae(e, t = 0) {
+function se(e, t = 0) {
   if (e.aborted === !0)
     return !0;
   for (let n = t; n < e.issues.length; n++)
@@ -475,7 +475,7 @@ function ae(e, t = 0) {
       return !0;
   return !1;
 }
-function se(e, t) {
+function ce(e, t) {
   return t.map((n) => {
     var r;
     return (r = n).path ?? (r.path = []), n.path.unshift(e), n;
@@ -522,7 +522,7 @@ function Jr(e, t = (n) => n.message) {
     o.path.length > 0 ? (n[o.path[0]] = n[o.path[0]] || [], n[o.path[0]].push(t(o))) : r.push(t(o));
   return { formErrors: r, fieldErrors: n };
 }
-function Vr(e, t = (n) => n.message) {
+function Kr(e, t = (n) => n.message) {
   const n = { _errors: [] }, r = (o) => {
     for (const a of o.issues)
       if (a.code === "invalid_union" && a.errors.length)
@@ -546,7 +546,7 @@ function Vr(e, t = (n) => n.message) {
 const st = (e) => (t, n, r, o) => {
   const a = r ? Object.assign(r, { async: !1 }) : { async: !1 }, i = t._zod.run({ value: n, issues: [] }, a);
   if (i instanceof Promise)
-    throw new ce();
+    throw new le();
   if (i.issues.length) {
     const c = new (o?.Err ?? e)(i.issues.map((p) => Q(p, a, X())));
     throw ln(c, o?.callee), c;
@@ -563,12 +563,12 @@ const st = (e) => (t, n, r, o) => {
 }, je = (e) => (t, n, r) => {
   const o = r ? { ...r, async: !1 } : { async: !1 }, a = t._zod.run({ value: n, issues: [] }, o);
   if (a instanceof Promise)
-    throw new ce();
+    throw new le();
   return a.issues.length ? {
     success: !1,
     error: new (e ?? dn)(a.issues.map((i) => Q(i, o, X())))
   } : { success: !0, data: a.value };
-}, Kr = /* @__PURE__ */ je(mn), ze = (e) => async (t, n, r) => {
+}, Vr = /* @__PURE__ */ je(mn), ze = (e) => async (t, n, r) => {
   const o = r ? Object.assign(r, { async: !0 }) : { async: !0 };
   let a = t._zod.run({ value: n, issues: [] }, o);
   return a instanceof Promise && (a = await a), a.issues.length ? {
@@ -772,7 +772,7 @@ const So = (e) => {
       continue: !t.abort
     });
   };
-}), $o = /* @__PURE__ */ u("$ZodCheckLengthEquals", (e, t) => {
+}), Co = /* @__PURE__ */ u("$ZodCheckLengthEquals", (e, t) => {
   var n;
   F.init(e, t), (n = e._zod.def).when ?? (n.when = (r) => {
     const o = r.value;
@@ -812,7 +812,7 @@ const So = (e) => {
     });
   }) : (r = e._zod).check ?? (r.check = () => {
   });
-}), Co = /* @__PURE__ */ u("$ZodCheckRegex", (e, t) => {
+}), $o = /* @__PURE__ */ u("$ZodCheckRegex", (e, t) => {
   De.init(e, t), e._zod.check = (n) => {
     t.pattern.lastIndex = 0, !t.pattern.test(n.value) && n.issues.push({
       origin: "string",
@@ -830,7 +830,7 @@ const So = (e) => {
   t.pattern ?? (t.pattern = jo), De.init(e, t);
 }), Mo = /* @__PURE__ */ u("$ZodCheckIncludes", (e, t) => {
   F.init(e, t);
-  const n = ue(t.includes), r = new RegExp(typeof t.position == "number" ? `^.{${t.position}}${n}` : n);
+  const n = de(t.includes), r = new RegExp(typeof t.position == "number" ? `^.{${t.position}}${n}` : n);
   t.pattern = r, e._zod.onattach.push((o) => {
     const a = o._zod.bag;
     a.patterns ?? (a.patterns = /* @__PURE__ */ new Set()), a.patterns.add(r);
@@ -847,7 +847,7 @@ const So = (e) => {
   };
 }), Zo = /* @__PURE__ */ u("$ZodCheckStartsWith", (e, t) => {
   F.init(e, t);
-  const n = new RegExp(`^${ue(t.prefix)}.*`);
+  const n = new RegExp(`^${de(t.prefix)}.*`);
   t.pattern ?? (t.pattern = n), e._zod.onattach.push((r) => {
     const o = r._zod.bag;
     o.patterns ?? (o.patterns = /* @__PURE__ */ new Set()), o.patterns.add(n);
@@ -864,7 +864,7 @@ const So = (e) => {
   };
 }), Uo = /* @__PURE__ */ u("$ZodCheckEndsWith", (e, t) => {
   F.init(e, t);
-  const n = new RegExp(`.*${ue(t.suffix)}$`);
+  const n = new RegExp(`.*${de(t.suffix)}$`);
   t.pattern ?? (t.pattern = n), e._zod.onattach.push((r) => {
     const o = r._zod.bag;
     o.patterns ?? (o.patterns = /* @__PURE__ */ new Set()), o.patterns.add(n);
@@ -925,34 +925,34 @@ const Fo = {
     });
   else {
     const o = (i, c, p) => {
-      let l = ae(i), h;
+      let l = se(i), h;
       for (const y of c) {
         if (y._zod.def.when) {
           if (!y._zod.def.when(i))
             continue;
         } else if (l)
           continue;
-        const v = i.issues.length, w = y._zod.check(i);
-        if (w instanceof Promise && p?.async === !1)
-          throw new ce();
-        if (h || w instanceof Promise)
+        const v = i.issues.length, I = y._zod.check(i);
+        if (I instanceof Promise && p?.async === !1)
+          throw new le();
+        if (h || I instanceof Promise)
           h = (h ?? Promise.resolve()).then(async () => {
-            await w, i.issues.length !== v && (l || (l = ae(i, v)));
+            await I, i.issues.length !== v && (l || (l = se(i, v)));
           });
         else {
           if (i.issues.length === v)
             continue;
-          l || (l = ae(i, v));
+          l || (l = se(i, v));
         }
       }
       return h ? h.then(() => i) : i;
     }, a = (i, c, p) => {
-      if (ae(i))
+      if (se(i))
         return i.aborted = !0, i;
       const l = o(c, r, p);
       if (l instanceof Promise) {
         if (p.async === !1)
-          throw new ce();
+          throw new le();
         return l.then((h) => e._zod.parse(h, p));
       }
       return e._zod.parse(l, p);
@@ -967,7 +967,7 @@ const Fo = {
       const p = e._zod.parse(i, c);
       if (p instanceof Promise) {
         if (c.async === !1)
-          throw new ce();
+          throw new le();
         return p.then((l) => o(l, r, c));
       }
       return o(p, r, c);
@@ -976,7 +976,7 @@ const Fo = {
   S(e, "~standard", () => ({
     validate: (o) => {
       try {
-        const a = Kr(e, o);
+        const a = Vr(e, o);
         return a.success ? { value: a.data } : { issues: a.error?.issues };
       } catch {
         return Wr(e, o).then((i) => i.success ? { value: i.data } : { issues: i.error?.issues });
@@ -1021,9 +1021,9 @@ const Fo = {
   } else
     t.pattern ?? (t.pattern = yt());
   E.init(e, t);
-}), Vo = /* @__PURE__ */ u("$ZodEmail", (e, t) => {
+}), Ko = /* @__PURE__ */ u("$ZodEmail", (e, t) => {
   t.pattern ?? (t.pattern = mo), E.init(e, t);
-}), Ko = /* @__PURE__ */ u("$ZodURL", (e, t) => {
+}), Vo = /* @__PURE__ */ u("$ZodURL", (e, t) => {
   E.init(e, t), e._zod.check = (n) => {
     try {
       const r = n.value.trim(), o = new URL(r);
@@ -1243,7 +1243,7 @@ const hi = /* @__PURE__ */ u("$ZodJWT", (e, t) => {
   }), n);
 });
 function bt(e, t, n) {
-  e.issues.length && t.issues.push(...se(n, e.issues)), t.value[n] = e.value;
+  e.issues.length && t.issues.push(...ce(n, e.issues)), t.value[n] = e.value;
 }
 const wi = /* @__PURE__ */ u("$ZodArray", (e, t) => {
   A.init(e, t), e._zod.parse = (n, r) => {
@@ -1271,7 +1271,7 @@ function we(e, t, n, r, o) {
   if (e.issues.length) {
     if (o && !(n in r))
       return;
-    t.issues.push(...se(n, e.issues));
+    t.issues.push(...ce(n, e.issues));
   }
   e.value === void 0 ? n in r && (t.value[n] = void 0) : t.value[n] = e.value;
 }
@@ -1299,7 +1299,7 @@ function Tn(e, t, n, r, o, a) {
       continue;
     }
     const v = p.run({ value: t[y], issues: [] }, r);
-    v instanceof Promise ? e.push(v.then((w) => we(w, n, y, t, h))) : we(v, n, y, t, h);
+    v instanceof Promise ? e.push(v.then((I) => we(I, n, y, t, h))) : we(v, n, y, t, h);
   }
   return i.length && n.issues.push({
     code: "unrecognized_keys",
@@ -1348,73 +1348,73 @@ const Ii = /* @__PURE__ */ u("$ZodObject", (e, t) => {
     c.value = {};
     const h = [], y = i.shape;
     for (const v of i.keys) {
-      const w = y[v], L = w._zod.optout === "optional", $ = w._zod.run({ value: l[v], issues: [] }, p);
-      $ instanceof Promise ? h.push($.then((M) => we(M, c, v, l, L))) : we($, c, v, l, L);
+      const I = y[v], L = I._zod.optout === "optional", C = I._zod.run({ value: l[v], issues: [] }, p);
+      C instanceof Promise ? h.push(C.then((M) => we(M, c, v, l, L))) : we(C, c, v, l, L);
     }
     return a ? Tn(h, l, c, p, r.value, e) : h.length ? Promise.all(h).then(() => c) : c;
   };
 }), ki = /* @__PURE__ */ u("$ZodObjectJIT", (e, t) => {
   Ii.init(e, t);
   const n = e._zod.parse, r = rt(() => kn(t)), o = (v) => {
-    const w = new Bo(["shape", "payload", "ctx"]), L = r.value, $ = (H) => {
+    const I = new Bo(["shape", "payload", "ctx"]), L = r.value, C = (H) => {
       const B = gt(H);
       return `shape[${B}]._zod.run({ value: input[${B}], issues: [] }, ctx)`;
     };
-    w.write("const input = payload.value;");
+    I.write("const input = payload.value;");
     const M = /* @__PURE__ */ Object.create(null);
     let er = 0;
     for (const H of L.keys)
       M[H] = `key_${er++}`;
-    w.write("const newResult = {};");
+    I.write("const newResult = {};");
     for (const H of L.keys) {
-      const B = M[H], K = gt(H), nr = v[H]?._zod?.optout === "optional";
-      w.write(`const ${B} = ${$(H)};`), nr ? w.write(`
+      const B = M[H], V = gt(H), nr = v[H]?._zod?.optout === "optional";
+      I.write(`const ${B} = ${C(H)};`), nr ? I.write(`
         if (${B}.issues.length) {
-          if (${K} in input) {
+          if (${V} in input) {
             payload.issues = payload.issues.concat(${B}.issues.map(iss => ({
               ...iss,
-              path: iss.path ? [${K}, ...iss.path] : [${K}]
+              path: iss.path ? [${V}, ...iss.path] : [${V}]
             })));
           }
         }
 
         if (${B}.value === undefined) {
-          if (${K} in input) {
-            newResult[${K}] = undefined;
+          if (${V} in input) {
+            newResult[${V}] = undefined;
           }
         } else {
-          newResult[${K}] = ${B}.value;
+          newResult[${V}] = ${B}.value;
         }
 
-      `) : w.write(`
+      `) : I.write(`
         if (${B}.issues.length) {
           payload.issues = payload.issues.concat(${B}.issues.map(iss => ({
             ...iss,
-            path: iss.path ? [${K}, ...iss.path] : [${K}]
+            path: iss.path ? [${V}, ...iss.path] : [${V}]
           })));
         }
 
         if (${B}.value === undefined) {
-          if (${K} in input) {
-            newResult[${K}] = undefined;
+          if (${V} in input) {
+            newResult[${V}] = undefined;
           }
         } else {
-          newResult[${K}] = ${B}.value;
+          newResult[${V}] = ${B}.value;
         }
 
       `);
     }
-    w.write("payload.value = newResult;"), w.write("return payload;");
-    const tr = w.compile();
+    I.write("payload.value = newResult;"), I.write("return payload;");
+    const tr = I.compile();
     return (H, B) => tr(v, H, B);
   };
   let a;
-  const i = ve, c = !Ue.jitless, l = c && $r.value, h = t.catchall;
+  const i = ve, c = !Ue.jitless, l = c && Cr.value, h = t.catchall;
   let y;
-  e._zod.parse = (v, w) => {
+  e._zod.parse = (v, I) => {
     y ?? (y = r.value);
     const L = v.value;
-    return i(L) ? c && l && w?.async === !1 && w.jitless !== !0 ? (a || (a = o(t.shape)), v = a(v, w), h ? Tn([], L, v, w, y, e) : v) : n(v, w) : (v.issues.push({
+    return i(L) ? c && l && I?.async === !1 && I.jitless !== !0 ? (a || (a = o(t.shape)), v = a(v, I), h ? Tn([], L, v, I, y, e) : v) : n(v, I) : (v.issues.push({
       expected: "object",
       code: "invalid_type",
       input: L,
@@ -1426,7 +1426,7 @@ function _t(e, t, n, r) {
   for (const a of e)
     if (a.issues.length === 0)
       return t.value = a.value, t;
-  const o = e.filter((a) => !ae(a));
+  const o = e.filter((a) => !se(a));
   return o.length === 1 ? (t.value = o[0].value, o[0]) : (t.issues.push({
     code: "invalid_union",
     input: t.value,
@@ -1476,7 +1476,7 @@ function Be(e, t) {
     return { valid: !0, data: e };
   if (e instanceof Date && t instanceof Date && +e == +t)
     return { valid: !0, data: e };
-  if (pe(e) && pe(t)) {
+  if (ue(e) && ue(t)) {
     const n = Object.keys(t), r = Object.keys(e).filter((a) => n.indexOf(a) !== -1), o = { ...e, ...t };
     for (const a of r) {
       const i = Be(e[a], t[a]);
@@ -1523,7 +1523,7 @@ function vt(e, t, n) {
     else
       e.issues.push(c);
   const a = [...r].filter(([, c]) => c.l && c.r).map(([c]) => c);
-  if (a.length && o && e.issues.push({ ...o, keys: a }), ae(e))
+  if (a.length && o && e.issues.push({ ...o, keys: a }), se(e))
     return e;
   const i = Be(t.value, n.value);
   if (!i.valid)
@@ -1533,7 +1533,7 @@ function vt(e, t, n) {
 const Pi = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
   A.init(e, t), e._zod.parse = (n, r) => {
     const o = n.value;
-    if (!pe(o))
+    if (!ue(o))
       return n.issues.push({
         expected: "record",
         code: "invalid_type",
@@ -1549,8 +1549,8 @@ const Pi = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
           c.add(typeof l == "number" ? l.toString() : l);
           const h = t.valueType._zod.run({ value: o[l], issues: [] }, r);
           h instanceof Promise ? a.push(h.then((y) => {
-            y.issues.length && n.issues.push(...se(l, y.issues)), n.value[l] = y.value;
-          })) : (h.issues.length && n.issues.push(...se(l, h.issues)), n.value[l] = h.value);
+            y.issues.length && n.issues.push(...ce(l, y.issues)), n.value[l] = y.value;
+          })) : (h.issues.length && n.issues.push(...ce(l, h.issues)), n.value[l] = h.value);
         }
       let p;
       for (const l in o)
@@ -1588,8 +1588,8 @@ const Pi = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
         }
         const h = t.valueType._zod.run({ value: o[c], issues: [] }, r);
         h instanceof Promise ? a.push(h.then((y) => {
-          y.issues.length && n.issues.push(...se(c, y.issues)), n.value[p.value] = y.value;
-        })) : (h.issues.length && n.issues.push(...se(c, h.issues)), n.value[p.value] = h.value);
+          y.issues.length && n.issues.push(...ce(c, y.issues)), n.value[p.value] = y.value;
+        })) : (h.issues.length && n.issues.push(...ce(c, h.issues)), n.value[p.value] = h.value);
       }
     }
     return a.length ? Promise.all(a).then(() => n) : n;
@@ -1597,7 +1597,7 @@ const Pi = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
 }), Ai = /* @__PURE__ */ u("$ZodEnum", (e, t) => {
   A.init(e, t);
   const n = cn(t.entries), r = new Set(n);
-  e._zod.values = r, e._zod.pattern = new RegExp(`^(${n.filter((o) => Cr.has(typeof o)).map((o) => typeof o == "string" ? ue(o) : o.toString()).join("|")})$`), e._zod.parse = (o, a) => {
+  e._zod.values = r, e._zod.pattern = new RegExp(`^(${n.filter((o) => $r.has(typeof o)).map((o) => typeof o == "string" ? de(o) : o.toString()).join("|")})$`), e._zod.parse = (o, a) => {
     const i = o.value;
     return r.has(i) || o.issues.push({
       code: "invalid_value",
@@ -1610,7 +1610,7 @@ const Pi = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
   if (A.init(e, t), t.values.length === 0)
     throw new Error("Cannot create literal schema with no valid values");
   const n = new Set(t.values);
-  e._zod.values = n, e._zod.pattern = new RegExp(`^(${t.values.map((r) => typeof r == "string" ? ue(r) : r ? ue(r.toString()) : String(r)).join("|")})$`), e._zod.parse = (r, o) => {
+  e._zod.values = n, e._zod.pattern = new RegExp(`^(${t.values.map((r) => typeof r == "string" ? de(r) : r ? de(r.toString()) : String(r)).join("|")})$`), e._zod.parse = (r, o) => {
     const a = r.value;
     return n.has(a) || r.issues.push({
       code: "invalid_value",
@@ -1627,7 +1627,7 @@ const Pi = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
     if (r.async)
       return (o instanceof Promise ? o : Promise.resolve(o)).then((i) => (n.value = i, n));
     if (o instanceof Promise)
-      throw new ce();
+      throw new le();
     return n.value = o, n;
   };
 });
@@ -1684,7 +1684,7 @@ function kt(e, t) {
     inst: t
   }), e;
 }
-const $i = /* @__PURE__ */ u("$ZodCatch", (e, t) => {
+const Ci = /* @__PURE__ */ u("$ZodCatch", (e, t) => {
   A.init(e, t), S(e._zod, "optin", () => t.innerType._zod.optin), S(e._zod, "optout", () => t.innerType._zod.optout), S(e._zod, "values", () => t.innerType._zod.values), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
       return t.innerType._zod.run(n, r);
@@ -1703,7 +1703,7 @@ const $i = /* @__PURE__ */ u("$ZodCatch", (e, t) => {
       input: n.value
     }), n.issues = []), n);
   };
-}), Ci = /* @__PURE__ */ u("$ZodPipe", (e, t) => {
+}), $i = /* @__PURE__ */ u("$ZodPipe", (e, t) => {
   A.init(e, t), S(e._zod, "values", () => t.in._zod.values), S(e._zod, "optin", () => t.in._zod.optin), S(e._zod, "optout", () => t.out._zod.optout), S(e._zod, "propValues", () => t.in._zod.propValues), e._zod.parse = (n, r) => {
     if (r.direction === "backward") {
       const a = t.out._zod.run(n, r);
@@ -1847,7 +1847,7 @@ function Ji(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Vi(e, t) {
+function Ki(e, t) {
   return new e({
     type: "string",
     format: "uuid",
@@ -1858,7 +1858,7 @@ function Vi(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Ki(e, t) {
+function Vi(e, t) {
   return new e({
     type: "string",
     format: "url",
@@ -2130,7 +2130,7 @@ function Et(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function $e(e, t) {
+function Ce(e, t) {
   return new vn({
     check: "greater_than",
     ..._(t),
@@ -2164,7 +2164,7 @@ function Ie(e, t) {
 }
 // @__NO_SIDE_EFFECTS__
 function An(e, t) {
-  return new $o({
+  return new Co({
     check: "length_equals",
     ..._(t),
     length: e
@@ -2172,7 +2172,7 @@ function An(e, t) {
 }
 // @__NO_SIDE_EFFECTS__
 function va(e, t) {
-  return new Co({
+  return new $o({
     check: "string_format",
     format: "regex",
     ..._(t),
@@ -2325,10 +2325,10 @@ function O(e, t, n = { path: [], schemaPath: [] }) {
     if (e._zod.processJSONSchema)
       e._zod.processJSONSchema(t, i.schema, h);
     else {
-      const v = i.schema, w = t.processors[o.type];
-      if (!w)
+      const v = i.schema, I = t.processors[o.type];
+      if (!I)
         throw new Error(`[toJSONSchema]: Non-representable type encountered: ${o.type}`);
-      w(e, t, v, h);
+      I(e, t, v, h);
     }
     const y = e._zod.parent;
     y && (i.ref || (i.ref = y), O(y, t, h), t.seen.get(y).isParent = !0);
@@ -2356,8 +2356,8 @@ function En(e, t) {
       const y = e.external.registry.get(i[0])?.id, v = e.external.uri ?? ((L) => L);
       if (y)
         return { ref: v(y) };
-      const w = i[1].defId ?? i[1].schema.id ?? `schema${e.counter++}`;
-      return i[1].defId = w, { defId: w, ref: `${v("__shared")}#/${c}/${w}` };
+      const I = i[1].defId ?? i[1].schema.id ?? `schema${e.counter++}`;
+      return i[1].defId = I, { defId: I, ref: `${v("__shared")}#/${c}/${I}` };
     }
     if (i[1] === n)
       return { ref: "#" };
@@ -2419,21 +2419,21 @@ function jn(e, t) {
     const p = c.def ?? c.schema, l = { ...p }, h = c.ref;
     if (c.ref = null, h) {
       r(h);
-      const v = e.seen.get(h), w = v.schema;
-      if (w.$ref && (e.target === "draft-07" || e.target === "draft-04" || e.target === "openapi-3.0") ? (p.allOf = p.allOf ?? [], p.allOf.push(w)) : Object.assign(p, w), Object.assign(p, l), i._zod.parent === h)
-        for (const $ in p)
-          $ === "$ref" || $ === "allOf" || $ in l || delete p[$];
-      if (w.$ref && v.def)
-        for (const $ in p)
-          $ === "$ref" || $ === "allOf" || $ in v.def && JSON.stringify(p[$]) === JSON.stringify(v.def[$]) && delete p[$];
+      const v = e.seen.get(h), I = v.schema;
+      if (I.$ref && (e.target === "draft-07" || e.target === "draft-04" || e.target === "openapi-3.0") ? (p.allOf = p.allOf ?? [], p.allOf.push(I)) : Object.assign(p, I), Object.assign(p, l), i._zod.parent === h)
+        for (const C in p)
+          C === "$ref" || C === "allOf" || C in l || delete p[C];
+      if (I.$ref && v.def)
+        for (const C in p)
+          C === "$ref" || C === "allOf" || C in v.def && JSON.stringify(p[C]) === JSON.stringify(v.def[C]) && delete p[C];
     }
     const y = i._zod.parent;
     if (y && y !== h) {
       r(y);
       const v = e.seen.get(y);
       if (v?.schema.$ref && (p.$ref = v.schema.$ref, v.def))
-        for (const w in p)
-          w === "$ref" || w === "allOf" || w in v.def && JSON.stringify(p[w]) === JSON.stringify(v.def[w]) && delete p[w];
+        for (const I in p)
+          I === "$ref" || I === "allOf" || I in v.def && JSON.stringify(p[I]) === JSON.stringify(v.def[I]) && delete p[I];
     }
     e.override({
       zodSchema: i,
@@ -2516,13 +2516,13 @@ function U(e, t) {
   }
   return !1;
 }
-const $a = (e, t = {}) => (n) => {
+const Ca = (e, t = {}) => (n) => {
   const r = xn({ ...n, processors: t });
   return O(e, r), En(r, e), jn(r, e);
 }, ke = (e, t, n = {}) => (r) => {
   const { libraryOptions: o, target: a } = r ?? {}, i = xn({ ...o ?? {}, target: a, io: t, processors: n });
   return O(e, i), En(i, e), jn(i, e);
-}, Ca = {
+}, $a = {
   guid: "uuid",
   url: "uri",
   datetime: "date-time",
@@ -2533,7 +2533,7 @@ const $a = (e, t = {}) => (n) => {
   const o = n;
   o.type = "string";
   const { minimum: a, maximum: i, format: c, patterns: p, contentEncoding: l } = e._zod.bag;
-  if (typeof a == "number" && (o.minLength = a), typeof i == "number" && (o.maxLength = i), c && (o.format = Ca[c] ?? c, o.format === "" && delete o.format, c === "time" && delete o.format), l && (o.contentEncoding = l), p && p.size > 0) {
+  if (typeof a == "number" && (o.minLength = a), typeof i == "number" && (o.maxLength = i), c && (o.format = $a[c] ?? c, o.format === "" && delete o.format, c === "time" && delete o.format), l && (o.contentEncoding = l), p && p.size > 0) {
     const h = [...p];
     h.length === 1 ? o.pattern = h[0].source : h.length > 1 && (o.allOf = [
       ...h.map((y) => ({
@@ -2578,10 +2578,10 @@ const $a = (e, t = {}) => (n) => {
 }, Ja = (e, t, n, r) => {
   if (t.unrepresentable === "throw")
     throw new Error("Transforms cannot be represented in JSON Schema");
-}, Va = (e, t, n, r) => {
+}, Ka = (e, t, n, r) => {
   const o = n, a = e._zod.def, { minimum: i, maximum: c } = e._zod.bag;
   typeof i == "number" && (o.minItems = i), typeof c == "number" && (o.maxItems = c), o.type = "array", o.items = O(a.element, t, { ...r, path: [...r.path, "items"] });
-}, Ka = (e, t, n, r) => {
+}, Va = (e, t, n, r) => {
   const o = n, a = e._zod.def;
   o.type = "object", o.properties = {};
   const i = a.shape;
@@ -2718,7 +2718,7 @@ function ms(e) {
 const fs = (e, t) => {
   dn.init(e, t), e.name = "ZodError", Object.defineProperties(e, {
     format: {
-      value: (n) => Vr(e, n)
+      value: (n) => Kr(e, n)
       // enumerable: false,
     },
     flatten: {
@@ -2744,21 +2744,21 @@ const fs = (e, t) => {
       // enumerable: false,
     }
   });
-}, V = u("ZodError", fs, {
+}, K = u("ZodError", fs, {
   Parent: Error
-}), hs = /* @__PURE__ */ st(V), gs = /* @__PURE__ */ ct(V), ys = /* @__PURE__ */ je(V), bs = /* @__PURE__ */ ze(V), _s = /* @__PURE__ */ Hr(V), vs = /* @__PURE__ */ Xr(V), ws = /* @__PURE__ */ Yr(V), Is = /* @__PURE__ */ Qr(V), ks = /* @__PURE__ */ eo(V), Ts = /* @__PURE__ */ to(V), Ss = /* @__PURE__ */ no(V), Ps = /* @__PURE__ */ ro(V), x = /* @__PURE__ */ u("ZodType", (e, t) => (A.init(e, t), Object.assign(e["~standard"], {
+}), hs = /* @__PURE__ */ st(K), gs = /* @__PURE__ */ ct(K), ys = /* @__PURE__ */ je(K), bs = /* @__PURE__ */ ze(K), _s = /* @__PURE__ */ Hr(K), vs = /* @__PURE__ */ Xr(K), ws = /* @__PURE__ */ Yr(K), Is = /* @__PURE__ */ Qr(K), ks = /* @__PURE__ */ eo(K), Ts = /* @__PURE__ */ to(K), Ss = /* @__PURE__ */ no(K), Ps = /* @__PURE__ */ ro(K), x = /* @__PURE__ */ u("ZodType", (e, t) => (A.init(e, t), Object.assign(e["~standard"], {
   jsonSchema: {
     input: ke(e, "input"),
     output: ke(e, "output")
   }
-}), e.toJSONSchema = $a(e, {}), e.def = t, e.type = t.type, Object.defineProperty(e, "_def", { value: t }), e.check = (...n) => e.clone(ne(t, {
+}), e.toJSONSchema = Ca(e, {}), e.def = t, e.type = t.type, Object.defineProperty(e, "_def", { value: t }), e.check = (...n) => e.clone(re(t, {
   checks: [
     ...t.checks ?? [],
     ...n.map((r) => typeof r == "function" ? { _zod: { check: r, def: { check: "custom" }, onattach: [] } } : r)
   ]
 }), {
   parent: !0
-}), e.with = e.check, e.clone = (n, r) => re(e, n, r), e.brand = () => e, e.register = ((n, r) => (n.add(e, r), e)), e.parse = (n, r) => hs(e, n, r, { callee: e.parse }), e.safeParse = (n, r) => ys(e, n, r), e.parseAsync = async (n, r) => gs(e, n, r, { callee: e.parseAsync }), e.safeParseAsync = async (n, r) => bs(e, n, r), e.spa = e.safeParseAsync, e.encode = (n, r) => _s(e, n, r), e.decode = (n, r) => vs(e, n, r), e.encodeAsync = async (n, r) => ws(e, n, r), e.decodeAsync = async (n, r) => Is(e, n, r), e.safeEncode = (n, r) => ks(e, n, r), e.safeDecode = (n, r) => Ts(e, n, r), e.safeEncodeAsync = async (n, r) => Ss(e, n, r), e.safeDecodeAsync = async (n, r) => Ps(e, n, r), e.refine = (n, r) => e.check(wc(n, r)), e.superRefine = (n) => e.check(Ic(n)), e.overwrite = (n) => e.check(/* @__PURE__ */ fe(n)), e.optional = () => Ot(e), e.exactOptional = () => sc(e), e.nullable = () => Nt(e), e.nullish = () => Ot(Nt(e)), e.nonoptional = (n) => mc(e, n), e.array = () => R(e), e.or = (n) => pt([e, n]), e.and = (n) => nc(e, n), e.transform = (n) => Ge(e, Nn(n)), e.default = (n) => pc(e, n), e.prefault = (n) => dc(e, n), e.catch = (n) => hc(e, n), e.pipe = (n) => Ge(e, n), e.readonly = () => bc(e), e.describe = (n) => {
+}), e.with = e.check, e.clone = (n, r) => oe(e, n, r), e.brand = () => e, e.register = ((n, r) => (n.add(e, r), e)), e.parse = (n, r) => hs(e, n, r, { callee: e.parse }), e.safeParse = (n, r) => ys(e, n, r), e.parseAsync = async (n, r) => gs(e, n, r, { callee: e.parseAsync }), e.safeParseAsync = async (n, r) => bs(e, n, r), e.spa = e.safeParseAsync, e.encode = (n, r) => _s(e, n, r), e.decode = (n, r) => vs(e, n, r), e.encodeAsync = async (n, r) => ws(e, n, r), e.decodeAsync = async (n, r) => Is(e, n, r), e.safeEncode = (n, r) => ks(e, n, r), e.safeDecode = (n, r) => Ts(e, n, r), e.safeEncodeAsync = async (n, r) => Ss(e, n, r), e.safeDecodeAsync = async (n, r) => Ps(e, n, r), e.refine = (n, r) => e.check(wc(n, r)), e.superRefine = (n) => e.check(Ic(n)), e.overwrite = (n) => e.check(/* @__PURE__ */ fe(n)), e.optional = () => Ot(e), e.exactOptional = () => sc(e), e.nullable = () => Nt(e), e.nullish = () => Ot(Nt(e)), e.nonoptional = (n) => mc(e, n), e.array = () => R(e), e.or = (n) => pt([e, n]), e.and = (n) => nc(e, n), e.transform = (n) => Ge(e, Nn(n)), e.default = (n) => pc(e, n), e.prefault = (n) => dc(e, n), e.catch = (n) => hc(e, n), e.pipe = (n) => Ge(e, n), e.readonly = () => bc(e), e.describe = (n) => {
   const r = e.clone();
   return he.add(r, { description: n }), r;
 }, Object.defineProperty(e, "description", {
@@ -2776,7 +2776,7 @@ const fs = (e, t) => {
   const n = e._zod.bag;
   e.format = n.format ?? null, e.minLength = n.minimum ?? null, e.maxLength = n.maximum ?? null, e.regex = (...r) => e.check(/* @__PURE__ */ va(...r)), e.includes = (...r) => e.check(/* @__PURE__ */ ka(...r)), e.startsWith = (...r) => e.check(/* @__PURE__ */ Ta(...r)), e.endsWith = (...r) => e.check(/* @__PURE__ */ Sa(...r)), e.min = (...r) => e.check(/* @__PURE__ */ Ie(...r)), e.max = (...r) => e.check(/* @__PURE__ */ Pn(...r)), e.length = (...r) => e.check(/* @__PURE__ */ An(...r)), e.nonempty = (...r) => e.check(/* @__PURE__ */ Ie(1, ...r)), e.lowercase = (r) => e.check(/* @__PURE__ */ wa(r)), e.uppercase = (r) => e.check(/* @__PURE__ */ Ia(r)), e.trim = () => e.check(/* @__PURE__ */ Aa()), e.normalize = (...r) => e.check(/* @__PURE__ */ Pa(...r)), e.toLowerCase = () => e.check(/* @__PURE__ */ xa()), e.toUpperCase = () => e.check(/* @__PURE__ */ Ea()), e.slugify = () => e.check(/* @__PURE__ */ ja());
 }), As = /* @__PURE__ */ u("ZodString", (e, t) => {
-  lt.init(e, t), Dn.init(e, t), e.email = (n) => e.check(/* @__PURE__ */ Bi(xs, n)), e.url = (n) => e.check(/* @__PURE__ */ Ki(Es, n)), e.jwt = (n) => e.check(/* @__PURE__ */ la(Fs, n)), e.emoji = (n) => e.check(/* @__PURE__ */ Wi(js, n)), e.guid = (n) => e.check(/* @__PURE__ */ At(zt, n)), e.uuid = (n) => e.check(/* @__PURE__ */ Fi(_e, n)), e.uuidv4 = (n) => e.check(/* @__PURE__ */ Gi(_e, n)), e.uuidv6 = (n) => e.check(/* @__PURE__ */ Ji(_e, n)), e.uuidv7 = (n) => e.check(/* @__PURE__ */ Vi(_e, n)), e.nanoid = (n) => e.check(/* @__PURE__ */ Hi(zs, n)), e.guid = (n) => e.check(/* @__PURE__ */ At(zt, n)), e.cuid = (n) => e.check(/* @__PURE__ */ Xi(Ds, n)), e.cuid2 = (n) => e.check(/* @__PURE__ */ Yi(Os, n)), e.ulid = (n) => e.check(/* @__PURE__ */ Qi(Ns, n)), e.base64 = (n) => e.check(/* @__PURE__ */ aa(Us, n)), e.base64url = (n) => e.check(/* @__PURE__ */ sa(qs, n)), e.xid = (n) => e.check(/* @__PURE__ */ ea($s, n)), e.ksuid = (n) => e.check(/* @__PURE__ */ ta(Cs, n)), e.ipv4 = (n) => e.check(/* @__PURE__ */ na(Rs, n)), e.ipv6 = (n) => e.check(/* @__PURE__ */ ra(Ls, n)), e.cidrv4 = (n) => e.check(/* @__PURE__ */ oa(Ms, n)), e.cidrv6 = (n) => e.check(/* @__PURE__ */ ia(Zs, n)), e.e164 = (n) => e.check(/* @__PURE__ */ ca(Bs, n)), e.datetime = (n) => e.check(ss(n)), e.date = (n) => e.check(ls(n)), e.time = (n) => e.check(us(n)), e.duration = (n) => e.check(ms(n));
+  lt.init(e, t), Dn.init(e, t), e.email = (n) => e.check(/* @__PURE__ */ Bi(xs, n)), e.url = (n) => e.check(/* @__PURE__ */ Vi(Es, n)), e.jwt = (n) => e.check(/* @__PURE__ */ la(Fs, n)), e.emoji = (n) => e.check(/* @__PURE__ */ Wi(js, n)), e.guid = (n) => e.check(/* @__PURE__ */ At(zt, n)), e.uuid = (n) => e.check(/* @__PURE__ */ Fi(_e, n)), e.uuidv4 = (n) => e.check(/* @__PURE__ */ Gi(_e, n)), e.uuidv6 = (n) => e.check(/* @__PURE__ */ Ji(_e, n)), e.uuidv7 = (n) => e.check(/* @__PURE__ */ Ki(_e, n)), e.nanoid = (n) => e.check(/* @__PURE__ */ Hi(zs, n)), e.guid = (n) => e.check(/* @__PURE__ */ At(zt, n)), e.cuid = (n) => e.check(/* @__PURE__ */ Xi(Ds, n)), e.cuid2 = (n) => e.check(/* @__PURE__ */ Yi(Os, n)), e.ulid = (n) => e.check(/* @__PURE__ */ Qi(Ns, n)), e.base64 = (n) => e.check(/* @__PURE__ */ aa(Us, n)), e.base64url = (n) => e.check(/* @__PURE__ */ sa(qs, n)), e.xid = (n) => e.check(/* @__PURE__ */ ea(Cs, n)), e.ksuid = (n) => e.check(/* @__PURE__ */ ta($s, n)), e.ipv4 = (n) => e.check(/* @__PURE__ */ na(Rs, n)), e.ipv6 = (n) => e.check(/* @__PURE__ */ ra(Ls, n)), e.cidrv4 = (n) => e.check(/* @__PURE__ */ oa(Ms, n)), e.cidrv6 = (n) => e.check(/* @__PURE__ */ ia(Zs, n)), e.e164 = (n) => e.check(/* @__PURE__ */ ca(Bs, n)), e.datetime = (n) => e.check(ss(n)), e.date = (n) => e.check(ls(n)), e.time = (n) => e.check(us(n)), e.duration = (n) => e.check(ms(n));
 });
 function d(e) {
   return /* @__PURE__ */ qi(As, e);
@@ -2784,13 +2784,13 @@ function d(e) {
 const j = /* @__PURE__ */ u("ZodStringFormat", (e, t) => {
   E.init(e, t), Dn.init(e, t);
 }), xs = /* @__PURE__ */ u("ZodEmail", (e, t) => {
-  Vo.init(e, t), j.init(e, t);
+  Ko.init(e, t), j.init(e, t);
 }), zt = /* @__PURE__ */ u("ZodGUID", (e, t) => {
   Go.init(e, t), j.init(e, t);
 }), _e = /* @__PURE__ */ u("ZodUUID", (e, t) => {
   Jo.init(e, t), j.init(e, t);
 }), Es = /* @__PURE__ */ u("ZodURL", (e, t) => {
-  Ko.init(e, t), j.init(e, t);
+  Vo.init(e, t), j.init(e, t);
 }), js = /* @__PURE__ */ u("ZodEmoji", (e, t) => {
   Wo.init(e, t), j.init(e, t);
 }), zs = /* @__PURE__ */ u("ZodNanoID", (e, t) => {
@@ -2801,9 +2801,9 @@ const j = /* @__PURE__ */ u("ZodStringFormat", (e, t) => {
   Yo.init(e, t), j.init(e, t);
 }), Ns = /* @__PURE__ */ u("ZodULID", (e, t) => {
   Qo.init(e, t), j.init(e, t);
-}), $s = /* @__PURE__ */ u("ZodXID", (e, t) => {
+}), Cs = /* @__PURE__ */ u("ZodXID", (e, t) => {
   ei.init(e, t), j.init(e, t);
-}), Cs = /* @__PURE__ */ u("ZodKSUID", (e, t) => {
+}), $s = /* @__PURE__ */ u("ZodKSUID", (e, t) => {
   ti.init(e, t), j.init(e, t);
 }), Rs = /* @__PURE__ */ u("ZodIPv4", (e, t) => {
   ai.init(e, t), j.init(e, t);
@@ -2822,7 +2822,7 @@ const j = /* @__PURE__ */ u("ZodStringFormat", (e, t) => {
 }), Fs = /* @__PURE__ */ u("ZodJWT", (e, t) => {
   hi.init(e, t), j.init(e, t);
 }), On = /* @__PURE__ */ u("ZodNumber", (e, t) => {
-  In.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => La(e, r, o), e.gt = (r, o) => e.check(/* @__PURE__ */ Et(r, o)), e.gte = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.min = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.lt = (r, o) => e.check(/* @__PURE__ */ xt(r, o)), e.lte = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.max = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.int = (r) => e.check(Dt(r)), e.safe = (r) => e.check(Dt(r)), e.positive = (r) => e.check(/* @__PURE__ */ Et(0, r)), e.nonnegative = (r) => e.check(/* @__PURE__ */ $e(0, r)), e.negative = (r) => e.check(/* @__PURE__ */ xt(0, r)), e.nonpositive = (r) => e.check(/* @__PURE__ */ Ne(0, r)), e.multipleOf = (r, o) => e.check(/* @__PURE__ */ jt(r, o)), e.step = (r, o) => e.check(/* @__PURE__ */ jt(r, o)), e.finite = () => e;
+  In.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => La(e, r, o), e.gt = (r, o) => e.check(/* @__PURE__ */ Et(r, o)), e.gte = (r, o) => e.check(/* @__PURE__ */ Ce(r, o)), e.min = (r, o) => e.check(/* @__PURE__ */ Ce(r, o)), e.lt = (r, o) => e.check(/* @__PURE__ */ xt(r, o)), e.lte = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.max = (r, o) => e.check(/* @__PURE__ */ Ne(r, o)), e.int = (r) => e.check(Dt(r)), e.safe = (r) => e.check(Dt(r)), e.positive = (r) => e.check(/* @__PURE__ */ Et(0, r)), e.nonnegative = (r) => e.check(/* @__PURE__ */ Ce(0, r)), e.negative = (r) => e.check(/* @__PURE__ */ xt(0, r)), e.nonpositive = (r) => e.check(/* @__PURE__ */ Ne(0, r)), e.multipleOf = (r, o) => e.check(/* @__PURE__ */ jt(r, o)), e.step = (r, o) => e.check(/* @__PURE__ */ jt(r, o)), e.finite = () => e;
   const n = e._zod.bag;
   e.minValue = Math.max(n.minimum ?? Number.NEGATIVE_INFINITY, n.exclusiveMinimum ?? Number.NEGATIVE_INFINITY) ?? null, e.maxValue = Math.min(n.maximum ?? Number.POSITIVE_INFINITY, n.exclusiveMaximum ?? Number.POSITIVE_INFINITY) ?? null, e.isInt = (n.format ?? "").includes("int") || Number.isSafeInteger(n.multipleOf ?? 0.5), e.isFinite = !0, e.format = n.format ?? null;
 });
@@ -2841,11 +2841,11 @@ const Js = /* @__PURE__ */ u("ZodBoolean", (e, t) => {
 function k(e) {
   return /* @__PURE__ */ ga(Js, e);
 }
-const Vs = /* @__PURE__ */ u("ZodNull", (e, t) => {
+const Ks = /* @__PURE__ */ u("ZodNull", (e, t) => {
   bi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Za(e, n, r);
 });
-function Ks(e) {
-  return /* @__PURE__ */ ya(Vs, e);
+function Vs(e) {
+  return /* @__PURE__ */ ya(Ks, e);
 }
 const Ws = /* @__PURE__ */ u("ZodUnknown", (e, t) => {
   _i.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => qa();
@@ -2860,13 +2860,13 @@ function Xs(e) {
   return /* @__PURE__ */ _a(Hs, e);
 }
 const Ys = /* @__PURE__ */ u("ZodArray", (e, t) => {
-  wi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Va(e, n, r, o), e.element = t.element, e.min = (n, r) => e.check(/* @__PURE__ */ Ie(n, r)), e.nonempty = (n) => e.check(/* @__PURE__ */ Ie(1, n)), e.max = (n, r) => e.check(/* @__PURE__ */ Pn(n, r)), e.length = (n, r) => e.check(/* @__PURE__ */ An(n, r)), e.unwrap = () => e.element;
+  wi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ka(e, n, r, o), e.element = t.element, e.min = (n, r) => e.check(/* @__PURE__ */ Ie(n, r)), e.nonempty = (n) => e.check(/* @__PURE__ */ Ie(1, n)), e.max = (n, r) => e.check(/* @__PURE__ */ Pn(n, r)), e.length = (n, r) => e.check(/* @__PURE__ */ An(n, r)), e.unwrap = () => e.element;
 });
 function R(e, t) {
   return /* @__PURE__ */ za(Ys, e, t);
 }
 const Qs = /* @__PURE__ */ u("ZodObject", (e, t) => {
-  ki.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ka(e, n, r, o), S(e, "shape", () => t.shape), e.keyof = () => P(Object.keys(e._zod.def.shape)), e.catchall = (n) => e.clone({ ...e._zod.def, catchall: n }), e.passthrough = () => e.clone({ ...e._zod.def, catchall: Te() }), e.loose = () => e.clone({ ...e._zod.def, catchall: Te() }), e.strict = () => e.clone({ ...e._zod.def, catchall: Xs() }), e.strip = () => e.clone({ ...e._zod.def, catchall: void 0 }), e.extend = (n) => Ur(e, n), e.safeExtend = (n) => qr(e, n), e.merge = (n) => Br(e, n), e.pick = (n) => Mr(e, n), e.omit = (n) => Zr(e, n), e.partial = (...n) => Fr($n, e, n[0]), e.required = (...n) => Gr(Cn, e, n[0]);
+  ki.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Va(e, n, r, o), S(e, "shape", () => t.shape), e.keyof = () => P(Object.keys(e._zod.def.shape)), e.catchall = (n) => e.clone({ ...e._zod.def, catchall: n }), e.passthrough = () => e.clone({ ...e._zod.def, catchall: Te() }), e.loose = () => e.clone({ ...e._zod.def, catchall: Te() }), e.strict = () => e.clone({ ...e._zod.def, catchall: Xs() }), e.strip = () => e.clone({ ...e._zod.def, catchall: void 0 }), e.extend = (n) => Ur(e, n), e.safeExtend = (n) => qr(e, n), e.merge = (n) => Br(e, n), e.pick = (n) => Mr(e, n), e.omit = (n) => Zr(e, n), e.partial = (...n) => Fr(Cn, e, n[0]), e.required = (...n) => Gr($n, e, n[0]);
 });
 function T(e, t) {
   const n = {
@@ -2984,11 +2984,11 @@ function Nn(e) {
     transform: e
   });
 }
-const $n = /* @__PURE__ */ u("ZodOptional", (e, t) => {
+const Cn = /* @__PURE__ */ u("ZodOptional", (e, t) => {
   Sn.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => zn(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
 });
 function Ot(e) {
-  return new $n({
+  return new Cn({
     type: "optional",
     innerType: e
   });
@@ -3035,18 +3035,18 @@ function dc(e, t) {
     }
   });
 }
-const Cn = /* @__PURE__ */ u("ZodNonOptional", (e, t) => {
+const $n = /* @__PURE__ */ u("ZodNonOptional", (e, t) => {
   Ni.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Qa(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
 });
 function mc(e, t) {
-  return new Cn({
+  return new $n({
     type: "nonoptional",
     innerType: e,
     ..._(t)
   });
 }
 const fc = /* @__PURE__ */ u("ZodCatch", (e, t) => {
-  $i.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => ns(e, n, r, o), e.unwrap = () => e._zod.def.innerType, e.removeCatch = e.unwrap;
+  Ci.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => ns(e, n, r, o), e.unwrap = () => e._zod.def.innerType, e.removeCatch = e.unwrap;
 });
 function hc(e, t) {
   return new fc({
@@ -3056,7 +3056,7 @@ function hc(e, t) {
   });
 }
 const gc = /* @__PURE__ */ u("ZodPipe", (e, t) => {
-  Ci.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => rs(e, n, r, o), e.in = t.in, e.out = t.out;
+  $i.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => rs(e, n, r, o), e.in = t.in, e.out = t.out;
 });
 function Ge(e, t) {
   return new gc({
@@ -3096,14 +3096,14 @@ function Ic(e) {
 function ut(e, t) {
   return Ge(Nn(e), t);
 }
-const de = {
+const ne = {
   custom: "custom"
 };
 X({ jitless: !0 });
 const kc = /^\d{4}-\d{2}-\d{2}$/, Tc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, Sc = /^data:image\/(svg\+xml|png|jpeg|webp)(;charset=[^;,]+)?(;base64)?,/i, N = d().regex(kc), Pc = ut(
   (e) => e === "" ? null : e,
   N.nullable().optional()
-), f = ee().finite(), J = ee().int(), le = ee().finite().min(0), b = d().trim().min(1), Ac = d().trim().min(1).nullable(), D = d().trim().min(1).nullable().optional(), xc = ut(
+), f = ee().finite(), J = ee().int(), pe = ee().finite().min(0), b = d().trim().min(1), Ac = d().trim().min(1).nullable(), D = d().trim().min(1).nullable().optional(), xc = ut(
   (e) => e === void 0 ? null : e,
   Ac
 ), Ln = d().regex(Tc), Ec = d().regex(Sc), Mn = P(["image/svg+xml", "image/png", "image/jpeg", "image/webp"]), Zn = P([
@@ -3117,7 +3117,7 @@ const kc = /^\d{4}-\d{2}-\d{2}$/, Tc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, S
   d(),
   f,
   k(),
-  Ks(),
+  Vs(),
   R(Se),
   te(d(), Se)
 ])), qn = Rn(() => T({
@@ -3129,7 +3129,7 @@ const kc = /^\d{4}-\d{2}-\d{2}$/, Tc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, S
     attrs: te(d(), Se).nullable().optional()
   }).passthrough()).optional(),
   text: d().optional()
-}).passthrough()), $t = T({
+}).passthrough()), Ct = T({
   version: G(1),
   type: G("tiptap-json"),
   content: qn,
@@ -3138,10 +3138,10 @@ const kc = /^\d{4}-\d{2}-\d{2}$/, Tc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, S
 }).passthrough(), jc = ut((e) => {
   if (e == null)
     return e;
-  const t = $t.safeParse(e);
+  const t = Ct.safeParse(e);
   if (t.success)
     return t.data;
-}, $t.nullable().optional()), zc = T({
+}, Ct.nullable().optional()), zc = T({
   type: P(["weekly", "monthly", "yearly"]),
   weeklyDays: R(ee().int().min(0).max(6)).optional(),
   monthlyType: P(["first", "last", "specific"]).optional(),
@@ -3170,7 +3170,7 @@ T({
   statusMode: P(["active", "quote"]).optional(),
   deadline: N.nullable().optional(),
   deadlineResolvedAt: f.nullable().optional(),
-  budgetAmount: le.nullable().optional()
+  budgetAmount: pe.nullable().optional()
 }).passthrough();
 T({
   id: b,
@@ -3195,12 +3195,12 @@ T({
   skippedOccurrenceDate: N.nullable().optional(),
   completedDatesByYear: te(d(), te(d(), R(ee().int().min(1).max(31)))).optional(),
   completedOnDate: N.nullable().optional(),
-  estimatedHours: le.nullable().optional(),
-  estimatedFlatAmount: le.nullable().optional(),
+  estimatedHours: pe.nullable().optional(),
+  estimatedFlatAmount: pe.nullable().optional(),
   quotedAmountBilling: T({
     invoiceId: b,
     billedAt: f,
-    total: le
+    total: pe
   }).nullable().optional()
 }).passthrough();
 T({
@@ -3215,13 +3215,13 @@ T({
   billedHourlyRate: f.nullable().optional(),
   billedAt: f.nullable().optional(),
   billedInvoiceId: D,
-  billedDurationMs: le.nullable().optional(),
+  billedDurationMs: pe.nullable().optional(),
   billingIncrementMinutes: ee().int().positive().nullable().optional(),
   _stoppedTimerKey: b.optional(),
   _stoppedTimerInstanceId: b.optional()
 }).superRefine((e, t) => {
   e.end < e.start && t.addIssue({
-    code: de.custom,
+    code: ne.custom,
     path: ["end"],
     message: "end must be greater than or equal to start"
   });
@@ -3282,11 +3282,11 @@ T({
   }).passthrough().optional()
 }).superRefine((e, t) => {
   !e.title && !e.name && t.addIssue({
-    code: de.custom,
+    code: ne.custom,
     path: ["title"],
     message: "title or name is required"
   }), !e.businessName && !e.name && t.addIssue({
-    code: de.custom,
+    code: ne.custom,
     path: ["businessName"],
     message: "businessName or name is required"
   });
@@ -3345,7 +3345,7 @@ const Dc = T({
   version: G(1),
   capturedAt: f,
   taskLastBilledAt: te(d(), f.nullable())
-}).passthrough(), $c = T({
+}).passthrough(), Cc = T({
   version: G(1),
   capturedAt: f,
   invoiceCurrency: b,
@@ -3392,7 +3392,7 @@ T({
   invoiceNumber: b,
   date: N,
   dueDate: N.nullable().optional(),
-  status: P(["draft", "sent", "paid", "overdue"]),
+  status: P(["draft", "sent", "paid", "overdue", "canceled"]),
   items: R(Dc),
   subtotal: f,
   tax: f.optional(),
@@ -3408,8 +3408,10 @@ T({
   paymentCurrencySnapshot: Bn.nullable().optional(),
   sentAt: f.nullable().optional(),
   sentToEmail: d().nullable().optional(),
+  canceledAt: f.positive().nullable().optional(),
+  cancellationReason: d().trim().min(1).max(500).nullable().optional(),
   billingStateSnapshot: Nc.nullable().optional(),
-  billingSelectionSnapshot: $c.nullable().optional(),
+  billingSelectionSnapshot: Cc.nullable().optional(),
   brandingSnapshot: T({
     businessInfoId: D,
     templateId: D,
@@ -3427,7 +3429,17 @@ T({
       contentHash: b
     }).nullable().optional()
   }).passthrough().nullable().optional()
-}).passthrough();
+}).passthrough().superRefine((e, t) => {
+  e.status === "canceled" && (typeof e.canceledAt != "number" && t.addIssue({
+    code: ne.custom,
+    path: ["canceledAt"],
+    message: "canceledAt is required for canceled invoices"
+  }), (typeof e.cancellationReason != "string" || !e.cancellationReason.trim()) && t.addIssue({
+    code: ne.custom,
+    path: ["cancellationReason"],
+    message: "cancellationReason is required for canceled invoices"
+  }));
+});
 T({
   id: b,
   name: b,
@@ -3570,7 +3582,7 @@ T({
   updatedAt: f.optional()
 }).superRefine((e, t) => {
   e.endDate < e.startDate && t.addIssue({
-    code: de.custom,
+    code: ne.custom,
     path: ["endDate"],
     message: "endDate must be greater than or equal to startDate"
   });
@@ -3587,11 +3599,11 @@ T({
   estimatedHours: f.nullable().optional()
 }).superRefine((e, t) => {
   e.mode === "date" && !e.date && t.addIssue({
-    code: de.custom,
+    code: ne.custom,
     path: ["date"],
     message: "date is required when mode is date"
   }), e.mode === "weekday" && (e.weekday === void 0 || e.weekday === null) && t.addIssue({
-    code: de.custom,
+    code: ne.custom,
     path: ["weekday"],
     message: "weekday is required when mode is weekday"
   });
@@ -3639,16 +3651,16 @@ T({
   timerInstanceId: b.optional(),
   startTime: f,
   paused: k().optional(),
-  pausedElapsedTime: le.optional(),
+  pausedElapsedTime: pe.optional(),
   note: d().optional(),
   lastActive: f.optional()
 }).passthrough();
-const Cc = "1.4";
-Array.from(/* @__PURE__ */ new Set(["1.0", "1.1", "1.3", Cc]));
+const $c = "1.5";
+Array.from(/* @__PURE__ */ new Set(["1.0", "1.1", "1.3", "1.4", $c]));
 const Je = (e, t) => t.some((n) => e instanceof n);
-let Ct, Rt;
+let $t, Rt;
 function Rc() {
-  return Ct || (Ct = [
+  return $t || ($t = [
     IDBDatabase,
     IDBObjectStore,
     IDBIndex,
@@ -3663,7 +3675,7 @@ function Lc() {
     IDBCursor.prototype.continuePrimaryKey
   ]);
 }
-const Ve = /* @__PURE__ */ new WeakMap(), Ce = /* @__PURE__ */ new WeakMap(), Oe = /* @__PURE__ */ new WeakMap();
+const Ke = /* @__PURE__ */ new WeakMap(), $e = /* @__PURE__ */ new WeakMap(), Oe = /* @__PURE__ */ new WeakMap();
 function Mc(e) {
   const t = new Promise((n, r) => {
     const o = () => {
@@ -3678,7 +3690,7 @@ function Mc(e) {
   return Oe.set(t, e), t;
 }
 function Zc(e) {
-  if (Ve.has(e))
+  if (Ke.has(e))
     return;
   const t = new Promise((n, r) => {
     const o = () => {
@@ -3690,13 +3702,13 @@ function Zc(e) {
     };
     e.addEventListener("complete", a), e.addEventListener("error", i), e.addEventListener("abort", i);
   });
-  Ve.set(e, t);
+  Ke.set(e, t);
 }
-let Ke = {
+let Ve = {
   get(e, t, n) {
     if (e instanceof IDBTransaction) {
       if (t === "done")
-        return Ve.get(e);
+        return Ke.get(e);
       if (t === "store")
         return n.objectStoreNames[1] ? void 0 : n.objectStore(n.objectStoreNames[0]);
     }
@@ -3710,7 +3722,7 @@ let Ke = {
   }
 };
 function Fn(e) {
-  Ke = e(Ke);
+  Ve = e(Ve);
 }
 function Uc(e) {
   return Lc().includes(e) ? function(...t) {
@@ -3720,15 +3732,15 @@ function Uc(e) {
   };
 }
 function qc(e) {
-  return typeof e == "function" ? Uc(e) : (e instanceof IDBTransaction && Zc(e), Je(e, Rc()) ? new Proxy(e, Ke) : e);
+  return typeof e == "function" ? Uc(e) : (e instanceof IDBTransaction && Zc(e), Je(e, Rc()) ? new Proxy(e, Ve) : e);
 }
 function Pe(e) {
   if (e instanceof IDBRequest)
     return Mc(e);
-  if (Ce.has(e))
-    return Ce.get(e);
+  if ($e.has(e))
+    return $e.get(e);
   const t = qc(e);
-  return t !== e && (Ce.set(e, t), Oe.set(t, e)), t;
+  return t !== e && ($e.set(e, t), Oe.set(t, e)), t;
 }
 const We = (e) => Oe.get(e), Bc = ["get", "getKey", "getAll", "getAllKeys", "count"], Fc = ["put", "add", "delete", "clear"], Re = /* @__PURE__ */ new Map();
 function Lt(e, t) {
@@ -3767,7 +3779,7 @@ const Gc = ["continue", "continuePrimaryKey", "advance"], Mt = {}, He = /* @__PU
     }), n;
   }
 };
-async function* Vc(...e) {
+async function* Kc(...e) {
   let t = this;
   if (t instanceof IDBCursor || (t = await t.openCursor(...e)), !t)
     return;
@@ -3782,21 +3794,21 @@ function Zt(e, t) {
 Fn((e) => ({
   ...e,
   get(t, n, r) {
-    return Zt(t, n) ? Vc : e.get(t, n, r);
+    return Zt(t, n) ? Kc : e.get(t, n, r);
   },
   has(t, n) {
     return Zt(t, n) || e.has(t, n);
   }
 }));
 Promise.resolve(void 0);
-const Kc = [
+const Vc = [
   { value: "last-month", label: "Last Month" },
   { value: "month", label: "This Month" },
   { value: "all-time", label: "All Time" },
   { value: "custom", label: "Custom Range" }
 ];
 new Set(
-  Kc.map((e) => e.value)
+  Vc.map((e) => e.value)
 );
 const Wc = [
   "Needs review",
@@ -4336,15 +4348,15 @@ function yl(e, t) {
 function bl(e, t) {
   return e === "::1" || t.family === "IPv6" ? "[::1]" : e;
 }
-const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m = { type: ["string", "null"] }, Bt = {
+const s = { type: "string" }, w = { type: "number" }, g = { type: "boolean" }, m = { type: ["string", "null"] }, Bt = {
   type: "object",
   properties: {
     id: s,
     title: s,
-    hours: I,
-    hourlyRate: I,
-    flatRate: I,
-    quantity: I,
+    hours: w,
+    hourlyRate: w,
+    flatRate: w,
+    quantity: w,
     useFlatRate: g,
     parentTaskId: m
   },
@@ -4396,7 +4408,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: q,
     bridgeLocal: !0
   }
-], Vn = [
+], Kn = [
   {
     name: "list_projects",
     description: "List active TaskTime Pro projects visible to the paired app session.",
@@ -4739,7 +4751,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         isDefault: g,
         taxEnabled: g,
         taxLabel: s,
-        taxRate: I,
+        taxRate: w,
         branding: { type: "object" },
         idempotencyKey: s
       },
@@ -4815,9 +4827,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         dataUrl: s,
         mimeType: { type: "string", enum: ["image/svg+xml", "image/png", "image/jpeg", "image/webp"] },
         fileName: m,
-        width: I,
-        height: I,
-        byteSize: I,
+        width: w,
+        height: w,
+        byteSize: w,
         contentHash: s,
         idempotencyKey: s
       },
@@ -4969,10 +4981,10 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         name: s,
         prefix: s,
         useSequentialNumbers: g,
-        currentSequentialNumber: I,
+        currentSequentialNumber: w,
         defaultNotes: s,
-        defaultTaxRate: I,
-        defaultDueDays: I,
+        defaultTaxRate: w,
+        defaultDueDays: w,
         isDefault: g,
         brandingOptions: { type: "object" },
         layoutStyle: { type: "string", enum: ["classic", "neutral"] },
@@ -5210,7 +5222,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
             timeFormat: s,
             theme: { type: "string", enum: ["light", "dark", "system"] },
             defaultView: s,
-            weekStartsOn: I,
+            weekStartsOn: w,
             autoHideTotalsOnRevisit: g,
             showCompletedTasks: g,
             defaultBillable: g,
@@ -5257,9 +5269,9 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
           type: ["object", "null"],
           properties: {
             type: { type: "string", enum: ["weekly", "monthly", "yearly"] },
-            weeklyDays: { type: "array", items: I },
+            weeklyDays: { type: "array", items: w },
             monthlyType: { type: "string", enum: ["first", "last", "specific"] },
-            monthlyDay: I,
+            monthlyDay: w,
             yearlyDate: s
           },
           required: ["type"],
@@ -5417,7 +5429,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         timerKey: s,
         taskId: s,
-        pausedAt: I
+        pausedAt: w
       },
       additionalProperties: !1
     }
@@ -5475,7 +5487,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         timerKey: s,
         taskId: s,
-        startTime: I,
+        startTime: w,
         note: m
       },
       additionalProperties: !1
@@ -5489,8 +5501,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         taskId: s,
-        start: I,
-        end: I,
+        start: w,
+        end: w,
         note: s,
         billingIncrementMinutes: { type: ["number", "null"] },
         idempotencyKey: s
@@ -5508,8 +5520,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         entryId: s,
         taskId: s,
-        start: I,
-        end: I,
+        start: w,
+        end: w,
         note: m,
         billingIncrementMinutes: { type: ["number", "null"] }
       },
@@ -5543,7 +5555,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         referenceId: s,
         mode: { type: "string", enum: ["static", "date", "weekday"] },
         date: s,
-        weekday: I
+        weekday: w
       },
       additionalProperties: !1
     }
@@ -5604,7 +5616,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        weekday: I
+        weekday: w
       },
       additionalProperties: !1
     }
@@ -5616,7 +5628,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        weekday: I,
+        weekday: w,
         targetHours: { type: ["number", "null"] },
         targetEarnings: { type: ["number", "null"] }
       },
@@ -5631,7 +5643,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        weekday: I
+        weekday: w
       },
       required: ["weekday"],
       additionalProperties: !1
@@ -5692,7 +5704,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         title: s,
         date: s,
-        amount: I,
+        amount: w,
         currency: s,
         isPersonal: g,
         billable: g,
@@ -5764,11 +5776,11 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         paidBy: m,
         paymentMode: { type: "string", enum: ["manual", "auto"] },
         currency: s,
-        amount: I,
+        amount: w,
         amountType: { type: "string", enum: ["fixed", "variable"] },
         repeat: { type: "string", enum: ["monthly", "yearly"] },
         monthlyType: { type: "string", enum: ["first", "last", "specific"] },
-        monthlyDay: I,
+        monthlyDay: w,
         startDate: s,
         endDate: m,
         clientId: m,
@@ -5853,7 +5865,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         expenseId: s,
-        amount: I,
+        amount: w,
         paidOn: m,
         paidBy: m
       },
@@ -5928,7 +5940,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         taxReturnPeriodId: s,
-        filedAt: I,
+        filedAt: w,
         confirmFiled: g
       },
       required: ["taxReturnPeriodId", "confirmFiled"],
@@ -5943,8 +5955,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       type: "object",
       properties: {
         taxReturnPeriodId: s,
-        filedAt: I,
-        paidAt: I,
+        filedAt: w,
+        paidAt: w,
         confirmPaid: g
       },
       required: ["taxReturnPeriodId", "confirmPaid"],
@@ -5997,8 +6009,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         clientId: m,
         projectId: m,
-        status: { enum: ["draft", "sent", "paid", "overdue"] },
-        limit: I
+        status: { enum: ["draft", "sent", "paid", "overdue", "canceled"] },
+        limit: w
       },
       additionalProperties: !1
     }
@@ -6072,7 +6084,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         confirmFinalize: g,
-        finalizedAt: I,
+        finalizedAt: w,
         idempotencyKey: s
       },
       required: ["invoiceId", "confirmFinalize"],
@@ -6088,7 +6100,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         confirmPaid: g,
-        paidAt: I,
+        paidAt: w,
         exchangeRates: { type: ["object", "null"] },
         idempotencyKey: s
       },
@@ -6105,10 +6117,28 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         invoiceId: s,
         confirmUnpaid: g,
-        referenceAt: I,
+        referenceAt: w,
         idempotencyKey: s
       },
       required: ["invoiceId", "confirmUnpaid"],
+      additionalProperties: !1
+    }
+  },
+  {
+    name: "cancel_invoice",
+    description: "Cancel a finalized unpaid invoice after explicit confirmation and exact invoice-number confirmation text. The invoice and number remain as an audit record while source claims owned by that invoice are released for future billing.",
+    scopes: ["read", "write", "billing"],
+    inputSchema: {
+      type: "object",
+      properties: {
+        invoiceId: s,
+        reason: { type: "string", minLength: 1, maxLength: 500 },
+        confirmCancel: g,
+        confirmationText: s,
+        canceledAt: w,
+        idempotencyKey: s
+      },
+      required: ["invoiceId", "reason", "confirmCancel", "confirmationText"],
       additionalProperties: !1
     }
   },
@@ -6122,7 +6152,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         invoiceId: s,
         confirmUndo: g,
         confirmationText: s,
-        undoneAt: I,
+        undoneAt: w,
         idempotencyKey: s
       },
       required: ["invoiceId", "confirmUndo", "confirmationText"],
@@ -6287,12 +6317,12 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         clientId: m,
         projectId: m,
         categoryId: m,
-        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
+        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft", "canceled"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
         includeRows: g,
-        rowLimit: I
+        rowLimit: w
       },
       additionalProperties: !1
     }
@@ -6312,11 +6342,11 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         clientId: m,
         projectId: m,
         categoryId: m,
-        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
+        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft", "canceled"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
-        rowLimit: I,
+        rowLimit: w,
         filename: s
       },
       required: ["section"],
@@ -6338,11 +6368,11 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         clientId: m,
         projectId: m,
         categoryId: m,
-        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
+        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft", "canceled"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
-        rowLimit: I,
+        rowLimit: w,
         filename: s
       },
       required: ["section"],
@@ -6363,11 +6393,11 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         clientId: m,
         projectId: m,
         categoryId: m,
-        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft"] },
+        invoiceStatus: { type: "string", enum: ["all", "non-draft", "paid", "unpaid", "overdue", "draft", "canceled"] },
         expenseStatus: { type: "string", enum: ["all", "paid", "unpaid", "claimed", "unclaimed", "excluded"] },
         incomeDateBasis: { type: "string", enum: ["invoice-date", "paid-date"] },
         expenseDateBasis: { type: "string", enum: ["expense-date", "paid-date"] },
-        rowLimit: I,
+        rowLimit: w,
         filename: s,
         includeInvoicePdfs: g
       },
@@ -6473,7 +6503,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
         autoSyncEnabled: g,
         autoSyncMode: { type: "string", enum: ["backup", "sync"] },
         backupEnabled: g,
-        backupFrequencyHours: I,
+        backupFrequencyHours: w,
         confirmBackupMode: g,
         runSync: g
       },
@@ -6504,7 +6534,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         projectId: m,
         taskId: m,
-        limit: I
+        limit: w
       },
       additionalProperties: !1
     }
@@ -6518,7 +6548,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
       properties: {
         projectId: m,
         taskId: m,
-        limit: I
+        limit: w
       },
       additionalProperties: !1
     }
@@ -6536,8 +6566,8 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
     inputSchema: {
       type: "object",
       properties: {
-        year: I,
-        week: I
+        year: w,
+        week: w
       },
       additionalProperties: !1
     }
@@ -6631,17 +6661,17 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, m
 function _l(e) {
   return [
     ...dt,
-    ...Vn.filter((t) => t.scopes.every((n) => e.has(n)))
+    ...Kn.filter((t) => t.scopes.every((n) => e.has(n)))
   ].sort((t, n) => t.name.localeCompare(n.name));
 }
 function Gt(e) {
-  return dt.find((t) => t.name === e) ?? Vn.find((t) => t.name === e) ?? null;
+  return dt.find((t) => t.name === e) ?? Kn.find((t) => t.name === e) ?? null;
 }
 function Jt(e) {
   return dt.some((t) => t.name === e);
 }
 const vl = (e) => e === null ? "null" : Array.isArray(e) ? "array" : typeof e;
-function Vt(e, t) {
+function Kt(e, t) {
   const n = [];
   return Ye(e, t, "$", n), { valid: n.length === 0, errors: n };
 }
@@ -6717,20 +6747,20 @@ class Sl {
   async callTool(t) {
     const n = t;
     if (!n || typeof n != "object" || typeof n.name != "string")
-      return C("INVALID_INPUT", "tools/call requires a string tool name.");
+      return $("INVALID_INPUT", "tools/call requires a string tool name.");
     const r = Gt(n.name);
     if (!r)
-      return C("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.name}`);
-    const o = n.arguments ?? {}, a = Vt(r.inputSchema, o);
+      return $("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.name}`);
+    const o = n.arguments ?? {}, a = Kt(r.inputSchema, o);
     if (!a.valid)
-      return C("INVALID_INPUT", `Invalid input for ${r.name}.`, {
+      return $("INVALID_INPUT", `Invalid input for ${r.name}.`, {
         validationErrors: a.errors
       });
     if (Jt(r.name))
       return this.callBridgeSetupTool(r.name);
     const i = r.scopes.find((l) => !this.scopes.has(l));
     if (i)
-      return C("PERMISSION_DENIED", `Missing ${i} permission.`, {
+      return $("PERMISSION_DENIED", `Missing ${i} permission.`, {
         scope: i
       });
     const c = this.consumeToolCallBudget(r.name);
@@ -6746,10 +6776,10 @@ class Sl {
         Pl(n.approval)
       );
     } catch (l) {
-      return l instanceof z ? C(l.code, l.message, Kt(l)) : C(
+      return l instanceof z ? $(l.code, l.message, Vt(l)) : $(
         "UNAVAILABLE",
         l instanceof Error ? l.message : "TaskTime Pro app session is unavailable.",
-        Kn()
+        Vn()
       );
     }
     return {
@@ -6764,35 +6794,35 @@ class Sl {
     };
   }
   callBridgeSetupTool(t) {
-    return t === "get_pairing_status" ? this.bridge.getPairingStatus ? Wt(t, this.bridge.getPairingStatus()) : C("UNAVAILABLE", "TaskTime Pro bridge pairing status is unavailable.") : this.bridge.refreshPairing ? Wt(t, this.bridge.refreshPairing()) : C("UNAVAILABLE", "TaskTime Pro bridge pairing refresh is unavailable.");
+    return t === "get_pairing_status" ? this.bridge.getPairingStatus ? Wt(t, this.bridge.getPairingStatus()) : $("UNAVAILABLE", "TaskTime Pro bridge pairing status is unavailable.") : this.bridge.refreshPairing ? Wt(t, this.bridge.refreshPairing()) : $("UNAVAILABLE", "TaskTime Pro bridge pairing refresh is unavailable.");
   }
   async createApprovalToken(t) {
     if (!this.bridge.createApprovalToken)
-      return C("UNAVAILABLE", "TaskTime Pro approval-token signing is unavailable.");
+      return $("UNAVAILABLE", "TaskTime Pro approval-token signing is unavailable.");
     const n = t;
     if (!n || typeof n != "object" || typeof n.command != "string")
-      return C("INVALID_INPUT", "tasktime/create_approval_token requires a string command.");
+      return $("INVALID_INPUT", "tasktime/create_approval_token requires a string command.");
     const r = Gt(n.command);
     if (!r)
-      return C("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.command}`);
+      return $("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.command}`);
     if (Jt(r.name))
-      return C("INVALID_INPUT", `TaskTime Pro setup tool does not require approval tokens: ${n.command}`);
-    const o = n.arguments ?? {}, a = Vt(r.inputSchema, o);
+      return $("INVALID_INPUT", `TaskTime Pro setup tool does not require approval tokens: ${n.command}`);
+    const o = n.arguments ?? {}, a = Kt(r.inputSchema, o);
     if (!a.valid)
-      return C("INVALID_INPUT", `Invalid input for ${r.name}.`, {
+      return $("INVALID_INPUT", `Invalid input for ${r.name}.`, {
         validationErrors: a.errors
       });
     const i = Al(n.scopes, r.scopes);
     if (!i)
-      return C("INVALID_INPUT", "Approval token scopes must be an array of strings.");
+      return $("INVALID_INPUT", "Approval token scopes must be an array of strings.");
     const c = i.find((l) => !this.scopes.has(l));
     if (c)
-      return C("PERMISSION_DENIED", `Missing ${c} permission.`, {
+      return $("PERMISSION_DENIED", `Missing ${c} permission.`, {
         scope: c
       });
     const p = El(n.ttlMs);
     if (p === null)
-      return C("INVALID_INPUT", "Approval token ttlMs must be a positive integer no greater than 300000.");
+      return $("INVALID_INPUT", "Approval token ttlMs must be a positive integer no greater than 300000.");
     try {
       const l = typeof n.inputHash == "string" ? n.inputHash : xl(o);
       return {
@@ -6807,7 +6837,7 @@ class Sl {
         })
       };
     } catch (l) {
-      return l instanceof z ? C(l.code, l.message, Kt(l)) : C("UNAVAILABLE", l instanceof Error ? l.message : "TaskTime Pro approval-token signing failed.");
+      return l instanceof z ? $(l.code, l.message, Vt(l)) : $("UNAVAILABLE", l instanceof Error ? l.message : "TaskTime Pro approval-token signing failed.");
     }
   }
   consumeToolCallBudget(t) {
@@ -6816,7 +6846,7 @@ class Sl {
     const n = this.now();
     if (n - this.toolCallWindowStartedAt >= this.toolCallRateWindowMs && (this.toolCallWindowStartedAt = n, this.toolCallCount = 0), this.toolCallCount >= this.toolCallRateLimit) {
       const r = Math.max(0, this.toolCallRateWindowMs - (n - this.toolCallWindowStartedAt));
-      return C("RATE_LIMITED", "TaskTime Pro MCP tool call rate limit exceeded.", {
+      return $("RATE_LIMITED", "TaskTime Pro MCP tool call rate limit exceeded.", {
         tool: t,
         limit: this.toolCallRateLimit,
         windowMs: this.toolCallRateWindowMs,
@@ -6867,13 +6897,13 @@ function El(e) {
   if (e !== void 0)
     return !Number.isInteger(e) || e <= 0 || e > Tl ? null : e;
 }
-function Kt(e) {
+function Vt(e) {
   return e.code !== "UNAVAILABLE" ? e.details : {
     ...e.details,
-    ...Kn()
+    ...Vn()
   };
 }
-function Kn() {
+function Vn() {
   return {
     recovery: {
       action: "launch_tasktime",
@@ -6901,7 +6931,7 @@ function Wt(e, t) {
     isError: !1
   };
 }
-function C(e, t, n) {
+function $(e, t, n) {
   const r = {
     ok: !1,
     command: "tools/call",
@@ -6968,8 +6998,8 @@ function Nl(e, t = process.env) {
     path: t.TASKTIME_AGENT_BRIDGE_PATH || Wn,
     scopes: Yn(t.TASKTIME_AGENT_BRIDGE_SCOPES) ?? et,
     allowedOrigins: Xn(t.TASKTIME_AGENT_BRIDGE_ORIGINS),
-    agentId: ie(t.TASKTIME_AGENT_ID, xe, "TASKTIME_AGENT_ID"),
-    agentLabel: ie(t.TASKTIME_AGENT_LABEL, tt, "TASKTIME_AGENT_LABEL"),
+    agentId: ae(t.TASKTIME_AGENT_ID, xe, "TASKTIME_AGENT_ID"),
+    agentLabel: ae(t.TASKTIME_AGENT_LABEL, tt, "TASKTIME_AGENT_LABEL"),
     pairingTtlMs: W(t.TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS, Le, "TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS"),
     sessionTtlMs: Ul(t.TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS, "TASKTIME_AGENT_BRIDGE_SESSION_TTL_MS"),
     commandTimeoutMs: W(t.TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS, Xt, "TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS"),
@@ -7009,10 +7039,10 @@ function Nl(e, t = process.env) {
         o.push(Z(e, ++a, i));
         break;
       case "--agent-id":
-        n.agentId = ie(Z(e, ++a, i), xe, i);
+        n.agentId = ae(Z(e, ++a, i), xe, i);
         break;
       case "--agent-label":
-        n.agentLabel = ie(Z(e, ++a, i), tt, i);
+        n.agentLabel = ae(Z(e, ++a, i), tt, i);
         break;
       case "--pairing-ttl-ms":
         n.pairingTtlMs = W(Z(e, ++a, i), Le, i);
@@ -7033,7 +7063,7 @@ function Nl(e, t = process.env) {
         n.appUrl = mt(Z(e, ++a, i), i);
         break;
       case "--status-file":
-        n.statusFile = ie(Z(e, ++a, i), "", i);
+        n.statusFile = ae(Z(e, ++a, i), "", i);
         break;
       default:
         throw new Error(`Unsupported option: ${i}`);
@@ -7041,7 +7071,7 @@ function Nl(e, t = process.env) {
   }
   return r.length > 0 && (n.scopes = nt(r)), o.length > 0 && (n.allowedOrigins = o), n.path = tn(n.path), n.scopes = nt(n.scopes), n;
 }
-function $l() {
+function Cl() {
   return [
     "TaskTime Pro local agent bridge",
     "",
@@ -7072,7 +7102,7 @@ function $l() {
   ].join(`
 `);
 }
-function Cl() {
+function $l() {
   return {
     schemaVersion: 1,
     app: {
@@ -7241,7 +7271,7 @@ async function Ll(e, t) {
     agentLabel: e.agentLabel,
     startedAt: a,
     activeSessionExpiresAt: n
-  }), v = () => (h(), y()), w = h(), L = new Sl({
+  }), v = () => (h(), y()), I = h(), L = new Sl({
     bridge: {
       sendCommand: l.sendCommand.bind(l),
       createApprovalToken: l.createApprovalToken.bind(l),
@@ -7252,7 +7282,7 @@ async function Ll(e, t) {
     commandTimeoutMs: e.commandTimeoutMs,
     toolCallRateLimit: e.toolCallRateLimit,
     toolCallRateWindowMs: e.toolCallRateWindowMs
-  }), $ = jl({
+  }), C = jl({
     input: t.stdin,
     output: t.stdout,
     server: L,
@@ -7261,14 +7291,14 @@ async function Ll(e, t) {
 `);
     }
   });
-  return t.stderr.write(`${Rl(w, e.appUrl)}
+  return t.stderr.write(`${Rl(I, e.appUrl)}
 `), {
     bridge: l,
-    challenge: w,
+    challenge: I,
     getStatus: y,
     refreshPairing: v,
     stop: async () => {
-      $(), await l.stop();
+      C(), await l.stop();
     }
   };
 }
@@ -7308,10 +7338,10 @@ async function Ml(e = process.argv.slice(2), t = {
 }, n = process.env) {
   const r = Nl(e, n);
   if (r.help)
-    return t.stderr.write(`${$l()}
+    return t.stderr.write(`${Cl()}
 `), null;
   if (r.manifest)
-    return t.stdout.write(`${JSON.stringify(Cl(), null, 2)}
+    return t.stdout.write(`${JSON.stringify($l(), null, 2)}
 `), null;
   const o = await Ll(r, t), a = async () => {
     await o.stop(), process.exit(0);
@@ -7380,9 +7410,9 @@ function ql(e, t) {
 }
 function Bl(e, t) {
   if (!(e === void 0 || e === ""))
-    return ie(e, "", t);
+    return ae(e, "", t);
 }
-function ie(e, t, n) {
+function ae(e, t, n) {
   const r = e === void 0 ? t : e;
   if (!r.trim())
     throw new Error(`${n} must be a non-empty string.`);
@@ -7416,8 +7446,8 @@ Fl() && Ml().catch((e) => {
 export {
   Hn as buildTaskTimeAgentBridgeLaunchUrl,
   Rl as formatPairingInstructions,
-  $l as getTaskTimeAgentBridgeCliUsage,
-  Cl as getTaskTimeAgentBridgeManifest,
+  Cl as getTaskTimeAgentBridgeCliUsage,
+  $l as getTaskTimeAgentBridgeManifest,
   Nl as parseTaskTimeAgentBridgeCliOptions,
   Ml as runTaskTimeAgentBridgeCli,
   Ll as startTaskTimeAgentBridgeCli

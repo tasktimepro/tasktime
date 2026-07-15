@@ -15,6 +15,7 @@ import {
     cascadeDeleteClientCommand,
     cascadeDeleteProjectCommand,
     cascadeDeleteTaskCommand,
+    cancelInvoiceCommand,
     clearTimerCommand,
     completeTaskCommand,
     createClientCommand,
@@ -410,6 +411,63 @@ function createContext(): AgentCommandContext & {
             }
             invoices.delete(invoice.id);
         }),
+        commitInvoiceCancellation: vi.fn(async ({ operationId, invoice, desiredInvoice, application, createdAt }: any) => {
+            const existingOperation = readEntity<Record<string, any>>(invoiceBillingOperations.get(operationId));
+            const entryMaps: Array<Y.Map<string, unknown>> = [entries];
+            const years = typeof (store as any).getAvailableYears === 'function'
+                ? await (store as any).getAvailableYears()
+                : [];
+            for (const year of years) {
+                const map = await (store as any).loadEntriesForYear(year);
+                if (map && !entryMaps.includes(map)) entryMaps.push(map);
+            }
+            const locateEntry = (id: string) => entryMaps.find((map) => map.has(id));
+            const locateTask = (id: string) => tasks.has(id) ? tasks : archivedTasks;
+            const locateExpense = (id: string) => expenses.has(id) ? expenses : archivedExpenses;
+            const operation = existingOperation || {
+                version: 1,
+                operationId,
+                invoiceId: invoice.id,
+                kind: 'cancel',
+                state: 'complete',
+                invoice,
+                desiredInvoice,
+                application,
+                createdAt,
+                updatedAt: createdAt,
+                lastCompletedPhase: 'complete',
+            };
+
+            invoiceBillingOperations.set(operationId, objectToYMap({
+                ...operation,
+                state: 'complete',
+                lastCompletedPhase: 'complete',
+            }));
+            application.entriesToDelete.forEach((entry: any) => locateEntry(entry.id)?.delete(entry.id));
+            application.entriesToClear.forEach(({ entry, updates }: any) => {
+                const map = locateEntry(entry.id);
+                if (map) updateEntityFields(map as any, entry.id, updates);
+            });
+            application.expenseUpdatesToUnbill.forEach(({ id, updates }: any) => {
+                const map = locateExpense(id);
+                if (map.has(id)) updateEntityFields(map as any, id, updates);
+            });
+            [...application.quotedTaskUpdates, ...application.taskCutoffUpdates].forEach(({ id, updates }: any) => {
+                const map = locateTask(id);
+                if (map.has(id)) updateEntityFields(map as any, id, updates);
+            });
+            invoices.set(desiredInvoice.id, objectToYMap(desiredInvoice));
+
+            return {
+                invoice: desiredInvoice,
+                operation: {
+                    ...operation,
+                    state: 'complete',
+                    lastCompletedPhase: 'complete',
+                },
+                alreadyApplied: Boolean(existingOperation),
+            };
+        }),
         getAllTimeEntries: () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean),
         getAllTasks: vi.fn(async () => [
             ...Array.from(tasks.values()).map((value) => readEntity(value)).filter(Boolean),
@@ -419,7 +477,7 @@ function createContext(): AgentCommandContext & {
         loadAllTimeEntries: vi.fn(async () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean)),
         getAllInvoices: vi.fn(async () => Array.from(invoices.values()).map((value) => readEntity(value)).filter(Boolean)),
         exportBackupData: vi.fn(async (options: Record<string, unknown> = {}) => ({
-            version: '1.4',
+            version: '1.5',
             exportDate: options.exportDate || '2026-06-25T12:00:00.000Z',
             backupType: options.backupType,
             projects: Array.from(projects.values()).map((value) => readEntity(value)).filter(Boolean),
@@ -4402,6 +4460,32 @@ describe('agent commands', () => {
             subtotal: 0,
             total: 100,
         }));
+        context.maps.invoices.set('invoice-open', objectToYMap({
+            id: 'invoice-open',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-OPEN',
+            date: '2026-06-25',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        }));
+        context.maps.invoices.set('invoice-canceled-query', objectToYMap({
+            id: 'invoice-canceled-query',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-CANCELED',
+            date: '2026-06-25',
+            status: 'canceled',
+            canceledAt: Date.parse('2026-06-26T12:00:00Z'),
+            cancellationReason: 'Duplicate',
+            items: [],
+            subtotal: 500,
+            total: 500,
+        }));
 
         expect(await getDashboardSummaryCommand(context)).toEqual(expect.objectContaining({
             projectCount: 1,
@@ -4599,6 +4683,25 @@ describe('agent commands', () => {
             total: 122,
             currency: 'USD',
         }));
+        context.maps.invoices.set('invoice-report-canceled', objectToYMap({
+            id: 'invoice-report-canceled',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            businessInfoId: 'business-report',
+            invoiceNumber: 'INV-REPORT-CANCELED',
+            date: '2026-06-16',
+            dueDate: '2026-06-21',
+            status: 'canceled',
+            canceledAt: Date.parse('2026-06-22T12:00:00Z'),
+            cancellationReason: 'Duplicate billing request',
+            items: [],
+            subtotal: 400,
+            tax: 88,
+            taxRate: 22,
+            total: 488,
+            currency: 'USD',
+        }));
         context.maps.expenses.set('expense-report', objectToYMap({
             id: 'expense-report',
             title: 'Report expense',
@@ -4643,7 +4746,7 @@ describe('agent commands', () => {
             }),
             preferredCurrency: 'USD',
             counts: expect.objectContaining({
-                invoices: 1,
+                invoices: 2,
                 issuedInvoices: 1,
                 expenses: 1,
                 timeEntries: 1,
@@ -4669,6 +4772,13 @@ describe('agent commands', () => {
                         total: 122,
                         status: 'overdue',
                     }),
+                    expect.objectContaining({
+                        invoiceNumber: 'INV-REPORT-CANCELED',
+                        total: 488,
+                        status: 'canceled',
+                        canceledAt: expect.any(String),
+                        cancellationReason: 'Duplicate billing request',
+                    }),
                 ],
                 expenses: [
                     expect.objectContaining({
@@ -4683,6 +4793,30 @@ describe('agent commands', () => {
                         uninvoicedHoursMs: 7_200_000,
                     }),
                 ],
+            }),
+        }));
+
+        const canceledOnly = await getReportSummaryCommand(context, {
+            period: 'custom',
+            customStart: '2026-06-01',
+            customEnd: '2026-06-30',
+            invoiceStatus: 'canceled',
+            includeRows: true,
+        });
+        expect(canceledOnly).toEqual(expect.objectContaining({
+            counts: expect.objectContaining({
+                invoices: 1,
+                issuedInvoices: 0,
+                outstandingInvoices: 0,
+            }),
+            totalsByCurrency: expect.objectContaining({
+                revenueIssued: {},
+                outstanding: {},
+                outputTax: {},
+            }),
+            rows: expect.objectContaining({
+                invoices: [expect.objectContaining({ invoiceNumber: 'INV-REPORT-CANCELED' })],
+                outstanding: [],
             }),
         }));
 
@@ -4902,6 +5036,22 @@ describe('agent commands', () => {
             total: 105,
             currency: 'USD',
         }));
+        context.maps.invoices.set('invoice-accountant-pack-canceled', objectToYMap({
+            id: 'invoice-accountant-pack-canceled',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-PACK-CANCELED',
+            date: '2026-06-16',
+            status: 'canceled',
+            canceledAt: Date.parse('2026-06-20T12:00:00Z'),
+            cancellationReason: 'Duplicate',
+            items: [],
+            subtotal: 200,
+            tax: 10,
+            total: 210,
+            currency: 'USD',
+        }));
         context.maps.entries.set('entry-accountant-pack', objectToYMap({
             id: 'entry-accountant-pack',
             taskId: task.id,
@@ -4931,6 +5081,11 @@ describe('agent commands', () => {
             [expect.objectContaining({ id: 'client-1' })],
             [expect.objectContaining({ id: 'asset-accountant-pack' })],
         );
+        expect(pdfMocks.getCurrentInvoiceHtmlContent).not.toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'invoice-accountant-pack-canceled' }),
+            expect.anything(),
+            expect.anything(),
+        );
         expect(pdfMocks.generatePDFBlob).toHaveBeenCalledTimes(2);
         expect(zipMocks.downloadZipFile).toHaveBeenCalledWith(
             'agent-accountant-pack.zip',
@@ -4941,6 +5096,23 @@ describe('agent commands', () => {
                 expect.objectContaining({ filename: 'monthly-summary.pdf' }),
                 expect.objectContaining({ filename: 'invoice-INV-PACK.pdf' }),
             ]),
+        );
+
+        const canceledOnly = await exportAccountantPackCommand(context, {
+            period: 'custom',
+            customStart: '2026-06-01',
+            customEnd: '2026-06-30',
+            invoiceStatus: 'canceled',
+            filename: 'agent-accountant-pack-canceled',
+        });
+        expect(canceledOnly).toEqual(expect.objectContaining({
+            filename: 'agent-accountant-pack-canceled.zip',
+            invoicePdfCount: 1,
+        }));
+        expect(pdfMocks.getCurrentInvoiceHtmlContent).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'invoice-accountant-pack-canceled', invoiceNumber: 'INV-PACK-CANCELED' }),
+            expect.anything(),
+            expect.anything(),
         );
 
         await expect(executeAgentCommand(context, 'export_accountant_pack', {
@@ -4981,7 +5153,7 @@ describe('agent commands', () => {
 
         expect(exported).toEqual({
             filename: 'agent-backup.json',
-            version: '1.4',
+            version: '1.5',
             exportDate: '2026-06-25T12:00:00.000Z',
             refreshFromCloud: true,
             counts: expect.objectContaining({
@@ -6554,13 +6726,428 @@ describe('agent commands', () => {
         }));
         expect(readStored<Record<string, unknown>>(context.maps.invoices, 'invoice-unpaid')).not.toHaveProperty('paymentCurrencySnapshot');
 
+        context.maps.invoices.set('invoice-unpaid-dispatch', objectToYMap({
+            id: 'invoice-unpaid-dispatch',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            invoiceNumber: 'INV-UNPAID-DISPATCH',
+            date: '2026-06-01',
+            dueDate: '2026-06-10',
+            status: 'paid',
+            paidAt: Date.parse('2026-06-12T12:00:00Z'),
+            items: [],
+            subtotal: 100,
+            total: 100,
+            currency: 'USD',
+        }));
+
         await expect(executeAgentCommand(context, 'mark_invoice_unpaid', {
-            invoiceId: 'invoice-unpaid',
+            invoiceId: 'invoice-unpaid-dispatch',
             confirmUnpaid: true,
         })).resolves.toEqual(expect.objectContaining({
             ok: true,
             command: 'mark_invoice_unpaid',
         }));
+
+        context.maps.invoices.set('invoice-already-unpaid', objectToYMap({
+            id: 'invoice-already-unpaid',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            invoiceNumber: 'INV-ALREADY-UNPAID',
+            date: '2026-06-01',
+            status: 'sent',
+            items: [],
+            subtotal: 100,
+            total: 100,
+            currency: 'USD',
+        }));
+
+        expect(() => markInvoiceUnpaidCommand(context, {
+            invoiceId: 'invoice-already-unpaid',
+            confirmUnpaid: true,
+        })).toThrow(/Only paid invoices/);
+        expect(readStored<Record<string, unknown>>(context.maps.invoices, 'invoice-already-unpaid')).toEqual(
+            expect.objectContaining({ status: 'sent' })
+        );
+    });
+
+    it('cancels finalized unpaid invoices while retaining their audit identity and releasing only owned source claims', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'billing']);
+        context.now = () => Date.parse('2026-06-26T12:00:00Z');
+        const historicalDoc = new Y.Doc();
+        const historicalEntries = historicalDoc.getMap('timeEntries');
+        (context.store as any).getAvailableYears = vi.fn(async () => [2025]);
+        (context.store as any).loadEntriesForYear = vi.fn(async () => historicalEntries);
+        context.maps.projects.set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Project One',
+            hourlyRate: 100,
+            preferredClientId: 'client-1',
+            invoiceIds: ['invoice-cancel'],
+        }));
+        createTaskCommand(context, {
+            id: 'task-cancel',
+            title: 'Cancellation task',
+            projectId: 'project-1',
+            billable: true,
+            lastBilledAt: Date.parse('2026-06-12T12:00:00Z'),
+        });
+        createTaskCommand(context, {
+            id: 'task-quoted-cancel',
+            title: 'Cancellation quoted task',
+            projectId: 'project-1',
+            billable: true,
+            lastBilledAt: Date.parse('2026-06-12T12:00:00Z'),
+            estimatedFlatAmount: null,
+            quotedAmountBilling: {
+                invoiceId: 'invoice-cancel',
+                billedAt: Date.parse('2026-06-25T12:00:00Z'),
+                total: 500,
+            },
+        });
+        context.maps.entries.set('entry-cancel-active', objectToYMap({
+            id: 'entry-cancel-active',
+            taskId: 'task-cancel',
+            start: Date.parse('2026-06-12T10:00:00Z'),
+            end: Date.parse('2026-06-12T12:00:00Z'),
+            billedAt: Date.parse('2026-06-25T12:00:00Z'),
+            billedInvoiceId: 'invoice-cancel',
+            billedHourlyRate: 100,
+        }));
+        context.maps.entries.set('entry-cancel-adjustment', objectToYMap({
+            id: 'entry-cancel-adjustment',
+            taskId: 'task-cancel',
+            start: Date.parse('2026-06-25T11:00:00Z'),
+            end: Date.parse('2026-06-25T12:00:00Z'),
+            source: 'invoice-adjustment',
+            billedAt: Date.parse('2026-06-25T12:00:00Z'),
+            billedInvoiceId: 'invoice-cancel',
+            billedHourlyRate: 100,
+        }));
+        context.maps.entries.set('entry-other-invoice', objectToYMap({
+            id: 'entry-other-invoice',
+            taskId: 'task-cancel',
+            start: Date.parse('2026-06-13T10:00:00Z'),
+            end: Date.parse('2026-06-13T12:00:00Z'),
+            billedAt: Date.parse('2026-06-25T12:00:00Z'),
+            billedInvoiceId: 'invoice-other',
+            billedHourlyRate: 100,
+        }));
+        historicalEntries.set('entry-cancel-historical', objectToYMap({
+            id: 'entry-cancel-historical',
+            taskId: 'task-cancel',
+            start: Date.parse('2025-06-12T10:00:00Z'),
+            end: Date.parse('2025-06-12T12:00:00Z'),
+            billedAt: Date.parse('2026-06-25T12:00:00Z'),
+            billedInvoiceId: 'invoice-cancel',
+            billedHourlyRate: 100,
+        }));
+        context.maps.expenses.set('expense-cancel', objectToYMap({
+            id: 'expense-cancel',
+            title: 'Cancellation expense',
+            date: '2026-06-12',
+            amount: 40,
+            currency: 'USD',
+            isPersonal: false,
+            billable: true,
+            billingStatus: 'billed',
+            paymentStatus: 'unpaid',
+            clientId: 'client-1',
+            projectId: 'project-1',
+            invoiceId: 'invoice-cancel',
+            billedAt: Date.parse('2026-06-25T12:00:00Z'),
+        }));
+        context.maps.expenses.set('expense-other-invoice', objectToYMap({
+            id: 'expense-other-invoice',
+            title: 'Other invoice expense',
+            date: '2026-06-12',
+            amount: 50,
+            currency: 'USD',
+            isPersonal: false,
+            billable: true,
+            billingStatus: 'billed',
+            paymentStatus: 'unpaid',
+            clientId: 'client-1',
+            projectId: 'project-1',
+            invoiceId: 'invoice-other',
+            billedAt: Date.parse('2026-06-25T12:00:00Z'),
+        }));
+        context.maps.invoiceTemplates.set('template-cancel', objectToYMap({
+            id: 'template-cancel',
+            name: 'Cancellation template',
+            invoiceNumberFormat: 'INV-{sequential}',
+            useSequentialNumbers: true,
+            currentSequentialNumber: 8,
+        }));
+        context.maps.invoices.set('invoice-cancel', objectToYMap({
+            id: 'invoice-cancel',
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            templateId: 'template-cancel',
+            invoiceNumber: 'INV-7',
+            date: '2026-06-25',
+            dueDate: '2026-07-25',
+            status: 'sent',
+            items: [],
+            subtotal: 740,
+            total: 740,
+            tasks: [{ id: 'task-cancel' }, { id: 'task-quoted-cancel', useFlatRate: true }],
+            billingStateSnapshot: {
+                version: 1,
+                capturedAt: Date.parse('2026-06-25T12:00:00Z'),
+                taskLastBilledAt: {
+                    'task-cancel': Date.parse('2025-01-01T00:00:00Z'),
+                    'task-quoted-cancel': null,
+                },
+            },
+        }));
+
+        await expect(cancelInvoiceCommand(context, {
+            invoiceId: 'invoice-cancel',
+            reason: 'Customer request',
+            confirmCancel: false,
+            confirmationText: 'INV-7',
+        })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+        await expect(cancelInvoiceCommand(context, {
+            invoiceId: 'invoice-cancel',
+            reason: 'Customer request',
+            confirmCancel: true,
+            confirmationText: ' INV-7 ',
+        })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+
+        const result = await cancelInvoiceCommand(context, {
+            invoiceId: 'invoice-cancel',
+            reason: '  Customer requested cancellation  ',
+            confirmCancel: true,
+            confirmationText: 'INV-7',
+            idempotencyKey: 'cancel-1',
+        });
+        const repeated = await cancelInvoiceCommand(context, {
+            invoiceId: 'invoice-cancel',
+            reason: 'Customer requested cancellation',
+            confirmCancel: true,
+            confirmationText: 'INV-7',
+            idempotencyKey: 'cancel-1',
+        });
+
+        expect(repeated).toBe(result);
+        expect(result).toEqual(expect.objectContaining({
+            invoice: expect.objectContaining({
+                id: 'invoice-cancel',
+                invoiceNumber: 'INV-7',
+                status: 'canceled',
+                canceledAt: Date.parse('2026-06-26T12:00:00Z'),
+                cancellationReason: 'Customer requested cancellation',
+            }),
+            releasedTimeEntryCount: 2,
+            deletedAdjustmentCount: 1,
+            releasedExpenseCount: 1,
+            releasedQuotedTaskCount: 1,
+            restoredTaskCutoffCount: 2,
+            retainedProjectLinkCount: 1,
+            retainedInvoiceNumber: true,
+            alreadyApplied: false,
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.projects, 'project-1')).toEqual(expect.objectContaining({
+            invoiceIds: ['invoice-cancel'],
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.invoiceTemplates, 'template-cancel')).toEqual(expect.objectContaining({
+            currentSequentialNumber: 8,
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.entries, 'entry-cancel-active')).toEqual(expect.objectContaining({
+            billedAt: null,
+            billedInvoiceId: null,
+            billedHourlyRate: null,
+        }));
+        expect(readStored<Record<string, unknown>>(historicalEntries, 'entry-cancel-historical')).toEqual(expect.objectContaining({
+            billedInvoiceId: null,
+        }));
+        expect(context.maps.entries.has('entry-cancel-adjustment')).toBe(false);
+        expect(readStored<Record<string, unknown>>(context.maps.entries, 'entry-other-invoice')).toEqual(expect.objectContaining({
+            billedInvoiceId: 'invoice-other',
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.expenses, 'expense-cancel')).toEqual(expect.objectContaining({
+            billingStatus: 'unbilled',
+            invoiceId: null,
+            billedAt: null,
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.expenses, 'expense-other-invoice')).toEqual(expect.objectContaining({
+            billingStatus: 'billed',
+            invoiceId: 'invoice-other',
+        }));
+        expect(readStored<Record<string, unknown>>(context.maps.tasks, 'task-quoted-cancel')).toEqual(expect.objectContaining({
+            estimatedFlatAmount: 500,
+            quotedAmountBilling: null,
+        }));
+
+        context.idempotency?.clear();
+        await expect(cancelInvoiceCommand(context, {
+            invoiceId: 'invoice-cancel',
+            reason: 'Different reason',
+            confirmCancel: true,
+            confirmationText: 'INV-7',
+            idempotencyKey: 'cancel-1',
+        })).rejects.toMatchObject({ code: 'CONFLICT' });
+        context.idempotency?.clear();
+        const replayedAfterSessionLoss = await cancelInvoiceCommand(context, {
+            invoiceId: 'invoice-cancel',
+            reason: 'Customer requested cancellation',
+            confirmCancel: true,
+            confirmationText: 'INV-7',
+            idempotencyKey: 'cancel-1',
+        });
+        expect(replayedAfterSessionLoss).toEqual(expect.objectContaining({
+            retainedInvoiceNumber: true,
+            alreadyApplied: true,
+        }));
+    });
+
+    it('rejects cancellation of draft or paid invoices and keeps canceled invoices terminal', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'billing']);
+        const baseInvoice = {
+            projectId: 'project-1',
+            projectIds: ['project-1'],
+            clientId: 'client-1',
+            date: '2026-06-25',
+            items: [],
+            subtotal: 100,
+            total: 100,
+        };
+
+        context.maps.invoices.set('invoice-draft-cancel', objectToYMap({
+            ...baseInvoice,
+            id: 'invoice-draft-cancel',
+            invoiceNumber: 'INV-DRAFT',
+            status: 'draft',
+        }));
+        context.maps.invoices.set('invoice-paid-cancel', objectToYMap({
+            ...baseInvoice,
+            id: 'invoice-paid-cancel',
+            invoiceNumber: 'INV-PAID-CANCEL',
+            status: 'paid',
+            paidAt: 100,
+        }));
+        context.maps.invoices.set('invoice-terminal-cancel', objectToYMap({
+            ...baseInvoice,
+            id: 'invoice-terminal-cancel',
+            invoiceNumber: 'INV-CANCELED',
+            status: 'canceled',
+            canceledAt: 100,
+            cancellationReason: 'Duplicate',
+        }));
+
+        for (const invoiceId of ['invoice-draft-cancel', 'invoice-paid-cancel']) {
+            const invoice = readStored<Record<string, unknown>>(context.maps.invoices, invoiceId)!;
+            await expect(cancelInvoiceCommand(context, {
+                invoiceId,
+                reason: 'Cannot use this invoice',
+                confirmCancel: true,
+                confirmationText: invoice.invoiceNumber as string,
+            })).rejects.toMatchObject({ code: 'CONFLICT' });
+        }
+
+        expect(() => markInvoicePaidCommand(context, {
+            invoiceId: 'invoice-terminal-cancel',
+            confirmPaid: true,
+        })).toThrow(/Canceled invoices/);
+        expect(() => markInvoiceUnpaidCommand(context, {
+            invoiceId: 'invoice-terminal-cancel',
+            confirmUnpaid: true,
+        })).toThrow(/Canceled invoices/);
+        expect(listAgentCommandDefinitions(context)).toContainEqual(expect.objectContaining({
+            name: 'cancel_invoice',
+            scopes: ['read', 'write', 'billing'],
+            requiresApproval: true,
+        }));
+    });
+
+    it('sanitizes cancellation history and commit failures', async () => {
+        const createEligibleContext = () => {
+            const context = createContext();
+            context.permissions = new Set(['read', 'write', 'billing']);
+            context.maps.invoices.set('invoice-cancel-failure', objectToYMap({
+                id: 'invoice-cancel-failure',
+                projectId: 'project-1',
+                projectIds: ['project-1'],
+                clientId: 'client-1',
+                invoiceNumber: 'INV-FAILURE',
+                date: '2026-06-25',
+                dueDate: '2026-07-25',
+                status: 'sent',
+                items: [],
+                subtotal: 100,
+                total: 100,
+            }));
+            return context;
+        };
+        const input = {
+            invoiceId: 'invoice-cancel-failure',
+            reason: 'Duplicate invoice',
+            confirmCancel: true,
+            confirmationText: 'INV-FAILURE',
+        };
+        const historyContext = createEligibleContext();
+        (historyContext.store as any).getAvailableYears = vi.fn(async () => {
+            throw new Error('private entries-2024 storage detail');
+        });
+        (historyContext.store as any).loadEntriesForYear = vi.fn();
+
+        const historyError = await cancelInvoiceCommand(historyContext, input).catch((error) => error);
+
+        expect(historyError).toMatchObject({
+            code: 'UNAVAILABLE',
+            details: { invoiceId: 'invoice-cancel-failure', retryable: true },
+        });
+        expect(JSON.stringify(historyError)).not.toContain('entries-2024');
+
+        const commitContext = createEligibleContext();
+        (commitContext.store.commitInvoiceCancellation as any).mockRejectedValueOnce(
+            new Error('private journal storage detail')
+        );
+
+        const commitError = await cancelInvoiceCommand(commitContext, input).catch((error) => error);
+
+        expect(commitError).toMatchObject({
+            code: 'UNAVAILABLE',
+            details: { invoiceId: 'invoice-cancel-failure', retryable: true },
+        });
+        expect(JSON.stringify(commitError)).not.toContain('journal storage');
+
+        const conflictContext = createEligibleContext();
+        (conflictContext.store.commitInvoiceCancellation as any).mockRejectedValueOnce(
+            new Error('billing operation conflict private-key-123')
+        );
+
+        const conflictError = await cancelInvoiceCommand(conflictContext, input).catch((error) => error);
+
+        expect(conflictError).toMatchObject({
+            code: 'CONFLICT',
+            details: { invoiceId: 'invoice-cancel-failure' },
+        });
+        expect(JSON.stringify(conflictError)).not.toContain('private-key-123');
+
+        const paymentRaceContext = createEligibleContext();
+        (paymentRaceContext.store.commitInvoiceCancellation as any).mockImplementationOnce(async () => {
+            updateEntityFields(paymentRaceContext.maps.invoices as any, 'invoice-cancel-failure', {
+                status: 'paid',
+                paidAt: 500,
+            });
+            throw new Error('Paid invoices cannot be canceled.');
+        });
+
+        const paymentRaceError = await cancelInvoiceCommand(paymentRaceContext, input).catch((error) => error);
+
+        expect(paymentRaceError).toMatchObject({
+            code: 'CONFLICT',
+            details: { invoiceId: 'invoice-cancel-failure' },
+        });
+        expect(readStored<Record<string, unknown>>(paymentRaceContext.maps.invoices, 'invoice-cancel-failure')).toEqual(
+            expect.objectContaining({ status: 'paid', paidAt: 500 })
+        );
     });
 
     it('undoes the latest unpaid invoice with UI-parity billing reversal side effects', async () => {

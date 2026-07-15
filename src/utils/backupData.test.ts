@@ -119,7 +119,7 @@ describe('backupData', () => {
         expect(parsed.expenseCategories).toEqual([]);
     });
 
-    it.each(['1.0', '1.1', '1.3', '1.4'])('imports advertised backup version %s', (version) => {
+    it.each(['1.0', '1.1', '1.3', '1.4', '1.5'])('imports advertised backup version %s', (version) => {
         const parsed = parseBackupImportJson(JSON.stringify({
             version,
             exportDate: '2024-01-02T00:00:00.000Z',
@@ -225,6 +225,77 @@ describe('backupData', () => {
             projects: [],
             invoices: [{ id: 'invoice-1' }],
         }))).toThrow('Invalid invoices entity in backup invoice invoice-1');
+    });
+
+    it('round-trips canceled invoices in version 1.5 while retaining project relationships and face value', () => {
+        const canceledAt = Date.parse('2026-07-14T09:30:00Z');
+        const payload = createBackupPayload({
+            ...baseInput,
+            exportDate: '2026-07-14T10:00:00.000Z',
+            projects: [{
+                id: 'project-canceled',
+                title: 'Canceled invoice project',
+                invoiceIds: ['invoice-canceled'],
+            }],
+            clients: [{ id: 'client-canceled', title: 'Canceled invoice client' }],
+            invoices: [{
+                id: 'invoice-canceled',
+                projectId: 'project-canceled',
+                projectIds: ['project-canceled'],
+                clientId: 'client-canceled',
+                invoiceNumber: 'INV-CANCELED-1',
+                date: '2026-07-01',
+                status: 'canceled',
+                canceledAt,
+                cancellationReason: 'Duplicate invoice',
+                items: [],
+                subtotal: 100,
+                tax: 20,
+                total: 120,
+            }],
+        });
+        const parsed = parseBackupImportJson(JSON.stringify(payload));
+
+        expect(parsed.version).toBe('1.5');
+        expect(parsed.projects[0].invoiceIds).toEqual(['invoice-canceled']);
+        expect(parsed.invoices).toEqual([
+            expect.objectContaining({
+                id: 'invoice-canceled',
+                invoiceNumber: 'INV-CANCELED-1',
+                status: 'canceled',
+                canceledAt,
+                cancellationReason: 'Duplicate invoice',
+                subtotal: 100,
+                tax: 20,
+                total: 120,
+            }),
+        ]);
+    });
+
+    it('rejects malformed canceled metadata before returning a replacement payload', () => {
+        const buildCanceledBackup = (invoiceUpdates: Record<string, unknown>) => JSON.stringify({
+            version: '1.5',
+            projects: [{ id: 'project-canceled', title: 'Canceled project', invoiceIds: ['invoice-canceled'] }],
+            clients: [{ id: 'client-canceled', title: 'Canceled client' }],
+            invoices: [{
+                id: 'invoice-canceled',
+                projectId: 'project-canceled',
+                clientId: 'client-canceled',
+                invoiceNumber: 'INV-CANCELED',
+                date: '2026-07-01',
+                status: 'canceled',
+                canceledAt: 100,
+                cancellationReason: 'Duplicate',
+                items: [],
+                subtotal: 100,
+                total: 100,
+                ...invoiceUpdates,
+            }],
+        });
+
+        expect(() => parseBackupImportJson(buildCanceledBackup({ canceledAt: undefined }))).toThrow(/canceledAt/);
+        expect(() => parseBackupImportJson(buildCanceledBackup({ cancellationReason: '   ' }))).toThrow(/cancellationReason/);
+        expect(() => parseBackupImportJson(buildCanceledBackup({ cancellationReason: 'x'.repeat(501) }))).toThrow(/cancellationReason/);
     });
 
     it('counts imported collections with missing arrays treated as empty', () => {

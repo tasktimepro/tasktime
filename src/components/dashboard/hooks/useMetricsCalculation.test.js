@@ -100,6 +100,15 @@ describe('useMetricsCalculation', () => {
                 { date: '2026-01-10', total: 120, currency: 'USD', status: 'paid' },
                 { date: '2026-01-11', total: 80, currency: 'USD', status: 'sent', dueDate: '2026-01-25' },
                 { date: '2026-01-12', total: 90, currency: 'USD', status: 'sent', dueDate: '2026-01-01' },
+                {
+                    date: '2026-01-13',
+                    total: 500,
+                    currency: 'USD',
+                    status: 'canceled',
+                    dueDate: '2026-01-01',
+                    canceledAt: baseDate.getTime(),
+                    cancellationReason: 'Duplicate invoice',
+                },
             ],
             clients: [],
             preferredCurrency: 'USD',
@@ -113,6 +122,7 @@ describe('useMetricsCalculation', () => {
             pastDueTotal: 90,
             hadConversionError: false,
         })
+        expect(result.current.thisMonthMetrics.outstandingInvoices).toEqual({ USD: 170 })
     })
 
     it('excludes non-billable tasks from unbilled totals', () => {
