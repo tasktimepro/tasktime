@@ -1108,7 +1108,8 @@ export class ManifestManager {
     private async fetchUpload(
         url: string,
         method: 'POST' | 'PATCH',
-        body: FormData,
+        body: BodyInit,
+        contentType?: string,
         authRetried = false,
     ): Promise<Response> {
         const controller = new AbortController();
@@ -1119,7 +1120,9 @@ export class ManifestManager {
             const authHeaders = await this.getAuthHeaders(authRetried);
             response = await fetch(url, {
                 method,
-                headers: authHeaders,
+                headers: contentType
+                    ? { ...authHeaders, 'Content-Type': contentType }
+                    : authHeaders,
                 body,
                 signal: controller.signal,
                 cache: 'no-store',
@@ -1143,11 +1146,44 @@ export class ManifestManager {
             const driveError = await ManifestManager.normalizeDriveError(response);
             if (response.status === 401 || (response.status === 403 && ManifestManager.isPermissionFailure(driveError))) {
                 this.tokenProvider?.clearToken();
-                return this.fetchUpload(url, method, body, true);
+                return this.fetchUpload(url, method, body, contentType, true);
             }
         }
 
         return response;
+    }
+
+    /**
+     * Build the standards-defined Drive multipart body without FormData.
+     *
+     * WebKit can serialize a JSON Blob appended to FormData as an empty part.
+     * Keeping this direct-only avoids changing the established Worker proxy
+     * wire format while giving every supported direct browser the same
+     * `multipart/related` representation Google documents.
+     */
+    private createDirectMultipartBody(metadata: Record<string, unknown>, blob: Blob): {
+        body: Blob;
+        contentType: string;
+    } {
+        const boundary = `tasktime-${crypto.randomUUID()}`;
+        const contentType = `multipart/related; boundary=${boundary}`;
+        const fileType = blob.type || 'application/octet-stream';
+        const prefix = [
+            `--${boundary}`,
+            'Content-Type: application/json; charset=UTF-8',
+            '',
+            JSON.stringify(metadata),
+            `--${boundary}`,
+            `Content-Type: ${fileType}`,
+            '',
+            '',
+        ].join('\r\n');
+        const suffix = `\r\n--${boundary}--\r\n`;
+
+        return {
+            body: new Blob([prefix, blob, suffix], { type: contentType }),
+            contentType,
+        };
     }
 
     private async throwUploadError(response: Response): Promise<never> {
@@ -1292,16 +1328,15 @@ export class ManifestManager {
             mimeType: blob.type,
             parents: ['appDataFolder'],
         };
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', blob);
+        const multipart = this.createDirectMultipartBody(metadata, blob);
 
         let response: Response;
         try {
             response = await this.fetchUpload(
                 `${DRIVE_UPLOAD_API}/files?uploadType=multipart`,
                 'POST',
-                form,
+                multipart.body,
+                multipart.contentType,
             );
         } catch (error) {
             if (error instanceof DriveConnectivityError) {
@@ -1346,21 +1381,29 @@ export class ManifestManager {
             mimeType: blob.type,
         };
 
-        const form = new FormData();
-        form.append(
-            'metadata',
-            new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-        );
-        form.append('file', blob);
-
         const uploadUrl = this.useWorker
             ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files/${fileId}?uploadType=multipart&fields=modifiedTime`
             : `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=multipart&fields=modifiedTime`;
+        const multipart = this.useWorker ? null : this.createDirectMultipartBody(metadata, blob);
+        const form = this.useWorker ? new FormData() : null;
+
+        if (form) {
+            form.append(
+                'metadata',
+                new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+            );
+            form.append('file', blob);
+        }
 
         let response: Response;
 
         try {
-            response = await this.fetchUpload(uploadUrl, 'PATCH', form);
+            response = await this.fetchUpload(
+                uploadUrl,
+                'PATCH',
+                multipart?.body ?? form!,
+                multipart?.contentType,
+            );
         } catch (error) {
             if (
                 error instanceof AuthorizationError

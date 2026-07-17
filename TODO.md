@@ -18,7 +18,7 @@
     [ ] MCP.so
 
 [ ] Drive worker sync updates: tasktime-infra/docs/todo/direct-google-drive-sync-implementation-plan.md
-    [ ] Make sure to update all the related docs that mention the privacy related clause that we had before regarding how things worked - because this is now much better setup so we actually never see the drive requests and should be an advantage in words, not what we have now - which is mentioned in multiple places throughout, including for agents/packages/blog posts - please double check and make sure we're now safe with these wordings publically too
+    [x] Update public privacy/terms/architecture wording: current compatible PWAs send routine Drive file requests directly to Google; the edge service keeps OAuth/token control-plane duties and the proxy remains only for old clients and rollback.
     [ ] Also since now multiple request checks don't affect the worker free tier counts, we might as well increase the auto-sync behaviour to be a bit more agressive if that would improve the experience - maybe even the notes can trigger a sync now instead of the manual sync now button
 
 [x] Invoice cancellation: tasktime-infra/docs/todo/invoice-cancellation-implementation-plan.md

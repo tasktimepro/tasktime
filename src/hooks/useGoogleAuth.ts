@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import { APP_VERSION } from '@/constants/app';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { driveAccessTokenProvider } from '@/stores/yjs/providers/DriveAccessTokenProvider';
 import {
@@ -391,7 +392,10 @@ export const useGoogleAuth = () => {
             try {
                 const response = await fetch(SYNC_WORKER_CONFIG.endpoints.authStatus, {
                     method: 'GET',
-                    headers: { 'X-Session-Id': session.sessionId },
+                    headers: {
+                        'X-Session-Id': session.sessionId,
+                        'X-TaskTime-App-Version': APP_VERSION,
+                    },
                     cache: 'no-store',
                     credentials: 'omit',
                     referrerPolicy: 'no-referrer',

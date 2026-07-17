@@ -6,6 +6,7 @@ import {
     disconnectDriveFromAccount,
     editProjectFromList,
     getProjectCard,
+    installMockDirectDriveRoutes,
     installMockDriveRoutes,
     openProjectDashboard,
     projectsHeadingName,
@@ -14,6 +15,44 @@ import {
 } from './helpers/tasktime.js';
 
 test.describe('Cloud sync smoke', () => {
+    test('uploads through the direct Google transport without falling back to the Worker proxy', async ({ page }) => {
+        const projectTitle = `Playwright Direct Project ${Date.now()}`;
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
+        const failedRequests = [];
+
+        page.on('requestfailed', (request) => {
+            failedRequests.push(`${request.url()}: ${request.failure()?.errorText || 'unknown error'}`);
+        });
+
+        await installMockDirectDriveRoutes(page, driveFixture);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-direct-session-${Date.now()}`,
+            userId: 'playwright-direct-user',
+            email: 'playwright-direct@example.com',
+        });
+
+        await page.reload();
+        await expect.poll(() => driveFixture.statusRequestCount()).toBeGreaterThan(0);
+        await expect.poll(() => driveFixture.tokenRequestCount()).toBeGreaterThan(0);
+        expect(failedRequests).toEqual([]);
+        await expect.poll(() => driveFixture.directRequestCount()).toBeGreaterThan(0);
+
+        await createPersonalProject(page, projectTitle);
+        await syncNowFromAccount(page);
+
+        await expect.poll(() => driveFixture.directUploads().length).toBeGreaterThan(0);
+        expect(driveFixture.directRequestCount()).toBeGreaterThan(0);
+        expect(driveFixture.proxyRequestCount()).toBe(0);
+        expect(driveFixture.directUploads().some(({ method }) => method === 'POST')).toBe(true);
+        expect(driveFixture.directUploads().some(({ method }) => method === 'PATCH')).toBe(true);
+        expect(driveFixture.directUploads().every(({ contentType }) => (
+            contentType.startsWith('multipart/related; boundary=tasktime-')
+        ))).toBe(true);
+    });
+
     test('pulls remote data on first manual restore when local state is pristine', async ({ page }) => {
         const projectTitle = `Playwright Remote Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({

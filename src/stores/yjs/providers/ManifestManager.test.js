@@ -358,8 +358,15 @@ describe('ManifestManager', () => {
 
         expect(fetchMock.mock.calls[0][0]).toContain('/files/generateIds?')
         expect(fetchMock.mock.calls[1][0]).toContain('/upload/drive/v3/files?uploadType=multipart')
-        const metadataPart = fetchMock.mock.calls[1][1].body.get('metadata')
-        await expect(readBlob(metadataPart)).resolves.toContain('"id":"generated-id"')
+        const upload = fetchMock.mock.calls[1][1]
+        expect(upload.headers).toEqual(expect.objectContaining({
+            'Content-Type': expect.stringMatching(/^multipart\/related; boundary=tasktime-/),
+        }))
+        const body = await readBlob(upload.body)
+        expect(body).toContain('"id":"generated-id"')
+        expect(body).toMatch(
+            /Content-Type: application\/octet-stream\r\n\r\npayload\r\n--tasktime-/,
+        )
     })
 
     it('reconciles an ambiguous direct create by the same generated ID without replaying the upload', async () => {
@@ -408,7 +415,7 @@ describe('ManifestManager', () => {
 
         const uploads = fetchMock.mock.calls.filter(([url]) => String(url).includes('/upload/'))
         expect(uploads).toHaveLength(2)
-        const metadata = await Promise.all(uploads.map(([, options]) => readBlob(options.body.get('metadata'))))
+        const metadata = await Promise.all(uploads.map(([, options]) => readBlob(options.body)))
         expect(metadata.every((value) => value.includes('"id":"same-id"'))).toBe(true)
     })
 
@@ -432,6 +439,9 @@ describe('ManifestManager', () => {
                 cache: 'no-store',
                 credentials: 'omit',
                 referrerPolicy: 'no-referrer',
+                headers: expect.objectContaining({
+                    'Content-Type': expect.stringMatching(/^multipart\/related; boundary=tasktime-/),
+                }),
             }),
         )
     })

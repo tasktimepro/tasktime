@@ -1,7 +1,7 @@
 {
   "name": "tasktime",
   "private": true,
-    "version": "1.3.0",
+    "version": "1.3.1",
   "license": "AGPL-3.0-only",
   "type": "module",
   "bin": {
@@ -24,8 +24,9 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test --workers=2 e2e/*.smoke.spec.js",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:smoke": "playwright test --workers=2 e2e/*.smoke.spec.js --project=chromium",
+    "test:e2e:drive-browsers": "playwright test --workers=2 e2e/sync.smoke.spec.js --grep \"uploads through the direct Google transport\"",
     "test:e2e:pwa:smoke": "npm run build && playwright test -c playwright.pwa.config.js",
     "release": "npm run lint && npm run typecheck && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run build",
     "release:agent": "npm run build:agent-bridge && npm run smoke:agent-bridge && npm run smoke:agent-bundles && npm run smoke:agent-live"

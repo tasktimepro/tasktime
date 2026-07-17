@@ -54,7 +54,8 @@ make lint                            # run ESLint
 make typecheck                       # run the repository-wide TypeScript check
 make test-run                        # run Vitest once
 make test-coverage                   # run Vitest with coverage
-make test-e2e-smoke                  # run Playwright smoke tests
+make test-e2e-smoke                  # run Playwright smoke tests in Chromium
+make test-e2e-drive-browsers         # run direct Drive smoke in Chromium, Firefox, and WebKit
 make build                           # build the app and public site
 make preview                         # build and preview production output
 make npm CMD="run build:agent-bridge" # build the agent bridge package
@@ -65,7 +66,7 @@ make npm CMD="run build:agent-bridge" # build the agent bridge package
 - React 19 and Vite for the app
 - Tailwind CSS, Radix, and shadcn-style UI primitives
 - Yjs CRDT documents with IndexedDB persistence
-- Optional Google Drive sync using a private edge OAuth/token service and a policy-selected direct or compatibility-proxy data path
+- Optional Google Drive sync using a private edge OAuth/token service and direct browser-to-Google Drive data path; a compatibility proxy remains for rollback and older installed clients
 - Astro for the public blog, agent docs, `llms.txt`, and sitemap output
 - Vitest for unit/integration tests and Playwright for browser smoke tests
 

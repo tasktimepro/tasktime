@@ -1,4 +1,5 @@
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import { APP_VERSION } from '@/constants/app';
 
 const DRIVE_APP_DATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const EARLY_EXPIRY_BUFFER_MS = 2 * 60 * 1000;
@@ -233,6 +234,7 @@ export class DriveAccessTokenProvider {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Session-Id': sessionId,
+                    'X-TaskTime-App-Version': APP_VERSION,
                 },
                 body: JSON.stringify({ forceRefresh }),
                 cache: 'no-store',

@@ -269,6 +269,8 @@ export function createStatefulDriveFixture(initialFixture) {
         ? Date.parse(initialFixture.modifiedTime)
         : Date.now();
     let nextFileId = 1;
+    let latestGeneratedId = null;
+    let responseHeaders = {};
 
     const touch = () => {
         const now = Date.now();
@@ -298,7 +300,7 @@ export function createStatefulDriveFixture(initialFixture) {
         }
 
         const created = {
-            id: `playwright-drive-file-${nextFileId++}`,
+            id: fileId || `playwright-drive-file-${nextFileId++}`,
             name,
             modifiedTime: state.modifiedTime,
         };
@@ -315,17 +317,31 @@ export function createStatefulDriveFixture(initialFixture) {
         const fileId = pathParts[pathParts.length - 1];
 
         if (request.method() === 'GET') {
+            if (url.pathname.endsWith('/generateIds')) {
+                const generatedId = `playwright-generated-file-${nextFileId++}`;
+                latestGeneratedId = generatedId;
+
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    headers: responseHeaders,
+                    body: JSON.stringify({ ids: [generatedId] }),
+                });
+                return;
+            }
+
             if (url.searchParams.get('alt') === 'media') {
                 const body = state.fileBodies.get(fileId);
 
                 if (!body) {
-                    await route.fulfill({ status: 404, body: 'Missing fixture file' });
+                    await route.fulfill({ status: 404, headers: responseHeaders, body: 'Missing fixture file' });
                     return;
                 }
 
                 await route.fulfill({
                     status: 200,
                     contentType: fileId.includes('manifest') ? 'application/json' : 'application/octet-stream',
+                    headers: responseHeaders,
                     body,
                 });
                 return;
@@ -337,6 +353,7 @@ export function createStatefulDriveFixture(initialFixture) {
                 await route.fulfill({
                     status: 200,
                     contentType: 'application/json',
+                    headers: responseHeaders,
                     body: JSON.stringify({ modifiedTime: targetFile?.modifiedTime || state.modifiedTime }),
                 });
                 return;
@@ -351,6 +368,7 @@ export function createStatefulDriveFixture(initialFixture) {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
+                headers: responseHeaders,
                 body: JSON.stringify({ files }),
             });
             return;
@@ -363,7 +381,7 @@ export function createStatefulDriveFixture(initialFixture) {
                 state.uploads.push(upload);
 
                 const savedFile = upsertFile({
-                    fileId: request.method() === 'PATCH' ? fileId : null,
+                    fileId: request.method() === 'PATCH' ? fileId : upload.metadata.id || null,
                     name: upload.metadata.name,
                     body: upload.fileBuffer,
                 });
@@ -371,6 +389,7 @@ export function createStatefulDriveFixture(initialFixture) {
                 await route.fulfill({
                     status: 200,
                     contentType: 'application/json',
+                    headers: responseHeaders,
                     body: JSON.stringify({ id: savedFile.id, modifiedTime: savedFile.modifiedTime }),
                 });
                 return;
@@ -380,6 +399,7 @@ export function createStatefulDriveFixture(initialFixture) {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
+            headers: responseHeaders,
             body: JSON.stringify({}),
         });
     };
@@ -387,6 +407,12 @@ export function createStatefulDriveFixture(initialFixture) {
     return {
         ...state,
         handleRoute,
+        getLatestGeneratedId() {
+            return latestGeneratedId;
+        },
+        setResponseHeaders(headers) {
+            responseHeaders = { ...headers };
+        },
         getFileByName,
         readCurrentCoreProjectTitles() {
             const coreFile = getFileByName('tasktime-yjs-core.bin');
@@ -566,6 +592,105 @@ export async function installMockDriveRoutes(target, driveFixture) {
     });
 
     await target.route('**/drive/files**', driveFixture.handleRoute);
+}
+
+/**
+ * Install a direct-transport fixture that proves browser uploads reach the
+ * Google endpoint and never use the retained Worker proxy.
+ */
+export async function installMockDirectDriveRoutes(target, driveFixture) {
+    let directRequests = 0;
+    let proxyRequests = 0;
+    let statusRequests = 0;
+    let tokenRequests = 0;
+    const directUploads = [];
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': 'http://127.0.0.1:3101',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Session-Id, X-TaskTime-App-Version',
+        'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+    };
+
+    const fulfillPreflight = async (route) => {
+        if (route.request().method() !== 'OPTIONS') return false;
+        await route.fulfill({ status: 204, headers: corsHeaders });
+        return true;
+    };
+
+    driveFixture.directRequestCount = () => directRequests;
+    driveFixture.proxyRequestCount = () => proxyRequests;
+    driveFixture.statusRequestCount = () => statusRequests;
+    driveFixture.tokenRequestCount = () => tokenRequests;
+    driveFixture.directUploads = () => directUploads;
+    driveFixture.setResponseHeaders(corsHeaders);
+
+    await target.route('**/auth/status', async (route) => {
+        if (await fulfillPreflight(route)) return;
+        statusRequests += 1;
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            headers: corsHeaders,
+            body: JSON.stringify({
+                authenticated: true,
+                driveTransport: 'direct',
+                transportPolicyVersion: 1,
+            }),
+        });
+    });
+
+    await target.route('**/auth/access-token', async (route) => {
+        if (await fulfillPreflight(route)) return;
+        tokenRequests += 1;
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            headers: {
+                ...corsHeaders,
+                'Cache-Control': 'no-store',
+            },
+            body: JSON.stringify({
+                accessToken: 'playwright-direct-access-token',
+                tokenType: 'Bearer',
+                expiresAt: Date.now() + 30 * 60 * 1000,
+                serverTime: Date.now(),
+                scope: 'https://www.googleapis.com/auth/drive.appdata',
+            }),
+        });
+    });
+
+    const handleDirectRoute = async (route) => {
+        if (await fulfillPreflight(route)) return;
+        directRequests += 1;
+
+        const request = route.request();
+        const url = new URL(request.url());
+
+        if (url.pathname.includes('/upload/drive/v3/files')
+            && (request.method() === 'POST' || request.method() === 'PATCH')) {
+            directUploads.push({
+                method: request.method(),
+                contentType: request.headers()['content-type'] || '',
+            });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                headers: corsHeaders,
+                body: JSON.stringify(request.method() === 'POST'
+                    ? { id: driveFixture.getLatestGeneratedId() }
+                    : { modifiedTime: new Date().toISOString() }),
+            });
+            return;
+        }
+
+        await driveFixture.handleRoute(route);
+    };
+
+    await target.route('**/drive/v3/**', handleDirectRoute);
+    await target.route('**/upload/drive/v3/**', handleDirectRoute);
+    await target.route('https://sync.tasktime.pro/drive/**', async (route) => {
+        proxyRequests += 1;
+        await route.fulfill({ status: 500, body: 'Unexpected Worker proxy request' });
+    });
 }
 
 async function openCreateProjectDialog(page) {

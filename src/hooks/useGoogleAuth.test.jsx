@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useGoogleAuth, _resetValidationCache } from './useGoogleAuth'
+import { APP_VERSION } from '@/constants/app'
 import { getStoredSession, clearStoredSession } from '@/utils/googleAuthStorage'
 
 const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
@@ -193,6 +194,9 @@ describe('useGoogleAuth', () => {
         expect(result.current.isSignedIn).toBe(true)
         expect(result.current.driveTransport).toBe('direct')
         expect(result.current.accessToken).toBeNull()
+        expect(fetch).toHaveBeenCalledWith('https://worker.example/auth/status', expect.objectContaining({
+            headers: expect.objectContaining({ 'X-TaskTime-App-Version': APP_VERSION }),
+        }))
     })
 
     it('force-refreshes a direct policy and switches the next connection to proxy without clearing the session', async () => {

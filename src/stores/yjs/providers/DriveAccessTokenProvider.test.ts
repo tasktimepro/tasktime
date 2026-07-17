@@ -4,6 +4,7 @@ import {
     DriveAccessTokenError,
     DriveAccessTokenProvider,
 } from './DriveAccessTokenProvider';
+import { APP_VERSION } from '@/constants/app';
 
 const ENDPOINT = 'https://worker.example/auth/access-token';
 const SESSION_ID = 'session-fixture';
@@ -45,7 +46,10 @@ describe('DriveAccessTokenProvider', () => {
             cache: 'no-store',
             credentials: 'omit',
             referrerPolicy: 'no-referrer',
-            headers: expect.objectContaining({ 'X-Session-Id': SESSION_ID }),
+            headers: expect.objectContaining({
+                'X-Session-Id': SESSION_ID,
+                'X-TaskTime-App-Version': APP_VERSION,
+            }),
         }));
     });
 

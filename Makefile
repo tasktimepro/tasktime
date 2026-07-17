@@ -4,7 +4,7 @@
 APP_RUN_ENV ?=
 APP_RUN = docker compose run --rm $(APP_RUN_ENV) app
 
-.PHONY: help dev dev-push-local preview-push-local preview-push-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
+.PHONY: help dev dev-push-local preview-push-local preview-push-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-drive-browsers test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
 
 PREVIEW_PORT ?= 3101
 
@@ -35,7 +35,8 @@ help:
 	@echo "  make test-run - Run vitest once"
 	@echo "  make test-coverage - Run vitest with coverage"
 	@echo "  make test-e2e - Run Playwright E2E tests"
-	@echo "  make test-e2e-smoke - Run critical Playwright smoke tests"
+	@echo "  make test-e2e-smoke - Run critical Playwright smoke tests in Chromium"
+	@echo "  make test-e2e-drive-browsers - Run direct Drive smoke in Chromium, Firefox, and WebKit"
 	@echo "  make test-e2e-pwa-smoke - Run production-preview PWA offline boot smoke test"
 	@echo "  make release-gate - Run lint, typecheck, coverage, browser/PWA smoke, and build"
 	@echo ""
@@ -155,6 +156,9 @@ test-e2e:
 
 test-e2e-smoke:
 	docker compose run --rm app npm run test:e2e:smoke
+
+test-e2e-drive-browsers:
+	docker compose run --rm app npm run test:e2e:drive-browsers
 
 test-e2e-pwa-smoke:
 	docker compose run --rm app npm run test:e2e:pwa:smoke

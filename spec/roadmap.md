@@ -44,6 +44,6 @@ The detailed finding-by-finding execution checklist and validation state live in
 - Gradual TypeScript migration
 - Test infrastructure improvements
 - Invoice cancellation completed: contract/lifecycle, shared replay-safe source release, browser/PDF safety, report/export parity, agent command parity, and backup `1.5` compatibility delivered and release-gated as six dependency-ordered slices
-- Direct browser-to-Google Drive sync in progress through contract-first Worker, isolated-staging, memory-only token, dual-transport, and gradual-rollout slices; the existing proxy remains the production compatibility path until staging and old-client gates pass
+- Direct browser-to-Google Drive sync is released by default for the current PWA through contract-first Worker, isolated-staging, memory-only token, and dual-transport slices; the existing proxy remains for rollback and older installed clients while the declared compatibility window is observed
 - Remaining approved product backlog such as task templates after recorded ambiguities are resolved
 - Continued public-site indexing/SEO and agent distribution maintenance

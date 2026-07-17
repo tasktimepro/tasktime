@@ -35,7 +35,7 @@ const LAST_UPDATED_ISO = '2026-07-17';
             If you connect Google Drive, TaskTime Pro syncs your data between your browser and a hidden app-data folder inside <strong>your own</strong> Google Drive storage. The synced copies belong to your Google account and are not stored as a TaskTime-hosted workspace.
         </p>
         <p>
-            To make sync work, a small edge service securely maintains your Google connection, stores its encrypted refresh token, issues short-lived access tokens to authorized browser sessions, and supports revocation. Depending on the compatible app version and rollout policy, normal sync file requests travel either directly between your browser and Google Drive or through a retained compatibility proxy. In direct mode, the access token stays only in active-browser memory and the edge service does not receive routine Drive file bodies. It does not keep your Drive file content as a TaskTime-hosted workspace.
+            To make sync work, a small edge service securely maintains your Google connection, stores its encrypted refresh token, issues short-lived access tokens to authorized browser sessions, and supports revocation. Current compatible app versions send normal sync file requests directly between your browser and Google Drive. Older installed versions and an explicit rollback path use the retained compatibility proxy. In direct mode, the access token stays only in active-browser memory and the edge service does not receive routine Drive file bodies. It does not keep your Drive file content as a TaskTime-hosted workspace.
         </p>
         <p>
             Sync is entirely optional. TaskTime Pro works fully offline without it, and you can disconnect at any time.
