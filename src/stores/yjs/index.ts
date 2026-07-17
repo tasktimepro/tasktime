@@ -23,10 +23,10 @@ export { YjsStore, getYjsStore, resetYjsStore } from './YjsStore';
 export { YjsDocManager } from './YjsDocManager';
 
 // Providers
-export { YjsDriveProvider, AuthorizationError } from './providers';
+export { YjsDriveProvider, AuthorizationError, DriveTransportDisabledError } from './providers';
 export { ManifestManager } from './providers';
 export { BackupManager } from './providers';
-export type { Manifest, DocManifest, DeltaInfo, BackupInfo } from './providers';
+export type { Manifest, DocManifest, DeltaInfo, BackupInfo, DriveConnectionOptions, DriveTransport } from './providers';
 
 // Types
 export type {

@@ -8,7 +8,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
-- **Drive sync:** `src/stores/yjs/providers/` synchronizes Yjs updates through the public `https://sync.tasktime.pro` Worker interface. The private Worker implementation is outside this repository.
+- **Drive sync:** Production currently synchronizes Yjs updates through the public `https://sync.tasktime.pro` Worker interface. The uncommitted direct-capable source can instead use short-lived memory-only tokens to call Google Drive when an explicit supported Worker policy selects that transport; proxy remains the fail-closed compatibility path. The private Worker implementation is outside this repository.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Public site:** Astro content under `blog/` builds the blog, legal pages, agent documentation, discovery metadata, and generated tool references.
@@ -50,6 +50,8 @@ The Yjs store is split into documents so current work stays loaded and historica
 - UI hooks and agent commands share domain operations for timer lifecycle/recovered stops, protected manual time-entry mutations, task completion/recurrence state, duplicate-safe entity identity, protected expense deletion, and relationship-safe project/client/task writes.
 - Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.
+- Google-grant revocation is confirmed before the browser clears its Worker session; transient refresh, rate-limit, Drive-status, and revocation failures preserve retryable credentials, while explicit local disconnect remains separate.
+- The uncommitted direct-capable transport keeps Google access tokens in one per-tab module instance only, clears them on expiry/session generation/cross-tab invalidation/rollback, removes any retired persisted-token record, deduplicates concurrent same-tab session validation, and keeps all Worker/Google API traffic outside service-worker Cache Storage. Transport is explicit and fixed for one connection; missing/invalid/disabled policy selects the proxy, while direct reads/writes use retry-safe Google operations without mid-pass proxy replay. Production remains on the Worker proxy until separately approved rollout work occurs.
 - Destructive data, billing, deletion, and sync actions require explicit intent and safe preview/confirmation where available.
 - Agent access is loopback-only with short-lived pairing, scoped permissions, approvals, rate limits, revocation, and memory-only session credentials.
 - Private Worker source, secrets, provider identifiers, and internal operational material do not enter the public repository.

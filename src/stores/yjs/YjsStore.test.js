@@ -73,7 +73,8 @@ vi.mock('./YjsDocManager', async () => {
 
 vi.mock('./providers/GoogleDriveProvider', () => ({
     YjsDriveProvider: class {
-        constructor() {
+        constructor(...args) {
+            this.constructorArgs = args
             this.markDocsForFullStateUpload = vi.fn()
             this.setSyncMode = vi.fn()
             this.getManifest = vi.fn(() => ({}))
@@ -1171,6 +1172,22 @@ describe('YjsStore reconnect sync tracking', () => {
         expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['core'])
         expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
 
+        store.destroy()
+    })
+
+    it('forwards an explicit direct transport and token provider without inferring from the session', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const tokenProvider = { getToken: vi.fn(), clearToken: vi.fn() }
+        const connection = {
+            transport: 'direct',
+            sessionId: 'session-direct',
+            tokenProvider,
+        }
+
+        await store.connectDrive(connection)
+
+        expect(providerInstances[0].constructorArgs[1]).toBe(connection)
         store.destroy()
     })
 

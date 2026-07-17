@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tasktime-cache-v4';
+const CACHE_NAME = 'tasktime-cache-v5';
 const APP_SHELL = [
     '/',
     '/index.html',
@@ -185,6 +185,13 @@ self.addEventListener('fetch', (event) => {
     const appOrigin = typeof self.location?.origin === 'string' ? self.location.origin : requestUrl?.origin;
 
     if (request.method !== 'GET') {
+        return;
+    }
+
+    // Cache only same-origin app-shell/assets. Worker auth/proxy requests and
+    // direct Google Drive traffic must remain network-only so credentials and
+    // synced content can never enter Cache Storage.
+    if (requestUrl && appOrigin && requestUrl.origin !== appOrigin) {
         return;
     }
 

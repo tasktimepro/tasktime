@@ -74,7 +74,16 @@ Configured by `VITE_SYNC_WORKER_URL`. Public client endpoint families are:
 - `/metrics/batch`
 - `/push/vapid-public-key`, `/push/subscription`, `/push/schedules`, `/push/test`
 
+The dev/build pipeline validates the configured Worker URL and adds only its
+origin to the HTML `connect-src` policy. HTTPS is required except for explicit
+loopback development URLs; malformed, credential-bearing, or non-loopback HTTP
+values fail closed instead of weakening the browser policy. A staging-configured
+build therefore does not require the production app to permanently trust the
+staging Worker hostname.
+
 The Worker owns OAuth refresh-token persistence and Drive API proxying. The browser owns product data semantics. Errors exposed to the browser must be sanitized; private deployment/KV/D1 details are not part of this public contract.
+
+Google-grant revocation and local disconnect are separate auth behaviors. The browser clears its stored Worker session after confirmed revocation or an already-invalid grant, but preserves it and surfaces an error when revocation fails transiently so the operation can be retried truthfully.
 
 ## Browser-to-bridge command protocol
 

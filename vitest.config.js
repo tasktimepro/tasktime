@@ -20,7 +20,6 @@ export default defineConfig({
             include: ['src/utils/**', 'src/hooks/**'],
             exclude: [
                 'src/**/*.{test,spec}.{js,jsx,ts,tsx}',
-                'src/hooks/useGoogleAuth.ts',
                 'src/hooks/yjs/**',
             ],
             thresholds: {

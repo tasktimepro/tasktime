@@ -62,6 +62,7 @@ export const SYNC_WORKER_CONFIG = {
             authCallback: `${base}/auth/callback`,
             authRevoke: `${base}/auth/revoke`,
             authStatus: `${base}/auth/status`,
+            authAccessToken: `${base}/auth/access-token`,
             drive: `${base}/drive`,
             metricsBatch: `${base}/metrics/batch`,
             pushVapidPublicKey: `${base}/push/vapid-public-key`,

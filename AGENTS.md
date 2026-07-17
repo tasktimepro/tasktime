@@ -201,6 +201,7 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 - **Backup = push-only by default.** No automatic pulling of remote changes. Users must click "Sync Now" or reload to get remote changes.
 - **Sync = full bidirectional.** Pulls + pushes on all triggers with cooldowns.
 - **Manual = user-controlled.** Only "Sync Now" triggers sync after setup. Page reload and reconnect normally only establish the Drive connection without pulling or pushing, except a pristine first device may do one bootstrap pull so existing Drive data appears immediately.
+- **Sync Now = full-state verification.** The user-facing action pulls and verifies every loaded document by uploading its full current state; refresh-only internal callers explicitly disable full-state verification.
 - **Pull efficiency:** Before downloading, a lightweight `modifiedTime` metadata check determines if the manifest changed. No download if unchanged.
 - **Pull throttle:** 30 seconds — skips manifest reload if no local changes and last pull was recent.
 - **Foreground request budget:** A clean focus/online event inside the 60-second cooldown makes zero Worker/Drive requests. Once stale, an unchanged clean check makes one manifest-metadata request, advances the local cooldown, and performs no document transfer, manifest save, backup listing, or full app-data listing.

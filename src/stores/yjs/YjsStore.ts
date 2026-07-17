@@ -13,7 +13,7 @@
 
 import * as Y from 'yjs';
 import { YjsDocManager } from './YjsDocManager';
-import { YjsDriveProvider } from './providers/GoogleDriveProvider';
+import { YjsDriveProvider, type DriveConnectionOptions } from './providers/GoogleDriveProvider';
 import { BackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
@@ -1189,15 +1189,18 @@ export class YjsStore {
 
     /**
      * Connect to Google Drive and start syncing
-     * @param accessToken - Access token (for direct auth mode)
-     * @param sessionId - Session ID (for Worker proxy mode)
+     * The explicit transport is fixed for the lifetime of this connection.
+     * The string overload remains for compatible tests/non-Worker consumers.
      */
-    async connectDrive(accessToken: string, sessionId?: string | null): Promise<void> {
+    async connectDrive(
+        connection: DriveConnectionOptions | string,
+        legacySessionId?: string | null,
+    ): Promise<void> {
         if (this.driveProvider) {
             this.driveProvider.disconnect();
         }
 
-        this.driveProvider = new YjsDriveProvider(this.docManager, accessToken, sessionId);
+        this.driveProvider = new YjsDriveProvider(this.docManager, connection, legacySessionId);
         this.driveProvider.setSyncMode(this.driveSyncMode);
 
         const bootstrapPullIfPristine = this.driveSyncMode === 'manual' && this.shouldBootstrapRemotePullOnManualConnect();

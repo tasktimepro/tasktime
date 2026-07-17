@@ -63,6 +63,7 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **SYNC-3:** Keep normal Worker/Drive requests proportional to actual work. A clean foreground event inside the cooldown makes zero requests. After the cooldown, a clean unchanged check makes at most one manifest-metadata request, records that successful check for the next cooldown, and performs no document download, upload, manifest save, backup listing, or full app-data listing. Heavier recovery requests require a correctness justification and request-count regression coverage.
 - **SYNC-4:** Serialize cross-tab synchronization, do not queue a second page-exit pass while one is active, persist dirty identity per document, and recover only affected disconnected documents on reconnect. Pull/consistency retries remain distinct from unsynced local data.
 - **SYNC-5:** Never auto-sync destructive resets or conflict decisions that can undo a valid change from another device.
+- **SYNC-6:** Treat local Drive disconnect and Google-grant revocation as distinct actions. A transient revocation or auth-status failure preserves the retryable Worker/browser session and must not be reported as successful revocation; clear it only after confirmed success, an already-invalid grant, or explicit local disconnect.
 
 ## Agent access
 

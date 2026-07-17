@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { isTokenExpired, getStoredToken, storeToken, clearStoredToken, getTokenTimeRemaining } from './googleAuthStorage';
-import { getStoredSession, storeSession, clearStoredSession } from './googleAuthStorage';
+import { clearLegacyStoredToken, getStoredSession, storeSession, clearStoredSession } from './googleAuthStorage';
 
 const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
     captureDebugBundleIncidentSpy: vi.fn(),
@@ -10,6 +9,12 @@ const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
 const mockDb = {
     get: vi.fn(),
     put: vi.fn(),
+    delete: vi.fn(),
+    transaction: vi.fn(),
+};
+
+const mockSessionStore = {
+    get: vi.fn(),
     delete: vi.fn(),
 };
 
@@ -28,6 +33,10 @@ describe('googleAuthStorage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useFakeTimers();
+        mockDb.transaction.mockReturnValue({
+            store: mockSessionStore,
+            done: Promise.resolve(),
+        });
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
@@ -36,180 +45,23 @@ describe('googleAuthStorage', () => {
         consoleErrorSpy?.mockRestore();
     });
 
-    describe('isTokenExpired', () => {
+    describe('legacy token cleanup', () => {
 
-        it('returns true for null token', () => {
-            expect(isTokenExpired(null)).toBe(true);
-        });
-
-        it('returns true for token without expiresAt', () => {
-            const token = { accessToken: 'abc' };
-            expect(isTokenExpired(token)).toBe(true);
-        });
-
-        it('returns true for expired token', () => {
-            vi.setSystemTime(new Date('2026-01-19T12:00:00Z'));
-            
-            const token = {
-                accessToken: 'abc',
-                expiresAt: new Date('2026-01-19T11:00:00Z').getTime(), // 1 hour ago
-            };
-
-            expect(isTokenExpired(token)).toBe(true);
-        });
-
-        it('returns true when token expires within buffer window (60s)', () => {
-            vi.setSystemTime(new Date('2026-01-19T12:00:00Z'));
-            
-            const token = {
-                accessToken: 'abc',
-                expiresAt: new Date('2026-01-19T12:00:30Z').getTime(), // 30s from now
-            };
-
-            expect(isTokenExpired(token)).toBe(true);
-        });
-
-        it('returns false for valid token outside buffer window', () => {
-            vi.setSystemTime(new Date('2026-01-19T12:00:00Z'));
-            
-            const token = {
-                accessToken: 'abc',
-                expiresAt: new Date('2026-01-19T13:00:00Z').getTime(), // 1 hour from now
-            };
-
-            expect(isTokenExpired(token)).toBe(false);
-        });
-    });
-
-    describe('getStoredToken', () => {
-
-        it('returns stored token when exists', async () => {
-            const storedToken = {
-                accessToken: 'abc123',
-                expiresAt: Date.now() + 3600000,
-            };
-            mockDb.get.mockResolvedValue(storedToken);
-
-            const result = await getStoredToken();
-
-            expect(result).toEqual(storedToken);
-        });
-
-        it('returns null when no token stored', async () => {
-            mockDb.get.mockResolvedValue(undefined);
-
-            const result = await getStoredToken();
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null on error', async () => {
-            mockDb.get.mockRejectedValue(new Error('DB error'));
-
-            const result = await getStoredToken();
-
-            expect(result).toBeNull();
-            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
-                incidentKey: 'auth.token_storage_read_failed',
-            }));
-        });
-    });
-
-    describe('storeToken', () => {
-
-        it('stores token in IndexedDB', async () => {
-            const token = {
-                accessToken: 'abc123',
-                expiresAt: Date.now() + 3600000,
-            };
-
-            await storeToken(token);
-
-            expect(mockDb.put).toHaveBeenCalledWith('app-data', token, 'google-auth-token');
-        });
-
-        it('handles errors gracefully', async () => {
-            mockDb.put.mockRejectedValue(new Error('DB error'));
-
-            // Should not throw
-            await expect(storeToken({ accessToken: 'abc', expiresAt: 1234 })).resolves.toBeUndefined();
-        });
-
-        it('logs a quota warning for QuotaExceededError DOMExceptions', async () => {
-            const error = new DOMException('Quota hit', 'QuotaExceededError');
-            mockDb.put.mockRejectedValue(error);
-
-            await expect(storeToken({ accessToken: 'abc', expiresAt: 1234 })).resolves.toBeUndefined();
-
-            expect(consoleErrorSpy).toHaveBeenCalledWith(
-                'IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.'
-            );
-            expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
-                incidentKey: 'auth.token_storage_quota_exceeded',
-            }));
-        });
-
-        it('logs a quota warning for storage quota error messages', async () => {
-            mockDb.put.mockRejectedValue(new Error('storage quota exceeded'));
-
-            await expect(storeToken({ accessToken: 'abc', expiresAt: 1234 })).resolves.toBeUndefined();
-
-            expect(consoleErrorSpy).toHaveBeenCalledWith(
-                'IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.'
-            );
-        });
-    });
-
-    describe('clearStoredToken', () => {
-
-        it('deletes token from IndexedDB', async () => {
-            await clearStoredToken();
+        it('deletes the retired persisted access-token record', async () => {
+            await clearLegacyStoredToken();
 
             expect(mockDb.delete).toHaveBeenCalledWith('app-data', 'google-auth-token');
+            expect(mockDb.put).not.toHaveBeenCalled();
         });
 
-        it('handles errors gracefully', async () => {
+        it('reports cleanup failure without exposing credential data', async () => {
             mockDb.delete.mockRejectedValue(new Error('DB error'));
 
-            // Should not throw
-            await expect(clearStoredToken()).resolves.toBeUndefined();
+            await expect(clearLegacyStoredToken()).resolves.toBeUndefined();
             expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
                 incidentKey: 'auth.token_storage_clear_failed',
+                context: { operation: 'clear', storageKind: 'token' },
             }));
-        });
-    });
-
-    describe('getTokenTimeRemaining', () => {
-
-        it('returns 0 for null token', () => {
-            expect(getTokenTimeRemaining(null)).toBe(0);
-        });
-
-        it('returns 0 for token without expiresAt', () => {
-            const token = { accessToken: 'abc' };
-            expect(getTokenTimeRemaining(token)).toBe(0);
-        });
-
-        it('returns positive remaining time for valid token', () => {
-            vi.setSystemTime(new Date('2026-01-19T12:00:00Z'));
-
-            const token = {
-                accessToken: 'abc',
-                expiresAt: new Date('2026-01-19T12:10:00Z').getTime(),
-            };
-
-            expect(getTokenTimeRemaining(token)).toBe(600000);
-        });
-
-        it('clamps remaining time at 0 for expired token', () => {
-            vi.setSystemTime(new Date('2026-01-19T12:00:00Z'));
-
-            const token = {
-                accessToken: 'abc',
-                expiresAt: new Date('2026-01-19T11:59:30Z').getTime(),
-            };
-
-            expect(getTokenTimeRemaining(token)).toBe(0);
         });
     });
 
@@ -283,13 +135,31 @@ describe('googleAuthStorage', () => {
         it('clears session in IndexedDB', async () => {
             await clearStoredSession();
 
-            expect(mockDb.delete).toHaveBeenCalledWith('app-data', 'google-auth-session');
+            expect(mockSessionStore.delete).toHaveBeenCalledWith('google-auth-session');
+        });
+
+        it('clears only the expected session so a stale tab cannot delete a replacement', async () => {
+            mockSessionStore.get.mockResolvedValueOnce({ sessionId: 'new-session' });
+
+            await expect(clearStoredSession('old-session')).resolves.toBe(false);
+
+            expect(mockSessionStore.delete).not.toHaveBeenCalled();
+        });
+
+        it('clears a matching expected session', async () => {
+            mockSessionStore.get.mockResolvedValueOnce({ sessionId: 'current-session' });
+
+            await expect(clearStoredSession('current-session')).resolves.toBe(true);
+
+            expect(mockSessionStore.delete).toHaveBeenCalledWith('google-auth-session');
         });
 
         it('handles session clear errors gracefully', async () => {
-            mockDb.delete.mockRejectedValue(new Error('session clear failed'));
+            mockDb.transaction.mockImplementationOnce(() => {
+                throw new Error('session clear failed');
+            });
 
-            await expect(clearStoredSession()).resolves.toBeUndefined();
+            await expect(clearStoredSession()).resolves.toBe(false);
 
             expect(consoleErrorSpy).toHaveBeenCalledWith(
                 'Error clearing session from IndexedDB:',

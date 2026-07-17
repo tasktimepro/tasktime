@@ -21,6 +21,7 @@ vi.mock('@/config/google', () => ({
 }))
 
 vi.mock('@/utils/googleAuthStorage', () => ({
+    clearLegacyStoredToken: vi.fn(async () => undefined),
     getStoredSession: vi.fn(),
     storeSession: vi.fn(),
     clearStoredSession: vi.fn(),
@@ -55,6 +56,8 @@ describe('useGoogleAuth', () => {
 
     afterEach(() => {
         vi.useRealTimers()
+        vi.unstubAllGlobals()
+        document.documentElement.classList.remove('dark')
     })
 
     it('clears stored session when auth status passes but Drive access is denied', async () => {
@@ -117,6 +120,29 @@ describe('useGoogleAuth', () => {
         expect(result.current.hadPreviousSession).toBe(true)
     })
 
+    it('keeps a stored session when auth status is temporarily rate limited', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-rate-limited',
+            userId: 'user-rate-limited',
+            email: 'rate-limited@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch.mockResolvedValueOnce({
+            ok: false,
+            status: 429,
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.sessionId).toBe('session-rate-limited')
+        expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
     it('restores signed-in state when session and Drive access are valid', async () => {
         getStoredSession.mockResolvedValue({
             sessionId: 'session-456',
@@ -140,6 +166,234 @@ describe('useGoogleAuth', () => {
         expect(result.current.sessionId).toBe('session-456')
         expect(result.current.user?.email).toBe('valid@example.com')
         expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
+    it('retains a supported direct transport policy as metadata without exposing an access token', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-direct-policy',
+            userId: 'user-direct-policy',
+            email: 'direct-policy@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                authenticated: true,
+                driveTransport: 'direct',
+                transportPolicyVersion: 1,
+            }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.driveTransport).toBe('direct')
+        expect(result.current.accessToken).toBeNull()
+    })
+
+    it('force-refreshes a direct policy and switches the next connection to proxy without clearing the session', async () => {
+        const storedSession = {
+            sessionId: 'session-policy-rollback',
+            userId: 'user-policy-rollback',
+            email: 'policy-rollback@example.com',
+            createdAt: new Date().toISOString(),
+        }
+        getStoredSession.mockResolvedValue(storedSession)
+        fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'direct',
+                    transportPolicyVersion: 1,
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'proxy',
+                    transportPolicyVersion: 1,
+                }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.driveTransport).toBe('direct'))
+
+        await act(async () => {
+            await expect(result.current.refreshDriveTransport()).resolves.toBe('proxy')
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.sessionId).toBe(storedSession.sessionId)
+        expect(result.current.driveTransport).toBe('proxy')
+        expect(clearStoredSession).not.toHaveBeenCalled()
+        expect(fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it.each([
+        { driveTransport: 'proxy', transportPolicyVersion: 1 },
+        { driveTransport: 'direct', transportPolicyVersion: 2 },
+        { driveTransport: 'direct' },
+        { driveTransport: 'unsupported', transportPolicyVersion: 1 },
+        {},
+    ])('fails closed to proxy for unsupported status policy %#', async (status) => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-policy-fallback',
+            userId: 'user-policy-fallback',
+            email: 'policy-fallback@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ authenticated: true, ...status }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.driveTransport).toBe('proxy')
+        expect(result.current.accessToken).toBeNull()
+    })
+
+    it('restores a stored session offline without calling the Worker', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-offline',
+            userId: 'user-offline',
+            email: 'offline@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.sessionId).toBe('session-offline')
+        expect(fetch).not.toHaveBeenCalled()
+    })
+
+    it('preserves the local session and reports a retryable revoke failure truthfully', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-revoke-retry',
+            userId: 'user-revoke-retry',
+            email: 'revoke-retry@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ authenticated: true }),
+            })
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 503,
+                headers: new Headers({ 'Content-Type': 'application/json' }),
+                json: async () => ({
+                    error: 'Token service unavailable',
+                    code: 'TOKEN_SERVICE_UNAVAILABLE',
+                }),
+                text: async () => '',
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isSignedIn).toBe(true)
+        })
+
+        let revokeError
+        await act(async () => {
+            try {
+                await result.current.revokeAccess()
+            } catch (error) {
+                revokeError = error
+            }
+        })
+
+        expect(revokeError).toBeInstanceOf(Error)
+        expect(revokeError.message).toBe('Token service unavailable')
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.sessionId).toBe('session-revoke-retry')
+        expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
+    it('clears the local session after Worker-confirmed Google revocation', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-revoke-success',
+            userId: 'user-revoke-success',
+            email: 'revoke-success@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ authenticated: true }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                headers: new Headers({ 'Content-Type': 'application/json' }),
+                json: async () => ({ success: true }),
+            })
+        clearStoredSession.mockImplementationOnce(async () => {
+            getStoredSession.mockResolvedValue(null)
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isSignedIn).toBe(true)
+        })
+
+        await act(async () => {
+            await result.current.revokeAccess()
+        })
+
+        expect(result.current.isSignedIn).toBe(false)
+        expect(result.current.sessionId).toBeNull()
+        expect(clearStoredSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps local disconnect separate from Google-grant revocation', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-local-disconnect',
+            userId: 'user-local-disconnect',
+            email: 'local-disconnect@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ authenticated: true }),
+        })
+        clearStoredSession.mockImplementationOnce(async () => {
+            getStoredSession.mockResolvedValue(null)
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isSignedIn).toBe(true)
+        })
+
+        await act(async () => {
+            await result.current.signOut()
+        })
+
+        expect(fetch).toHaveBeenCalledTimes(1)
+        expect(clearStoredSession).toHaveBeenCalledTimes(1)
+        expect(result.current.isSignedIn).toBe(false)
     })
 
     it('retries a transient auth init network failure without requiring another user tap', async () => {
@@ -223,6 +477,132 @@ describe('useGoogleAuth', () => {
         expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalledWith(expect.objectContaining({
             incidentKey: 'auth.sign_in_failed',
         }))
+    })
+
+    it('retries transient auth init HTTP responses through the final configured delay', async () => {
+        getStoredSession.mockResolvedValue(null)
+
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+        fetch
+            .mockResolvedValueOnce({ ok: false, status: 503 })
+            .mockResolvedValueOnce({ ok: false, status: 408 })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                    state: 'oauth-state',
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    sessionId: 'session-http-retry',
+                    user: {
+                        id: 'user-http-retry',
+                        email: 'http-retry@example.com',
+                    },
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ authenticated: true }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        vi.useFakeTimers()
+        let signInPromise
+
+        act(() => {
+            signInPromise = result.current.signIn()
+        })
+
+        await act(async () => {
+            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(500)
+        })
+
+        expect(popup.document.body.textContent).toContain('Retrying Google Drive connection')
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(1500)
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'auth-code',
+                    state: 'oauth-state',
+                },
+            }))
+        })
+
+        await act(async () => {
+            await signInPromise
+        })
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(fetch).toHaveBeenCalledTimes(5)
+    })
+
+    it('surfaces a non-JSON auth init error body without retrying it', async () => {
+        getStoredSession.mockResolvedValue(null)
+        fetch.mockResolvedValueOnce(new Response('Worker maintenance', {
+            status: 400,
+            headers: { 'Content-Type': 'text/plain' },
+        }))
+
+        const { result } = renderHook(() => useGoogleAuth())
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false)
+        })
+
+        let signInError
+        await act(async () => {
+            try {
+                await result.current.signIn()
+            } catch (error) {
+                signInError = error
+            }
+        })
+
+        expect(signInError).toBeInstanceOf(Error)
+        expect(signInError.message).toBe('Worker maintenance')
+        expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses the dark fallback palette when popup computed colors are unavailable', async () => {
+        getStoredSession.mockResolvedValue(null)
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+        document.documentElement.classList.add('dark')
+        vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+            backgroundColor: '',
+            color: '',
+        })
+        fetch.mockResolvedValueOnce(new Response('', { status: 400 }))
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        await act(async () => {
+            await result.current.signIn().catch(() => undefined)
+        })
+
+        expect(popup.document.head.textContent).toContain('color-scheme: dark')
+        expect(popup.document.head.textContent).toContain('rgb(10, 10, 10)')
     })
 
     it('returns an actionable error when the sync worker is unreachable after auth init retries', async () => {
@@ -404,6 +784,120 @@ describe('useGoogleAuth', () => {
 
         expect(thrownError.message).toBe('Token exchange failed: {"error":"invalid_grant"}')
         expect(result.current.error).toBe('Token exchange failed: {"error":"invalid_grant"}')
+    })
+
+    it('rejects an OAuth callback error while ignoring unrelated messages and an unavailable broadcast channel', async () => {
+        getStoredSession.mockResolvedValue(null)
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+        vi.stubGlobal('BroadcastChannel', class {
+            constructor() {
+                throw new Error('BroadcastChannel unavailable')
+            }
+        })
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                state: 'oauth-state',
+            }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        let signInError
+        act(() => {
+            void result.current.signIn().catch(error => {
+                signInError = error
+            })
+        })
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: 'https://untrusted.example',
+                data: { type: 'google-auth-callback', error: 'ignored' },
+            }))
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: { type: 'unrelated-message' },
+            }))
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: { type: 'google-auth-callback', error: 'Google access denied' },
+            }))
+        })
+
+        await waitFor(() => {
+            expect(signInError).toBeInstanceOf(Error)
+        })
+
+        expect(signInError.message).toBe('Google access denied')
+        expect(result.current.isSignedIn).toBe(false)
+    })
+
+    it('rejects sign-in when the Worker callback session lacks Drive authorization', async () => {
+        getStoredSession.mockResolvedValue(null)
+        const popup = createPopupStub()
+        window.open.mockImplementation(() => popup)
+        fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+                    state: 'oauth-state',
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    sessionId: 'session-no-drive',
+                    user: {
+                        id: 'user-no-drive',
+                        email: 'no-drive@example.com',
+                    },
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ authenticated: false }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        let signInError
+        act(() => {
+            void result.current.signIn().catch(error => {
+                signInError = error
+            })
+        })
+
+        await waitFor(() => {
+            expect(popup.location.href).toBe('https://accounts.google.com/o/oauth2/v2/auth')
+        })
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                origin: window.location.origin,
+                data: {
+                    type: 'google-auth-callback',
+                    code: 'auth-code',
+                    state: 'oauth-state',
+                },
+            }))
+        })
+
+        await waitFor(() => {
+            expect(signInError).toBeInstanceOf(Error)
+        })
+
+        expect(signInError.message).toContain('Drive access is not authorized')
+        expect(result.current.isSignedIn).toBe(false)
     })
 
     it('shows a friendly message when the sync service hits the daily sign-in limit', async () => {
@@ -966,6 +1460,47 @@ describe('useGoogleAuth', () => {
         })
 
         expect(result2.current.isSignedIn).toBe(true)
+        expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('shares one auth-status validation across simultaneous hook consumers', async () => {
+        const storedSession = {
+            sessionId: 'session-concurrent-validation',
+            userId: 'user-concurrent-validation',
+            email: 'concurrent-validation@example.com',
+            createdAt: new Date().toISOString(),
+        }
+        let resolveStatus
+
+        getStoredSession.mockResolvedValue(storedSession)
+        fetch.mockImplementation(() => new Promise((resolve) => {
+            resolveStatus = resolve
+        }))
+
+        const { result } = renderHook(() => [useGoogleAuth(), useGoogleAuth()])
+
+        await waitFor(() => {
+            expect(getStoredSession).toHaveBeenCalledTimes(2)
+            expect(fetch).toHaveBeenCalledTimes(1)
+        })
+
+        await act(async () => {
+            resolveStatus({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'direct',
+                    transportPolicyVersion: 1,
+                }),
+            })
+        })
+
+        await waitFor(() => {
+            expect(result.current[0].isLoading).toBe(false)
+            expect(result.current[1].isLoading).toBe(false)
+        })
+        expect(result.current[0].driveTransport).toBe('direct')
+        expect(result.current[1].driveTransport).toBe('direct')
         expect(fetch).toHaveBeenCalledTimes(1)
     })
 })

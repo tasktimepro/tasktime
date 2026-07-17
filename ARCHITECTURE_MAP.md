@@ -17,7 +17,8 @@ Browser / PWA
 └── src/utils/                              Focused calculations and integrations
         │
         ├── IndexedDB (local, authoritative working copy)
-        ├── sync.tasktime.pro → Google Drive appDataFolder (optional)
+        ├── sync.tasktime.pro OAuth/token broker + compatibility proxy (optional)
+        ├── Google Drive appDataFolder direct data path when policy-enabled (optional)
         ├── DebugBundle endpoint (optional diagnostics)
         └── exchange-rate / email / push integrations as configured
 
@@ -40,6 +41,7 @@ Public web build
 - Hooks expose Yjs-backed collections and mutations through `YjsContext`/`YjsStore`.
 - Domain modules remain UI-independent and receive explicit inputs/dependencies.
 - Sync providers operate on Yjs document updates and manifests; they do not redefine entity business rules.
+- Drive transport is an explicit per-connection dependency: missing/unsupported policy selects the Worker proxy, while policy-enabled direct connections inject the module-owned token provider and keep that choice fixed until reconnect.
 - Agent commands call the same store/domain behaviors as the UI and never expose raw Yjs access to MCP clients.
 - Shared operations under `src/domain/time/`, `src/domain/tasks/`, `src/domain/work/`, `src/domain/entities/`, and `src/domain/expenses/` own cross-surface validation and mutation planning; hooks and agent commands adapt errors, permissions, transactions, archive loading, and activity metrics around them.
 - Invoice finalization, undo, and terminal cancellation use shared application plans under `src/domain/invoices/` plus the replay-safe `invoiceBillingOperations` journal in `YjsStore`; browser and agent adapters do not calculate source release independently.

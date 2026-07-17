@@ -10,13 +10,23 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { YjsStore, getYjsStore, YjsDocManager, SyncState, SyncPhase, AutoSyncMode, AuthorizationError } from '@/stores/yjs';
+import {
+    YjsStore,
+    getYjsStore,
+    YjsDocManager,
+    SyncState,
+    SyncPhase,
+    AutoSyncMode,
+    AuthorizationError,
+    DriveTransportDisabledError,
+} from '@/stores/yjs';
 /* eslint-disable react-refresh/only-export-components */
 import type { BackupInfo } from '@/stores/yjs';
 import type { BackupImportPayload } from '@/utils/backupData';
 import type { TimeEntry } from '@/stores/yjs/types';
 import type * as Y from 'yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { driveAccessTokenProvider } from '@/stores/yjs/providers/DriveAccessTokenProvider';
 import { useToast } from '@/hooks/useToast';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
@@ -144,7 +154,16 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const consecutiveSyncErrors = useRef(0);
     
     // Auth hook for Google Drive connection
-    const { isSignedIn, accessToken, sessionId, isLoading: authLoading, signIn, signOut, invalidateSession } = useGoogleAuth();
+    const {
+        isSignedIn,
+        sessionId,
+        driveTransport,
+        isLoading: authLoading,
+        signIn,
+        signOut,
+        invalidateSession,
+        refreshDriveTransport,
+    } = useGoogleAuth();
 
     const handleAuthorizationFailure = useCallback(async (error: unknown): Promise<boolean> => {
         if (!(error instanceof AuthorizationError)) {
@@ -167,17 +186,36 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return true;
     }, [store, invalidateSession]);
 
+    const handleDriveBoundaryFailure = useCallback(async (error: unknown): Promise<boolean> => {
+        if (error instanceof DriveTransportDisabledError) {
+            driveAccessTokenProvider.clearToken();
+            store.disconnectDrive();
+            setIsDriveConnected(false);
+            setIsConnecting(false);
+            setSyncState('idle');
+            setSyncPhase('idle');
+            setHasSynced(false);
+            setManualSyncInProgress(false);
+            setDriveBindingVersion(previous => previous + 1);
+            hasCheckedPersistedState.current = false;
+            await refreshDriveTransport();
+            return true;
+        }
+
+        return handleAuthorizationFailure(error);
+    }, [handleAuthorizationFailure, refreshDriveTransport, store]);
+
     const runSyncWithAuthHandling = useCallback<RunSyncWithAuthHandling>(async (options) => {
         try {
             await store.syncDrive(options);
         } catch (error) {
-            if (await handleAuthorizationFailure(error)) {
+            if (await handleDriveBoundaryFailure(error)) {
                 return;
             }
 
             throw error;
         }
-    }, [store, handleAuthorizationFailure]);
+    }, [store, handleDriveBoundaryFailure]);
 
     // Initialize store on mount
     useEffect(() => {
@@ -271,17 +309,17 @@ export function YjsProvider({ children }: YjsProviderProps) {
     useEffect(() => {
         if (!isReady || authLoading) return;
 
-        const hasDirectAuth = Boolean(accessToken);
         const hasWorkerAuth = Boolean(sessionId);
 
-        if (isSignedIn && (hasDirectAuth || hasWorkerAuth)) {
+        if (isSignedIn && hasWorkerAuth) {
             setHasSynced(false);
             setIsConnecting(true);
 
-            // In worker mode we don't have a client-side access token; pass a placeholder
-            const tokenForConnect = accessToken || 'worker-placeholder';
-
-            store.connectDrive(tokenForConnect, sessionId)
+            store.connectDrive({
+                transport: driveTransport,
+                sessionId,
+                tokenProvider: driveTransport === 'direct' ? driveAccessTokenProvider : null,
+            })
                 .then(async () => {
                     setIsDriveConnected(true);
                     setSyncState(store.getSyncState());
@@ -293,7 +331,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                     // no need for a follow-up forceDriveSync
                 })
                 .catch(async (error) => {
-                    if (await handleAuthorizationFailure(error)) {
+                    if (await handleDriveBoundaryFailure(error)) {
                         return;
                     }
 
@@ -316,14 +354,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             setManualSyncInProgress(false);
             setDriveBindingVersion(previous => previous + 1);
         }
-    }, [isReady, isSignedIn, accessToken, sessionId, authLoading, store, handleAuthorizationFailure]);
-
-    // Update access token when it changes
-    useEffect(() => {
-        if (accessToken && store.isDriveConnected()) {
-            store.updateDriveAccessToken(accessToken);
-        }
-    }, [accessToken, store]);
+    }, [isReady, isSignedIn, sessionId, driveTransport, authLoading, store, handleDriveBoundaryFailure]);
 
     // Update session ID when it changes (Worker mode)
     useEffect(() => {

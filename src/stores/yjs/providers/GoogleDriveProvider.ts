@@ -14,7 +14,14 @@
 import * as Y from 'yjs';
 import { encodeStateAsUpdate, applyUpdate, mergeUpdates } from 'yjs';
 import { YjsDocManager } from '../YjsDocManager';
-import { ManifestManager, AuthorizationError, isDriveFileNotFoundError } from './ManifestManager';
+import {
+    ManifestManager,
+    AuthorizationError,
+    DriveTransportDisabledError,
+    isDriveFileNotFoundError,
+    type DriveTokenProvider,
+    type DriveTransport,
+} from './ManifestManager';
 import { BackupManager } from './BackupManager';
 import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
 import { validateDocManagerState } from '../validation';
@@ -114,12 +121,21 @@ type SyncOptions = {
     forceFullState?: boolean;
 };
 
+export interface DriveConnectionOptions {
+    transport: DriveTransport;
+    sessionId: string | null;
+    tokenProvider?: DriveTokenProvider | null;
+    /** Legacy direct-auth compatibility for non-Worker consumers. */
+    accessToken?: string | null;
+}
+
 export class YjsDriveProvider {
 
     private docManager: YjsDocManager;
     private manifest: ManifestManager;
     private accessToken: string;
     private sessionId: string | null;
+    private readonly transport: DriveTransport;
 
     private connected: boolean = false;
     private syncState: SyncState = 'idle';
@@ -509,11 +525,29 @@ export class YjsDriveProvider {
         return true;
     }
 
-    constructor(docManager: YjsDocManager, accessToken: string, sessionId?: string | null) {
+    constructor(
+        docManager: YjsDocManager,
+        connection: DriveConnectionOptions | string,
+        legacySessionId?: string | null,
+    ) {
         this.docManager = docManager;
-        this.accessToken = accessToken;
-        this.sessionId = sessionId ?? null;
-        this.manifest = new ManifestManager(accessToken, sessionId);
+        if (typeof connection === 'string') {
+            this.accessToken = connection;
+            this.sessionId = legacySessionId ?? null;
+            this.transport = legacySessionId ? 'proxy' : 'direct';
+            this.manifest = new ManifestManager(connection, legacySessionId);
+            return;
+        }
+
+        this.accessToken = connection.accessToken ?? '';
+        this.sessionId = connection.sessionId;
+        this.transport = connection.transport;
+        this.manifest = new ManifestManager({
+            transport: connection.transport,
+            sessionId: connection.sessionId,
+            tokenProvider: connection.tokenProvider,
+            accessToken: connection.accessToken,
+        });
     }
 
     /**
@@ -540,6 +574,19 @@ export class YjsDriveProvider {
      *   'sync' = pull + push (default), 'backup' = push only, 'manual' = subscribe only
      */
     async connect(syncMode?: DriveSyncMode, options: ConnectOptions = {}): Promise<void> {
+        if (this.connected) return;
+
+        const lockResult = await withSyncLock(
+            () => this.connectInner(syncMode, options),
+            true,
+        );
+
+        if (!lockResult.acquired) {
+            throw new Error('Unable to acquire the Google Drive connection lock.');
+        }
+    }
+
+    private async connectInner(syncMode?: DriveSyncMode, options: ConnectOptions = {}): Promise<void> {
         if (this.connected) return;
 
         const mode = syncMode ?? this.syncMode;
@@ -679,7 +726,7 @@ export class YjsDriveProvider {
             }
 
             console.error('[YjsDriveProvider] Connection failed:', error);
-            if (!(error instanceof AuthorizationError)) {
+            if (!(error instanceof AuthorizationError) && !(error instanceof DriveTransportDisabledError)) {
                 captureDriveIncident({
                     incidentKey: 'drive.connect_failed',
                     message: 'TaskTime Pro could not connect to Google Drive sync',
@@ -1048,7 +1095,9 @@ export class YjsDriveProvider {
         } catch (error) {
             console.error('[YjsDriveProvider] Sync failed:', error);
             markSyncFailed(); // Persist that sync failed (pending changes remain)
-            if (!(error instanceof AuthorizationError) && !(error instanceof BackupModeRemoteChangedError)) {
+            if (!(error instanceof AuthorizationError)
+                && !(error instanceof DriveTransportDisabledError)
+                && !(error instanceof BackupModeRemoteChangedError)) {
                 captureDriveIncident({
                     incidentKey: 'drive.sync_failed',
                     message: 'TaskTime Pro Drive sync failed',
@@ -1060,7 +1109,7 @@ export class YjsDriveProvider {
                     },
                 });
             }
-            if (error instanceof AuthorizationError) {
+            if (error instanceof AuthorizationError || error instanceof DriveTransportDisabledError) {
                 this.setState('error');
                 this.setPhase('error');
                 throw error; // Auth errors should propagate
@@ -1653,6 +1702,14 @@ export class YjsDriveProvider {
      */
     async syncAndSubscribeDoc(docName: DocName, options: { allowPull?: boolean } = {}): Promise<void> {
         if (!this.connected) return;
+
+        // Lazy document loads can be triggered by navigation while offline. They
+        // must remain available locally without attempting manifest, pull, or
+        // push work; the normal online/reconnect flow will reconcile later.
+        if (!this.isOnline()) {
+            this.subscribeToDoc(docName);
+            return;
+        }
 
         if (this.syncMode === 'manual' && options.allowPull !== true) {
             this.subscribeToDoc(docName);

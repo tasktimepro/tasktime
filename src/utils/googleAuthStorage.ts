@@ -1,12 +1,6 @@
 import { openDB } from 'idb';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 
-interface StoredToken {
-    accessToken: string;
-    expiresAt: number;
-    scope?: string;
-}
-
 /**
  * Session storage for Worker-based auth
  * The session ID is a reference to server-side tokens
@@ -23,7 +17,6 @@ const DB_VERSION = 1;
 const STORE_NAME = 'app-data';
 const TOKEN_KEY = 'google-auth-token';
 const SESSION_KEY = 'google-auth-session';
-const EXPIRY_BUFFER_MS = 60_000;
 const AUTH_STORAGE_INCIDENT_THROTTLE_MS = 30 * 60 * 1000;
 
 function captureAuthStorageIncident(
@@ -57,67 +50,8 @@ const getDB = () => {
     });
 };
 
-export const getStoredToken = async (): Promise<StoredToken | null> => {
-
-    try {
-
-        const db = await getDB();
-        const token = await db.get(STORE_NAME, TOKEN_KEY) as StoredToken | undefined;
-
-        return token ?? null;
-
-    } catch (error) {
-
-        console.error('Error loading Google auth token from IndexedDB:', error);
-        captureAuthStorageIncident(
-            'auth.token_storage_read_failed',
-            'TaskTime Pro could not read the Google auth token from IndexedDB',
-            error,
-            { operation: 'read', storageKind: 'token' },
-        );
-        return null;
-    }
-};
-
-const isQuotaError = (error: unknown): boolean => {
-    if (error instanceof DOMException) {
-        return error.name === 'QuotaExceededError' || error.code === 22;
-    }
-
-    const message = error instanceof Error ? error.message : String(error);
-    return message.includes('QuotaExceededError') || message.includes('storage quota');
-};
-
-export const storeToken = async (token: StoredToken): Promise<void> => {
-
-    try {
-
-        const db = await getDB();
-        await db.put(STORE_NAME, token, TOKEN_KEY);
-
-    } catch (error) {
-
-        if (isQuotaError(error)) {
-            console.error('IndexedDB storage quota exceeded while saving auth token. Clear browser data to free space.');
-            captureAuthStorageIncident(
-                'auth.token_storage_quota_exceeded',
-                'TaskTime Pro could not save the Google auth token because IndexedDB quota was exceeded',
-                error,
-                { operation: 'write', storageKind: 'token', quotaExceeded: true },
-            );
-        } else {
-            console.error('Error saving Google auth token to IndexedDB:', error);
-            captureAuthStorageIncident(
-                'auth.token_storage_write_failed',
-                'TaskTime Pro could not save the Google auth token to IndexedDB',
-                error,
-                { operation: 'write', storageKind: 'token', quotaExceeded: false },
-            );
-        }
-    }
-};
-
-export const clearStoredToken = async (): Promise<void> => {
+/** Remove credentials persisted by the retired pre-Worker auth design. */
+export const clearLegacyStoredToken = async (): Promise<void> => {
 
     try {
 
@@ -134,27 +68,6 @@ export const clearStoredToken = async (): Promise<void> => {
             { operation: 'clear', storageKind: 'token' },
         );
     }
-};
-
-export const isTokenExpired = (token: StoredToken | null): boolean => {
-
-    if (!token?.expiresAt) {
-
-        return true;
-    }
-
-    return Date.now() >= (token.expiresAt - EXPIRY_BUFFER_MS);
-};
-
-export const getTokenTimeRemaining = (token: StoredToken | null): number => {
-
-    if (!token?.expiresAt) {
-
-        return 0;
-    }
-
-    const remaining = token.expiresAt - Date.now();
-    return Math.max(0, remaining);
 };
 
 // ============================================================================
@@ -202,12 +115,22 @@ export const storeSession = async (session: StoredSession): Promise<void> => {
     }
 };
 
-export const clearStoredSession = async (): Promise<void> => {
+export const clearStoredSession = async (expectedSessionId?: string): Promise<boolean> => {
 
     try {
 
         const db = await getDB();
-        await db.delete(STORE_NAME, SESSION_KEY);
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const stored = await transaction.store.get(SESSION_KEY) as StoredSession | undefined;
+
+        if (expectedSessionId && stored?.sessionId !== expectedSessionId) {
+            await transaction.done;
+            return false;
+        }
+
+        await transaction.store.delete(SESSION_KEY);
+        await transaction.done;
+        return true;
 
     } catch (error) {
 
@@ -218,7 +141,8 @@ export const clearStoredSession = async (): Promise<void> => {
             error,
             { operation: 'clear', storageKind: 'session' },
         );
+        return false;
     }
 };
 
-export type { StoredToken, StoredSession };
+export type { StoredSession };

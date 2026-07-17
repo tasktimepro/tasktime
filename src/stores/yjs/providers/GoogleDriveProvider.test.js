@@ -81,6 +81,62 @@ describe('YjsDriveProvider', () => {
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
     })
 
+    it('subscribes an on-demand document locally without remote work while offline', async () => {
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+
+        provider.connected = true
+        provider.syncMode = 'sync'
+        provider.isOnline = () => false
+        provider.manifest = {
+            getManifest: vi.fn(() => ({ documents: {} })),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async () => {})
+        provider.subscribeToDoc = vi.fn()
+
+        await provider.syncAndSubscribeDoc('entries-2026')
+
+        expect(provider.syncDoc).not.toHaveBeenCalled()
+        expect(provider.manifest.save).not.toHaveBeenCalled()
+        expect(provider.subscribeToDoc).toHaveBeenCalledWith('entries-2026')
+    })
+
+    it('serializes remote connection work under the cross-tab Drive lock', async () => {
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+        const originalLocksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
+        const request = vi.fn(async (_name, _options, callback) => callback({ name: 'tasktime-drive-sync' }))
+
+        Object.defineProperty(navigator, 'locks', {
+            configurable: true,
+            value: { request },
+        })
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: {} })),
+            isDirty: vi.fn(() => false),
+        }
+        provider.subscribeToDoc = vi.fn()
+
+        try {
+            await provider.connect('manual')
+            expect(request).toHaveBeenCalledWith(
+                'tasktime-drive-sync',
+                { ifAvailable: false },
+                expect.any(Function),
+            )
+            expect(provider.manifest.load).toHaveBeenCalledTimes(1)
+        } finally {
+            if (originalLocksDescriptor) {
+                Object.defineProperty(navigator, 'locks', originalLocksDescriptor)
+            } else {
+                delete navigator.locks
+            }
+        }
+    })
+
     it('pulls remote data on manual-mode connect when bootstrap is allowed for a pristine device', async () => {
         const liveDoc = new Y.Doc()
         const provider = createProviderWithCoreDoc(liveDoc)

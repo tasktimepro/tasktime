@@ -44,6 +44,7 @@
 - Sync mode performs bidirectional work on documented triggers with cooldown and cross-tab locking.
 - “Sync Now” forces a full pull/push in every mode.
 - The visible sync-status control remains keyboard-operable while loading, connecting, checking, downloading, uploading, or syncing and opens Account > Cloud Sync without starting a duplicate sync.
+- A transient Google-grant revocation, token refresh, rate-limit, or Drive-status failure keeps the retryable session and does not claim that access was revoked; confirmed revocation clears it, while explicit local disconnect remains available separately.
 
 ## Agent bridge
 

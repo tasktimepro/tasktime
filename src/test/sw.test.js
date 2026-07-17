@@ -121,6 +121,32 @@ describe('service worker caching', () => {
         expect(await response.text()).toBe('Offline')
     })
 
+    it.each([
+        'https://sync.tasktime.pro/auth/status',
+        'https://www.googleapis.com/drive/v3/files',
+        'https://www.googleapis.com/upload/drive/v3/files',
+    ])('leaves authenticated cross-origin API traffic network-only for %s', (url) => {
+        const event = createEvent()
+        event.request = { url, mode: 'cors', method: 'GET' }
+
+        handlers.fetch(event)
+
+        expect(event.respondWith).not.toHaveBeenCalled()
+        expect(globalThis.caches.match).not.toHaveBeenCalled()
+        expect(globalThis.caches.open).not.toHaveBeenCalled()
+    })
+
+    it('removes the previous app-shell cache during the privacy cache upgrade', async () => {
+        globalThis.caches.keys.mockResolvedValueOnce(['tasktime-cache-v4', 'tasktime-cache-v5'])
+        const event = { waitUntil: vi.fn() }
+
+        handlers.activate(event)
+        await event.waitUntil.mock.calls[0][0]
+
+        expect(globalThis.caches.delete).toHaveBeenCalledWith('tasktime-cache-v4')
+        expect(globalThis.caches.delete).not.toHaveBeenCalledWith('tasktime-cache-v5')
+    })
+
     it('shows a generic notification for empty push events', async () => {
 
         const event = {

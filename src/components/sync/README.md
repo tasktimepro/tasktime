@@ -42,6 +42,7 @@ Mode rules:
 - Manual means user-controlled. Do not pull or push automatically after connect/reload unless the user clicks Sync Now, except for a one-time bootstrap pull on a pristine device so existing Drive data appears immediately after first connect.
 - Backup means push-only by default after connect. It must not overwrite changed remote Drive state without requiring Sync Now first.
 - Sync means bidirectional. It should merge remote changes and push local changes.
+- The user-facing Sync Now action performs full-state verification for every loaded document after pulling. Internal refresh-only callers must opt out explicitly when they need current cloud state without rewriting verified bases.
 - All modes must preserve pending local changes after failed uploads.
 
 ## Efficiency Contract
@@ -63,6 +64,8 @@ Sync must stay fast and Worker-friendly.
 - Page hide or exit during an active sync must not enqueue another forced sync; the active pass and durable recovery state already own the work.
 
 Reliability can add checks, but heavy checks must stay off the normal no-change path.
+
+Direct-capable source keeps Google access tokens in one module-owned provider per tab. Tokens never enter React state/context, IndexedDB, local/session storage, Cache Storage, diagnostics, backup, or export. Cross-tab invalidation carries only a version and reason, and stale tabs may not delete a newer shared Worker session. A supported explicit Worker policy fixes either direct Google requests or the Worker proxy for each connection; missing, malformed, disabled, offline, or unsupported policy selects proxy. Direct mutations never replay through proxy, creates retain one pre-generated Drive ID for reconciliation, and a policy rollback changes transport only by establishing the next connection. Production remains proxy-only until the separately approved rollout.
 
 The visible sync-status control remains navigable to Account > Cloud Sync during loading, connecting, checking, downloading, uploading, and syncing. That navigation must not start another sync pass.
 

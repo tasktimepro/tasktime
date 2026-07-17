@@ -15,8 +15,10 @@
  */
 
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import { DriveAccessTokenError } from './DriveAccessTokenProvider';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 const MANIFEST_FILE_NAME = 'tasktime-yjs-manifest.json';
 const SYNC_FILE_PREFIX = 'tasktime-yjs-';
 const SYNC_FILE_SUFFIX = '.bin';
@@ -50,6 +52,26 @@ export interface Manifest {
     revision?: number;
     lastWriterId?: string;
     writeId?: string;
+}
+
+export type DriveTransport = 'proxy' | 'direct';
+
+export interface DriveTokenProvider {
+    getToken(options?: { forceRefresh?: boolean }): Promise<string>;
+    clearToken(): void;
+}
+
+export interface ManifestManagerOptions {
+    transport: DriveTransport;
+    sessionId?: string | null;
+    tokenProvider?: DriveTokenProvider | null;
+    /** Legacy direct-auth compatibility for tests and non-Worker consumers. */
+    accessToken?: string | null;
+}
+
+interface NormalizedDriveError {
+    status: number;
+    reasons: Set<string>;
 }
 
 const MAX_COMPACTED_DELTA_TOMBSTONES = 512;
@@ -198,6 +220,7 @@ function isManifest(value: unknown): value is Manifest {
 }
 
 export function isDriveFileNotFoundError(error: unknown): boolean {
+    if (error instanceof DriveFileNotFoundError) return true;
     const message = error instanceof Error ? error.message : String(error);
     const lowerMessage = message.toLowerCase();
 
@@ -215,12 +238,54 @@ export class AuthorizationError extends Error {
     }
 }
 
+export class DriveStorageQuotaError extends Error {
+
+    constructor() {
+        super('Google Drive storage is full. Free space and try syncing again.');
+        this.name = 'DriveStorageQuotaError';
+    }
+}
+
+export class DriveRateLimitError extends Error {
+
+    constructor() {
+        super('Google Drive is temporarily rate limited. Try syncing again shortly.');
+        this.name = 'DriveRateLimitError';
+    }
+}
+
+export class DriveFileNotFoundError extends Error {
+
+    constructor() {
+        super('Drive API error 404: file not found');
+        this.name = 'DriveFileNotFoundError';
+    }
+}
+
+export class DriveConnectivityError extends Error {
+
+    constructor() {
+        super('Unable to reach Google Drive. Your local changes remain saved and will retry.');
+        this.name = 'DriveConnectivityError';
+    }
+}
+
+export class DriveTransportDisabledError extends Error {
+
+    constructor() {
+        super('Direct Google Drive access was disabled. Sync will return to the compatibility transport.');
+        this.name = 'DriveTransportDisabledError';
+    }
+}
+
 /**
  * Manages the manifest.json file in Google Drive appDataFolder
  */
 export class ManifestManager {
 
     private accessToken: string;
+    private readonly transport: DriveTransport;
+    private readonly tokenProvider: DriveTokenProvider | null;
     private sessionId: string | null;
     private manifestFileId: string | null = null;
     private manifest: Manifest | null = null;
@@ -228,10 +293,29 @@ export class ManifestManager {
     private lastManifestModifiedTime: string | null = null;
     private _dirty: boolean = false;
     private readonly localWriterId = crypto.randomUUID();
+    private readonly pendingCreateIds: Map<string, string> = new Map();
 
-    constructor(accessToken: string, sessionId?: string | null) {
-        this.accessToken = accessToken;
-        this.sessionId = sessionId ?? null;
+    constructor(options: ManifestManagerOptions | string, legacySessionId?: string | null) {
+        if (typeof options === 'string') {
+            this.accessToken = options;
+            this.sessionId = legacySessionId ?? null;
+            this.transport = legacySessionId ? 'proxy' : 'direct';
+            this.tokenProvider = null;
+            return;
+        }
+
+        this.transport = options.transport;
+        this.sessionId = options.sessionId ?? null;
+        this.tokenProvider = options.tokenProvider ?? null;
+        this.accessToken = options.accessToken ?? '';
+
+        if (this.transport === 'proxy' && !this.sessionId) {
+            throw new Error('Worker proxy transport requires a session.');
+        }
+
+        if (this.transport === 'direct' && !this.tokenProvider && !this.accessToken) {
+            throw new Error('Direct Drive transport requires a token provider.');
+        }
     }
 
     /**
@@ -243,13 +327,14 @@ export class ManifestManager {
         this.fileIdCache.clear();
         this.lastManifestModifiedTime = null;
         this._dirty = false;
+        this.pendingCreateIds.clear();
     }
 
     /**
      * Check if using Worker proxy mode
      */
     private get useWorker(): boolean {
-        return SYNC_WORKER_CONFIG.isEnabled && Boolean(this.sessionId);
+        return this.transport === 'proxy';
     }
 
     /**
@@ -262,11 +347,27 @@ export class ManifestManager {
     /**
      * Get auth headers for API calls
      */
-    private getAuthHeaders(): Record<string, string> {
+    private async getAuthHeaders(forceRefresh = false): Promise<Record<string, string>> {
         if (this.useWorker) {
             return { 'X-Session-Id': this.sessionId! };
         }
-        return { 'Authorization': `Bearer ${this.accessToken}` };
+
+        try {
+            const token = this.tokenProvider
+                ? await this.tokenProvider.getToken({ forceRefresh })
+                : this.accessToken;
+            return { 'Authorization': `Bearer ${token}` };
+        } catch (error) {
+            if (error instanceof DriveAccessTokenError) {
+                if (error.code === 'DIRECT_TRANSPORT_DISABLED') {
+                    throw new DriveTransportDisabledError();
+                }
+                if (error.code === 'SESSION_NOT_FOUND' || error.code === 'REFRESH_FAILED') {
+                    throw new AuthorizationError('Google session expired. Reconnect Google Drive.');
+                }
+            }
+            throw error;
+        }
     }
 
     /**
@@ -657,6 +758,10 @@ export class ManifestManager {
             }
         } catch (error) {
             console.warn(`[ManifestManager] Failed to search for file ${fileName}:`, error);
+            // A failed lookup is not evidence that a file is absent. Propagate
+            // it so callers retain dirty evidence instead of creating a
+            // possible duplicate after an ambiguous network/auth failure.
+            throw error;
         }
 
         return null;
@@ -776,6 +881,55 @@ export class ManifestManager {
     private static readonly UPLOAD_TIMEOUT_MS = 60_000;
     private static readonly MAX_RETRIES = 3;
 
+    private static async normalizeDriveError(response: Response): Promise<NormalizedDriveError & { code?: string }> {
+        const reasons = new Set<string>();
+        let code: string | undefined;
+
+        try {
+            const payload = await response.clone().json() as {
+                code?: unknown;
+                error?: unknown;
+            };
+
+            if (typeof payload.code === 'string') code = payload.code;
+
+            if (typeof payload.error === 'string') {
+                const lower = payload.error.toLowerCase();
+                if (lower.includes('insufficient')) reasons.add('insufficientPermissions');
+                if (lower.includes('rate limit')) reasons.add('rateLimitExceeded');
+                if (lower.includes('quota')) reasons.add('storageQuotaExceeded');
+            } else if (payload.error && typeof payload.error === 'object') {
+                const googleError = payload.error as {
+                    errors?: unknown;
+                    status?: unknown;
+                };
+                if (Array.isArray(googleError.errors)) {
+                    for (const item of googleError.errors) {
+                        if (item && typeof item === 'object' && typeof (item as { reason?: unknown }).reason === 'string') {
+                            reasons.add((item as { reason: string }).reason);
+                        }
+                    }
+                }
+                if (typeof googleError.status === 'string') reasons.add(googleError.status);
+            }
+        } catch {
+            // Provider response bodies are untrusted and never included in errors.
+        }
+
+        return { status: response.status, reasons, code };
+    }
+
+    private static isRateLimited(error: NormalizedDriveError): boolean {
+        return error.status === 429
+            || error.reasons.has('rateLimitExceeded')
+            || error.reasons.has('userRateLimitExceeded');
+    }
+
+    private static isPermissionFailure(error: NormalizedDriveError): boolean {
+        return error.reasons.has('insufficientPermissions')
+            || error.reasons.has('PERMISSION_DENIED');
+    }
+
     /**
      * Compute retry delay: honor Retry-After header, otherwise exponential backoff (max 30s)
      */
@@ -802,7 +956,8 @@ export class ManifestManager {
     private async request(
         endpoint: string,
         options: RequestInit = {},
-        retryCount = 0
+        retryCount = 0,
+        authRetried = false,
     ): Promise<Response> {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), ManifestManager.REQUEST_TIMEOUT_MS);
@@ -810,77 +965,87 @@ export class ManifestManager {
         let response: Response;
 
         try {
+            const authHeaders = await this.getAuthHeaders(authRetried);
             response = await fetch(`${this.driveBaseUrl}${endpoint}`, {
                 ...options,
                 signal: options.signal ?? controller.signal,
                 headers: {
-                    ...this.getAuthHeaders(),
+                    ...authHeaders,
                     ...options.headers,
                 },
+                cache: 'no-store',
+                credentials: 'omit',
+                referrerPolicy: 'no-referrer',
             });
         } catch (error) {
             clearTimeout(timeoutId);
+
+            if (
+                error instanceof AuthorizationError
+                || error instanceof DriveTransportDisabledError
+                || error instanceof DriveAccessTokenError
+            ) {
+                throw error;
+            }
 
             // Retry on network / timeout errors
             if (retryCount < ManifestManager.MAX_RETRIES) {
                 const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
                 console.warn(`[ManifestManager] request ${endpoint} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
-                return this.request(endpoint, options, retryCount + 1);
+                return this.request(endpoint, options, retryCount + 1, authRetried);
             }
 
-            throw error;
+            throw new DriveConnectivityError();
         } finally {
             clearTimeout(timeoutId);
         }
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
-                let errorMessage = 'Google authorization expired. Reconnect Google Drive.';
+            const driveError = await ManifestManager.normalizeDriveError(response);
 
-                try {
-                    const cloned = response.clone();
-                    const contentType = cloned.headers.get('Content-Type') || '';
-
-                    if (contentType.includes('application/json')) {
-                        const payload = await cloned.json() as { error?: unknown; code?: string };
-                        const payloadError = typeof payload.error === 'string' ? payload.error : null;
-                        const payloadCode = typeof payload.code === 'string' ? payload.code : null;
-
-                        if (response.status === 403) {
-                            if (payloadError && payloadError.toLowerCase().includes('insufficient')) {
-                                errorMessage = 'Google Drive permission is missing for this session. Reconnect and allow Drive access.';
-                            } else {
-                                errorMessage = 'Google Drive access was denied. Reconnect Google Drive.';
-                            }
-                        } else if (payloadCode === 'SESSION_NOT_FOUND' || payloadCode === 'REFRESH_FAILED') {
-                            errorMessage = 'Google session expired. Reconnect Google Drive.';
-                        }
-                    } else if (response.status === 403) {
-                        const text = await cloned.text();
-                        if (text.toLowerCase().includes('insufficient')) {
-                            errorMessage = 'Google Drive permission is missing for this session. Reconnect and allow Drive access.';
-                        } else {
-                            errorMessage = 'Google Drive access was denied. Reconnect Google Drive.';
-                        }
-                    }
-                } catch {
-                    // Ignore parse failures and keep generic auth message
-                }
-
-                throw new AuthorizationError(errorMessage);
+            const shouldRefreshDirectAuth = !this.useWorker
+                && Boolean(this.tokenProvider)
+                && !authRetried
+                && (response.status === 401 || (response.status === 403 && ManifestManager.isPermissionFailure(driveError)));
+            if (shouldRefreshDirectAuth) {
+                this.tokenProvider?.clearToken();
+                return this.request(endpoint, options, retryCount, true);
             }
 
             // Retry transient errors with exponential backoff (honors Retry-After)
-            if ((response.status >= 500 || response.status === 429) && retryCount < ManifestManager.MAX_RETRIES) {
+            if ((response.status >= 500 || ManifestManager.isRateLimited(driveError)) && retryCount < ManifestManager.MAX_RETRIES) {
                 const delay = ManifestManager.getRetryDelay(response, retryCount);
                 console.warn(`[ManifestManager] request ${endpoint} failed with ${response.status}, retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
-                return this.request(endpoint, options, retryCount + 1);
+                return this.request(endpoint, options, retryCount + 1, authRetried);
             }
 
-            const text = await response.text();
-            throw new Error(`Drive API error ${response.status}: ${text}`);
+            if (response.status === 401) {
+                const message = driveError.code === 'SESSION_NOT_FOUND' || driveError.code === 'REFRESH_FAILED'
+                    ? 'Google session expired. Reconnect Google Drive.'
+                    : 'Google authorization expired. Reconnect Google Drive.';
+                throw new AuthorizationError(message);
+            }
+            if (response.status === 403 && driveError.reasons.has('storageQuotaExceeded')) {
+                throw new DriveStorageQuotaError();
+            }
+            if (response.status === 403 && ManifestManager.isPermissionFailure(driveError)) {
+                throw new AuthorizationError('Google Drive permission is missing for this session. Reconnect and allow Drive access.');
+            }
+            if (response.status === 403 && !ManifestManager.isRateLimited(driveError)) {
+                throw new AuthorizationError('Google Drive access was denied. Reconnect Google Drive.');
+            }
+            if (ManifestManager.isRateLimited(driveError)) {
+                throw new DriveRateLimitError();
+            }
+            if (response.status === 404) {
+                throw new DriveFileNotFoundError();
+            }
+            if (response.status >= 500) {
+                throw new DriveConnectivityError();
+            }
+            throw new Error(`Google Drive request failed (${response.status}).`);
         }
 
         return response;
@@ -926,10 +1091,131 @@ export class ManifestManager {
         return response.arrayBuffer();
     }
 
+    private async generateDirectFileId(): Promise<string> {
+        const response = await this.request('/files/generateIds?count=1&space=appDataFolder&type=files');
+        const payload = await response.json() as { ids?: unknown };
+        const id = Array.isArray(payload.ids) && typeof payload.ids[0] === 'string'
+            ? payload.ids[0]
+            : null;
+
+        if (!id) {
+            throw new Error('Google Drive did not allocate a file ID.');
+        }
+
+        return id;
+    }
+
+    private async fetchUpload(
+        url: string,
+        method: 'POST' | 'PATCH',
+        body: FormData,
+        authRetried = false,
+    ): Promise<Response> {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.UPLOAD_TIMEOUT_MS);
+
+        let response: Response;
+        try {
+            const authHeaders = await this.getAuthHeaders(authRetried);
+            response = await fetch(url, {
+                method,
+                headers: authHeaders,
+                body,
+                signal: controller.signal,
+                cache: 'no-store',
+                credentials: 'omit',
+                referrerPolicy: 'no-referrer',
+            });
+        } catch (error) {
+            if (
+                error instanceof AuthorizationError
+                || error instanceof DriveTransportDisabledError
+                || error instanceof DriveAccessTokenError
+            ) {
+                throw error;
+            }
+            throw new DriveConnectivityError();
+        } finally {
+            clearTimeout(timeoutId);
+        }
+
+        if (!response.ok && !this.useWorker && Boolean(this.tokenProvider) && !authRetried) {
+            const driveError = await ManifestManager.normalizeDriveError(response);
+            if (response.status === 401 || (response.status === 403 && ManifestManager.isPermissionFailure(driveError))) {
+                this.tokenProvider?.clearToken();
+                return this.fetchUpload(url, method, body, true);
+            }
+        }
+
+        return response;
+    }
+
+    private async throwUploadError(response: Response): Promise<never> {
+        const driveError = await ManifestManager.normalizeDriveError(response);
+
+        if (response.status === 401) {
+            throw new AuthorizationError('Google authorization expired. Reconnect Google Drive.');
+        }
+        if (response.status === 403 && driveError.reasons.has('storageQuotaExceeded')) {
+            throw new DriveStorageQuotaError();
+        }
+        if (response.status === 403 && ManifestManager.isPermissionFailure(driveError)) {
+            throw new AuthorizationError('Google Drive permission is missing for this session. Reconnect and allow Drive access.');
+        }
+        if (response.status === 403 && !ManifestManager.isRateLimited(driveError)) {
+            throw new AuthorizationError('Google Drive access was denied. Reconnect Google Drive.');
+        }
+        if (ManifestManager.isRateLimited(driveError)) {
+            throw new DriveRateLimitError();
+        }
+        if (response.status === 404) {
+            throw new DriveFileNotFoundError();
+        }
+        if (response.status >= 500) {
+            throw new DriveConnectivityError();
+        }
+        throw new Error(`Google Drive upload failed (${response.status}).`);
+    }
+
+    private async reconcileDirectCreate(fileId: string, name: string, mimeType: string): Promise<boolean> {
+        try {
+            const fields = encodeURIComponent('id,name,mimeType,parents,trashed');
+            const response = await this.request(`/files/${encodeURIComponent(fileId)}?fields=${fields}`);
+            const file = await response.json() as {
+                id?: unknown;
+                name?: unknown;
+                mimeType?: unknown;
+                parents?: unknown;
+                trashed?: unknown;
+            };
+            const matches = file.id === fileId
+                && file.name === name
+                && file.mimeType === mimeType
+                && Array.isArray(file.parents)
+                && file.parents.includes('appDataFolder')
+                && file.trashed !== true;
+
+            if (!matches) {
+                throw new Error('Google Drive returned conflicting metadata for an allocated TaskTime file ID.');
+            }
+
+            this.fileIdCache.set(name, fileId);
+            this.pendingCreateIds.delete(name);
+            return true;
+        } catch (error) {
+            if (error instanceof DriveFileNotFoundError) return false;
+            throw error;
+        }
+    }
+
     /**
      * Create a new file in appDataFolder
      */
     async createFile(name: string, blob: Blob, retryCount = 0): Promise<string> {
+        if (!this.useWorker) {
+            return this.createDirectFile(name, blob, retryCount);
+        }
+
         const metadata = {
             name,
             mimeType: blob.type,
@@ -943,9 +1229,7 @@ export class ManifestManager {
         );
         form.append('file', blob);
 
-        const uploadUrl = this.useWorker
-            ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files?uploadType=multipart`
-            : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+        const uploadUrl = `${SYNC_WORKER_CONFIG.endpoints.drive}/files?uploadType=multipart`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), ManifestManager.UPLOAD_TIMEOUT_MS);
@@ -953,11 +1237,15 @@ export class ManifestManager {
         let response: Response;
 
         try {
+            const authHeaders = await this.getAuthHeaders();
             response = await fetch(uploadUrl, {
                 method: 'POST',
-                headers: this.getAuthHeaders(),
+                headers: authHeaders,
                 body: form,
                 signal: controller.signal,
+                cache: 'no-store',
+                credentials: 'omit',
+                referrerPolicy: 'no-referrer',
             });
         } catch (error) {
             clearTimeout(timeoutId);
@@ -987,13 +1275,65 @@ export class ManifestManager {
                 return this.createFile(name, blob, retryCount + 1);
             }
 
-            const text = await response.text();
-            throw new Error(`Drive upload error ${response.status}: ${text}`);
+            throw new Error(`Drive upload error ${response.status}.`);
         }
 
         const result = await response.json();
         this.fileIdCache.set(name, result.id);
         return result.id;
+    }
+
+    private async createDirectFile(name: string, blob: Blob, retryCount = 0): Promise<string> {
+        const fileId = this.pendingCreateIds.get(name) ?? await this.generateDirectFileId();
+        this.pendingCreateIds.set(name, fileId);
+        const metadata = {
+            id: fileId,
+            name,
+            mimeType: blob.type,
+            parents: ['appDataFolder'],
+        };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+
+        let response: Response;
+        try {
+            response = await this.fetchUpload(
+                `${DRIVE_UPLOAD_API}/files?uploadType=multipart`,
+                'POST',
+                form,
+            );
+        } catch (error) {
+            if (error instanceof DriveConnectivityError) {
+                if (await this.reconcileDirectCreate(fileId, name, blob.type)) return fileId;
+            }
+            throw error;
+        }
+
+        if (response.ok) {
+            const result = await response.json() as { id?: unknown };
+            if (result.id !== fileId) {
+                throw new Error('Google Drive returned an unexpected file ID for a TaskTime upload.');
+            }
+            this.fileIdCache.set(name, fileId);
+            this.pendingCreateIds.delete(name);
+            return fileId;
+        }
+
+        const driveError = await ManifestManager.normalizeDriveError(response);
+        const ambiguous = response.status === 409 || response.status >= 500;
+        if (ambiguous && await this.reconcileDirectCreate(fileId, name, blob.type)) {
+            return fileId;
+        }
+
+        const retryable = ambiguous || ManifestManager.isRateLimited(driveError);
+        if (retryable && retryCount < ManifestManager.MAX_RETRIES) {
+            const delay = ManifestManager.getRetryDelay(response, retryCount);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return this.createDirectFile(name, blob, retryCount + 1);
+        }
+
+        await this.throwUploadError(response);
     }
 
     /**
@@ -1015,50 +1355,41 @@ export class ManifestManager {
 
         const uploadUrl = this.useWorker
             ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files/${fileId}?uploadType=multipart&fields=modifiedTime`
-            : `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&fields=modifiedTime`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.UPLOAD_TIMEOUT_MS);
+            : `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=multipart&fields=modifiedTime`;
 
         let response: Response;
 
         try {
-            response = await fetch(uploadUrl, {
-                method: 'PATCH',
-                headers: this.getAuthHeaders(),
-                body: form,
-                signal: controller.signal,
-            });
+            response = await this.fetchUpload(uploadUrl, 'PATCH', form);
         } catch (error) {
-            clearTimeout(timeoutId);
-
+            if (
+                error instanceof AuthorizationError
+                || error instanceof DriveTransportDisabledError
+                || error instanceof DriveAccessTokenError
+                || error instanceof DriveStorageQuotaError
+            ) {
+                throw error;
+            }
             if (retryCount < ManifestManager.MAX_RETRIES) {
                 const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
                 console.warn(`[ManifestManager] updateFile ${name} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
                 return this.updateFile(fileId, name, blob, retryCount + 1);
             }
-
             throw error;
-        } finally {
-            clearTimeout(timeoutId);
         }
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
-                throw new AuthorizationError('Google authorization expired.');
-            }
-
             // Retry transient errors with exponential backoff (honors Retry-After)
-            if ((response.status >= 500 || response.status === 429) && retryCount < ManifestManager.MAX_RETRIES) {
+            const driveError = await ManifestManager.normalizeDriveError(response);
+            if ((response.status >= 500 || ManifestManager.isRateLimited(driveError)) && retryCount < ManifestManager.MAX_RETRIES) {
                 const delay = ManifestManager.getRetryDelay(response, retryCount);
                 console.warn(`[ManifestManager] updateFile ${name} failed with ${response.status}, retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
                 return this.updateFile(fileId, name, blob, retryCount + 1);
             }
 
-            const text = await response.text();
-            throw new Error(`Drive update error ${response.status}: ${text}`);
+            await this.throwUploadError(response);
         }
 
         try {
