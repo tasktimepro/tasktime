@@ -217,14 +217,15 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 
 - **Worker URL:** `https://sync.tasktime.pro`
 - **Source:** private operational Worker source. The public repository mirror intentionally excludes this implementation.
-- **Features:** Secure refresh token storage, auto-refresh, Drive API proxy
+- **Features:** Secure refresh-token storage, auto-refresh, short-lived direct-token issuance, and a retained Drive API compatibility proxy
 
 **How it works:**
 1. OAuth popup → Worker exchanges code for tokens
 2. Worker encrypts and stores refresh token in KV
 3. Worker returns session ID to app (stored in localStorage)
-4. All Drive API calls go through Worker with session ID
-5. Worker auto-refreshes access tokens as needed
+4. Worker status selects a fixed transport for the next connection: the compatibility proxy or direct Google Drive
+5. Direct connections receive a short-lived access token kept only in tab memory; proxy connections use the Worker session ID
+6. Worker auto-refreshes access tokens as needed; it never returns a refresh token to the browser
 
 **Worker operations:** Deployment, logs, D1/KV commands, and secret management live in the private infrastructure repository, not in the public app Makefile.
 

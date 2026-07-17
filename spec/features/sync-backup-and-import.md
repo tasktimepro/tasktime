@@ -3,7 +3,7 @@
 ## Behavior
 
 - IndexedDB persists every managed Yjs document locally.
-- Drive sync exchanges deltas/manifests through the configured Worker and uses metadata checks, throttling, and cross-tab locking.
+- Drive sync exchanges deltas/manifests using a Worker-selected per-connection transport: a retained Worker compatibility proxy or direct Google Drive requests with a short-lived memory-only access token. It uses metadata checks, throttling, and cross-tab locking in either transport.
 - Manual, backup, and sync modes follow the trigger matrix in `AGENTS.md`.
 - Dirty documents changed while disconnected are recorded for full-state upload on reconnect.
 - Export produces a portable data backup; import validates and previews before restore.

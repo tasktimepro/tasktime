@@ -19,5 +19,6 @@ Make backup, import, Drive connection, and sync-mode consequences understandable
   until every replacement document passes a persistence barrier; startup
   automatically recovers the previous workspace if the browser stopped first.
 - Account-wide deletion and Drive revocation remain separate explicit operations.
+- The edge service retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, revocation, and compatibility support. A compatible connection may send normal Drive file requests directly to Google using an active-tab-memory token; an absent, invalid, disabled, or unsupported policy uses the proxy. The UI must not imply that either transport creates a TaskTime-hosted workspace copy.
 
 Errors provide recovery steps without suggesting browser/Drive resets as a routine fix.
