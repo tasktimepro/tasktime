@@ -21,7 +21,7 @@ This data stays on your device unless you choose a feature that intentionally se
 
 Google Drive sync is optional. If you connect it, TaskTime Pro stores sync documents and backups in the app-data area of your own Google Drive account.
 
-The public app uses a small edge authentication service at `sync.tasktime.pro` to securely maintain the Google connection. It stores the session record and encrypted OAuth refresh token needed for that connection, issues short-lived Google access tokens only to an authorized browser connection, and supports revocation. Current compatible app versions send normal sync file requests directly between the browser and Google Drive. Older installed versions and an explicit rollback path use the retained compatibility proxy. In direct mode, the access token stays only in active-browser memory and the edge service does not receive routine Drive file bodies. In either mode, it does not retain your work records as a hosted TaskTime workspace.
+The public app uses a small edge authentication service at `sync.tasktime.pro` to securely maintain the Google connection. It stores the session record and encrypted OAuth refresh token needed for that connection, issues short-lived Google access tokens only to an authorized browser connection, and supports revocation. Routine sync file requests travel directly between your browser and Google Drive. The access token stays only in active-browser memory, and the edge service does not receive or retain routine Drive file bodies or your work records as a TaskTime-hosted workspace.
 
 Google Drive sync uses the minimum practical Google scopes for app-data sync and account identification. Google's own terms and privacy policy apply to your Google account and Drive storage.
 
@@ -83,7 +83,7 @@ Use synthetic examples for public reports. Follow [SECURITY.md](./SECURITY.md) f
 TaskTime Pro may interact with:
 
 - Google Drive, when you enable sync
-- Cloudflare, for public edge services such as OAuth/session proxying, metrics, notification scheduling, and related app endpoints
+- Cloudflare, for public edge services such as OAuth/session control, metrics, notification scheduling, and related app endpoints
 - Resend, when you send invoice email
 - DebugBundle, when runtime diagnostics are configured
 - GitHub and npm, for public source, issue tracking, packages, and release artifacts

@@ -45,7 +45,7 @@
 - “Sync Now” forces a full pull/push in every mode.
 - The visible sync-status control remains keyboard-operable while loading, connecting, checking, downloading, uploading, or syncing and opens Account > Cloud Sync without starting a duplicate sync.
 - A transient Google-grant revocation, token refresh, rate-limit, or Drive-status failure keeps the retryable session and does not claim that access was revoked; confirmed revocation clears it, while explicit local disconnect remains available separately.
-- A policy-selected direct connection keeps its access token only in active-tab memory and sends ordinary Drive file requests directly to Google. Missing, malformed, disabled, or unsupported policy remains compatible through the Worker proxy; a transport change is applied only to a later connection/pass and never replays an ambiguous write through the other transport.
+- A direct connection keeps its access token only in active-tab memory and sends ordinary Drive file requests directly to Google. Ambiguous writes are never replayed through the Worker.
 
 ## Agent bridge
 

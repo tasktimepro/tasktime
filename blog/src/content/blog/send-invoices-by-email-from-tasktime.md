@@ -52,7 +52,7 @@ Reminders work exactly like invoice sends: preview the email, adjust if needed, 
 If you're the kind of person who cares about where your data goes (and if you're using TaskTime Pro, you probably are), here's what happens:
 
 1. The PDF is generated in your browser, just like before
-2. The email is sent through a secure backend — the same one that handles Google Drive sync
+2. The email is sent through a secure backend — the same edge service that supports Google Drive sync authentication
 3. The backend passes the PDF to the email provider (Resend), then immediately forgets it
 4. No invoice content, client data, or PDF files are stored on the server
 

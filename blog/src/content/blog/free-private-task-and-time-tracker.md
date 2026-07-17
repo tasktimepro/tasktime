@@ -40,7 +40,7 @@ TaskTime Pro stores your work records in your browser using a technology called 
 
 There's no TaskTime account and no backend database containing your work records. The production app sends limited aggregate usage counters, such as daily session and action totals, but never project names, task names, client details, notes, amounts, tracked hours, or other raw work content.
 
-If you want to sync across devices, you connect your own Google Drive. Sync documents are stored in the app-data area of your Drive rather than a TaskTime-hosted workspace.
+If you want to sync across devices, you connect your own Google Drive. Sync documents are stored in the app-data area of your Drive rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to Google Drive.
 
 And core use is free — not as a loss leader or a growth hack, but because work management runs locally without requiring a hosted account. Optional services have infrastructure costs, but core use is not financed by monetizing your work records.
 

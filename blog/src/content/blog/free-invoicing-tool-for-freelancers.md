@@ -42,7 +42,7 @@ The invoice pulls in your time entries and billable expenses. You customize the 
 
 Payment tracking is simple: mark each invoice as paid or unpaid, and you can see outstanding amounts at a glance.
 
-All of this is free. Not "free for 14 days" or "free for your first 5 invoices" — just free. TaskTime Pro runs in your browser and stores everything on your device, so there's no server cost to pass on to you.
+All of this is free. Not "free for 14 days" or "free for your first 5 invoices" — just free. TaskTime Pro runs in your browser and stores records locally by default, without a paid hosted workspace tier.
 
 ## The difference between free and "free tier"
 

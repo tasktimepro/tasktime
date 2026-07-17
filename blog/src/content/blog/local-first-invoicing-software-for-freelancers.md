@@ -31,9 +31,9 @@ Here's what day-to-day freelancing looks like with a local-first approach:
 
 "But what if I use two devices?" — totally fair question.
 
-Local-first doesn't mean local-only. TaskTime Pro, for example, lets you sync across devices through your own Google Drive. Sync documents are stored in the app-data area of your Drive rather than a TaskTime-hosted workspace.
+Local-first doesn't mean local-only. TaskTime Pro, for example, lets you sync across devices through your own Google Drive. Sync documents are stored in the app-data area of your Drive rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to Google Drive.
 
-So you get the convenience of sync without the privacy trade-off of storing everything on a company's servers.
+So you get the convenience of sync without routing routine Drive file bodies through TaskTime Pro.
 
 ## Try it and feel the difference
 

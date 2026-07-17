@@ -66,7 +66,7 @@ make npm CMD="run build:agent-bridge" # build the agent bridge package
 - React 19 and Vite for the app
 - Tailwind CSS, Radix, and shadcn-style UI primitives
 - Yjs CRDT documents with IndexedDB persistence
-- Optional Google Drive sync using a private edge OAuth/token service and direct browser-to-Google Drive data path; a compatibility proxy remains for rollback and older installed clients
+- Optional Google Drive sync sends routine sync files directly from your browser to your own Google Drive; the private edge service handles only OAuth and short-lived token issuance
 - Astro for the public blog, agent docs, `llms.txt`, and sitemap output
 - Vitest for unit/integration tests and Playwright for browser smoke tests
 

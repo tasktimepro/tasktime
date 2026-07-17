@@ -56,7 +56,7 @@ Customize the template with your business logo, payment details, and notes. Then
 
 ## Set up sync (optional)
 
-If you use TaskTime Pro on multiple devices (say, your laptop and your phone), you can set up **Google Drive sync** under Account settings. The sync documents are stored in the app-data area of your own Drive rather than a TaskTime-hosted workspace.
+If you use TaskTime Pro on multiple devices (say, your laptop and your phone), you can set up **Google Drive sync** under Account settings. The sync documents are stored in the app-data area of your own Drive rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to Google Drive.
 
 Sync is entirely optional. The app works perfectly fine without it.
 

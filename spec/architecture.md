@@ -33,7 +33,7 @@ The app uses `useUrlState` and History API events rather than React Router. App 
 
 ## External boundaries
 
-- Google OAuth/Drive and push endpoints are accessed through the configured Worker URL.
+- Google OAuth, token-control, and push endpoints use the configured Worker URL. Routine Google Drive file requests go directly from the browser to Google Drive with a short-lived, memory-only access token.
 - The private Worker's source and deployment are external to this repository.
 - Email, exchange rates, DebugBundle, npm/MCP registries, and agent platforms are adapters with sanitized failure behavior.
 - The local agent bridge binds to loopback, while the browser remains the mutation owner.

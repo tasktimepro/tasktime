@@ -11,7 +11,7 @@
 | PWA | vite-plugin-pwa, custom service worker registration | Installability, caching, and offline boot |
 | Public site | Astro | Blog, legal pages, agent docs, discovery artifacts |
 | Agent interface | Local WebSocket/browser transport and MCP bridge | Same-device scoped agent access |
-| Cloud adapter | Google Drive appDataFolder through Cloudflare Worker | Optional sync, auth, push, and metrics boundary |
+| Cloud adapter | Google Drive appDataFolder plus Cloudflare Worker control plane | Direct optional Drive sync; Worker OAuth/token, push, and metrics boundary |
 | Diagnostics | DebugBundle browser SDK | Optional captured runtime evidence |
 | Tests | Vitest, Testing Library, Playwright | Unit/component/integration and browser flows |
 | Tooling | Docker Compose, Make, GitHub Actions | Reproducible development and CI release gates |

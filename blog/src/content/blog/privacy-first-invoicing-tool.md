@@ -31,7 +31,7 @@ Not every tool that mentions privacy actually delivers it. Here's what to look f
 
 TaskTime Pro keeps your invoicing records in your browser by default. There is no TaskTime-hosted workspace database containing those records.
 
-If you want backup and sync across devices, you can connect your own Google Drive. Sync documents are stored in the app-data area of your Drive rather than a TaskTime-hosted workspace.
+If you want backup and sync across devices, you can connect your own Google Drive. Sync documents are stored in the app-data area of your Drive rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to Google Drive.
 
 You can also generate PDF invoices, customize templates, and track payment status — all without creating an account or handing over your data.
 

@@ -36,7 +36,7 @@ An invoicing app that works without the cloud is simpler than it sounds:
 
 - **Your invoices live on your device.** Create them, edit them, export them — all without an internet connection.
 - **PDF export works locally.** You generate the PDF in your browser, not on a remote server.
-- **No account means no data on their end.** If there's no sign-up, there's nothing to store about you.
+- **No product account or hosted workspace database.** Your local invoice records do not require a TaskTime-hosted workspace.
 - **Sync is opt-in, on your terms.** If you *want* backup or multi-device access, you decide where the data goes.
 
 ## How TaskTime Pro approaches this
@@ -45,9 +45,9 @@ TaskTime Pro is a PWA — a progressive web app — that runs entirely in your b
 
 When you generate an invoice, the PDF is created right in your browser. No server round-trip, no upload. The file goes from your device to wherever you choose to save it.
 
-If you want your invoicing data available on another device, you can connect Google Drive for sync. Sync documents are stored in the app-data area of your own Drive rather than a TaskTime-hosted workspace.
+If you want your invoicing data available on another device, you can connect Google Drive for sync. Sync documents are stored in the app-data area of your own Drive rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to Google Drive.
 
-There's no account to create. No monthly fee. No server holding your billing history. You control your financial records completely, and you can export everything at any time.
+There is no product account to create and no monthly fee. TaskTime Pro does not keep a hosted workspace copy of your billing history. You control your financial records and can export everything at any time.
 
 ## It's a mindset shift
 

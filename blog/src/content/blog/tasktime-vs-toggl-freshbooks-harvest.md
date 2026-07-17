@@ -31,7 +31,7 @@ FreshBooks is a solid all-in-one accounting tool. It handles invoicing, expenses
 
 The trade-off? Everything lives on FreshBooks' servers. Your client data, billing history, and business details are all in their cloud. If you stop paying, you lose access to your records (they give you a grace period, but still). And their pricing has gone up steadily over the years — the Lite plan that used to be cheap now costs more than many freelancers want to spend.
 
-**TaskTime Pro's approach:** Your data stays in your browser. No account required, no monthly fee, no server storing your information. If you want sync across devices, you connect your own Google Drive. FreshBooks knows everything about your business; TaskTime Pro knows nothing.
+**TaskTime Pro's approach:** Your data stays in your browser. No product account required and no monthly fee. If you want sync across devices, routine file data travels directly between your browser and your own Google Drive, rather than through TaskTime Pro. FreshBooks hosts your business records; TaskTime Pro does not receive your routine Drive file bodies.
 
 ## Harvest: Solid but aging
 

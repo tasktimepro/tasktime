@@ -217,14 +217,14 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 
 - **Worker URL:** `https://sync.tasktime.pro`
 - **Source:** private operational Worker source. The public repository mirror intentionally excludes this implementation.
-- **Features:** Secure refresh-token storage, auto-refresh, short-lived direct-token issuance, and a retained Drive API compatibility proxy
+- **Features:** Secure refresh-token storage, auto-refresh, and short-lived direct-token issuance
 
 **How it works:**
 1. OAuth popup → Worker exchanges code for tokens
 2. Worker encrypts and stores refresh token in KV
 3. Worker returns session ID to app (stored in localStorage)
-4. Worker status selects a fixed transport for the next connection: the compatibility proxy or direct Google Drive
-5. Direct connections receive a short-lived access token kept only in tab memory; proxy connections use the Worker session ID
+4. Worker status selects direct Google Drive for the next connection
+5. The browser receives a short-lived access token kept only in tab memory and sends routine Drive file requests directly to Google
 6. Worker auto-refreshes access tokens as needed; it never returns a refresh token to the browser
 
 **Worker operations:** Deployment, logs, D1/KV commands, and secret management live in the private infrastructure repository, not in the public app Makefile.
@@ -307,7 +307,7 @@ docker compose run --rm app npm run <script>
 - [x] useTaskState migrated to Yjs hooks
 - [x] `syncableEntity.ts` deleted (no longer needed)
 - [x] Cloudflare Worker deployed (private operational source; excluded from the public mirror)
-- [x] Worker-based auth flow (OAuth popup → Worker proxy)
+- [x] Worker-based auth flow (OAuth popup → Worker OAuth/token control plane)
 - [x] Encrypted refresh token storage in Cloudflare KV
 
 ### Next Steps

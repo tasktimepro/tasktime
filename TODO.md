@@ -17,8 +17,8 @@
     [ ] Glama
     [ ] MCP.so
 
-[ ] Drive worker sync updates: tasktime-infra/docs/todo/direct-google-drive-sync-implementation-plan.md
-    [x] Update public privacy/terms/architecture wording: current compatible PWAs send routine Drive file requests directly to Google; the edge service keeps OAuth/token control-plane duties and the proxy remains only for old clients and rollback.
+[x] Drive worker sync updates: tasktime-infra/docs/todo/direct-google-drive-sync-implementation-plan.md
+    [x] Retire the temporary staging environment and Worker data proxy; routine Drive file requests now go directly from the browser to Google Drive while the edge service retains only OAuth/token control-plane duties.
     [ ] Also since now multiple request checks don't affect the worker free tier counts, we might as well increase the auto-sync behaviour to be a bit more agressive if that would improve the experience - maybe even the notes can trigger a sync now instead of the manual sync now button
 
 [x] Invoice cancellation: tasktime-infra/docs/todo/invoice-cancellation-implementation-plan.md

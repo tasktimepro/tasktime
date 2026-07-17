@@ -30,7 +30,7 @@ When your tasks, time tracking, expenses, and invoicing all live in the same too
 
 Here's something people don't think about: if you use four different SaaS tools, four different companies have a piece of your work data. Your task titles (which often contain client names), your work patterns, your billing rates, your client list — scattered across vendors.
 
-With a local-first tool like TaskTime Pro, all of that stays in your browser. One place, under your control. If you add sync, it goes to *your* Google Drive — not someone else's servers.
+With a local-first tool like TaskTime Pro, all of that stays in your browser. One place, under your control. If you add sync, routine file data travels directly from your browser to *your* Google Drive; TaskTime Pro does not receive those Drive file bodies.
 
 ## What this looks like in practice
 

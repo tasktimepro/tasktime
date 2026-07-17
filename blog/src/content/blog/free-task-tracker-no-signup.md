@@ -43,9 +43,9 @@ TaskTime Pro is a task tracker that lives in your browser. You open it, create a
 
 Your tasks support subtasks, so you can break bigger deliverables into manageable pieces. Each task can have a timer attached, and when you complete work, the time entries stay connected to the right task and project.
 
-Everything is stored locally on your device. Your task list doesn't live on someone else's server, and there's no monthly fee keeping it alive. It's just *there*, in your browser, whenever you need it.
+Everything is stored locally on your device by default. There is no TaskTime-hosted workspace database for your task list, and no monthly fee keeping it alive. It's just *there*, in your browser, whenever you need it.
 
-If you want to access your tasks across devices, you can optionally sync through your own Google Drive. But the app works perfectly fine without it — most people don't need sync at all.
+If you want to access your tasks across devices, you can optionally sync through your own Google Drive. Routine sync file requests travel directly from your browser to Google Drive, but the app works perfectly fine without sync — most people don't need it at all.
 
 ## The simplest test
 

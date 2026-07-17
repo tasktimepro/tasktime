@@ -46,8 +46,8 @@ There's no free tier because there's no paid tier. The whole app is free. No lim
 
 ## The catch? There isn't one
 
-Seriously. TaskTime Pro runs in your browser and stores everything locally on your device. There's no server to fund, which means there's no reason to charge you or restrict features behind a paywall.
+Seriously. TaskTime Pro runs in your browser and stores everything locally on your device by default. There is no product account or TaskTime-hosted workspace database to fund, which means there is no reason to charge you or restrict features behind a paywall.
 
-If you want sync across devices, you can connect your own Google Drive — but that's optional. The timer works perfectly fine without it.
+If you want sync across devices, you can connect your own Google Drive — but that's optional. Routine sync file requests travel directly from your browser to Google Drive, and the timer works perfectly fine without sync.
 
 [Try it out](/) — you'll be timing your first task in about ten seconds.

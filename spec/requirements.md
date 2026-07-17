@@ -64,7 +64,7 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **SYNC-4:** Serialize cross-tab synchronization, do not queue a second page-exit pass while one is active, persist dirty identity per document, and recover only affected disconnected documents on reconnect. Pull/consistency retries remain distinct from unsynced local data.
 - **SYNC-5:** Never auto-sync destructive resets or conflict decisions that can undo a valid change from another device.
 - **SYNC-6:** Treat local Drive disconnect and Google-grant revocation as distinct actions. A transient revocation or auth-status failure preserves the retryable Worker/browser session and must not be reported as successful revocation; clear it only after confirmed success, an already-invalid grant, or explicit local disconnect.
-- **SYNC-7:** Select one Drive transport per connection from an authenticated Worker policy. Missing, malformed, disabled, or unsupported policy must select the compatibility proxy. Direct mode may keep only a short-lived Google access token in active-tab memory, sends normal Drive file requests directly to Google, and never replays an ambiguous mutation through the proxy.
+- **SYNC-7:** Drive sync uses direct Google requests. It may keep only a short-lived Google access token in active-tab memory, sends normal Drive file requests directly to Google, and never routes a routine Drive file body through the Worker.
 
 ## Agent access
 

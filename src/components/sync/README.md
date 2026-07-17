@@ -10,7 +10,7 @@ TaskTime Pro is in production. Existing IndexedDB and Google Drive appDataFolder
 
 - Storage is local-first Yjs CRDT data persisted in IndexedDB.
 - Drive sync stores Yjs base-state files, delta files, and one manifest in Google Drive appDataFolder.
-- A Worker-issued per-connection policy selects either the Cloudflare Worker compatibility proxy or direct Google Drive requests. The Worker always retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, revocation, and compatibility support.
+- The Worker retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, and revocation. Routine Google Drive requests go directly from the browser to Google.
 - JSON backups are separate snapshot files. They are not Yjs sync files and must not be deleted by ordinary sync cleanup.
 - Import/export uses the Yjs store, not separate localStorage state.
 
@@ -65,7 +65,7 @@ Sync must stay fast and Worker-friendly.
 
 Reliability can add checks, but heavy checks must stay off the normal no-change path.
 
-Direct-capable source keeps Google access tokens in one module-owned provider per tab. Tokens never enter React state/context, IndexedDB, local/session storage, Cache Storage, diagnostics, backup, or export. Cross-tab invalidation carries only a version and reason, and stale tabs may not delete a newer shared Worker session. A supported explicit Worker policy fixes either direct Google requests or the Worker proxy for each connection; missing, malformed, disabled, offline, or unsupported policy selects proxy. Direct connections send normal Drive file bodies to Google rather than the Worker. Direct mutations never replay through proxy, creates retain one pre-generated Drive ID for reconciliation, and a policy rollback changes transport only by establishing the next connection.
+Direct source keeps Google access tokens in one module-owned provider per tab. Tokens never enter React state/context, IndexedDB, local/session storage, Cache Storage, diagnostics, backup, or export. Cross-tab invalidation carries only a version and reason, and stale tabs may not delete a newer shared Worker session. Direct connections send normal Drive file bodies to Google rather than the Worker, and creates retain one pre-generated Drive ID for reconciliation.
 
 The visible sync-status control remains navigable to Account > Cloud Sync during loading, connecting, checking, downloading, uploading, and syncing. That navigation must not start another sync pass.
 

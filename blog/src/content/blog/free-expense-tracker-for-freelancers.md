@@ -44,7 +44,7 @@ In TaskTime Pro, expenses are part of your project workflow. You log an expense,
 
 Recurring expenses get created automatically on the schedule you set — monthly, weekly, whatever makes sense. When you generate an invoice, billable expenses show up alongside your tracked time. No copying numbers between apps.
 
-Everything is stored locally in your browser. There's no account, no server storing your financial data, and no monthly charge. You can optionally sync to Google Drive if you want backup, but the app works fine without it.
+By default, everything is stored locally in your browser. There is no product account or TaskTime-hosted workspace database for your financial data, and no monthly charge. You can optionally sync to Google Drive if you want backup; routine Drive file requests go directly from your browser to Google, and the app works fine without sync.
 
 ## A simpler approach to tax time
 
