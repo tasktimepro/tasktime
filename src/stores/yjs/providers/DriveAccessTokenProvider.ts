@@ -6,6 +6,12 @@ const EARLY_EXPIRY_BUFFER_MS = 2 * 60 * 1000;
 const MAX_LOCAL_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_RETRY_AFTER_SECONDS = 60 * 60;
 
+function withAppVersion(endpoint: string): string {
+    const url = new URL(endpoint);
+    url.searchParams.set('appVersion', APP_VERSION);
+    return url.toString();
+}
+
 const WORKER_ERROR_CODES = new Set([
     'DIRECT_TRANSPORT_DISABLED',
     'DRIVE_NOT_ENTITLED',
@@ -229,7 +235,7 @@ export class DriveAccessTokenProvider {
     ): Promise<string> {
         let response: Response;
         try {
-            response = await fetch(this.endpoint, {
+            response = await fetch(withAppVersion(this.endpoint), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

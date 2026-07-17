@@ -583,7 +583,7 @@ export function createStatefulDriveFixture(initialFixture) {
 }
 
 export async function installMockDriveRoutes(target, driveFixture) {
-    await target.route('**/auth/status', async (route) => {
+    await target.route('**/auth/status**', async (route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -623,7 +623,7 @@ export async function installMockDirectDriveRoutes(target, driveFixture) {
     driveFixture.directUploads = () => directUploads;
     driveFixture.setResponseHeaders(corsHeaders);
 
-    await target.route('**/auth/status', async (route) => {
+    await target.route('**/auth/status**', async (route) => {
         if (await fulfillPreflight(route)) return;
         statusRequests += 1;
         await route.fulfill({
@@ -638,7 +638,7 @@ export async function installMockDirectDriveRoutes(target, driveFixture) {
         });
     });
 
-    await target.route('**/auth/access-token', async (route) => {
+    await target.route('**/auth/access-token**', async (route) => {
         if (await fulfillPreflight(route)) return;
         tokenRequests += 1;
         await route.fulfill({

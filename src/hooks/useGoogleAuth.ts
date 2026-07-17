@@ -53,6 +53,13 @@ const AUTH_POPUP_CLOSE_CHECK_DELAY_MS = 250;
 
 const HAD_PREVIOUS_SESSION_KEY = 'google-auth-had-previous-session';
 
+function withAppVersion(endpoint: string): string {
+
+    const url = new URL(endpoint);
+    url.searchParams.set('appVersion', APP_VERSION);
+    return url.toString();
+}
+
 function readHadPreviousSessionFlag(): boolean {
 
     if (typeof window === 'undefined') {
@@ -390,7 +397,7 @@ export const useGoogleAuth = () => {
 
         const promise = (async (): Promise<boolean> => {
             try {
-                const response = await fetch(SYNC_WORKER_CONFIG.endpoints.authStatus, {
+                const response = await fetch(withAppVersion(SYNC_WORKER_CONFIG.endpoints.authStatus), {
                     method: 'GET',
                     headers: {
                         'X-Session-Id': session.sessionId,

@@ -744,7 +744,7 @@ test.describe('Cloud sync smoke', () => {
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
         let expireDriveRequests = false;
 
-        await page.route('**/auth/status', async (route) => {
+        await page.route('**/auth/status**', async (route) => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
@@ -790,7 +790,7 @@ test.describe('Cloud sync smoke', () => {
     });
 
     test('shows reconnect state when a previous Drive session is no longer valid', async ({ page }) => {
-        await page.route('**/auth/status', async (route) => {
+        await page.route('**/auth/status**', async (route) => {
             await route.fulfill({
                 status: 401,
                 contentType: 'application/json',

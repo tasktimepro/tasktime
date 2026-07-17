@@ -8,7 +8,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
-- **Drive sync:** The `v1.3.1` PWA uses direct browser-to-Google Drive requests with a short-lived memory-only access token by default. The public `https://sync.tasktime.pro` Worker retains OAuth code exchange, encrypted refresh-token storage, token issuance, revocation, and a compatibility proxy. Production selection is additionally gated by a non-secret PWA build identifier, so older installed clients fail closed to the proxy until updated. The private Worker implementation is outside this repository.
+- **Drive sync:** The `v1.3.2` PWA uses direct browser-to-Google Drive requests with a short-lived memory-only access token by default. The public `https://sync.tasktime.pro` Worker retains OAuth code exchange, encrypted refresh-token storage, token issuance, revocation, and a compatibility proxy. Production selection is additionally gated by a non-secret PWA build identifier, so older installed clients fail closed to the proxy until updated. The private Worker implementation is outside this repository.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Public site:** Astro content under `blog/` builds the blog, legal pages, agent documentation, discovery metadata, and generated tool references.

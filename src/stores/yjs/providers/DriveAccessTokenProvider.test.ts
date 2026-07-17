@@ -41,7 +41,7 @@ describe('DriveAccessTokenProvider', () => {
         await expect(provider.getToken()).resolves.toBe('access-token-fixture');
 
         expect(fetch).toHaveBeenCalledOnce();
-        expect(fetch).toHaveBeenCalledWith(ENDPOINT, expect.objectContaining({
+        expect(fetch).toHaveBeenCalledWith(`${ENDPOINT}?appVersion=${APP_VERSION}`, expect.objectContaining({
             method: 'POST',
             cache: 'no-store',
             credentials: 'omit',

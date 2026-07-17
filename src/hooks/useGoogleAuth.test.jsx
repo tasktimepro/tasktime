@@ -194,7 +194,7 @@ describe('useGoogleAuth', () => {
         expect(result.current.isSignedIn).toBe(true)
         expect(result.current.driveTransport).toBe('direct')
         expect(result.current.accessToken).toBeNull()
-        expect(fetch).toHaveBeenCalledWith('https://worker.example/auth/status', expect.objectContaining({
+        expect(fetch).toHaveBeenCalledWith(`https://worker.example/auth/status?appVersion=${APP_VERSION}`, expect.objectContaining({
             headers: expect.objectContaining({ 'X-TaskTime-App-Version': APP_VERSION }),
         }))
     })
@@ -1012,7 +1012,7 @@ describe('useGoogleAuth', () => {
                 }
             }
 
-            if (input === 'https://worker.example/auth/status') {
+            if (input.startsWith('https://worker.example/auth/status?appVersion=')) {
                 return {
                     ok: true,
                     json: async () => ({ authenticated: true }),
@@ -1110,7 +1110,7 @@ describe('useGoogleAuth', () => {
                 }
             }
 
-            if (input === 'https://worker.example/auth/status') {
+            if (input.startsWith('https://worker.example/auth/status?appVersion=')) {
                 return {
                     ok: true,
                     json: async () => ({ authenticated: true }),
