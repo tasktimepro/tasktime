@@ -189,10 +189,10 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 
 | Trigger | Manual | Backup | Sync |
 |---------|--------|--------|------|
-| **Local edit** | No auto-sync | Push-only (debounced 100ms) | Push-only (debounced 100ms) |
+| **Local edit** | No auto-sync | Push-only (debounced 100ms; project-note edits after 1.5s quiet) | Manifest check, reconcile if changed, then push (debounced 100ms; project-note edits after 1.5s quiet) |
 | **Tab focus** | No auto-sync | Push pending local changes only | Full pull+push (60s cooldown) |
 | **Network online** | No auto-sync | Push pending local changes only | Full pull+push (60s cooldown) |
-| **Periodic interval** | None | None | Every 15 minutes (pull+push) |
+| **Periodic interval** | None | None | Every 5 minutes while visible (manifest check; pull+push if changed) |
 | **Page reload** | Connect only, except a pristine first device may do one bootstrap pull | Full pull+push on connect | Full pull+push on connect |
 | **"Sync Now" button** | Full pull+push (force) | Full pull+push (force) | Full pull+push (force) |
 | **Reconnect after disconnect** | Connect only (no sync) | Push dirty docs on connect | Push dirty docs on connect |
@@ -206,6 +206,7 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 - **Pull throttle:** 30 seconds — skips manifest reload if no local changes and last pull was recent.
 - **Foreground request budget:** A clean focus/online event inside the 60-second cooldown makes zero Worker/Drive requests. Once stale, an unchanged clean check makes one manifest-metadata request, advances the local cooldown, and performs no document transfer, manifest save, backup listing, or full app-data listing.
 - **Cross-tab lock:** Web Locks API prevents duplicate syncs across tabs.
+- **Pending local retry:** If an automatic upload meets an active sync or occupied Web Lock, genuine pending local work retries with bounded exponential backoff after the current pass can release the lock. Clean checks do not retry, and failed network/conflict passes wait for the normal recovery triggers.
 - **Page-exit serialization:** Hiding or exiting during an active sync does not enqueue a second forced pass.
 - **Reconnect push:** Dirty docs are tracked by document name in localStorage and only those docs are pushed as full-state on next connect regardless of mode. Pull/consistency retries remain separate from local-dirty evidence; legacy boolean-only markers are conservatively supported.
 - **Idempotent reconciliation:** Archive and persisted-record reconciliation emits no Yjs update after records are already settled.

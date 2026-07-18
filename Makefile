@@ -4,7 +4,7 @@
 APP_RUN_ENV ?=
 APP_RUN = docker compose run --rm $(APP_RUN_ENV) app
 
-.PHONY: help dev dev-push-local preview-push-local preview-push-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-drive-browsers test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
+.PHONY: help dev dev-push-local preview-push-local preview-push-cloud preview-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-drive-browsers test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
 
 PREVIEW_PORT ?= 3101
 
@@ -17,6 +17,7 @@ help:
 	@echo "  make dev-push-local - Start app dev server using local Worker at http://localhost:8787"
 	@echo "  make preview-push-local - Build production preview using local Worker at http://localhost:8787"
 	@echo "  make preview-push-cloud - Build production preview using deployed Worker at https://sync.tasktime.pro"
+	@echo "  make preview-cloud - Build production preview using the deployed production Worker"
 	@echo "  make stop     - Stop development server"
 	@echo "  make build    - Build for production"
 	@echo "  make preview  - Stop current dev containers, build merged app+blog output, and serve it locally on PREVIEW_PORT ($(PREVIEW_PORT))"
@@ -72,6 +73,10 @@ preview-push-cloud:
 		-e VITE_SYNC_WORKER_URL=https://sync.tasktime.pro \
 		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
 		app sh -lc 'npm run build && npm run preview -- --host 0.0.0.0 --port $(PREVIEW_PORT)'
+
+# Production-equivalent local browser check. Keep preview-push-cloud as the
+# backwards-compatible target used by existing Web Push documentation.
+preview-cloud: preview-push-cloud
 
 # Stop development server
 stop:

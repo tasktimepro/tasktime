@@ -302,6 +302,25 @@ describe('InvoicesList', () => {
         expect(screen.queryByText('INV-OVERDUE')).not.toBeInTheDocument()
     })
 
+    it('hides the Canceled tab when there are no canceled invoices', () => {
+
+        render(
+            <InvoicesList
+                projectInvoices={[baseInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+                selectedTab="canceled"
+            />
+        )
+
+        expect(screen.queryByRole('tab', { name: 'Canceled (0)' })).not.toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: 'Outstanding (1)' })).toHaveAttribute('data-state', 'active')
+        expect(screen.getByText('INV-001')).toBeInTheDocument()
+    })
+
     it('shows paid badge for processed invoices', () => {
 
         const paidInvoice = {

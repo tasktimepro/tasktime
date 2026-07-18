@@ -2,11 +2,12 @@
 
 ## Current focus
 
-- [x] Retire the Drive data proxy and temporary staging environment. Worker `22a94fd9-9ce7-475e-a215-10bf8de8df33` serves direct Drive control-plane sessions only and denies old `/drive/*` browser preflight without CORS permission. The isolated staging Worker, KV namespace, D1 databases, secret file, config, tests, and runbook are removed. Current privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary.
+- [x] Make direct Drive sync more responsive without weakening mode boundaries: Backup and Sync modes debounce note edits for 1.5 seconds, pending local work retries with bounded backoff after active-sync/Web Lock contention, Sync mode checks every five minutes only while visible, and Manual mode remains explicit-only.
+- [x] Retire the Drive data proxy and temporary staging environment. Active Worker version `37` serves direct Drive control-plane sessions only, denies old `/drive/*` browser preflight without CORS permission, and permits the exact local production-preview origin. The isolated staging Worker, KV namespace, D1 databases, secret file, config, tests, and runbook are removed. Current privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary.
 - [x] Complete all six invoice-cancellation slices: terminal retained records, replay-safe source release, Canceled UI/PDF safety, zero-contribution financial reporting, agent parity, and backup `1.5` compatibility.
 - [x] Expose the existing paid-invoice correction in the browser three-dot menu with explicit confirmation, paid-only eligibility, refund-safe wording, payment-detail clearing, preserved billing-source claims, and Outstanding/Overdue routing.
 - [x] Complete pre-ship hardening for cancellation commit races, persisted-plan field constraints, late-arriving owned claims, protected later billing, and theme-aware canceled-state UI tokens.
-- [x] Release the completed cancellation scope locally as `v1.2.0`: core app `1.2.0`, backup contract `1.5`, agent bridge/MCP and OpenClaw/Claude bundles `0.3.0`, ClawHub skill `1.1.0`, and Claude marketplace `1.1.0`; no private Worker change is required, and remote publication or deployment remains pending separate authorization.
+- [x] Release the completed cancellation scope as `v1.2.0`: core app `1.2.0`, backup contract `1.5`, agent bridge/MCP and OpenClaw/Claude bundles `0.3.0`, ClawHub skill `1.1.0`, and Claude marketplace `1.1.0`; no private Worker change was required.
 - [x] Cross-validate critical persistence and billing specifications against implementation and historical fixtures.
 - [x] Complete the dependency-ordered remediation and release checklist in `status/critical-path-assurance.md`.
 - [ ] Continue gradual TypeScript migration without breaking stable imports or persisted contracts.

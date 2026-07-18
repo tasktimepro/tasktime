@@ -151,6 +151,45 @@ describe('ProjectDashboard', () => {
         expect(screen.getByText('Task tree')).toBeInTheDocument();
     });
 
+    it('keeps the invoice action on the header row until flex wrapping is needed on mobile', () => {
+        setMatchMedia(true);
+
+        render(
+            <ProjectDashboard
+                project={{ id: 'project-1', title: 'Website', hourlyRate: 125, isPersonal: false }}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToProjects={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openTaskModal={vi.fn()}
+                onViewTask={vi.fn()}
+                navigateToClient={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        const invoiceToggle = screen.getByRole('button', { name: /Invoices \(0\)/ });
+        const generateInvoice = screen.getByRole('button', { name: 'New Invoice' });
+        const headerRow = invoiceToggle.parentElement;
+
+        expect(headerRow?.className).toContain('flex-wrap');
+        expect(headerRow?.className).not.toContain('flex-col');
+        expect(generateInvoice.parentElement?.className).toContain('shrink-0');
+        expect(generateInvoice.parentElement?.className).toContain('ml-auto');
+        expect(generateInvoice.parentElement?.className).not.toContain('w-full');
+    });
+
     it('opens invoice generation from the mobile more-actions menu', async () => {
         const user = userEvent.setup();
         setMatchMedia(true);

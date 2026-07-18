@@ -98,7 +98,7 @@ const ProjectNotesEditor = ({ project }) => {
         isDirty,
         isSavingLocal,
         isDriveConnected,
-        manualSyncInProgress,
+        isDriveSyncing,
         pendingSyncChanges,
         lastLocalSavedAt,
         lastSyncedAt,
@@ -241,9 +241,9 @@ const ProjectNotesEditor = ({ project }) => {
                                 size="sm"
                                 leadingIcon={CloudButtonIcon}
                                 onClick={handleManualCloudSave}
-                                loading={manualSyncInProgress}
-                                loadingText="Saving..."
-                                disabled={!hasPendingCloudSave}
+                                loading={isDriveSyncing}
+                                loadingText="Syncing..."
+                                disabled={isDriveSyncing || !hasPendingCloudSave}
                                 className="shrink-0"
                             >
                                 {cloudButtonLabel}

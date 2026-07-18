@@ -873,7 +873,7 @@ const ProjectDashboard = ({
             {!project.isPersonal && !projectIsQuoteMode && (
                 <Card>
                     <CardHeader className={cn(isMobileLayout && 'px-3 py-3')}>
-                        <div className={cn('flex justify-between gap-3', isMobileLayout ? 'flex-col items-start' : 'items-center')}>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                             <button
                                 type="button"
                                 onClick={toggleInvoicesExpanded}
@@ -889,7 +889,7 @@ const ProjectDashboard = ({
                                 />
                             </button>
                             
-                            <div className={cn(isMobileLayout && 'w-full flex justify-end')}>
+                            <div className="ml-auto shrink-0">
                                 <InvoiceGenerator
                                     project={project}
                                     timeEntries={projectTimeEntries}

@@ -133,7 +133,11 @@ const InvoicesList = ({
     // Default to first non-empty tab (overdue -> outstanding -> paid), with optional override via selectedTab
     const defaultTab = useMemo(() => {
         const validTabs = ['overdue', 'outstanding', 'paid', 'canceled'];
-        if (selectedTab && validTabs.includes(selectedTab)) {
+        if (
+            selectedTab
+            && validTabs.includes(selectedTab)
+            && (selectedTab !== 'canceled' || canceledInvoices.length > 0)
+        ) {
             if (selectedTab !== 'overdue' || overdueInvoices.length > 0) {
                 return selectedTab;
             }
@@ -142,7 +146,7 @@ const InvoicesList = ({
         if (overdueInvoices.length > 0) return 'overdue';
         if (outstandingInvoices.length > 0) return 'outstanding';
         return 'paid';
-    }, [selectedTab, overdueInvoices.length, outstandingInvoices.length]);
+    }, [selectedTab, overdueInvoices.length, outstandingInvoices.length, canceledInvoices.length]);
     
     const [activeTab, setActiveTab] = useState(defaultTab);
     
@@ -1041,16 +1045,18 @@ const InvoicesList = ({
                     >
                         Paid ({paidInvoices.length})
                     </TabsTrigger>
-                    <TabsTrigger
-                        value="canceled"
-                        className={cn(
-                            isMobileLayout
-                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
-                                : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
-                        )}
-                    >
-                        Canceled ({canceledInvoices.length})
-                    </TabsTrigger>
+                    {canceledInvoices.length > 0 && (
+                        <TabsTrigger
+                            value="canceled"
+                            className={cn(
+                                isMobileLayout
+                                    ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                    : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                            )}
+                        >
+                            Canceled ({canceledInvoices.length})
+                        </TabsTrigger>
+                    )}
                 </TabsList>
             </Tabs>
 

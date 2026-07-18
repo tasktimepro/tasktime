@@ -407,7 +407,7 @@ describe('YjsDriveProvider', () => {
         provider.disconnect()
     })
 
-    it('queues local-only project note updates without scheduling an immediate sync', async () => {
+    it('syncs local project note updates after a quiet period in backup mode', async () => {
         vi.useFakeTimers()
 
         try {
@@ -434,7 +434,127 @@ describe('YjsDriveProvider', () => {
                 }))
             }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
 
-            vi.advanceTimersByTime(500)
+            vi.advanceTimersByTime(1499)
+
+            expect(provider.pendingDeltas.get('core')).toHaveLength(1)
+            expect(syncSpy).not.toHaveBeenCalled()
+
+            vi.advanceTimersByTime(1)
+
+            expect(syncSpy).toHaveBeenCalledWith(false, { allowPull: false })
+
+            provider.disconnect()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('restarts the project note quiet period after each backup-mode edit', async () => {
+        vi.useFakeTimers()
+
+        try {
+            const liveDoc = new Y.Doc()
+            const provider = createProviderWithCoreDoc(liveDoc)
+
+            provider.connected = true
+            provider.isOnline = () => true
+            provider.setSyncMode('backup')
+
+            const syncSpy = vi.spyOn(provider, 'sync').mockResolvedValue(undefined)
+
+            provider.subscribeToDoc('core')
+
+            liveDoc.transact(() => {
+                liveDoc.getMap('projects').set('project-1', objectToYMap({
+                    id: 'project-1',
+                    title: 'First note draft',
+                }))
+            }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
+
+            vi.advanceTimersByTime(1_000)
+
+            liveDoc.transact(() => {
+                liveDoc.getMap('projects').set('project-1', objectToYMap({
+                    id: 'project-1',
+                    title: 'Latest note draft',
+                }))
+            }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
+
+            vi.advanceTimersByTime(1_499)
+
+            expect(syncSpy).not.toHaveBeenCalled()
+
+            vi.advanceTimersByTime(1)
+
+            expect(syncSpy).toHaveBeenCalledTimes(1)
+            expect(syncSpy).toHaveBeenCalledWith(false, { allowPull: false })
+
+            provider.disconnect()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('syncs local project note updates with a manifest check in sync mode', async () => {
+        vi.useFakeTimers()
+
+        try {
+            const liveDoc = new Y.Doc()
+            const provider = createProviderWithCoreDoc(liveDoc)
+
+            provider.connected = true
+            provider.isOnline = () => true
+            provider.setSyncMode('sync')
+
+            const syncSpy = vi.spyOn(provider, 'sync').mockResolvedValue(undefined)
+
+            provider.subscribeToDoc('core')
+
+            liveDoc.transact(() => {
+                liveDoc.getMap('projects').set('project-1', objectToYMap({
+                    id: 'project-1',
+                    title: 'Bidirectional note draft',
+                }))
+            }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
+
+            vi.advanceTimersByTime(1_500)
+
+            expect(syncSpy).toHaveBeenCalledTimes(1)
+            expect(syncSpy).toHaveBeenCalledWith(false, { allowPull: true })
+
+            provider.disconnect()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('keeps local project note updates manual in manual mode', async () => {
+        vi.useFakeTimers()
+
+        try {
+            const liveDoc = new Y.Doc()
+            const provider = createProviderWithCoreDoc(liveDoc)
+
+            provider.isOnline = () => true
+            provider.manifest = {
+                load: vi.fn(async () => {}),
+                getManifest: vi.fn(() => ({ documents: {} })),
+                isDirty: vi.fn(() => false),
+                save: vi.fn(async () => {}),
+            }
+
+            const syncSpy = vi.spyOn(provider, 'sync').mockResolvedValue(undefined)
+
+            await provider.connect('manual')
+
+            liveDoc.transact(() => {
+                liveDoc.getMap('projects').set('project-1', objectToYMap({
+                    id: 'project-1',
+                    title: 'Manual project note',
+                }))
+            }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
+
+            vi.advanceTimersByTime(2_000)
 
             expect(provider.pendingDeltas.get('core')).toHaveLength(1)
             expect(syncSpy).not.toHaveBeenCalled()
@@ -720,6 +840,204 @@ describe('YjsDriveProvider', () => {
         }
     })
 
+    it('retries pending local changes after cross-tab lock contention', async () => {
+        vi.useFakeTimers()
+
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+        const originalLocksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
+        const request = vi.fn()
+            .mockImplementationOnce(async (_name, _options, callback) => callback(null))
+            .mockImplementation(async (_name, _options, callback) => callback({ name: 'tasktime-drive-sync' }))
+
+        Object.defineProperty(navigator, 'locks', {
+            configurable: true,
+            value: { request },
+        })
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.pendingDeltas.set('core', [new Uint8Array([1, 2, 3])])
+        provider.syncInner = vi.fn(async () => {})
+
+        try {
+            await provider.sync(false, { allowPull: false })
+
+            expect(request).toHaveBeenCalledTimes(1)
+            expect(provider.syncInner).not.toHaveBeenCalled()
+
+            await vi.advanceTimersByTimeAsync(249)
+
+            expect(request).toHaveBeenCalledTimes(1)
+
+            await vi.advanceTimersByTimeAsync(1)
+
+            expect(request).toHaveBeenCalledTimes(2)
+            expect(provider.syncInner).toHaveBeenCalledWith(false, { allowPull: false })
+        } finally {
+            provider.disconnect()
+            vi.useRealTimers()
+
+            if (originalLocksDescriptor) {
+                Object.defineProperty(navigator, 'locks', originalLocksDescriptor)
+            } else {
+                delete navigator.locks
+            }
+        }
+    })
+
+    it('backs off repeated cross-tab lock retries while local changes remain pending', async () => {
+        vi.useFakeTimers()
+
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+        const originalLocksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
+        const request = vi.fn(async (_name, _options, callback) => callback(null))
+
+        Object.defineProperty(navigator, 'locks', {
+            configurable: true,
+            value: { request },
+        })
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.pendingDeltas.set('core', [new Uint8Array([1, 2, 3])])
+
+        try {
+            await provider.sync(false, { allowPull: true })
+
+            await vi.advanceTimersByTimeAsync(250)
+
+            expect(request).toHaveBeenCalledTimes(2)
+
+            await vi.advanceTimersByTimeAsync(499)
+
+            expect(request).toHaveBeenCalledTimes(2)
+
+            await vi.advanceTimersByTimeAsync(1)
+
+            expect(request).toHaveBeenCalledTimes(3)
+        } finally {
+            provider.disconnect()
+            vi.useRealTimers()
+
+            if (originalLocksDescriptor) {
+                Object.defineProperty(navigator, 'locks', originalLocksDescriptor)
+            } else {
+                delete navigator.locks
+            }
+        }
+    })
+
+    it('cancels an automatic pending retry when the user switches to manual mode', async () => {
+        vi.useFakeTimers()
+
+        const provider = createProviderWithCoreDoc(new Y.Doc())
+        const originalLocksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
+        const request = vi.fn(async (_name, _options, callback) => callback(null))
+
+        Object.defineProperty(navigator, 'locks', {
+            configurable: true,
+            value: { request },
+        })
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.pendingDeltas.set('core', [new Uint8Array([1, 2, 3])])
+
+        try {
+            await provider.sync(false, { allowPull: true })
+
+            provider.setSyncMode('manual')
+            await vi.advanceTimersByTimeAsync(250)
+
+            expect(request).toHaveBeenCalledTimes(1)
+        } finally {
+            provider.disconnect()
+            vi.useRealTimers()
+
+            if (originalLocksDescriptor) {
+                Object.defineProperty(navigator, 'locks', originalLocksDescriptor)
+            } else {
+                delete navigator.locks
+            }
+        }
+    })
+
+    it('retries pending local changes after an active sync completes', async () => {
+        vi.useFakeTimers()
+
+        try {
+            const provider = createProviderWithCoreDoc(new Y.Doc())
+
+            provider.connected = true
+            provider.isOnline = () => true
+            provider.pendingDeltas.set('core', [new Uint8Array([1, 2, 3])])
+            provider.isSyncing = true
+            provider.syncInner = vi.fn(async () => {})
+
+            await provider.sync(false, { allowPull: true })
+
+            expect(provider.syncInner).not.toHaveBeenCalled()
+
+            provider.isSyncing = false
+            await vi.advanceTimersByTimeAsync(250)
+
+            expect(provider.syncInner).toHaveBeenCalledWith(false, { allowPull: true })
+
+            provider.disconnect()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('checks for remote changes every five minutes only while sync mode is visible', async () => {
+        vi.useFakeTimers()
+
+        const originalVisibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+
+        Object.defineProperty(document, 'visibilityState', {
+            configurable: true,
+            value: 'visible',
+        })
+
+        try {
+            const provider = createProviderWithCoreDoc(new Y.Doc())
+
+            provider.connected = true
+
+            const syncSpy = vi.spyOn(provider, 'sync').mockResolvedValue(undefined)
+
+            provider.setSyncMode('sync')
+
+            vi.advanceTimersByTime(299_999)
+
+            expect(syncSpy).not.toHaveBeenCalled()
+
+            vi.advanceTimersByTime(1)
+
+            expect(syncSpy).toHaveBeenCalledTimes(1)
+            expect(syncSpy).toHaveBeenCalledWith(false, { allowPull: true })
+
+            Object.defineProperty(document, 'visibilityState', {
+                configurable: true,
+                value: 'hidden',
+            })
+
+            vi.advanceTimersByTime(300_000)
+
+            expect(syncSpy).toHaveBeenCalledTimes(1)
+
+            provider.disconnect()
+        } finally {
+            vi.useRealTimers()
+
+            if (originalVisibilityDescriptor) {
+                Object.defineProperty(document, 'visibilityState', originalVisibilityDescriptor)
+            } else {
+                delete document.visibilityState
+            }
+        }
+    })
+
     it('keeps durable pending state when a queued delta upload fails during sync', async () => {
         const liveDoc = new Y.Doc()
         const provider = createProviderWithCoreDoc(liveDoc)
@@ -933,6 +1251,55 @@ describe('YjsDriveProvider', () => {
 
         expect(provider.pendingDeltas.get('core')).toHaveLength(1)
         expect(provider.manifest.createFile).toHaveBeenCalledTimes(1)
+    })
+
+    it('merges a project note typing batch into one Drive delta upload', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+        const capturedUpdates = []
+
+        liveDoc.on('update', (update) => {
+            capturedUpdates.push(update)
+        })
+
+        liveDoc.transact(() => {
+            liveDoc.getMap('notes').set('first', 'Project')
+        }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
+
+        liveDoc.transact(() => {
+            liveDoc.getMap('notes').set('second', 'Project notes')
+        }, PROJECT_NOTES_LOCAL_SAVE_ORIGIN)
+
+        provider.pendingDeltas.set('core', capturedUpdates)
+        provider.manifest = {
+            createFile: vi.fn(async () => 'delta-file-id'),
+            setFileId: vi.fn(),
+            addDelta: vi.fn(),
+            save: vi.fn(async () => {}),
+        }
+
+        await provider.pushDeltas('core', liveDoc)
+
+        expect(provider.manifest.createFile).toHaveBeenCalledTimes(1)
+        expect(provider.manifest.addDelta).toHaveBeenCalledTimes(1)
+        expect(provider.pendingDeltas.get('core')).toHaveLength(0)
+
+        const uploadedBlob = provider.manifest.createFile.mock.calls[0][1]
+        const restoredDoc = new Y.Doc()
+        const uploadedBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+
+            reader.addEventListener('load', () => resolve(reader.result))
+            reader.addEventListener('error', () => reject(reader.error))
+            reader.readAsArrayBuffer(uploadedBlob)
+        })
+
+        Y.applyUpdate(restoredDoc, new Uint8Array(uploadedBuffer))
+
+        expect(restoredDoc.getMap('notes').toJSON()).toEqual({
+            first: 'Project',
+            second: 'Project notes',
+        })
     })
 
     it('preserves updates queued while a full-state upload is in flight', async () => {

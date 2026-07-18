@@ -42,8 +42,12 @@ import { PROJECT_NOTES_LOCAL_SAVE_ORIGIN } from '@/constants/syncOrigins';
 export { AuthorizationError };
 
 const COMPACTION_THRESHOLD = 10; // Compact after 10 deltas
-const SYNC_INTERVAL_MS = 900_000; // 15 minutes (reduced periodic checks)
+const VISIBLE_SYNC_INTERVAL_MS = 300_000; // Check every 5 minutes while Sync mode is visible
 const SYNC_DEBOUNCE_MS = 100; // Small debounce to batch rapid changes
+const PROJECT_NOTES_SYNC_DEBOUNCE_MS = 1_500; // Wait for a pause before uploading rich-text edits
+const SYNC_RETRY_BASE_DELAY_MS = 250;
+const SYNC_RETRY_MAX_DELAY_MS = 5_000;
+const SYNC_RETRY_MAX_ATTEMPT = 5;
 const PULL_THROTTLE_MS = 30_000; // Skip pull if no local changes and last pull was < 30s ago
 const CROSS_TAB_SYNC_RECENCY_MS = 60_000; // Skip periodic sync if another tab synced in last 60s
 const SYNC_LOCK_NAME = 'tasktime-drive-sync';
@@ -151,6 +155,8 @@ export class YjsDriveProvider {
     private docUpdateHandlers: Map<DocName, DocUpdateHandler> = new Map();
     private syncInterval: ReturnType<typeof setInterval> | null = null;
     private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    private syncRetryAttempt: number = 0;
     private isSyncing: boolean = false;
     private forceFullStateDocs: Set<DocName> = new Set();
     private verifyFullStateDocs: Set<DocName> = new Set();
@@ -767,6 +773,8 @@ export class YjsDriveProvider {
             this.syncDebounceTimer = null;
         }
 
+        this.clearPendingSyncRetry();
+
         this.connected = false;
         this.pendingDeltas.clear();
         this.forceFullStateDocs.clear();
@@ -851,6 +859,11 @@ export class YjsDriveProvider {
      */
     setSyncMode(mode: DriveSyncMode): void {
         this.syncMode = mode;
+
+        if (mode === 'manual') {
+            this.clearPendingSyncRetry();
+        }
+
         this.updateSyncInterval();
         this.log('sync mode updated', { mode });
     }
@@ -866,8 +879,50 @@ export class YjsDriveProvider {
         }
 
         this.syncInterval = setInterval(() => {
+            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+                return;
+            }
+
             this.sync(false, { allowPull: true }).catch(console.error);
-        }, SYNC_INTERVAL_MS);
+        }, VISIBLE_SYNC_INTERVAL_MS);
+    }
+
+    private clearPendingSyncRetry(): void {
+        if (this.syncRetryTimer) {
+            clearTimeout(this.syncRetryTimer);
+            this.syncRetryTimer = null;
+        }
+
+        this.syncRetryAttempt = 0;
+    }
+
+    private schedulePendingSyncRetry(options: SyncOptions): void {
+        if (
+            this.syncRetryTimer
+            || !this.connected
+            || this.syncMode === 'manual'
+            || !this.hasActualLocalChangesToPush()
+        ) {
+            return;
+        }
+
+        const delayMs = Math.min(
+            SYNC_RETRY_BASE_DELAY_MS * (2 ** this.syncRetryAttempt),
+            SYNC_RETRY_MAX_DELAY_MS,
+        );
+
+        this.syncRetryAttempt = Math.min(this.syncRetryAttempt + 1, SYNC_RETRY_MAX_ATTEMPT);
+        this.syncRetryTimer = setTimeout(() => {
+            this.syncRetryTimer = null;
+            const retryOptions = {
+                ...options,
+                allowPull: this.syncMode === 'sync' && options.allowPull !== false,
+            };
+
+            this.sync(false, retryOptions).catch(console.error);
+        }, delayMs);
+
+        this.log('sync: pending local retry scheduled', { delayMs, allowPull: options.allowPull ?? true });
     }
 
     /** Get the latest successful local check or manifest write timestamp. */
@@ -897,6 +952,10 @@ export class YjsDriveProvider {
             this.syncDebounceTimer = null;
         }
 
+        if (force) {
+            this.clearPendingSyncRetry();
+        }
+
         if (!this.connected) {
             console.warn('[YjsDriveProvider] Cannot sync: not connected');
             return;
@@ -916,6 +975,7 @@ export class YjsDriveProvider {
 
         if (this.isSyncing && !force) {
             this.log('sync: already in progress, skipping');
+            this.schedulePendingSyncRetry(options);
             return;
         }
 
@@ -938,6 +998,7 @@ export class YjsDriveProvider {
 
         if (!lockResult.acquired && !force) {
             this.log('sync: skipped, sync lock is currently held');
+            this.schedulePendingSyncRetry(options);
         }
     }
 
@@ -1131,10 +1192,14 @@ export class YjsDriveProvider {
 
             this.updatePendingState();
 
-            // If changes arrived during sync, run another pass immediately
-            if (this.syncState !== 'error' && this.hasPendingDeltas()) {
+            // If changes arrived during the active pass, retry after this Web
+            // Lock callback has returned. Calling sync immediately from here can
+            // lose the retry because the current pass still owns the lock.
+            if (this.syncState !== 'error' && this.hasActualLocalChangesToPush()) {
                 const followUpAllowPull = this.syncMode === 'sync';
-                this.sync(false, { allowPull: followUpAllowPull }).catch(console.error);
+                this.schedulePendingSyncRetry({ allowPull: followUpAllowPull });
+            } else {
+                this.clearPendingSyncRetry();
             }
         }
     }
@@ -1559,7 +1624,12 @@ export class YjsDriveProvider {
             this.updatePendingState();
 
             if (origin === PROJECT_NOTES_LOCAL_SAVE_ORIGIN) {
-                this.log('scheduleSync: deferred for local-only project notes update', { docName });
+                // Notes are committed locally on every editor update. In automatic
+                // modes, wait for a natural typing pause before using the normal
+                // sync pipeline so they reach other devices without one request
+                // per keystroke. Manual mode still remains fully user-controlled.
+                this.log('scheduleSync: project notes queued for debounced automatic sync', { docName });
+                this.scheduleSync(PROJECT_NOTES_SYNC_DEBOUNCE_MS);
                 return;
             }
 
@@ -1589,7 +1659,7 @@ export class YjsDriveProvider {
     /**
      * Schedule a debounced sync
      */
-    private scheduleSync(): void {
+    private scheduleSync(debounceMs: number = SYNC_DEBOUNCE_MS): void {
         if (this.syncMode === 'manual') {
             this.log('scheduleSync: manual mode, skipping');
             return;
@@ -1604,9 +1674,9 @@ export class YjsDriveProvider {
         this.syncDebounceTimer = setTimeout(() => {
             this.syncDebounceTimer = null;
             this.sync(false, { allowPull }).catch(console.error);
-        }, SYNC_DEBOUNCE_MS);
+        }, debounceMs);
 
-        this.log('scheduleSync: debounced', { allowPull });
+        this.log('scheduleSync: debounced', { allowPull, debounceMs });
     }
 
     // =========================================================================

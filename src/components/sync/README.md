@@ -32,7 +32,7 @@ When adding a document, update export/import, Drive sync, validation, local clea
 | Local edit | No auto-sync | Push-only, debounced | Push with manifest check, debounced |
 | Tab focus | No auto-sync | Push pending local changes only | Pull+push, cooldown guarded |
 | Network online | No auto-sync | Push pending local changes only | Pull+push, cooldown guarded |
-| Periodic interval | None | None | Pull+push every 15 minutes |
+| Periodic interval | None | None | Manifest check every 5 minutes while visible; pull+push if changed |
 | Page reload connect | Connect only, except a pristine first device may do one bootstrap pull | Initial pull if remote data exists, otherwise push dirty docs | Pull+push |
 | Sync Now | Pull+push forced | Pull+push forced | Pull+push forced |
 | Reconnect after disconnect | Connect only | Push dirty docs on connect | Push dirty docs on connect |
@@ -50,15 +50,17 @@ Mode rules:
 Sync must stay fast and Worker-friendly.
 
 - Normal sync checks manifest `modifiedTime` first.
+- Ordinary local edits debounce for 100ms. Rich project-note edits wait for a 1.5-second typing pause, then use the same automatic mode pipeline; Manual mode keeps every edit local until the user explicitly syncs.
 - A clean foreground event inside the cooldown makes zero Worker/Drive requests.
 - After the cooldown, a clean unchanged check makes at most one manifest-metadata request. A successful no-op check advances the local cooldown timestamp.
 - If the manifest is unchanged, do not download document files.
 - An unchanged check must not upload documents, save the manifest, list backups, or list the full appDataFolder.
 - Do not call full appDataFolder listing on unchanged/no-op syncs. A manifest write may list files once to merge concurrent writer evidence safely.
 - `listAppDataFiles()` is for connect/load, backup listing, wipe, and stale-file recovery.
-- Keep periodic sync at 15 minutes unless there is a measured reason to change it.
+- Keep periodic checks visible-only. Sync mode checks every 5 minutes; hidden tabs, Manual mode, and Backup mode do not poll.
 - Keep foreground sync cooldowns so focus/online events do not spam the Worker.
 - Use Web Locks to avoid duplicate cross-tab sync.
+- Retry genuine pending local work with bounded backoff when an active sync or Web Lock contention blocks an automatic upload. Do not retry clean checks or failed network/conflict passes in a loop.
 - Use one merged delta per queued doc batch instead of uploading every Yjs update separately.
 - Only run full-state upload when required: initial state, the exact disconnected dirty docs, legacy boolean-only dirty recovery, explicit verification, or compaction. A pull/consistency retry alone is not local dirty evidence.
 - Page hide or exit during an active sync must not enqueue another forced sync; the active pass and durable recovery state already own the work.

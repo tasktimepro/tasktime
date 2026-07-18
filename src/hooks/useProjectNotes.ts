@@ -19,6 +19,7 @@ export function useProjectNotes(projectId: string, initialNotes?: ProjectNotes |
     const { updateProject } = useProjects();
     const {
         isDriveConnected,
+        isSyncing,
         manualSyncInProgress,
         pendingSyncChanges,
         lastSyncedAt,
@@ -169,6 +170,7 @@ export function useProjectNotes(projectId: string, initialNotes?: ProjectNotes |
         isDirty,
         isSavingLocal,
         isDriveConnected,
+        isDriveSyncing: isSyncing || manualSyncInProgress,
         manualSyncInProgress,
         pendingSyncChanges,
         lastLocalSavedAt,

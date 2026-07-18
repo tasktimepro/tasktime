@@ -10,6 +10,7 @@ const hookMocks = vi.hoisted(() => ({
         isDirty: false,
         isSavingLocal: false,
         isDriveConnected: true,
+        isDriveSyncing: false,
         manualSyncInProgress: false,
         pendingSyncChanges: false,
         lastLocalSavedAt: null,
@@ -128,6 +129,21 @@ describe('ProjectNotesEditor', () => {
         expect(screen.queryByTestId('project-notes-save-status')).not.toBeInTheDocument();
     });
 
+    it('shows a disabled syncing button while an automatic Drive sync is active', () => {
+        hookMocks.projectNotes = {
+            ...hookMocks.projectNotes,
+            isDriveSyncing: true,
+            pendingSyncChanges: true,
+        };
+
+        render(<ProjectNotesEditor project={{ id: 'project-1', notes: null }} />);
+
+        const syncButton = screen.getByRole('button', { name: 'Syncing...' });
+
+        expect(syncButton).toBeDisabled();
+        expect(syncButton.querySelector('.animate-spin')).not.toBeNull();
+    });
+
     it('returns the expected cloud button labels', () => {
         expect(getCloudButtonLabel(true, true)).toBe('Save to cloud');
         expect(getCloudButtonLabel(false, true)).toBe('In sync');
@@ -155,6 +171,7 @@ describe('ProjectNotesEditor', () => {
 
         hookMocks.projectNotes = {
             ...hookMocks.projectNotes,
+            isDriveSyncing: false,
             pendingSyncChanges: false,
             lastLocalSavedAt: 1_700_000_010_000,
             lastSyncedAt: 1_700_000_000_000,

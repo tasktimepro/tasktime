@@ -41,7 +41,8 @@
 
 - Manual mode auto-connects but does not normally pull/push without “Sync Now,” except documented pristine-device bootstrap.
 - Backup mode automatically pushes pending local changes and does not automatically pull normal remote changes on focus/online triggers.
-- Sync mode performs bidirectional work on documented triggers with cooldown and cross-tab locking.
+- Sync mode performs bidirectional work on documented triggers with cooldown and cross-tab locking, including a lightweight five-minute manifest check only while the app is visible.
+- Genuine pending local work that encounters an active sync or occupied cross-tab lock retries after the current pass can release the lock; clean checks and failed network/conflict passes do not create retry loops.
 - “Sync Now” forces a full pull/push in every mode.
 - The visible sync-status control remains keyboard-operable while loading, connecting, checking, downloading, uploading, or syncing and opens Account > Cloud Sync without starting a duplicate sync.
 - A transient Google-grant revocation, token refresh, rate-limit, or Drive-status failure keeps the retryable session and does not claim that access was revoked; confirmed revocation clears it, while explicit local disconnect remains available separately.

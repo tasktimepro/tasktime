@@ -10,8 +10,9 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Maintainability evolution and publishing follow-through**
 
-- Direct browser-to-Google Drive sync is deployed. Worker version `22a94fd9-9ce7-475e-a215-10bf8de8df33` retains only OAuth/token control-plane duties and rejects the retired `/drive/*` route without CORS permission. The temporary staging Worker, KV namespace, D1 databases, local secrets/configuration, tests, and runbook have been removed. Privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary; the latest Pages production deployment is `37c96faf-b487-40c7-80c6-8f7a5f60d89a`.
+- Direct browser-to-Google Drive sync is deployed. Active Worker version `37` retains only OAuth/token control-plane duties, rejects the retired `/drive/*` route without CORS permission, and permits the exact `http://localhost:3101` production-equivalent preview origin. The temporary staging Worker, KV namespace, D1 databases, local secrets/configuration, tests, and runbook have been removed. Privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary; the latest Pages production deployment is `fe29474d-f608-4a31-abe6-1840ad27c4bf`.
 - Offline lazy-document navigation now short-circuits before any remote Drive work and subscribes locally; a red/green provider regression covers the cached-manifest case that previously produced failed offline requests. Focused provider tests, app typecheck, lint, and diff checks are green.
+- Direct Drive auto-sync now batches project-note typing after a 1.5-second quiet period, retries genuine pending work after active-sync/Web Lock contention with bounded backoff, and checks for remote changes every five minutes only while Sync mode is visible.
 - The browser retest confirms offline navigation now produces neither Drive requests nor upload errors.
 - Gradual TypeScript and testing-infrastructure improvements
 - Installed OpenClaw validation and remaining agent-directory publication checks
@@ -39,7 +40,7 @@ The repository now has a zero-diagnostic TypeScript baseline enforced by the rel
 - [x] Delivered the six-slice terminal cancellation lifecycle across Yjs recovery, browser UI, reports/exports, backups, and agent surfaces.
 - [x] Preserved invoice audit records and numbering while conditionally releasing only source work still owned by the canceled invoice.
 - [x] Hardened first-commit eligibility, persisted-plan validation, late-arriving source reconciliation, protected later billing, and paid-only mark-as-unpaid behavior during pre-ship review.
-- [x] Passed the final full release gate and packaged live-agent cancellation smoke; the `v1.2.0` release is committed and tagged locally, while remote publication and deployment remain pending separate authorization.
+- [x] Passed the final full release gate and packaged live-agent cancellation smoke; the `v1.2.0` release was published before the later direct-Drive releases.
 
 ## Blockers and open questions
 

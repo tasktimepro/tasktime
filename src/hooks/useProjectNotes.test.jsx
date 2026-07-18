@@ -32,11 +32,42 @@ describe('useProjectNotes', () => {
 
         mockUseYjs.mockReturnValue({
             isDriveConnected: true,
+            isSyncing: false,
             manualSyncInProgress: false,
             pendingSyncChanges: false,
             lastSyncedAt: 1_700_000_000_000,
             forceSyncDrive: vi.fn().mockResolvedValue(undefined),
         });
+    });
+
+    it('exposes the shared Drive sync state for the notes cloud action', () => {
+        mockUseYjs.mockReturnValue({
+            isDriveConnected: true,
+            isSyncing: true,
+            manualSyncInProgress: false,
+            pendingSyncChanges: true,
+            lastSyncedAt: 1_700_000_000_000,
+            forceSyncDrive: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const { result } = renderHook(() => useProjectNotes('project-1', null));
+
+        expect(result.current.isDriveSyncing).toBe(true);
+    });
+
+    it('keeps the notes cloud action busy while a manual sync is starting', () => {
+        mockUseYjs.mockReturnValue({
+            isDriveConnected: true,
+            isSyncing: false,
+            manualSyncInProgress: true,
+            pendingSyncChanges: true,
+            lastSyncedAt: 1_700_000_000_000,
+            forceSyncDrive: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const { result } = renderHook(() => useProjectNotes('project-1', null));
+
+        expect(result.current.isDriveSyncing).toBe(true);
     });
 
     afterEach(() => {
