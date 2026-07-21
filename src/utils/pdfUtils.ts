@@ -219,6 +219,9 @@ type PdfOptions = {
 };
 
 const PDF_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
+const PDF_SIGNATURE_BYTES = [0x25, 0x50, 0x44, 0x46, 0x2D]; // %PDF-
+const PDF_EOF_MARKER_BYTES = [0x25, 0x25, 0x45, 0x4F, 0x46]; // %%EOF
+const PDF_EOF_SEARCH_WINDOW_BYTES = 1024;
 
 const captureInvoicePdfIncident = ({
     incidentKey,
@@ -239,6 +242,90 @@ const captureInvoicePdfIncident = ({
         context,
         throttleMs: PDF_INCIDENT_THROTTLE_MS,
     });
+};
+
+const startsWithBytes = (bytes: Uint8Array, expected: number[]): boolean => (
+    expected.every((value, index) => bytes[index] === value)
+);
+
+const includesBytes = (bytes: Uint8Array, expected: number[]): boolean => {
+    const lastStartIndex = bytes.length - expected.length;
+
+    for (let startIndex = 0; startIndex <= lastStartIndex; startIndex += 1) {
+        if (expected.every((value, offset) => bytes[startIndex + offset] === value)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+/**
+ * Reject non-PDF or obviously truncated output before it leaves the browser.
+ */
+const validateGeneratedPdfBlob = async (blob: Blob): Promise<void> => {
+    let bytes: Uint8Array;
+
+    try {
+        bytes = await new Promise<Uint8Array>((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onload = () => {
+                if (reader.result instanceof ArrayBuffer) {
+                    resolve(new Uint8Array(reader.result));
+                    return;
+                }
+
+                reject(new Error('Failed to read generated PDF bytes'));
+            };
+            reader.onerror = () => reject(new Error('Failed to read generated PDF bytes'));
+            reader.readAsArrayBuffer(blob);
+        });
+    } catch (error) {
+        captureInvoicePdfIncident({
+            incidentKey: 'invoice.pdf_integrity_validation_failed',
+            message: 'TaskTime Pro could not validate a generated invoice PDF',
+            error,
+            context: {
+                operation: 'integrity',
+                check: 'read',
+            },
+        });
+        throw error;
+    }
+
+    if (!startsWithBytes(bytes, PDF_SIGNATURE_BYTES)) {
+        const error = new Error('Generated PDF has an invalid file signature');
+
+        captureInvoicePdfIncident({
+            incidentKey: 'invoice.pdf_integrity_validation_failed',
+            message: 'TaskTime Pro generated an invalid invoice PDF',
+            error,
+            context: {
+                operation: 'integrity',
+                check: 'signature',
+            },
+        });
+        throw error;
+    }
+
+    const tailStart = Math.max(0, bytes.length - PDF_EOF_SEARCH_WINDOW_BYTES);
+    const tailBytes = bytes.subarray(tailStart);
+
+    if (!includesBytes(tailBytes, PDF_EOF_MARKER_BYTES)) {
+        const error = new Error('Generated PDF is missing end-of-file marker');
+
+        captureInvoicePdfIncident({
+            incidentKey: 'invoice.pdf_integrity_validation_failed',
+            message: 'TaskTime Pro generated an incomplete invoice PDF',
+            error,
+            context: {
+                operation: 'integrity',
+                check: 'end-of-file',
+            },
+        });
+        throw error;
+    }
 };
 
 /** Force the cloned html2canvas document into light mode so PDFs are never
@@ -391,36 +478,34 @@ export const generatePDFBlob = (
 /**
  * Generate a PDF as a base64 string (for email attachment)
  */
-export const generatePDFBase64 = (htmlContent: string): Promise<string> => {
+export const generatePDFBase64 = async (htmlContent: string): Promise<string> => {
+    const blob = await generatePDFBlob(htmlContent);
+
+    await validateGeneratedPdfBlob(blob);
+
     return new Promise((resolve, reject) => {
-        generatePDFBlob(htmlContent)
-            .then((blob: Blob) => {
-                const reader = new FileReader();
+        const reader = new FileReader();
 
-                reader.onload = () => {
-                    const dataUrl = reader.result as string;
-                    // Strip data:application/pdf;base64, prefix
-                    const base64 = dataUrl.split(',')[1];
-                    resolve(base64);
-                };
+        reader.onload = () => {
+            const dataUrl = reader.result as string;
+            // Strip data:application/pdf;base64, prefix
+            const base64 = dataUrl.split(',')[1];
+            resolve(base64);
+        };
 
-                reader.onerror = () => {
-                    const error = new Error('Failed to convert PDF to base64');
-                    captureInvoicePdfIncident({
-                        incidentKey: 'invoice.pdf_base64_generation_failed',
-                        message: 'TaskTime Pro invoice PDF base64 conversion failed',
-                        error,
-                        context: {
-                            operation: 'base64',
-                        },
-                    });
-                    reject(error);
-                };
-                reader.readAsDataURL(blob);
-            })
-            .catch((error: unknown) => {
-                reject(error);
+        reader.onerror = () => {
+            const error = new Error('Failed to convert PDF to base64');
+            captureInvoicePdfIncident({
+                incidentKey: 'invoice.pdf_base64_generation_failed',
+                message: 'TaskTime Pro invoice PDF base64 conversion failed',
+                error,
+                context: {
+                    operation: 'base64',
+                },
             });
+            reject(error);
+        };
+        reader.readAsDataURL(blob);
     });
 };
 

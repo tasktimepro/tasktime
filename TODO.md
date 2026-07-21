@@ -17,12 +17,6 @@
     [ ] Glama
     [ ] MCP.so
 
-[x] Drive worker sync updates: tasktime-infra/docs/todo/direct-google-drive-sync-implementation-plan.md
-    [x] Retire the temporary staging environment and Worker data proxy; routine Drive file requests now go directly from the browser to Google Drive while the edge service retains only OAuth/token control-plane duties.
-[x] Improve direct Drive auto-sync without increasing Worker traffic: Backup and Sync modes upload notes after a 1.5-second typing pause; genuine pending uploads retry safely after active-sync/Web Lock contention; Sync mode checks every five minutes only while visible; Manual mode remains explicit-only.
-
-[x] Invoice cancellation: tasktime-infra/docs/todo/invoice-cancellation-implementation-plan.md
-
 ---
 
 ## Blog Posts

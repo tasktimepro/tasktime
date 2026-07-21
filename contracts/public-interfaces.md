@@ -73,6 +73,7 @@ Configured by `VITE_SYNC_WORKER_URL`. Public client endpoint families are:
 - `/auth/access-token`
 - `/drive`
 - `/metrics/batch`
+- `/email/invoice`
 - `/push/vapid-public-key`, `/push/subscription`, `/push/schedules`, `/push/test`
 
 The dev/build pipeline validates the configured Worker URL and adds only its
@@ -83,6 +84,8 @@ configured build therefore does not require the production app to permanently
 trust another Worker hostname.
 
 The Worker owns OAuth code exchange, encrypted refresh-token persistence, session validation, token issuance, and revocation. The browser owns product data semantics. A successful status response selects direct Google Drive for the next connection. The browser sends its non-secret build identifier in `X-TaskTime-App-Version` and matching `appVersion` query parameter on status and token requests. Direct connections request a short-lived Google access token from `POST /auth/access-token`, retain it only in active-tab memory, and send routine Drive file requests directly to Google Drive. The Worker must never return a refresh token and may cache its short-lived Google access token only in encrypted private session storage. Errors exposed to the browser must be sanitized; private deployment/KV/D1 details are not part of this public contract.
+
+`POST /email/invoice` accepts the existing opaque `X-Session-Id` and an invoice, reminder, or quote email payload containing a base64 PDF attachment. The browser and Worker both require the decoded attachment to start with the PDF signature and contain a final PDF end-of-file marker before the provider call. TaskTime Pro does not persist the attachment bytes.
 
 `POST /auth/access-token` accepts the existing opaque `X-Session-Id`, optional non-secret `X-TaskTime-App-Version`, and no credential in its URL. It accepts only an optional boolean `forceRefresh` body field, returns a short-lived bearer token, its absolute expiry, Worker time, and known grant scope. Every success and failure response is `no-store`.
 

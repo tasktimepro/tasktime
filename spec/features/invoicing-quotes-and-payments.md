@@ -11,6 +11,7 @@
 - Cancellation requires a trimmed reason of 1–500 characters and exact invoice-number confirmation. It is journaled, retry-safe, and shared by the browser and agent surfaces.
 - Canceled invoices remain available as immutable audit records but are non-payable, non-emailable, excluded from financial/report totals, and unmistakably marked in retained PDF output. Their numbers remain permanently consumed.
 - Quote preview/export/email operates in quote mode and does not claim work as billed.
+- Invoice, reminder, and quote email flows reject generated attachments that lack the PDF signature or a final PDF end-of-file marker. Validation runs in memory before browser upload and again at the Worker boundary; attachment bytes are not persisted by TaskTime Pro.
 
 ## Lifecycle distinctions
 

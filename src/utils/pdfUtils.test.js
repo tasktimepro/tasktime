@@ -38,7 +38,7 @@ beforeEach(() => {
     vi.clearAllMocks()
 
     html2pdfMocks.save.mockResolvedValue(undefined)
-    html2pdfMocks.outputPdf.mockResolvedValue(new Blob(['%PDF-mock'], { type: 'application/pdf' }))
+    html2pdfMocks.outputPdf.mockResolvedValue(new Blob(['%PDF-1.4\nmock\n%%EOF\n'], { type: 'application/pdf' }))
     html2pdfMocks.from.mockReturnValue({ save: html2pdfMocks.save, outputPdf: html2pdfMocks.outputPdf })
     html2pdfMocks.set.mockReturnValue({ from: html2pdfMocks.from })
     html2pdfMocks.html2pdf.mockReturnValue({ set: html2pdfMocks.set })
@@ -1320,17 +1320,52 @@ describe('generatePDFBase64', () => {
         }))
     })
 
+    it('rejects generated content without a PDF signature', async () => {
+
+        html2pdfMocks.outputPdf.mockResolvedValueOnce(new Blob(['not-a-pdf\n%%EOF\n'], { type: 'application/pdf' }))
+
+        await expect(generatePDFBase64('<p>Invoice</p>')).rejects.toThrow('invalid file signature')
+    })
+
+    it('rejects a generated PDF without an end-of-file marker', async () => {
+
+        html2pdfMocks.outputPdf.mockResolvedValueOnce(new Blob(['%PDF-1.4\ntruncated'], { type: 'application/pdf' }))
+
+        await expect(generatePDFBase64('<p>Invoice</p>')).rejects.toThrow('missing end-of-file marker')
+    })
+
+    it('captures failures while reading generated PDF bytes for validation', async () => {
+
+        const originalFileReader = global.FileReader
+
+        class BrokenPdfValidationReader extends originalFileReader {
+            readAsArrayBuffer() {
+                this.onerror?.(new Event('error'))
+            }
+        }
+
+        global.FileReader = BrokenPdfValidationReader
+
+        try {
+            await expect(generatePDFBase64('<p>Invoice</p>')).rejects.toThrow('Failed to read generated PDF bytes')
+        } finally {
+            global.FileReader = originalFileReader
+        }
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'invoice.pdf_integrity_validation_failed',
+            context: expect.objectContaining({
+                operation: 'integrity',
+                check: 'read',
+            }),
+        }))
+    })
+
     it('captures base64 conversion failures separately', async () => {
 
         const originalFileReader = global.FileReader
 
-        class BrokenFileReader {
-            constructor() {
-                this.result = null
-                this.onload = null
-                this.onerror = null
-            }
-
+        class BrokenFileReader extends originalFileReader {
             readAsDataURL() {
                 this.onerror?.(new Event('error'))
             }
