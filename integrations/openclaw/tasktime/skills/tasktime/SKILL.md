@@ -7,7 +7,7 @@ description: >-
   installed, and stores work records in the browser. This first-party TaskTime
   Pro skill lets same-device agents operate the app through scoped access and
   approval controls.
-version: 1.2.2
+version: 1.2.1
 metadata:
   openclaw:
     requires:
