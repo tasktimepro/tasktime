@@ -9,123 +9,47 @@ on:
         default: true
         type: boolean
 
-concurrency:
-  group: publish-clawhub-tasktime-agent
-  cancel-in-progress: false
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   publish:
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    with:
+      owner: tasktimepro
+      skill_path: integrations/openclaw/tasktime/skills/tasktime
+      dry_run: ${{ inputs.dry_run }}
+      ref: ${{ github.sha }}
+    secrets:
+      clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}
+
+  verify:
+    needs: publish
+    if: ${{ inputs.dry_run == false }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      CLAWHUB_CLI_VERSION: "0.23.1"
-      SKILL_PATH: integrations/openclaw/tasktime/skills/tasktime
-
     steps:
-      - name: Checkout exact release commit
-        uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-
-      - name: Resolve and validate release identity
-        id: release
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [[ "$GITHUB_REPOSITORY" != "tasktimepro/tasktime" ]]; then
-            echo "ClawHub releases must run from tasktimepro/tasktime, not $GITHUB_REPOSITORY." >&2
-            exit 1
-          fi
-
-          SKILL_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' "$SKILL_PATH/SKILL.md")"
-          if [[ ! "$SKILL_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "SKILL.md must declare an explicit semantic version; found '$SKILL_VERSION'." >&2
-            exit 1
-          fi
-
-          git cat-file -e "$GITHUB_SHA:$SKILL_PATH/SKILL.md"
-          echo "version=$SKILL_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing candidate @tasktimepro/tasktime-agent@$SKILL_VERSION from $GITHUB_REPOSITORY@$GITHUB_SHA ($SKILL_PATH)."
-
-      - name: Dry-run canonical ClawHub release
-        if: ${{ inputs.dry_run == true }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill publish "$SKILL_PATH" \
-            --owner tasktimepro \
-            --slug tasktime-agent \
-            --name "TaskTime Pro" \
-            --version "${{ steps.release.outputs.version }}" \
-            --source-repo "$GITHUB_REPOSITORY" \
-            --source-commit "$GITHUB_SHA" \
-            --source-ref "$GITHUB_REF_NAME" \
-            --source-path "$SKILL_PATH" \
-            --dry-run \
-            --json
-
-      - name: Configure ClawHub authentication
-        if: ${{ inputs.dry_run == false }}
-        shell: bash
+      - name: Verify official ClawHub identity and provenance
         env:
-          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
-          CLAWHUB_CONFIG_PATH: ${{ runner.temp }}/clawhub-config.json
-        run: |
-          set -euo pipefail
-          if [[ -z "$CLAWHUB_TOKEN" ]]; then
-            echo "The CLAWHUB_TOKEN repository secret is required for a real release." >&2
-            exit 1
-          fi
-
-          node -e 'const fs = require("node:fs"); fs.writeFileSync(process.env.CLAWHUB_CONFIG_PATH, JSON.stringify({ registry: "https://clawhub.ai", token: process.env.CLAWHUB_TOKEN }) + "\n", { mode: 0o600 });'
-          echo "CLAWHUB_CONFIG_PATH=$CLAWHUB_CONFIG_PATH" >> "$GITHUB_ENV"
-
-      - name: Publish canonical ClawHub release
-        if: ${{ inputs.dry_run == false }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill publish "$SKILL_PATH" \
-            --owner tasktimepro \
-            --slug tasktime-agent \
-            --name "TaskTime Pro" \
-            --version "${{ steps.release.outputs.version }}" \
-            --source-repo "$GITHUB_REPOSITORY" \
-            --source-commit "$GITHUB_SHA" \
-            --source-ref "$GITHUB_REF_NAME" \
-            --source-path "$SKILL_PATH" \
-            --json
-
-      - name: Verify published identity and provenance
-        if: ${{ inputs.dry_run == false }}
-        shell: bash
-        env:
-          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
           VERIFY_PATH: ${{ runner.temp }}/clawhub-verify.json
         run: |
           set -euo pipefail
 
           for attempt in $(seq 1 30); do
-            npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill verify @tasktimepro/tasktime-agent \
-              --version "$EXPECTED_VERSION" > "$VERIFY_PATH" || true
+            npx -y clawhub@0.23.1 skill verify @tasktimepro/tasktime-agent > "$VERIFY_PATH" || true
 
             if node -e '
               const fs = require("node:fs");
               const result = JSON.parse(fs.readFileSync(process.env.VERIFY_PATH, "utf8"));
               const valid = result.ok === true
                 && result.publisherHandle === "tasktimepro"
-                && result.slug === "tasktime-agent"
-                && result.version === process.env.EXPECTED_VERSION
                 && result.card?.available === true
                 && result.provenance?.source === "server-resolved-github-import";
               process.exit(valid ? 0 : 1);
             '; then
-              echo "ClawHub verified the canonical publisher, version, Skill Card, and GitHub provenance."
+              echo "ClawHub verified the canonical publisher, Skill Card, and GitHub provenance."
               exit 0
             fi
 
@@ -138,8 +62,3 @@ jobs:
           cat "$VERIFY_PATH" >&2
           echo "Do not republish this version; follow the verification procedure in docs/agent-release-runbook.md." >&2
           exit 1
-
-      - name: Remove temporary ClawHub credentials
-        if: ${{ always() && inputs.dry_run == false }}
-        shell: bash
-        run: rm -f "${CLAWHUB_CONFIG_PATH:-${RUNNER_TEMP}/clawhub-config.json}"

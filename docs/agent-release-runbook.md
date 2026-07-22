@@ -254,31 +254,13 @@ repository, commit, and skill path so ClawHub can associate the submitted bytes
 with the canonical first-party source:
 
 ```bash
-SOURCE_COMMIT="$(git rev-parse HEAD)"
-SKILL_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' integrations/openclaw/tasktime/skills/tasktime/SKILL.md)"
-docker run --rm \
-  -v "$PWD:/repo" \
-  -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
-  -e SOURCE_COMMIT \
-  -e SKILL_VERSION \
-  -w /repo \
-  node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-ref main --source-path integrations/openclaw/tasktime/skills/tasktime --dry-run'
+gh workflow run publish-clawhub-skill.yml --ref main -f dry_run=true
 ```
 
 Publish:
 
 ```bash
-SOURCE_COMMIT="$(git rev-parse HEAD)"
-SKILL_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' integrations/openclaw/tasktime/skills/tasktime/SKILL.md)"
-docker run --rm \
-  -v "$PWD:/repo" \
-  -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
-  -e SOURCE_COMMIT \
-  -e SKILL_VERSION \
-  -w /repo \
-  node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-ref main --source-path integrations/openclaw/tasktime/skills/tasktime'
+gh workflow run publish-clawhub-skill.yml --ref main -f dry_run=false
 ```
 
 Verify:
