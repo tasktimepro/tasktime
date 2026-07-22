@@ -15,6 +15,7 @@ TaskTime Pro is a browser-owned local-first system with optional remote and loca
 | Providers/adapters | Drive/manifest, backup, auth, email, push, PDF, diagnostics, and exchange-rate boundaries |
 | Agent commands | Scoped business-action facade used by browser bridge/MCP tooling |
 | Local bridge | Pairing, sessions, origins, scopes, approvals, rate limiting, command transport, and MCP protocol |
+| Managed agent plugin | Host-lifecycle ownership and generated tool adaptation around the existing local bridge; no product-data or business-logic ownership |
 | Public build | Astro content, generated agent artifacts, discovery files, and combined production output |
 
 ## Data distribution
@@ -37,6 +38,8 @@ The app uses `useUrlState` and History API events rather than React Router. App 
 - The private Worker's source and deployment are external to this repository.
 - Email, exchange rates, DebugBundle, npm/MCP registries, and agent platforms are adapters with sanitized failure behavior.
 - The local agent bridge binds to loopback, while the browser remains the mutation owner.
+- The official OpenClaw plugin runs in the supervised Gateway, owns one packaged bridge child for that Gateway/profile lifetime, and routes generated native tools through the existing bridge enforcement. Generic MCP and Claude integrations continue to own their stdio bridge processes directly.
+- Browser refresh retains a bounded app-session bearer token only in current-tab `sessionStorage`. Same-profile close/reopen continuity uses a dedicated origin-local IndexedDB credential store containing a non-exportable P-256 signing key and non-secret discovery metadata; it is isolated from Yjs, Drive, backup/export, and product state. The live bridge stores only the matching public-key authorization in memory, so Gateway restart remains an explicit re-pair boundary.
 
 ## Evolution rules
 

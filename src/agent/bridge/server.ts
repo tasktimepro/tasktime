@@ -1,11 +1,15 @@
 import { Buffer } from 'node:buffer';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { createAgentBridgeSession, isAgentBridgeSessionExpired, type AgentBridgeSession } from '@/agent/session';
 import {
     AGENT_APP_SESSION_PROTOCOL_VERSION,
+    createAgentBridgeReconnectSignatureInput,
+    isAgentBridgeReconnectForgetMessage,
+    isAgentBridgeReconnectProofMessage,
+    isAgentBridgeReconnectRegisterMessage,
     isAgentAppSessionApprovalGrantMessage,
     isAgentAppSessionApprovalGrantRevocationMessage,
     isAgentAppSessionControlMessage,
@@ -17,8 +21,12 @@ import {
     type AgentAppSessionPairingMessage,
     type AgentAppSessionRequest,
     type AgentAppSessionResponse,
+    type AgentBridgeReconnectChallengeMessage,
+    type AgentBridgeReconnectForgetMessage,
+    type AgentBridgeReconnectProofMessage,
+    type AgentBridgeReconnectRegisterMessage,
 } from '@/agent/transport/protocol';
-import { AgentCommandError } from '@/agent/types';
+import { AgentCommandError, type AgentPermissionScope } from '@/agent/types';
 import { BridgeAuditLog, type BridgeAuditEvent } from './auditLog';
 import { assertAllowedTaskTimeOrigin, assertLoopbackHost, DEFAULT_ALLOWED_TASKTIME_ORIGINS } from './originPolicy';
 import type { BridgePairingChallenge, BridgePairingStore } from './pairing';
@@ -26,6 +34,7 @@ import type { BridgePairingChallenge, BridgePairingStore } from './pairing';
 const WEBSOCKET_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const DEFAULT_APP_SESSION_PATH = '/tasktime-agent';
 const DEFAULT_APP_SESSION_REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_RECONNECT_CHALLENGE_TTL_MS = 30_000;
 
 export interface BridgeWebSocketServerOptions {
     host: string;
@@ -67,19 +76,46 @@ export interface BridgeAppSessionPairingOptions {
 
 interface SessionConnectionResult {
     challenge?: BridgePairingChallenge;
+    reconnectAuthorization?: BridgeReconnectAuthorization;
     resumed: boolean;
-    session: AgentBridgeSession;
+    session: AgentBridgeSession | null;
+}
+
+interface BridgeReconnectAuthorization {
+    keyId: string;
+    publicKey: CryptoKey;
+    origin: string;
+    scopes: Set<AgentPermissionScope>;
+    createdAt: number;
+    expiresAt: number;
+    agentId?: string;
+    agentLabel?: string;
+}
+
+interface BridgeReconnectChallenge {
+    clientId: string;
+    message: AgentBridgeReconnectChallengeMessage;
 }
 
 export class BridgeWebSocketClient {
 
     readonly id: string;
-    readonly session: AgentBridgeSession | null;
+    readonly origin: string;
+    session: AgentBridgeSession | null;
+    reconnectPending: boolean;
     private readonly socket: Duplex;
 
-    constructor(socket: Duplex, id: string, session: AgentBridgeSession | null = null) {
+    constructor(
+        socket: Duplex,
+        id: string,
+        origin: string,
+        session: AgentBridgeSession | null = null,
+        reconnectPending: boolean = false
+    ) {
         this.id = id;
+        this.origin = origin;
         this.session = session;
+        this.reconnectPending = reconnectPending;
         this.socket = socket;
     }
 
@@ -206,6 +242,10 @@ export class BridgeAppSessionServer {
     private readonly clients = new Set<BridgeWebSocketClient>();
     private readonly pendingResponses = new Map<string, PendingAppSessionResponse>();
     private readonly sessions = new Map<string, AgentBridgeSession>();
+    private readonly reconnectAuthorizations = new Map<string, BridgeReconnectAuthorization>();
+    private readonly reconnectChallenges = new Map<string, BridgeReconnectChallenge>();
+    private readonly sessionReconnectKeyIds = new Map<string, string>();
+    private readonly bridgeInstanceId = randomUUID();
     private server: Server | null = null;
     private nextClientId = 0;
     private authoritativeClientId: string | null = null;
@@ -245,6 +285,9 @@ export class BridgeAppSessionServer {
 
         this.clients.clear();
         this.sessions.clear();
+        this.reconnectAuthorizations.clear();
+        this.reconnectChallenges.clear();
+        this.sessionReconnectKeyIds.clear();
         this.authoritativeClientId = null;
 
         if (!server) {
@@ -262,6 +305,10 @@ export class BridgeAppSessionServer {
 
     getSessionCount(): number {
         return this.sessions.size;
+    }
+
+    getBridgeInstanceId(): string {
+        return this.bridgeInstanceId;
     }
 
     getAuthoritativeClientId(): string | null {
@@ -300,6 +347,9 @@ export class BridgeAppSessionServer {
         });
         this.rejectPendingResponses(new AgentCommandError('PERMISSION_DENIED', 'TaskTime Pro agent bridge access was revoked.'));
         this.sessions.clear();
+        this.reconnectAuthorizations.clear();
+        this.reconnectChallenges.clear();
+        this.sessionReconnectKeyIds.clear();
 
         for (const client of this.clients) {
             client.close();
@@ -410,7 +460,7 @@ export class BridgeAppSessionServer {
     }
 
     private electAuthoritativeClient(): void {
-        this.authoritativeClientId = Array.from(this.clients)[0]?.id ?? null;
+        this.authoritativeClientId = Array.from(this.clients).find((client) => !client.reconnectPending)?.id ?? null;
     }
 
     private resolvePendingResponse(response: AgentAppSessionResponse, client: BridgeWebSocketClient): boolean {
@@ -507,9 +557,249 @@ export class BridgeAppSessionServer {
         }
     }
 
+    private async importReconnectPublicKey(publicKeyJwk: JsonWebKey): Promise<CryptoKey | null> {
+        if (
+            publicKeyJwk.kty !== 'EC'
+            || publicKeyJwk.crv !== 'P-256'
+            || typeof publicKeyJwk.x !== 'string'
+            || !publicKeyJwk.x
+            || typeof publicKeyJwk.y !== 'string'
+            || !publicKeyJwk.y
+            || publicKeyJwk.d !== undefined
+            || (publicKeyJwk.use !== undefined && publicKeyJwk.use !== 'sig')
+            || (publicKeyJwk.key_ops !== undefined
+                && (publicKeyJwk.key_ops.length !== 1 || publicKeyJwk.key_ops[0] !== 'verify'))
+        ) {
+            return null;
+        }
+
+        try {
+            return await globalThis.crypto.subtle.importKey(
+                'jwk',
+                publicKeyJwk,
+                { name: 'ECDSA', namedCurve: 'P-256' },
+                false,
+                ['verify']
+            );
+        } catch {
+            return null;
+        }
+    }
+
+    private async handleReconnectRegisterMessage(
+        message: AgentBridgeReconnectRegisterMessage,
+        client: BridgeWebSocketClient
+    ): Promise<void> {
+        const session = client.session;
+        const now = this.options.pairing?.now ? this.options.pairing.now() : Date.now();
+
+        if (
+            !session
+            || message.sessionToken !== session.sessionToken
+            || isAgentBridgeSessionExpired(session, now)
+            || client.origin.length === 0
+        ) {
+            client.close();
+            return;
+        }
+
+        const publicKey = await this.importReconnectPublicKey(message.publicKeyJwk);
+
+        if (!publicKey) {
+            client.close();
+            return;
+        }
+
+        const keyId = randomUUID();
+        const authorization: BridgeReconnectAuthorization = {
+            keyId,
+            publicKey,
+            origin: client.origin,
+            scopes: new Set(session.scopes),
+            createdAt: now,
+            expiresAt: session.expiresAt,
+            agentId: session.agentId,
+            agentLabel: session.agentLabel,
+        };
+
+        this.reconnectAuthorizations.set(keyId, authorization);
+        client.sendJson({
+            type: 'agent_bridge_reconnect_registered',
+            protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+            keyId,
+            bridgeInstanceId: this.bridgeInstanceId,
+            expiresAt: authorization.expiresAt,
+        });
+    }
+
+    private createReconnectChallenge(
+        client: BridgeWebSocketClient,
+        authorization: BridgeReconnectAuthorization,
+        now: number
+    ): AgentBridgeReconnectChallengeMessage {
+        const challengeId = randomUUID();
+        const message: AgentBridgeReconnectChallengeMessage = {
+            type: 'agent_bridge_reconnect_challenge',
+            protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+            bridgeInstanceId: this.bridgeInstanceId,
+            keyId: authorization.keyId,
+            challengeId,
+            nonce: randomBytes(32).toString('base64url'),
+            origin: authorization.origin,
+            expiresAt: Math.min(now + DEFAULT_RECONNECT_CHALLENGE_TTL_MS, authorization.expiresAt),
+        };
+
+        this.reconnectChallenges.set(challengeId, {
+            clientId: client.id,
+            message,
+        });
+
+        return message;
+    }
+
+    private async handleReconnectProofMessage(
+        message: AgentBridgeReconnectProofMessage,
+        client: BridgeWebSocketClient
+    ): Promise<void> {
+        const challenge = this.reconnectChallenges.get(message.challengeId);
+        this.reconnectChallenges.delete(message.challengeId);
+
+        if (!challenge) {
+            client.close();
+            return;
+        }
+
+        const authorization = this.reconnectAuthorizations.get(message.keyId);
+        const now = this.options.pairing?.now ? this.options.pairing.now() : Date.now();
+
+        if (
+            !authorization
+            || challenge.clientId !== client.id
+            || challenge.message.keyId !== message.keyId
+            || challenge.message.bridgeInstanceId !== this.bridgeInstanceId
+            || challenge.message.origin !== client.origin
+            || challenge.message.expiresAt <= now
+            || authorization.expiresAt <= now
+            || authorization.origin !== client.origin
+        ) {
+            client.close();
+            return;
+        }
+
+        let verified = false;
+
+        try {
+            verified = await globalThis.crypto.subtle.verify(
+                { name: 'ECDSA', hash: 'SHA-256' },
+                authorization.publicKey,
+                new Uint8Array(Buffer.from(message.signature, 'base64url')),
+                new TextEncoder().encode(createAgentBridgeReconnectSignatureInput(challenge.message))
+            );
+        } catch {
+            verified = false;
+        }
+
+        if (!verified) {
+            client.close();
+            return;
+        }
+
+        const pairing = this.options.pairing;
+        const session = createAgentBridgeSession({
+            scopes: authorization.scopes,
+            now: () => now,
+            ttlMs: authorization.expiresAt - now,
+            tokenBytes: pairing?.tokenBytes,
+            tokenFactory: pairing?.tokenFactory,
+            agentId: authorization.agentId,
+            agentLabel: authorization.agentLabel,
+        });
+
+        this.sessions.set(session.sessionToken, session);
+        this.sessionReconnectKeyIds.set(session.sessionToken, authorization.keyId);
+        client.session = session;
+        client.reconnectPending = false;
+        if (!this.authoritativeClientId) {
+            this.authoritativeClientId = client.id;
+        }
+        client.sendJson(this.createPairingMessage(session));
+        this.audit({
+            action: 'session_connected',
+            clientId: client.id,
+            details: {
+                paired: false,
+                resumed: false,
+                browserReconnected: true,
+                authoritative: this.authoritativeClientId === client.id,
+            },
+        });
+    }
+
+    private handleReconnectForgetMessage(
+        message: AgentBridgeReconnectForgetMessage,
+        client: BridgeWebSocketClient
+    ): boolean {
+        if (!client.session || message.sessionToken !== client.session.sessionToken) {
+            client.close();
+            return true;
+        }
+
+        this.reconnectAuthorizations.delete(message.keyId);
+
+        for (const [challengeId, challenge] of this.reconnectChallenges) {
+            if (challenge.message.keyId === message.keyId) {
+                this.reconnectChallenges.delete(challengeId);
+            }
+        }
+
+        const forgottenSessionTokens = new Set<string>();
+
+        for (const [sessionToken, keyId] of this.sessionReconnectKeyIds) {
+            if (keyId !== message.keyId) {
+                continue;
+            }
+
+            forgottenSessionTokens.add(sessionToken);
+            this.sessionReconnectKeyIds.delete(sessionToken);
+            this.sessions.delete(sessionToken);
+        }
+
+        for (const connectedClient of this.clients) {
+            if (
+                connectedClient === client
+                || (connectedClient.session
+                    && forgottenSessionTokens.has(connectedClient.session.sessionToken))
+            ) {
+                connectedClient.close();
+            }
+        }
+
+        return true;
+    }
+
     private createSessionConnection(requestUrl: URL): SessionConnectionResult | null {
         const pairing = this.options.pairing;
         const now = pairing?.now ? pairing.now() : Date.now();
+        const reconnectKeyId = requestUrl.searchParams.get('reconnectKeyId')?.trim();
+
+        if (reconnectKeyId) {
+            const reconnectAuthorization = this.reconnectAuthorizations.get(reconnectKeyId);
+
+            if (!reconnectAuthorization || reconnectAuthorization.expiresAt <= now) {
+                if (reconnectAuthorization) {
+                    this.reconnectAuthorizations.delete(reconnectKeyId);
+                }
+
+                throw new AgentCommandError('PERMISSION_DENIED', 'Browser reconnect authorization expired or not found.');
+            }
+
+            return {
+                reconnectAuthorization,
+                resumed: false,
+                session: null,
+            };
+        }
+
         const sessionToken = requestUrl.searchParams.get('sessionToken')?.trim();
 
         if (sessionToken) {
@@ -587,6 +877,7 @@ export class BridgeAppSessionServer {
     private async handleUpgrade(request: IncomingMessage, socket: Duplex): Promise<void> {
         try {
             assertAllowedTaskTimeOrigin(request.headers.origin, this.options.allowedOrigins || DEFAULT_ALLOWED_TASKTIME_ORIGINS);
+            const requestOrigin = new URL(String(request.headers.origin)).origin;
 
             const requestUrl = getRequestUrl(request);
 
@@ -610,10 +901,16 @@ export class BridgeAppSessionServer {
                 '',
             ].join('\r\n'));
 
-            const client = new BridgeWebSocketClient(socket, `client-${this.nextClientId++}`, sessionResult?.session ?? null);
+            const client = new BridgeWebSocketClient(
+                socket,
+                `client-${this.nextClientId++}`,
+                requestOrigin,
+                sessionResult?.session ?? null,
+                Boolean(sessionResult?.reconnectAuthorization)
+            );
             this.clients.add(client);
 
-            if (!this.authoritativeClientId) {
+            if (!this.authoritativeClientId && !client.reconnectPending) {
                 this.authoritativeClientId = client.id;
             }
 
@@ -623,11 +920,12 @@ export class BridgeAppSessionServer {
                 details: {
                     paired: Boolean(sessionResult?.challenge),
                     resumed: Boolean(sessionResult?.resumed),
+                    browserReconnectPending: Boolean(sessionResult?.reconnectAuthorization),
                     authoritative: this.authoritativeClientId === client.id,
                 },
             });
 
-            if (sessionResult) {
+            if (sessionResult?.session) {
                 client.sendJson(this.createPairingMessage(sessionResult.session));
 
                 if (sessionResult.challenge) {
@@ -642,6 +940,14 @@ export class BridgeAppSessionServer {
                     });
                     this.options.onSessionCreated?.(sessionResult.session, client, sessionResult.challenge);
                 }
+            }
+
+            if (sessionResult?.reconnectAuthorization) {
+                client.sendJson(this.createReconnectChallenge(
+                    client,
+                    sessionResult.reconnectAuthorization,
+                    this.options.pairing?.now ? this.options.pairing.now() : Date.now()
+                ));
             }
 
             this.options.onClientConnected?.(client);
@@ -664,6 +970,20 @@ export class BridgeAppSessionServer {
                         continue;
                     }
 
+                    if (isAgentBridgeReconnectRegisterMessage(parsed)) {
+                        void this.handleReconnectRegisterMessage(parsed, client);
+                        continue;
+                    }
+
+                    if (isAgentBridgeReconnectProofMessage(parsed)) {
+                        void this.handleReconnectProofMessage(parsed, client);
+                        continue;
+                    }
+
+                    if (isAgentBridgeReconnectForgetMessage(parsed) && this.handleReconnectForgetMessage(parsed, client)) {
+                        continue;
+                    }
+
                     if (isAgentAppSessionApprovalGrantMessage(parsed) && this.handleApprovalGrantMessage(parsed, client)) {
                         continue;
                     }
@@ -683,6 +1003,11 @@ export class BridgeAppSessionServer {
             socket.on('close', () => {
                 const wasAuthoritative = this.authoritativeClientId === client.id;
                 this.clients.delete(client);
+                for (const [challengeId, challenge] of this.reconnectChallenges) {
+                    if (challenge.clientId === client.id) {
+                        this.reconnectChallenges.delete(challengeId);
+                    }
+                }
                 if (wasAuthoritative) {
                     this.electAuthoritativeClient();
                 }

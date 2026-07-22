@@ -42,7 +42,11 @@ const highlights = [
             <li>The pairing code is time-limited, single-use, and should be treated as a local secret.</li>
             <li>Managed bridges should provide a stable agent identity, such as <code>tasktime.agent.openclaw</code>, so trust is not tied to a random localhost port.</li>
             <li>App sessions default to normal work-session length; pairing codes remain short so copied setup URLs are not useful long-term.</li>
+            <li>The bearer token is stored only in bridge memory and the current tab's <code>sessionStorage</code>; it never enters durable browser/Yjs/Drive storage.</li>
+            <li>Same-profile reopen uses a dedicated IndexedDB store containing a non-exportable sign-only P-256 key and non-secret metadata. The live bridge retains only the public authorization in memory.</li>
+            <li>Reconnect challenges are short-lived, single-use, origin-bound, bridge-instance-bound, and consumed before verification to prevent replay.</li>
             <li>Trusted chat approvals default to until revoked for stable same-device agents, with shorter choices available for users who prefer them.</li>
+            <li>Trusted chat approval duration is separate from bridge connection lifetime.</li>
             <li>Account &gt; Agent Access shows paired status, scopes, current activity, and local activity history.</li>
             <li>The user can disconnect or revoke local agent access without clearing TaskTime Pro data.</li>
         </ul>

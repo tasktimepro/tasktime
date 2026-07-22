@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Readable, Writable } from 'node:stream';
@@ -56,6 +56,7 @@ export interface StartedTaskTimeAgentBridgeCli {
 export interface TaskTimeAgentBridgeStatus {
     schemaVersion: 1;
     pid: number;
+    bridgeInstanceId: string;
     startedAt: string;
     updatedAt: string;
     agent: {
@@ -75,6 +76,33 @@ export interface TaskTimeAgentBridgeStatus {
     session: {
         paired: boolean;
         clientCount: number;
+        connectedBrowserSessions: number;
+        authoritativeClientId: string | null;
+        expiresAt?: string;
+    };
+}
+
+export interface TaskTimeAgentBridgeDiscoveryStatus {
+    schemaVersion: 2;
+    pid: number;
+    bridgeInstanceId: string;
+    startedAt: string;
+    updatedAt: string;
+    agent: {
+        id: string;
+        label: string;
+    };
+    endpoint: string;
+    appUrl?: string;
+    scopes: AgentPermissionScope[];
+    pairing: {
+        expiresAt: string;
+        expired: boolean;
+    };
+    session: {
+        paired: boolean;
+        clientCount: number;
+        connectedBrowserSessions: number;
         authoritativeClientId: string | null;
         expiresAt?: string;
     };
@@ -222,7 +250,7 @@ export function getTaskTimeAgentBridgeCliUsage(): string {
         '  --tool-rate-limit <count>     Max MCP tools/call requests per window. Default: 120. Use 0 to disable.',
         '  --tool-rate-window-ms <ms>    MCP tools/call rate-limit window. Default: 60000',
         '  --app-url <url>               Print a TaskTime Pro launch URL with pairing details.',
-        '  --status-file <path>          Write machine-readable bridge pairing/status JSON.',
+        '  --status-file <path>          Write non-secret machine-readable bridge status JSON.',
         '  --manifest                    Print local agent discovery metadata as JSON and exit.',
         '  --help                        Show this help.',
         '',
@@ -285,14 +313,17 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
                 defaultSessionTtlMs: 24 * 60 * 60 * 1000,
                 resume: {
                     queryParam: 'sessionToken',
-                    memoryOnly: true,
+                    currentTabStorage: 'sessionStorage',
+                    browserReopen: 'non-exportable-p256-proof-of-possession',
+                    bearerTokenDurable: false,
                     until: ['session_expiry', 'access_revocation', 'bridge_process_exit'],
                 },
             },
             statusFile: {
                 argument: '--status-file',
                 environment: 'TASKTIME_AGENT_BRIDGE_STATUS_FILE',
-                schemaVersion: 1,
+                schemaVersion: 2,
+                containsPairingCredentials: false,
             },
             identity: {
                 argument: '--agent-id',
@@ -396,8 +427,7 @@ export async function startTaskTimeAgentBridgeCli(
         }
 
         try {
-            mkdirSync(dirname(statusFile), { recursive: true });
-            writeFileSync(statusFile, `${JSON.stringify(buildTaskTimeAgentBridgeStatus({
+            const status = buildTaskTimeAgentBridgeStatus({
                 bridge,
                 challenge: currentChallenge,
                 appUrl: options.appUrl,
@@ -405,7 +435,16 @@ export async function startTaskTimeAgentBridgeCli(
                 agentLabel: options.agentLabel,
                 startedAt,
                 activeSessionExpiresAt,
-            }), null, 2)}\n`);
+            });
+            const tempFile = getStatusTempFile(statusFile, status.bridgeInstanceId);
+
+            mkdirSync(dirname(statusFile), { recursive: true, mode: 0o700 });
+            writeFileSync(tempFile, `${JSON.stringify(buildTaskTimeAgentBridgeDiscoveryStatus(status), null, 2)}\n`, {
+                mode: 0o600,
+            });
+            chmodSync(tempFile, 0o600);
+            renameSync(tempFile, statusFile);
+            chmodSync(statusFile, 0o600);
         } catch (error) {
             io.stderr.write(`TaskTime Pro bridge status file write failed: ${error instanceof Error ? error.message : String(error)}\n`);
         }
@@ -493,6 +532,10 @@ export async function startTaskTimeAgentBridgeCli(
         stop: async () => {
             stopTransport();
             await runningBridge.stop();
+            removeStatusFile(statusFile);
+            if (statusFile) {
+                removeStatusFile(getStatusTempFile(statusFile, runningBridge.getBridgeInstanceId()));
+            }
         },
     };
 }
@@ -511,6 +554,7 @@ function buildTaskTimeAgentBridgeStatus(options: {
     return {
         schemaVersion: 1,
         pid: process.pid,
+        bridgeInstanceId: options.bridge.getBridgeInstanceId(),
         startedAt: options.startedAt,
         updatedAt: new Date(now).toISOString(),
         agent: {
@@ -530,10 +574,49 @@ function buildTaskTimeAgentBridgeStatus(options: {
         session: {
             paired: options.bridge.getClientCount() > 0,
             clientCount: options.bridge.getClientCount(),
+            connectedBrowserSessions: options.bridge.getClientCount(),
             authoritativeClientId: options.bridge.getAuthoritativeClientId(),
             expiresAt: options.activeSessionExpiresAt ? new Date(options.activeSessionExpiresAt).toISOString() : undefined,
         },
     };
+}
+
+function buildTaskTimeAgentBridgeDiscoveryStatus(
+    status: TaskTimeAgentBridgeStatus
+): TaskTimeAgentBridgeDiscoveryStatus {
+    return {
+        schemaVersion: 2,
+        pid: status.pid,
+        bridgeInstanceId: status.bridgeInstanceId,
+        startedAt: status.startedAt,
+        updatedAt: status.updatedAt,
+        agent: status.agent,
+        endpoint: status.endpoint,
+        appUrl: status.appUrl,
+        scopes: status.scopes,
+        pairing: {
+            expiresAt: status.pairing.expiresAt,
+            expired: status.pairing.expired,
+        },
+        session: status.session,
+    };
+}
+
+function getStatusTempFile(statusFile: string, bridgeInstanceId: string): string {
+    return `${statusFile}.${process.pid}.${bridgeInstanceId}.tmp`;
+}
+
+function removeStatusFile(filePath?: string): void {
+    if (!filePath) {
+        return;
+    }
+
+    try {
+        unlinkSync(filePath);
+    } catch {
+        // A missing, replaced, or invalid user-supplied status target must not
+        // prevent bridge shutdown or lead to broader filesystem cleanup.
+    }
 }
 
 export async function runTaskTimeAgentBridgeCli(

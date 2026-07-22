@@ -93,6 +93,8 @@ export default [
     files: [
       'e2e/**/*.js',
       'e2e/**/*.ts',
+      'integrations/openclaw/tasktime/dist/**/*.js',
+      'integrations/openclaw/tasktime/src/**/*.js',
       '*.config.js',
       '*.config.ts',
       'eslint.config.js',

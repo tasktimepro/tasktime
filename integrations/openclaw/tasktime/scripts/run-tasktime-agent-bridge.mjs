@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
-import { createWriteStream, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,29 +27,30 @@ const command = bridgePath
 const args = bridgePath
     ? [bridgePath, ...effectiveArgs]
     : effectiveArgs;
-const logPath = resolve(__dirname, '../tasktime-agent-bridge.log');
-mkdirSync(dirname(logPath), { recursive: true });
-const log = createWriteStream(logPath, { flags: 'w' });
-
 const child = spawn(command, args, {
-    stdio: ['inherit', 'pipe', 'pipe'],
+    stdio: 'inherit',
 });
+const forwardedSignals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 
-child.stdout.pipe(process.stdout);
-child.stderr.on('data', (chunk) => {
-    process.stderr.write(chunk);
-    log.write(chunk);
-});
+for (const signal of forwardedSignals) {
+    process.once(signal, () => {
+        if (child.exitCode === null && child.signalCode === null) {
+            child.kill(signal);
+        }
+    });
+}
 
 child.on('error', (error) => {
     const message = `Failed to launch TaskTime Pro agent bridge: ${error.message}\n`;
     process.stderr.write(message);
-    log.write(message);
     process.exitCode = 1;
 });
 
 child.on('exit', (code, signal) => {
-    log.end();
+    for (const forwardedSignal of forwardedSignals) {
+        process.removeAllListeners(forwardedSignal);
+    }
+
     if (signal) {
         process.kill(process.pid, signal);
         return;

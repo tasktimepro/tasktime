@@ -556,6 +556,230 @@ describe('agent bridge websocket helpers', () => {
         }
     });
 
+    it('registers a browser proof key and issues a fresh session after every tab is closed', async () => {
+        const pairingStore = new BridgePairingStore();
+        let tokenIndex = 0;
+        const server = new BridgeAppSessionServer({
+            host: '127.0.0.1',
+            port: 0,
+            allowedOrigins: ['http://localhost:3101'],
+            pairing: {
+                store: pairingStore,
+                now: () => Date.now(),
+                sessionTtlMs: 60_000,
+                tokenFactory: () => `browser-session-${++tokenIndex}`,
+            },
+        });
+        let pairedConnection: TestWebSocketConnection | null = null;
+        let reconnectConnection: TestWebSocketConnection | null = null;
+        let secondReconnectConnection: TestWebSocketConnection | null = null;
+
+        pairingStore.create({
+            endpoint: 'ws://127.0.0.1:0/tasktime-agent',
+            scopes: ['read', 'navigation'],
+            ttlMs: 60_000,
+            idFactory: () => 'browser-reconnect-pairing',
+            codeFactory: () => '123456',
+            agentId: 'tasktime.agent.openclaw',
+            agentLabel: 'OpenClaw on this device',
+        });
+
+        try {
+            const keyPair = await globalThis.crypto.subtle.generateKey(
+                { name: 'ECDSA', namedCurve: 'P-256' },
+                true,
+                ['sign', 'verify']
+            );
+            const publicKeyJwk = await globalThis.crypto.subtle.exportKey('jwk', keyPair.publicKey);
+
+            await server.start();
+            const address = parseAddress(server.getAddress());
+            pairedConnection = await connectTestWebSocket(
+                address.port,
+                '/tasktime-agent?pairingId=browser-reconnect-pairing&pairingCode=123456'
+            );
+            const pairedSession = await pairedConnection.nextMessage();
+
+            expect(pairedSession).toEqual(expect.objectContaining({
+                type: 'agent_bridge_session',
+                sessionToken: 'browser-session-1',
+            }));
+
+            pairedConnection.sendJson({
+                type: 'agent_bridge_reconnect_register',
+                protocolVersion: 1,
+                sessionToken: 'browser-session-1',
+                publicKeyJwk,
+            });
+
+            const registration = await pairedConnection.nextMessage(250) as Record<string, unknown> | null;
+
+            expect(registration).toEqual(expect.objectContaining({
+                type: 'agent_bridge_reconnect_registered',
+                protocolVersion: 1,
+                keyId: expect.any(String),
+                bridgeInstanceId: expect.any(String),
+                expiresAt: expect.any(Number),
+            }));
+
+            await pairedConnection.close();
+            pairedConnection = null;
+            reconnectConnection = await connectTestWebSocket(
+                address.port,
+                `/tasktime-agent?reconnectKeyId=${encodeURIComponent(String(registration?.keyId))}`
+            );
+            const challenge = await reconnectConnection.nextMessage() as Record<string, unknown>;
+
+            expect(challenge).toEqual(expect.objectContaining({
+                type: 'agent_bridge_reconnect_challenge',
+                protocolVersion: 1,
+                bridgeInstanceId: registration?.bridgeInstanceId,
+                keyId: registration?.keyId,
+                challengeId: expect.any(String),
+                nonce: expect.any(String),
+                origin: 'http://localhost:3101',
+                expiresAt: expect.any(Number),
+            }));
+
+            const signaturePayload = JSON.stringify({
+                domain: 'tasktime.agent.browser-reconnect',
+                protocolVersion: 1,
+                bridgeInstanceId: challenge.bridgeInstanceId,
+                keyId: challenge.keyId,
+                challengeId: challenge.challengeId,
+                nonce: challenge.nonce,
+                origin: challenge.origin,
+                expiresAt: challenge.expiresAt,
+            });
+            const signature = await globalThis.crypto.subtle.sign(
+                { name: 'ECDSA', hash: 'SHA-256' },
+                keyPair.privateKey,
+                new TextEncoder().encode(signaturePayload)
+            );
+
+            reconnectConnection.sendJson({
+                type: 'agent_bridge_reconnect_proof',
+                protocolVersion: 1,
+                keyId: challenge.keyId,
+                challengeId: challenge.challengeId,
+                signature: Buffer.from(signature).toString('base64url'),
+            });
+
+            await expect(reconnectConnection.nextMessage()).resolves.toEqual(expect.objectContaining({
+                type: 'agent_bridge_session',
+                sessionToken: 'browser-session-2',
+                scopes: ['read', 'navigation'],
+            }));
+
+            secondReconnectConnection = await connectTestWebSocket(
+                address.port,
+                `/tasktime-agent?reconnectKeyId=${encodeURIComponent(String(registration?.keyId))}`
+            );
+            const secondChallenge = await secondReconnectConnection.nextMessage() as Record<string, unknown>;
+            const secondSignaturePayload = JSON.stringify({
+                domain: 'tasktime.agent.browser-reconnect',
+                protocolVersion: 1,
+                bridgeInstanceId: secondChallenge.bridgeInstanceId,
+                keyId: secondChallenge.keyId,
+                challengeId: secondChallenge.challengeId,
+                nonce: secondChallenge.nonce,
+                origin: secondChallenge.origin,
+                expiresAt: secondChallenge.expiresAt,
+            });
+            const secondSignature = await globalThis.crypto.subtle.sign(
+                { name: 'ECDSA', hash: 'SHA-256' },
+                keyPair.privateKey,
+                new TextEncoder().encode(secondSignaturePayload)
+            );
+
+            secondReconnectConnection.sendJson({
+                type: 'agent_bridge_reconnect_proof',
+                protocolVersion: 1,
+                keyId: secondChallenge.keyId,
+                challengeId: secondChallenge.challengeId,
+                signature: Buffer.from(secondSignature).toString('base64url'),
+            });
+
+            await expect(secondReconnectConnection.nextMessage()).resolves.toEqual(expect.objectContaining({
+                type: 'agent_bridge_session',
+                sessionToken: 'browser-session-3',
+            }));
+            expect(server.getSessionCount()).toBe(3);
+
+            reconnectConnection.sendJson({
+                type: 'agent_bridge_reconnect_proof',
+                protocolVersion: 1,
+                keyId: challenge.keyId,
+                challengeId: challenge.challengeId,
+                signature: Buffer.from(signature).toString('base64url'),
+            });
+
+            await expect(reconnectConnection.nextMessage(50)).resolves.toBeNull();
+            expect(server.getSessionCount()).toBe(3);
+        } finally {
+            await secondReconnectConnection?.close();
+            await reconnectConnection?.close();
+            await pairedConnection?.close();
+            await server.stop();
+        }
+    });
+
+    it('does not accept an app-session token after its owning bridge process is replaced', async () => {
+        const firstPairingStore = new BridgePairingStore();
+        const firstServer = new BridgeAppSessionServer({
+            host: '127.0.0.1',
+            port: 0,
+            allowedOrigins: ['http://localhost:3101'],
+            pairing: {
+                store: firstPairingStore,
+                tokenFactory: () => 'process-owned-session',
+            },
+        });
+        let pairedConnection: TestWebSocketConnection | null = null;
+
+        firstPairingStore.create({
+            endpoint: 'ws://127.0.0.1:0/tasktime-agent',
+            scopes: ['read'],
+            idFactory: () => 'process-pairing',
+            codeFactory: () => '123456',
+        });
+
+        await firstServer.start();
+        const firstAddress = parseAddress(firstServer.getAddress());
+        pairedConnection = await connectTestWebSocket(
+            firstAddress.port,
+            '/tasktime-agent?pairingId=process-pairing&pairingCode=123456'
+        );
+        await expect(pairedConnection.nextMessage()).resolves.toEqual(expect.objectContaining({
+            sessionToken: 'process-owned-session',
+        }));
+        await pairedConnection.close();
+        pairedConnection = null;
+        await firstServer.stop();
+
+        const replacementServer = new BridgeAppSessionServer({
+            host: '127.0.0.1',
+            port: 0,
+            allowedOrigins: ['http://localhost:3101'],
+            pairing: {
+                store: new BridgePairingStore(),
+            },
+        });
+
+        try {
+            await replacementServer.start();
+            const replacementAddress = parseAddress(replacementServer.getAddress());
+
+            await expect(requestWebSocketHandshake(
+                replacementAddress.port,
+                'http://localhost:3101',
+                '/tasktime-agent?sessionToken=process-owned-session'
+            )).resolves.toContain('HTTP/1.1 403 Forbidden');
+        } finally {
+            await replacementServer.stop();
+        }
+    });
+
     it('lets a paired app session revoke all bridge app sessions', async () => {
         const connectedClients: BridgeWebSocketClient[] = [];
         const pairingStore = new BridgePairingStore();

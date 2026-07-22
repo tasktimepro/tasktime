@@ -40,7 +40,8 @@ These invariants summarize critical production contracts. They supplement the de
 - The browser app remains the mutation owner; MCP tools expose business actions rather than raw storage access.
 - UI and agent business capabilities must remain in audited parity and use shared domain/application operations wherever both surfaces support the action; duplicated mutation or calculation logic is a correctness defect.
 - The bridge stays loopback-only and requires explicit pairing, scopes, approvals, and revocation.
-- Pairing codes and app-session tokens remain short-lived or memory-only as documented; they must never enter logs, status files, docs, or recovery payloads.
+- Pairing codes remain single-use and short-lived. App-session bearer tokens remain bounded and may exist only in active memory, current-tab `sessionStorage`, and the live bridge session map; they must never enter logs, status files, IndexedDB, Yjs, Drive, backups, exports, docs, diagnostics, or recovery payloads.
+- Same-browser agent reconnect uses proof of possession, never stable identity or a persisted bearer token. Its private key is non-exportable, origin-local, sign-only, isolated from product/synced storage, and paired with an in-memory bridge authorization that is scope-, origin-, instance-, expiry-, and revocation-bound.
 - Private Worker source, deployment state, provider identifiers, secrets, and internal operational runbooks remain outside the public repository.
 
 Changes touching these areas require focused regression coverage and the relevant broader release checks.

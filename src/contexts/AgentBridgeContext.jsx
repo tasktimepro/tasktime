@@ -9,6 +9,19 @@ import {
     revokeAgentBridgeApprovalGrant as revokeStoredAgentBridgeApprovalGrant,
     saveAgentBridgeApprovalGrant,
 } from '@/agent/browser/approvalTokens';
+import {
+    clearAgentBridgeSessionResumeRecord,
+    createAgentBridgeSessionFromResumeRecord,
+    loadAgentBridgeSessionResumeRecord,
+    saveAgentBridgeSessionResumeRecord,
+} from '@/agent/browser/sessionResume';
+import {
+    createAgentBridgeReconnectCredential,
+    deleteAgentBridgeReconnectCredential,
+    generateAgentBridgeReconnectKeyPair,
+    loadAgentBridgeReconnectCredential,
+    saveAgentBridgeReconnectCredential,
+} from '@/agent/browser/reconnectCredential';
 import { AgentAppSessionWebSocketClient } from '@/agent/transport/websocketClient';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -95,7 +108,10 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
     const commandContext = useAgentCommandContext();
     const commandContextRef = useRef(commandContext);
     const clientRef = useRef(null);
+    const connectRef = useRef(null);
     const pendingApprovalRef = useRef(null);
+    const reconnectCredentialRef = useRef(null);
+    const pendingReconnectKeyRef = useRef(null);
     const [status, setStatus] = useState('idle');
     const [session, setSession] = useState(null);
     const [error, setError] = useState('');
@@ -107,6 +123,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
     const [agentAccessEnabled, setAgentAccessEnabled] = useState(true);
     const [approvalGrants, setApprovalGrants] = useState([]);
     const [approvalGrantError, setApprovalGrantError] = useState('');
+    const [browserReconnectRemembered, setBrowserReconnectRemembered] = useState(false);
 
     useEffect(() => {
         commandContextRef.current = commandContext;
@@ -174,7 +191,13 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         }
     }, []);
 
-    const connect = useCallback(({ endpoint, pairingId, pairingCode }) => {
+    const connect = useCallback(({
+        endpoint,
+        pairingId,
+        pairingCode,
+        session: existingSession = null,
+        reconnectCredential = null,
+    }) => {
         if (!agentAccessEnabled) {
             setError('Agent access is disabled for this page session.');
             return false;
@@ -183,11 +206,13 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         let url;
 
         try {
-            url = buildAgentBridgePairingUrl({
-                endpoint,
-                pairingId,
-                pairingCode,
-            });
+            url = existingSession || reconnectCredential
+                ? endpoint
+                : buildAgentBridgePairingUrl({
+                    endpoint,
+                    pairingId,
+                    pairingCode,
+                });
         } catch (validationError) {
             setError(validationError instanceof Error ? validationError.message : 'Invalid bridge pairing details.');
             return false;
@@ -204,6 +229,8 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
             url,
             context: commandContextRef.current,
             getContext: () => commandContextRef.current,
+            session: existingSession,
+            reconnectCredential,
             autoReconnect: true,
             maxReconnectAttempts: 5,
             onStatusChange: (nextStatus) => {
@@ -223,8 +250,83 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
                 }
             },
             onSessionChange: (nextSession) => {
+                saveAgentBridgeSessionResumeRecord(endpoint, nextSession);
                 setSession(nextSession);
                 void deliverStoredApprovalGrants(nextSession);
+
+                if (
+                    typeof globalThis.indexedDB !== 'undefined'
+                    && !reconnectCredentialRef.current
+                    && !pendingReconnectKeyRef.current
+                ) {
+                    void generateAgentBridgeReconnectKeyPair()
+                        .then(({ privateKey, publicKeyJwk }) => {
+                            if (clientRef.current !== client) {
+                                return;
+                            }
+
+                            pendingReconnectKeyRef.current = {
+                                privateKey,
+                                endpoint,
+                                session: nextSession,
+                            };
+
+                            if (client.registerReconnectPublicKey(publicKeyJwk) !== true) {
+                                pendingReconnectKeyRef.current = null;
+                            }
+                        })
+                        .catch(() => {
+                            pendingReconnectKeyRef.current = null;
+                        });
+                }
+            },
+            onReconnectRegistered: (registration) => {
+                const pending = pendingReconnectKeyRef.current;
+
+                if (!pending || clientRef.current !== client) {
+                    return;
+                }
+
+                pendingReconnectKeyRef.current = null;
+
+                try {
+                    const credential = createAgentBridgeReconnectCredential(pending.privateKey, {
+                        endpoint: pending.endpoint,
+                        registration,
+                        agentId: pending.session.agentId,
+                        agentLabel: pending.session.agentLabel,
+                    });
+
+                    reconnectCredentialRef.current = credential;
+                    void saveAgentBridgeReconnectCredential(credential)
+                        .then(() => {
+                            setBrowserReconnectRemembered(true);
+                        })
+                        .catch(() => {
+                            if (reconnectCredentialRef.current?.bridgeInstanceId === credential.bridgeInstanceId) {
+                                reconnectCredentialRef.current = null;
+                            }
+                            setBrowserReconnectRemembered(false);
+                        });
+                } catch {
+                    reconnectCredentialRef.current = null;
+                    setBrowserReconnectRemembered(false);
+                }
+            },
+            onReconnectFailure: () => {
+                const credential = reconnectCredentialRef.current;
+
+                reconnectCredentialRef.current = null;
+                pendingReconnectKeyRef.current = null;
+                setBrowserReconnectRemembered(false);
+                clearAgentBridgeSessionResumeRecord();
+
+                if (credential) {
+                    void deleteAgentBridgeReconnectCredential(credential.bridgeInstanceId).catch(() => undefined);
+                }
+
+                setError('The remembered browser authorization is no longer accepted by the active local bridge. Pair TaskTime Pro again.');
+                client.close();
             },
             onCommandApprovalRequest: (request) => {
                 resolvePendingApproval(false);
@@ -314,9 +416,75 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         }
     }, [agentAccessEnabled, closeClient, deliverStoredApprovalGrants, resolvePendingApproval, verifyApprovalToken]);
 
+    connectRef.current = connect;
+
+    useEffect(() => {
+        if (!agentAccessEnabled) {
+            return;
+        }
+
+        const record = loadAgentBridgeSessionResumeRecord();
+        let cancelled = false;
+
+        void (async () => {
+            let reconnectCredential = null;
+
+            if (typeof globalThis.indexedDB !== 'undefined') {
+                try {
+                    reconnectCredential = await loadAgentBridgeReconnectCredential();
+                } catch {
+                    reconnectCredential = null;
+                }
+            }
+
+            if (cancelled) {
+                return;
+            }
+
+            const matchingReconnectCredential = record
+                && reconnectCredential
+                && reconnectCredential.endpoint !== record.endpoint
+                ? null
+                : reconnectCredential;
+
+            reconnectCredentialRef.current = matchingReconnectCredential;
+            setBrowserReconnectRemembered(Boolean(matchingReconnectCredential));
+
+            if (record) {
+                connectRef.current?.({
+                    endpoint: record.endpoint,
+                    session: createAgentBridgeSessionFromResumeRecord(record),
+                });
+                return;
+            }
+
+            if (matchingReconnectCredential) {
+                connectRef.current?.({
+                    endpoint: matchingReconnectCredential.endpoint,
+                    reconnectCredential: matchingReconnectCredential,
+                });
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [agentAccessEnabled]);
+
     const disconnect = useCallback(() => {
         resolvePendingApproval(false);
+        const reconnectCredential = reconnectCredentialRef.current;
+
+        if (reconnectCredential) {
+            clientRef.current?.forgetReconnectKey(reconnectCredential.keyId);
+            void deleteAgentBridgeReconnectCredential(reconnectCredential.bridgeInstanceId).catch(() => undefined);
+        }
+
+        reconnectCredentialRef.current = null;
+        pendingReconnectKeyRef.current = null;
+        setBrowserReconnectRemembered(false);
         closeClient();
+        clearAgentBridgeSessionResumeRecord();
         setSession(null);
         setCurrentActivity(null);
         setStatus('closed');
@@ -324,8 +492,19 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
 
     const revoke = useCallback(() => {
         resolvePendingApproval(false);
+        const reconnectCredential = reconnectCredentialRef.current;
+
         clientRef.current?.revoke();
         clientRef.current = null;
+        reconnectCredentialRef.current = null;
+        pendingReconnectKeyRef.current = null;
+        setBrowserReconnectRemembered(false);
+
+        if (reconnectCredential) {
+            void deleteAgentBridgeReconnectCredential(reconnectCredential.bridgeInstanceId).catch(() => undefined);
+        }
+
+        clearAgentBridgeSessionResumeRecord();
         setSession(null);
         setCurrentActivity(null);
         setStatus('closed');
@@ -388,8 +567,18 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
 
         if (!enabled) {
             resolvePendingApproval(false);
+            const reconnectCredential = reconnectCredentialRef.current;
+
             clientRef.current?.revoke();
             clientRef.current = null;
+            reconnectCredentialRef.current = null;
+            pendingReconnectKeyRef.current = null;
+            setBrowserReconnectRemembered(false);
+
+            if (reconnectCredential) {
+                void deleteAgentBridgeReconnectCredential(reconnectCredential.bridgeInstanceId).catch(() => undefined);
+            }
+            clearAgentBridgeSessionResumeRecord();
             setSession(null);
             setCurrentActivity(null);
             setLastActivity(null);
@@ -423,6 +612,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         agentAccessEnabled,
         approvalGrants,
         approvalGrantError,
+        browserReconnectRemembered,
         connect,
         disconnect,
         revoke,
@@ -443,6 +633,7 @@ export function AgentBridgeProvider({ children, verifyApprovalToken }) {
         agentAccessEnabled,
         approvalGrants,
         approvalGrantError,
+        browserReconnectRemembered,
         connect,
         disconnect,
         revoke,

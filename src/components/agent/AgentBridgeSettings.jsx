@@ -141,6 +141,7 @@ export default function AgentBridgeSettings() {
         agentAccessEnabled,
         approvalGrants,
         approvalGrantError,
+        browserReconnectRemembered,
         connect,
         disconnect,
         revoke,
@@ -399,7 +400,7 @@ export default function AgentBridgeSettings() {
 
                 <div className={cn(
                     'grid gap-3 rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground',
-                    'sm:grid-cols-3'
+                    'sm:grid-cols-4'
                 )}>
                     <div>
                         <span className="block font-medium text-foreground">Connection</span>
@@ -411,7 +412,11 @@ export default function AgentBridgeSettings() {
                     </div>
                     <div>
                         <span className="block font-medium text-foreground">Session token</span>
-                        <span>Memory only</span>
+                        <span>Current tab only</span>
+                    </div>
+                    <div>
+                        <span className="block font-medium text-foreground">Browser reopen</span>
+                        <span>{browserReconnectRemembered ? 'Securely remembered' : 'Pairing required'}</span>
                     </div>
                 </div>
 
@@ -419,7 +424,7 @@ export default function AgentBridgeSettings() {
                     <CardHeader>
                         <CardTitle>Trusted Chat Approvals</CardTitle>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Approval tokens from trusted local agents can satisfy sensitive command prompts.
+                            Approval tokens from trusted local agents can satisfy sensitive command prompts. This trust does not keep the local bridge connected.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">

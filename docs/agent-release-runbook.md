@@ -10,7 +10,7 @@ This file is the local source of truth for publishing TaskTime Pro agent-facing 
 - Public bridge manifest: `public/.well-known/tasktime-agent.json`
 - Public MCP tool catalog: `https://tasktime.pro/agents/mcp-tools.json`
 - OpenClaw/ClawHub skill slug: `@tasktimepro/tasktime-agent`
-- OpenClaw bundle path: `integrations/openclaw/tasktime/`
+- Native OpenClaw plugin path: `integrations/openclaw/tasktime/`
 - Claude Code plugin path: `integrations/claude/tasktime/`
 
 The canonical ClawHub skill is `@tasktimepro/tasktime-agent`. The legacy slugs
@@ -24,13 +24,13 @@ TaskTime Pro pairing must be smooth for managed agent platforms:
 
 - Pairing codes stay short-lived and single-use. Do not lengthen pairing codes to days or months.
 - App sessions default to normal work-session length: 24 hours unless a host explicitly overrides `--session-ttl-ms`.
-- After successful pairing, browser reconnects must use the in-memory app-session token, not the consumed pairing code. The bridge should accept `?sessionToken=...` until the session expires, access is revoked, or the bridge process exits.
-- App-session tokens are memory-only. Do not write them to status files, logs, launch URLs, docs, or MCP recovery payloads.
+- After pairing, the current tab keeps the bounded app-session token in `sessionStorage` for refresh recovery. It must never enter localStorage, IndexedDB, Yjs, Drive, backups, logs, status files, docs, or MCP recovery payloads.
+- Same-profile close/reopen continuity uses a non-exportable browser signing key and bridge challenge/response to issue a fresh session. The bridge public authorization remains memory-only and ends on bridge/Gateway restart.
 - Stable trust identity comes from `--agent-id` and `--agent-label`, not the dynamic WebSocket port.
 - Trusted chat approval grants default to "until revoked" for stable same-device managed agents. The UI may also offer shorter grants such as "today" or "30 days", but the smooth path should not force recurring monthly re-trust.
 - OpenClaw uses `tasktime.agent.openclaw` / `OpenClaw on this device`.
 - Claude Code uses `tasktime.agent.claude-code` / `Claude Code on this device`.
-- Managed bundles should pass `--status-file` so agents can discover the active endpoint and launch URL without scraping stderr.
+- Managed integrations should pass `--status-file` for non-secret endpoint, PID, instance, identity, expiry, and browser-session discovery. Pairing IDs/codes and launch URLs must remain in ephemeral interactive/MCP setup output.
 - Agents should use `get_pairing_status` before giving setup instructions, and `refresh_pairing` when a pairing code expired or was consumed.
 - Agents must not ask users to run a separate `tasktime-agent-bridge` terminal process when the installed MCP server already owns a bridge.
 - Current TaskTime Pro app builds show requested scopes in the launch approval notice before connection and confirmed scopes after connection; do not document user-selectable scopes unless the app gains a visible scope picker.
@@ -60,6 +60,25 @@ npm publishing uses GitHub Actions and the `NPM_TOKEN` repository secret:
 ```text
 .github/workflows/publish-agent-bridge.yml
 ```
+
+ClawHub publishing uses a manually dispatched, dry-run-first GitHub Actions
+workflow and the `CLAWHUB_TOKEN` repository secret:
+
+```text
+.github/workflows/publish-clawhub-skill.yml
+```
+
+ClawHub does not currently support GitHub OIDC trusted publishing for skills.
+Keep the token in GitHub Actions secrets; never place it in repository files,
+workflow inputs, logs, or release notes.
+
+One-time repository setup, performed interactively by an authorized maintainer:
+
+```bash
+gh secret set CLAWHUB_TOKEN --repo tasktimepro/tasktime
+```
+
+Paste the ClawHub publisher token only into that hidden prompt.
 
 MCP Registry publishing uses the domain proof at `https://tasktime.pro/.well-known/mcp-registry-auth`.
 The matching private key is stored on the release machine at:
@@ -190,6 +209,35 @@ canonical install command is:
 openclaw skills install @tasktimepro/tasktime-agent
 ```
 
+The canonical release path is the manually dispatched GitHub Actions workflow.
+It reads the exact version from `SKILL.md`, refuses to publish from a fork,
+pins the public `tasktimepro/tasktime` repository plus the workflow's exact
+commit and skill path, and verifies the resulting publisher identity, Skill
+Card, and server-resolved GitHub provenance.
+
+Run the dry-run first:
+
+```bash
+gh workflow run publish-clawhub-skill.yml --ref main -f dry_run=true
+gh run watch
+```
+
+After the coordinated release checks pass and the user explicitly approves the
+ClawHub publication, run the real release:
+
+```bash
+gh workflow run publish-clawhub-skill.yml --ref main -f dry_run=false
+gh run watch
+```
+
+Do not run the real workflow from a commit that has not completed the intended
+release gates. The workflow publishes the version declared in the checked-out
+`SKILL.md`; it never lets ClawHub silently choose the next patch version.
+
+The local CLI commands below are an emergency/manual fallback. Use them only
+from the canonical repository at a pushed commit whose `SKILL.md` bytes match
+that commit.
+
 Use the standalone ClawHub CLI with Node 24:
 
 ```bash
@@ -207,26 +255,30 @@ with the canonical first-party source:
 
 ```bash
 SOURCE_COMMIT="$(git rev-parse HEAD)"
+SKILL_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' integrations/openclaw/tasktime/skills/tasktime/SKILL.md)"
 docker run --rm \
   -v "$PWD:/repo" \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
   -e SOURCE_COMMIT \
+  -e SKILL_VERSION \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime --dry-run'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime --dry-run'
 ```
 
 Publish:
 
 ```bash
 SOURCE_COMMIT="$(git rev-parse HEAD)"
+SKILL_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' integrations/openclaw/tasktime/skills/tasktime/SKILL.md)"
 docker run --rm \
   -v "$PWD:/repo" \
   -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
   -e SOURCE_COMMIT \
+  -e SKILL_VERSION \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime'
 ```
 
 Verify:
@@ -238,9 +290,11 @@ docker run --rm \
   sh -lc 'npx -y clawhub@0.23.1 skill verify @tasktimepro/tasktime-agent'
 ```
 
-This command must return `"ok": true` and `card.available: true`. The
-generated card is part of ClawHub's verification contract, even when every
-security scanner is clean. Confirm the card itself is available with:
+This command must return `"ok": true`, `publisherHandle: "tasktimepro"`, the
+exact published version, `card.available: true`, and
+`provenance.source: "server-resolved-github-import"`. The generated card is
+part of ClawHub's verification contract, even when every security scanner is
+clean. Confirm the card itself is available with:
 
 ```bash
 docker run --rm \
@@ -287,7 +341,7 @@ docker run --rm \
   sh -lc 'npx -y clawhub@0.23.1 skill merge @tasktimepro/<duplicate-slug> @tasktimepro/tasktime-agent --yes'
 ```
 
-## OpenClaw Bundle
+## Native OpenClaw Plugin
 
 The OpenClaw bundle is in:
 
@@ -298,15 +352,20 @@ integrations/openclaw/tasktime/
 Important files:
 
 - `package.json`
+- `openclaw.plugin.json`
+- `src/index.js`
+- `dist/index.js`
 - `.codex-plugin/plugin.json`
 - `.mcp.json`
 - `skills/tasktime/SKILL.md`
 - `scripts/run-tasktime-agent-bridge.mjs`
 - `vendor/tasktime-agent-bridge.mjs`
 
-The OpenClaw `.mcp.json` must pass `--agent-id tasktime.agent.openclaw`, `--agent-label "OpenClaw on this device"`, and a work-session-length `--session-ttl-ms`. The launcher writes `tasktime-agent-bridge.status.json` next to the bundle by default.
+The native plugin is the primary OpenClaw path. It must activate on Gateway startup, register one supervised bridge service, expose generated `tasktime__*` tools, retain the skill directory, bind the bridge to loopback, and use `tasktime.agent.openclaw` / `OpenClaw on this device`. The retained `.mcp.json` is a compatibility artifact and must not become a second OpenClaw owner when native format is present.
 
-When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`.
+The native plugin writes a secret-free discovery status below the OpenClaw state directory. Its setup tools return the ephemeral pairing launch URL. Legacy `mcp.servers.tasktime` config must produce `legacy_mcp_conflict` instead of starting a duplicate bridge.
+
+When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`, then run `build:openclaw-plugin`. The publish workflow performs both steps before package smoke and packing.
 
 If the OpenClaw bundle package is published to npm, bump `integrations/openclaw/tasktime/package.json` and use the repo workflow:
 
@@ -339,7 +398,7 @@ The marketplace install path is repository-backed:
 /plugin install tasktime@tasktimepro
 ```
 
-The Claude `.mcp.json` must pass `--agent-id tasktime.agent.claude-code`, `--agent-label "Claude Code on this device"`, and a work-session-length `--session-ttl-ms`. The launcher writes `tasktime-agent-bridge.status.json` next to the plugin by default.
+The Claude `.mcp.json` must pass `--agent-id tasktime.agent.claude-code`, `--agent-label "Claude Code on this device"`, and a work-session-length `--session-ttl-ms`. The launcher writes a secret-free `tasktime-agent-bridge.status.json` next to the plugin by default; pairing URLs come from the setup tool.
 
 When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`. Bump `.claude-plugin/plugin.json` when the plugin bundle changes in a way users should receive as a new plugin version.
 
@@ -353,7 +412,7 @@ Before tagging or announcing an agent release:
 - `@tasktimepro/tasktime-agent` is the only canonical TaskTime Pro ClawHub skill under owner `tasktimepro`.
 - `@tasktimepro/tasktime` and `@tasktimepro/tasktime-pro` redirect to `@tasktimepro/tasktime-agent` if inspected.
 - `clawhub skill verify @tasktimepro/tasktime-agent` returns `"ok": true` and a generated Skill Card.
-- ClawHub verification identifies the canonical public source repository, commit, and skill path; any unavailable or merely self-declared provenance is recorded for follow-up.
+- ClawHub verification identifies the canonical public source repository, exact commit, and skill path as server-resolved GitHub provenance; unavailable or merely self-declared provenance blocks release completion.
 - The generated Skill Card contains no unrelated or invented capabilities.
 - Unqualified `clawhub skill verify tasktime-agent` and `openclaw skills verify tasktime-agent` resolve to TaskTime Pro.
 - Public docs point to `@tasktimepro/tasktime-agent`, `@tasktimepro/agent-bridge`, and `pro.tasktime/agent-bridge`.

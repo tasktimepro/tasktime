@@ -28,6 +28,11 @@ Local agent process
     ├── pairing/session/scope/rate-limit enforcement
     └── WebSocket connection to the browser-owned command layer
 
+Managed OpenClaw Gateway
+└── integrations/openclaw/tasktime/ native plugin
+    ├── generated native tool registrations
+    └── one Gateway-lifecycle packaged bridge child using the same enforcement/protocol
+
 Public web build
 └── blog/ + scripts/build-pages.mjs
     ├── blog and legal pages
@@ -46,6 +51,8 @@ Public web build
 - Shared operations under `src/domain/time/`, `src/domain/tasks/`, `src/domain/work/`, `src/domain/entities/`, and `src/domain/expenses/` own cross-surface validation and mutation planning; hooks and agent commands adapt errors, permissions, transactions, archive loading, and activity metrics around them.
 - Invoice finalization, undo, and terminal cancellation use shared application plans under `src/domain/invoices/` plus the replay-safe `invoiceBillingOperations` journal in `YjsStore`; browser and agent adapters do not calculate source release independently.
 - The local bridge transports commands but does not become a second data owner.
+- The native OpenClaw plugin is a lifecycle/tool adapter around the existing bridge. It starts services only in the full Gateway runtime, does not duplicate TaskTime command/security logic, and leaves generic stdio hosts supported.
+- Agent browser credential storage is isolated under `src/agent/browser/`: current-tab bearer resume state uses `sessionStorage`; same-profile reopen uses a dedicated non-Yjs IndexedDB store containing a non-exportable signing key and non-secret routing metadata. Neither participates in Drive sync, product backup/export, or entity hooks.
 - Public docs and generated tool artifacts derive from the implemented command/catalog sources.
 
 ## Change hotspots

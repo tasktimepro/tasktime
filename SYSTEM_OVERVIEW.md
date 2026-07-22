@@ -11,6 +11,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Drive sync:** The PWA uses direct browser-to-Google Drive requests with a short-lived memory-only access token. The public `https://sync.tasktime.pro` Worker retains OAuth code exchange, encrypted refresh-token storage, token issuance, and revocation; it does not receive routine Drive file bodies. The private Worker implementation is outside this repository.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
+- **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
 - **Public site:** Astro content under `blog/` builds the blog, legal pages, agent documentation, discovery metadata, and generated tool references.
 - **Operational evidence:** DebugBundle captures opted-in runtime incident evidence; local tests remain the first tool for deterministic failures.
 
@@ -54,7 +55,7 @@ The Yjs store is split into documents so current work stays loaded and historica
 - Google-grant revocation is confirmed before the browser clears its Worker session; transient refresh, rate-limit, Drive-status, and revocation failures preserve retryable credentials, while explicit local disconnect remains separate.
 - Direct transport keeps Google access tokens in one per-tab module instance only, clears them on expiry/session generation/cross-tab invalidation, removes any retired persisted-token record, deduplicates concurrent same-tab session validation, and keeps all Worker/Google API traffic outside service-worker Cache Storage. Direct reads/writes use retry-safe Google operations and the Worker does not receive routine Drive file bodies.
 - Destructive data, billing, deletion, and sync actions require explicit intent and safe preview/confirmation where available.
-- Agent access is loopback-only with short-lived pairing, scoped permissions, approvals, rate limits, revocation, and memory-only session credentials.
+- Agent access is loopback-only with short-lived pairing, scoped permissions, approvals, rate limits, and revocation. App-session bearer tokens are bounded to memory/current-tab resume state. Same-profile browser reopen uses a non-exportable origin-local P-256 key and replay-safe challenge to obtain a fresh token; the matching public authorization remains only in the live bridge, so Gateway restart requires pairing.
 - Private Worker source, secrets, provider identifiers, and internal operational material do not enter the public repository.
 
 ## Development and verification

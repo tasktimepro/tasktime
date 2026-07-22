@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -25,6 +25,8 @@ const bundles = [
 ]
 
 try {
+  await assertOpenClawNativePlugin()
+
   for (const bundle of bundles) {
     await assertBundleStartsManagedBridge(bundle)
   }
@@ -34,7 +36,68 @@ try {
   await rm(tempDir, { force: true, recursive: true })
 }
 
+async function assertOpenClawNativePlugin() {
+  const packageRoot = path.join(repoRoot, 'integrations/openclaw/tasktime')
+  const packageJson = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8'))
+  const manifest = JSON.parse(await readFile(path.join(packageRoot, 'openclaw.plugin.json'), 'utf8'))
+  const runtime = await import(pathToFileURL(path.join(packageRoot, 'dist/index.js')).href)
+  const distFiles = await readdir(path.join(packageRoot, 'dist'))
+  const services = []
+  const tools = []
+  const logged = []
+
+  assert(packageJson.openclaw?.extensions?.includes('./dist/index.js'), 'OpenClaw package did not declare its native runtime entry')
+  assert(JSON.stringify(distFiles.sort()) === JSON.stringify(['index.js']), 'OpenClaw native plugin dist contains unrelated app or runtime artifacts')
+  assert(manifest.activation?.onStartup === true, 'OpenClaw native plugin must activate at Gateway startup')
+  assert(manifest.skills?.includes('./skills'), 'OpenClaw native plugin did not retain its skill directory')
+  assert(JSON.stringify(manifest.contracts?.tools) === JSON.stringify(runtime.OPENCLAW_TOOL_CONTRACT_NAMES), 'OpenClaw native tool contracts drifted from generated definitions')
+  assert(existsSync(path.join(packageRoot, '.mcp.json')), 'OpenClaw package lost its generic compatibility bundle')
+
+  runtime.default.register({
+    config: {},
+    pluginConfig: {
+      scopes: ['read', 'write', 'billing', 'export', 'email', 'navigation'],
+    },
+    logger: {
+      debug: (message) => logged.push(String(message)),
+      info: (message) => logged.push(String(message)),
+      warn: (message) => logged.push(String(message)),
+      error: (message) => logged.push(String(message)),
+    },
+    registerService: (service) => services.push(service),
+    registerTool: (tool) => tools.push(tool),
+  })
+
+  assert(services.length === 1, 'OpenClaw native plugin did not register exactly one bridge service')
+  assert(tools.length === manifest.contracts.tools.length, 'OpenClaw native plugin did not register every configured generated tool')
+
+  const service = services[0]
+  await service.start({
+    stateDir: tempDir,
+    config: {},
+    logger: {},
+  })
+
+  try {
+    const pairingTool = tools.find((tool) => tool.name === 'tasktime__get_pairing_status')
+    assert(pairingTool, 'OpenClaw native plugin did not register tasktime__get_pairing_status')
+    const first = await pairingTool.execute('native-status-1', {})
+    const second = await pairingTool.execute('native-status-2', {})
+    assert(first.isError === false, 'OpenClaw native setup tool failed before browser pairing')
+    assert(first.details?.data?.launchUrl?.includes('https://tasktime.pro/account?'), 'OpenClaw native setup tool did not return an ephemeral launch URL')
+    assert(first.details?.data?.pid === second.details?.data?.pid, 'OpenClaw native plugin replaced the bridge child between tool calls')
+    assert(first.details?.data?.bridgeInstanceId === second.details?.data?.bridgeInstanceId, 'OpenClaw native plugin replaced the bridge instance between tool calls')
+    assert(!logged.some((message) => /agentBridgePairingCode|Pairing code:/i.test(message)), 'OpenClaw native plugin copied pairing credentials into Gateway logs')
+  } finally {
+    await service.stop({})
+  }
+}
+
 async function assertBundleStartsManagedBridge(bundle) {
+  const launcherSource = await readFile(path.join(bundle.root, 'scripts/run-tasktime-agent-bridge.mjs'), 'utf8')
+  assert(!launcherSource.includes('tasktime-agent-bridge.log'), `${bundle.name} launcher still persists raw bridge stderr`)
+  assert(!launcherSource.includes('createWriteStream'), `${bundle.name} launcher still opens a persistent stderr log`)
+
   const config = JSON.parse(await readFile(path.join(bundle.root, '.mcp.json'), 'utf8'))
   const server = config.mcpServers?.tasktime
 
@@ -94,10 +157,10 @@ async function assertBundleStartsManagedBridge(bundle) {
     assert(status.agent?.id === bundle.expectedAgentId, `${bundle.name} status file reported wrong agent id`)
     assert(status.agent?.label === bundle.expectedAgentLabel, `${bundle.name} status file reported wrong agent label`)
     assert(status.endpoint?.startsWith('ws://127.0.0.1:'), `${bundle.name} status file did not include loopback endpoint`)
-    assert(status.launchUrl?.includes('https://tasktime.pro/account?'), `${bundle.name} status file did not include launch URL`)
-    const launchUrl = new URL(status.launchUrl)
-    assert(launchUrl.searchParams.get('agentBridgeAgentId') === bundle.expectedAgentId, `${bundle.name} launch URL did not include stable agent id`)
-    assert(launchUrl.searchParams.get('agentBridgeAgentLabel') === bundle.expectedAgentLabel, `${bundle.name} launch URL did not include stable agent label`)
+    assert(status.schemaVersion === 2, `${bundle.name} status file did not use the non-secret discovery schema`)
+    assert(!('launchUrl' in status), `${bundle.name} status file persisted a pairing launch URL`)
+    assert(!('id' in status.pairing), `${bundle.name} status file persisted a pairing id`)
+    assert(!('code' in status.pairing), `${bundle.name} status file persisted a pairing code`)
     assert(status.session?.paired === false, `${bundle.name} should start without a paired browser session`)
 
     writeJsonRpc(child, 'tools', 'tools/list')
@@ -115,10 +178,16 @@ async function assertBundleStartsManagedBridge(bundle) {
     const pairingStatus = pairingStatusResponse.result?.structuredContent?.data
 
     assert(pairingStatus?.agent?.id === bundle.expectedAgentId, `${bundle.name} get_pairing_status reported wrong agent id`)
-    assert(pairingStatus?.launchUrl === status.launchUrl, `${bundle.name} get_pairing_status did not match status file launch URL`)
+    assert(pairingStatus?.launchUrl?.includes('https://tasktime.pro/account?'), `${bundle.name} get_pairing_status did not include an ephemeral launch URL`)
+    const launchUrl = new URL(pairingStatus.launchUrl)
+    assert(launchUrl.searchParams.get('agentBridgeAgentId') === bundle.expectedAgentId, `${bundle.name} launch URL did not include stable agent id`)
+    assert(launchUrl.searchParams.get('agentBridgeAgentLabel') === bundle.expectedAgentLabel, `${bundle.name} launch URL did not include stable agent label`)
   } finally {
     child.kill('SIGTERM')
     await waitForExit(child)
+    child.stdin?.destroy()
+    child.stdout?.destroy()
+    child.stderr?.destroy()
   }
 }
 

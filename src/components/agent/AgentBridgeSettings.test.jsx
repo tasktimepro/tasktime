@@ -90,6 +90,41 @@ const approvalTokenMocks = vi.hoisted(() => {
         }),
     };
 });
+const reconnectCredentialMocks = vi.hoisted(() => {
+    const state = {
+        credential: null,
+    };
+
+    return {
+        state,
+        createAgentBridgeReconnectCredential: vi.fn((_privateKey, options) => ({
+            schemaVersion: 1,
+            endpoint: options.endpoint,
+            bridgeInstanceId: options.registration.bridgeInstanceId,
+            keyId: options.registration.keyId,
+            privateKey: { type: 'private' },
+            createdAt: Date.now(),
+            expiresAt: options.registration.expiresAt,
+            agentId: options.agentId,
+            agentLabel: options.agentLabel,
+        })),
+        deleteAgentBridgeReconnectCredential: vi.fn(async () => undefined),
+        generateAgentBridgeReconnectKeyPair: vi.fn(async () => ({
+            privateKey: { type: 'private' },
+            publicKeyJwk: {
+                kty: 'EC',
+                crv: 'P-256',
+                x: 'public-x',
+                y: 'public-y',
+            },
+        })),
+        loadAgentBridgeReconnectCredential: vi.fn(async () => state.credential),
+        saveAgentBridgeReconnectCredential: vi.fn(async (credential) => {
+            state.credential = credential;
+        }),
+        signAgentBridgeReconnectChallenge: vi.fn(async () => 'signed-reconnect-proof'),
+    };
+});
 
 vi.mock('@/contexts/YjsContext', () => ({
     useYjs: () => yjsMocks,
@@ -105,6 +140,15 @@ vi.mock('@/agent/browser/approvalTokens', () => ({
     listAgentBridgeApprovalGrants: approvalTokenMocks.listAgentBridgeApprovalGrants,
     revokeAgentBridgeApprovalGrant: approvalTokenMocks.revokeAgentBridgeApprovalGrant,
     deleteRevokedAgentBridgeApprovalGrants: approvalTokenMocks.deleteRevokedAgentBridgeApprovalGrants,
+}));
+
+vi.mock('@/agent/browser/reconnectCredential', () => ({
+    createAgentBridgeReconnectCredential: reconnectCredentialMocks.createAgentBridgeReconnectCredential,
+    deleteAgentBridgeReconnectCredential: reconnectCredentialMocks.deleteAgentBridgeReconnectCredential,
+    generateAgentBridgeReconnectKeyPair: reconnectCredentialMocks.generateAgentBridgeReconnectKeyPair,
+    loadAgentBridgeReconnectCredential: reconnectCredentialMocks.loadAgentBridgeReconnectCredential,
+    saveAgentBridgeReconnectCredential: reconnectCredentialMocks.saveAgentBridgeReconnectCredential,
+    signAgentBridgeReconnectChallenge: reconnectCredentialMocks.signAgentBridgeReconnectChallenge,
 }));
 
 function renderAgentBridgeSettings(ui = <AgentBridgeSettings />) {
@@ -127,11 +171,20 @@ describe('AgentBridgeSettings', () => {
         approvalTokenMocks.listAgentBridgeApprovalGrants.mockClear();
         approvalTokenMocks.revokeAgentBridgeApprovalGrant.mockClear();
         approvalTokenMocks.deleteRevokedAgentBridgeApprovalGrants.mockClear();
+        reconnectCredentialMocks.state.credential = null;
+        reconnectCredentialMocks.createAgentBridgeReconnectCredential.mockClear();
+        reconnectCredentialMocks.deleteAgentBridgeReconnectCredential.mockClear();
+        reconnectCredentialMocks.generateAgentBridgeReconnectKeyPair.mockClear();
+        reconnectCredentialMocks.loadAgentBridgeReconnectCredential.mockClear();
+        reconnectCredentialMocks.saveAgentBridgeReconnectCredential.mockClear();
+        reconnectCredentialMocks.signAgentBridgeReconnectChallenge.mockClear();
+        window.sessionStorage.clear();
         window.history.pushState({}, '', '/account?section=agent');
     });
 
     afterEach(() => {
         vi.useRealTimers();
+        vi.unstubAllGlobals();
     });
 
     it('requires explicit loopback pairing details before connecting', async () => {
@@ -211,7 +264,7 @@ describe('AgentBridgeSettings', () => {
         });
 
         expect(screen.getByText('read, write, navigation')).toBeInTheDocument();
-        expect(screen.getByText('Memory only')).toBeInTheDocument();
+        expect(screen.getByText('Current tab only')).toBeInTheDocument();
         expect(screen.getByLabelText('Pairing code')).toHaveValue('');
 
         await userEvent.click(screen.getByRole('button', { name: 'Revoke' }));
@@ -735,5 +788,165 @@ describe('AgentBridgeSettings', () => {
                 command: 'open_expenses_view',
             }),
         }));
+    });
+
+    it('restores the paired bridge session when the provider remounts after a page refresh', async () => {
+        const firstRender = renderAgentBridgeSettings();
+
+        await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
+        await userEvent.type(screen.getByLabelText('Pairing ID'), 'pairing-1');
+        await userEvent.type(screen.getByLabelText('Pairing code'), '123456');
+        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+        const firstSocket = FakeWebSocket.instances[0];
+        act(() => {
+            firstSocket.open();
+            firstSocket.message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'refresh-session-token',
+                scopes: ['read', 'navigation'],
+                expiresAt: Date.now() + 60_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
+            }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('Paired').length).toBeGreaterThan(0);
+        });
+
+        firstRender.unmount();
+        renderAgentBridgeSettings();
+
+        await waitFor(() => {
+            expect(FakeWebSocket.instances).toHaveLength(2);
+        });
+        expect(FakeWebSocket.instances[1].url).toBe(
+            'ws://127.0.0.1:39123/tasktime-agent?sessionToken=refresh-session-token'
+        );
+    });
+
+    it('registers a browser-bound reconnect key after pairing when secure storage is available', async () => {
+        vi.stubGlobal('indexedDB', {});
+        renderAgentBridgeSettings();
+
+        await userEvent.type(screen.getByLabelText('Bridge endpoint'), 'ws://127.0.0.1:39123/tasktime-agent');
+        await userEvent.type(screen.getByLabelText('Pairing ID'), 'pairing-1');
+        await userEvent.type(screen.getByLabelText('Pairing code'), '123456');
+        await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'paired-token',
+                scopes: ['read', 'navigation'],
+                expiresAt: Date.now() + 60_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
+            }));
+        });
+
+        await waitFor(() => {
+            expect(socket.sent.map((message) => JSON.parse(message))).toContainEqual(expect.objectContaining({
+                type: 'agent_bridge_reconnect_register',
+                sessionToken: 'paired-token',
+                publicKeyJwk: expect.objectContaining({
+                    kty: 'EC',
+                    crv: 'P-256',
+                }),
+            }));
+        });
+
+        act(() => {
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_reconnect_registered',
+                protocolVersion: 1,
+                keyId: 'reconnect-key-1',
+                bridgeInstanceId: 'bridge-instance-1',
+                expiresAt: Date.now() + 60_000,
+            }));
+        });
+
+        await waitFor(() => {
+            expect(reconnectCredentialMocks.saveAgentBridgeReconnectCredential).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    endpoint: 'ws://127.0.0.1:39123/tasktime-agent',
+                    keyId: 'reconnect-key-1',
+                    bridgeInstanceId: 'bridge-instance-1',
+                })
+            );
+        });
+    });
+
+    it('reconnects a newly opened tab with a signed browser-bound challenge and fresh session', async () => {
+        vi.stubGlobal('indexedDB', {});
+        reconnectCredentialMocks.state.credential = {
+            schemaVersion: 1,
+            endpoint: 'ws://127.0.0.1:39123/tasktime-agent',
+            bridgeInstanceId: 'bridge-instance-1',
+            keyId: 'reconnect-key-1',
+            privateKey: { type: 'private' },
+            createdAt: Date.now() - 1000,
+            expiresAt: Date.now() + 60_000,
+            agentId: 'tasktime.agent.openclaw',
+            agentLabel: 'OpenClaw on this device',
+        };
+
+        renderAgentBridgeSettings();
+
+        await waitFor(() => {
+            expect(reconnectCredentialMocks.loadAgentBridgeReconnectCredential).toHaveBeenCalled();
+            expect(FakeWebSocket.instances).toHaveLength(1);
+        });
+        const socket = FakeWebSocket.instances[0];
+        expect(socket.url).toBe(
+            'ws://127.0.0.1:39123/tasktime-agent?reconnectKeyId=reconnect-key-1'
+        );
+
+        act(() => {
+            socket.open();
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_reconnect_challenge',
+                protocolVersion: 1,
+                bridgeInstanceId: 'bridge-instance-1',
+                keyId: 'reconnect-key-1',
+                challengeId: 'challenge-1',
+                nonce: 'nonce-1',
+                origin: window.location.origin,
+                expiresAt: Date.now() + 30_000,
+            }));
+        });
+
+        await waitFor(() => {
+            expect(reconnectCredentialMocks.signAgentBridgeReconnectChallenge).toHaveBeenCalled();
+            expect(socket.sent.map((message) => JSON.parse(message))).toContainEqual({
+                type: 'agent_bridge_reconnect_proof',
+                protocolVersion: 1,
+                keyId: 'reconnect-key-1',
+                challengeId: 'challenge-1',
+                signature: 'signed-reconnect-proof',
+            });
+        });
+
+        act(() => {
+            socket.message(JSON.stringify({
+                type: 'agent_bridge_session',
+                protocolVersion: 1,
+                sessionToken: 'fresh-reopen-token',
+                scopes: ['read', 'navigation'],
+                expiresAt: Date.now() + 60_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
+            }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('Paired').length).toBeGreaterThan(0);
+        });
+        expect(window.sessionStorage.getItem('tasktime.agent.bridge.session.v1')).not.toContain('signed-reconnect-proof');
     });
 });

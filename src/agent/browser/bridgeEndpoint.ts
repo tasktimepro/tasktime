@@ -23,6 +23,11 @@ export interface AgentBridgeSessionFields {
     sessionToken: string;
 }
 
+export interface AgentBridgeReconnectFields {
+    endpoint: string;
+    keyId: string;
+}
+
 export function buildAgentBridgePairingUrl(fields: AgentBridgePairingFields): string {
     const endpoint = fields.endpoint.trim();
     const pairingId = fields.pairingId.trim();
@@ -81,6 +86,36 @@ export function buildAgentBridgeSessionUrl(fields: AgentBridgeSessionFields): st
     url.searchParams.delete('pairingId');
     url.searchParams.delete('pairingCode');
     url.searchParams.set('sessionToken', sessionToken);
+
+    return url.toString();
+}
+
+export function buildAgentBridgeReconnectUrl(fields: AgentBridgeReconnectFields): string {
+    const endpoint = fields.endpoint.trim();
+    const keyId = fields.keyId.trim();
+
+    if (!endpoint) {
+        throw new Error('Bridge endpoint is required.');
+    }
+
+    if (!keyId) {
+        throw new Error('Reconnect key ID is required.');
+    }
+
+    const url = new URL(endpoint);
+
+    if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+        throw new Error('Bridge endpoint must use ws:// or wss://.');
+    }
+
+    if (!LOOPBACK_HOSTS.has(url.hostname)) {
+        throw new Error('Bridge endpoint must use a loopback host.');
+    }
+
+    url.searchParams.delete('pairingId');
+    url.searchParams.delete('pairingCode');
+    url.searchParams.delete('sessionToken');
+    url.searchParams.set('reconnectKeyId', keyId);
 
     return url.toString();
 }

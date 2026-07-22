@@ -685,6 +685,41 @@ describe('AgentAppSessionWebSocketClient', () => {
         expect(client.getStatus()).toBe('closed');
     });
 
+    it('reports a stale browser reconnect credential after bounded handshake failures', () => {
+        vi.useFakeTimers();
+        const onReconnectFailure = vi.fn();
+        const client = new AgentAppSessionWebSocketClient({
+            url: 'ws://127.0.0.1:39876/tasktime-agent',
+            context: createContext(),
+            reconnectCredential: {
+                schemaVersion: 1,
+                endpoint: 'ws://127.0.0.1:39876/tasktime-agent',
+                bridgeInstanceId: 'stale-bridge',
+                keyId: 'stale-key',
+                privateKey: {} as CryptoKey,
+                createdAt: Date.now(),
+                expiresAt: Date.now() + 60_000,
+                agentId: 'tasktime.agent.openclaw',
+                agentLabel: 'OpenClaw on this device',
+            },
+            WebSocketCtor: FakeWebSocket,
+            autoReconnect: true,
+            reconnectDelayMs: 250,
+            maxReconnectAttempts: 2,
+            onReconnectFailure,
+        });
+
+        client.connect();
+        FakeWebSocket.instances[0].close();
+        vi.advanceTimersByTime(250);
+        FakeWebSocket.instances[1].close();
+        vi.advanceTimersByTime(250);
+        FakeWebSocket.instances[2].close();
+
+        expect(onReconnectFailure).toHaveBeenCalledTimes(1);
+        expect(FakeWebSocket.instances).toHaveLength(3);
+    });
+
     it('sends an authenticated revoke control message before closing', () => {
         const client = new AgentAppSessionWebSocketClient({
             url: 'ws://127.0.0.1:39876/tasktime-agent',

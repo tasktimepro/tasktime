@@ -48,6 +48,26 @@ const highlights = [
                         <td>Pairing failure</td>
                         <td>Check that the endpoint is from the active bridge, the dynamic port is listening, the path matches, the code is fresh, and browser local-network policy allows loopback WebSockets.</td>
                     </tr>
+                    <tr>
+                        <td>Paired, then disconnected after refresh</td>
+                        <td>Update TaskTime Pro and the bridge/plugin together. Current builds restore the same tab automatically; do not start another bridge.</td>
+                    </tr>
+                    <tr>
+                        <td>Disconnected after closing and reopening TaskTime</td>
+                        <td>Use the same browser profile and allow IndexedDB/Web Crypto. Restricted/private storage falls back truthfully to explicit pairing.</td>
+                    </tr>
+                    <tr>
+                        <td><code>legacy_mcp_conflict</code></td>
+                        <td>Back up the OpenClaw config, inspect the reported legacy path, preview <code>openclaw config unset &lt;path&gt; --dry-run</code>, then unset, validate, and restart. Do not run both owners.</td>
+                    </tr>
+                    <tr>
+                        <td>Bridge PID, instance ID, or port changed</td>
+                        <td>The Gateway/bridge restarted. Old browser authorization is intentionally invalid; use the new <code>get_pairing_status</code> launch URL once.</td>
+                    </tr>
+                    <tr>
+                        <td>OpenClaw CLI/Gateway versions differ</td>
+                        <td>Run <code>openclaw --version</code>, <code>which openclaw</code>, and <code>openclaw gateway status --deep</code>; align versions before changing TaskTime setup.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -60,7 +80,9 @@ const highlights = [
             checks through Docker.
         </p>
         <pre><code>make npm CMD="run build:agent-bridge"
+make npm CMD="run build:openclaw-plugin"
 make npm CMD="run smoke:agent-bridge"
+make npm CMD="run smoke:agent-bundles"
 make npm CMD="run smoke:agent-live"
 make npm CMD="run test:run -- src/agent/bridge/mcpServer.test.ts src/agent/bridge/bridge.test.ts src/agent/commands/commands.test.ts"</code></pre>
         <p>

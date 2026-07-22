@@ -70,9 +70,12 @@ Requirement identifiers are stable references for acceptance criteria, design do
 
 - **AGENT-1:** Expose business actions through a loopback-only local MCP bridge; never expose raw Yjs/IndexedDB access.
 - **AGENT-2:** Require explicit short-lived pairing, session management, scoped permissions, approvals for sensitive actions, revocation, and rate limiting.
-- **AGENT-3:** Keep app-session tokens memory-only and exclude credentials from logs, files, docs, and recovery responses.
+- **AGENT-3:** Keep app-session bearer tokens in browser/bridge memory or the current tab's bounded `sessionStorage` resume record only. Exclude bearer tokens, pairing codes, reconnect private keys, and approval credentials from logs, status files, synced/product storage, backups, exports, docs, diagnostics, and recovery responses.
 - **AGENT-4:** Every new or changed user-facing business action receives a UI/agent parity review. Supported actions use the same domain/application operation and keep behavior, validation, errors, permissions, approvals, tool schemas, generated docs, bundles, and published package metadata aligned; intentional exclusions are documented and not advertised as parity.
-- **AGENT-5:** Support the long-running task/time flow across sessions: select/create task, start timer, allow work to continue, stop the same timer, and verify the created entry.
+- **AGENT-5:** Support the long-running task/time flow across agent turns and ordinary browser lifecycle events: select/create task, start timer, allow work to continue, refresh or close/reopen TaskTime in the same browser profile, stop the same timer, and verify the created entry.
+- **AGENT-6:** A managed OpenClaw installation uses one native plugin service owned by the supervised Gateway. Ordinary agent turns reuse that bridge; generic MCP and Claude hosts retain the existing stdio bridge contract.
+- **AGENT-7:** Same-browser reopen uses proof of possession rather than a persisted app-session bearer token. Explicit pairing registers a non-exportable, origin-local P-256 signing key; the live bridge keeps only its in-memory public-key authorization and issues a fresh scoped session after a single-use, short-lived, instance/origin-bound challenge. Stable agent IDs and discovery metadata are never authentication.
+- **AGENT-8:** Browser reconnect authorization ends on explicit disconnect/forget, revocation, disabling agent access, expiry, definitive proof rejection, local credential deletion, or bridge/Gateway restart. Another browser profile, device, or private session requires explicit pairing.
 
 ## UX, accessibility, and operations
 

@@ -11,6 +11,7 @@ Hardening is part of each change, especially for storage, sync, billing, imports
 ## Data and secrets
 
 - Never expose or log tokens, pairing codes, app-session tokens, credentials, private keys, raw sensitive payloads, or private infrastructure details.
+- Persisted browser cryptographic keys must be non-exportable, minimum-usage, origin-local, schema/algorithm validated, excluded from product/sync/backup/export storage, and paired with replay-safe challenge/response rather than accepted directly as bearer credentials.
 - Keep user data local-first and minimize copies in logs, fixtures, screenshots, and diagnostics.
 - Make destructive storage, sync, deletion, and billing actions explicit and test-covered.
 - Preserve recoverability and compatibility where the product contract requires them.

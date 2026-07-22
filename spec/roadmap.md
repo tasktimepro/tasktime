@@ -15,7 +15,9 @@ This roadmap describes the current production project rather than pretending it 
 ## Phase 2 — Agent access and publishing (implemented; validation follow-through active)
 
 - Browser command layer, local bridge, MCP tools, scopes/approvals, bundles, public docs, registry artifacts
-- Remaining success evidence: real installed OpenClaw long-running task/timer flow and remaining directory validation/publication
+- Active durability slice: same-tab refresh and same-profile reopen continuity, credential/status hardening, and conversion of the compatible OpenClaw bundle to a Gateway-owned native plugin while retaining generic MCP/Claude stdio compatibility
+- Remaining success evidence: real installed OpenClaw long-running task/timer flow across later turns and browser close/reopen, migration/rollback validation, and remaining directory validation/publication
+- Release intent: the prepared candidate is core app `1.4.0`, agent bridge/MCP Registry `1.0.0`, OpenClaw and Claude bundles `1.0.0`, and ClawHub skill/Claude marketplace `1.2.0`; publication requires aligned real-profile acceptance and explicit approval
 
 ## Phase 3 — Agent-kit foundation reconciliation (completed)
 

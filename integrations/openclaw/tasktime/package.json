@@ -1,8 +1,9 @@
 {
   "name": "@tasktimepro/openclaw",
-  "version": "0.3.0",
-  "description": "First-party OpenClaw bundle for TaskTime Pro's free, open-source, local-first work manager.",
+  "version": "1.0.0",
+  "description": "First-party native OpenClaw plugin for TaskTime Pro's free, open-source, local-first work manager.",
   "type": "module",
+  "main": "./dist/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tasktimepro/tasktime.git",
@@ -11,9 +12,11 @@
   "files": [
     ".codex-plugin/",
     ".mcp.json",
+    "dist/",
     "LICENSE",
     "LICENSE.agent-bridge",
     "README.md",
+    "openclaw.plugin.json",
     "scripts/",
     "skills/",
     "vendor/"
@@ -36,5 +39,19 @@
   "license": "(MIT-0 AND AGPL-3.0-only)",
   "publishConfig": {
     "access": "public"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "install": {
+      "clawhubSpec": "clawhub:@tasktimepro/openclaw",
+      "npmSpec": "@tasktimepro/openclaw",
+      "defaultChoice": "npm",
+      "minHostVersion": ">=2026.6.11"
+    },
+    "compat": {
+      "pluginApi": ">=2026.6.11"
+    }
   }
 }

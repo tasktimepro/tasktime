@@ -51,14 +51,17 @@
       "defaultSessionTtlMs": 86400000,
       "resume": {
         "queryParam": "sessionToken",
-        "memoryOnly": true,
+        "currentTabStorage": "sessionStorage",
+        "browserReopen": "non-exportable-p256-proof-of-possession",
+        "bearerTokenDurable": false,
         "until": ["session_expiry", "access_revocation", "bridge_process_exit"]
       }
     },
     "statusFile": {
       "argument": "--status-file",
       "environment": "TASKTIME_AGENT_BRIDGE_STATUS_FILE",
-      "schemaVersion": 1
+      "schemaVersion": 2,
+      "containsPairingCredentials": false
     },
     "identity": {
       "argument": "--agent-id",

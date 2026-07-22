@@ -134,6 +134,10 @@ export class LocalAgentBridge {
         return this.server.getClientCount();
     }
 
+    getBridgeInstanceId(): string {
+        return this.server.getBridgeInstanceId();
+    }
+
     getAuthoritativeClientId(): string | null {
         return this.server.getAuthoritativeClientId();
     }

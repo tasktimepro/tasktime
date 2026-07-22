@@ -1,7 +1,7 @@
 {
   "name": "tasktime",
   "private": true,
-    "version": "1.3.3",
+    "version": "1.4.0",
   "license": "AGPL-3.0-only",
   "type": "module",
   "bin": {
@@ -13,6 +13,7 @@
     "build": "node ./scripts/build-pages.mjs",
     "build:app": "vite build",
     "build:agent-bridge": "vite build --config vite.agent-bridge.config.js && node ./scripts/fix-agent-bridge-bin.mjs",
+    "build:openclaw-plugin": "vite build --config vite.openclaw-plugin.config.js && node ./scripts/sync-openclaw-plugin-manifest.mjs",
     "smoke:agent-bridge": "node ./scripts/smoke-agent-bridge.mjs",
     "smoke:agent-bundles": "node ./scripts/smoke-agent-bundles.mjs",
     "smoke:agent-live": "node ./scripts/smoke-agent-live.mjs",
@@ -29,7 +30,7 @@
     "test:e2e:drive-browsers": "playwright test --workers=2 e2e/sync.smoke.spec.js --grep \"uploads through the direct Google transport\"",
     "test:e2e:pwa:smoke": "npm run build && playwright test -c playwright.pwa.config.js",
     "release": "npm run lint && npm run typecheck && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run build",
-    "release:agent": "npm run build:agent-bridge && npm run smoke:agent-bridge && npm run smoke:agent-bundles && npm run smoke:agent-live"
+    "release:agent": "npm run build:agent-bridge && npm run build:openclaw-plugin && npm run smoke:agent-bridge && npm run smoke:agent-bundles && npm run smoke:agent-live"
   },
   "dependencies": {
     "@debugbundle/sdk-browser": "^1.4.0",

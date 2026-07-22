@@ -7,7 +7,7 @@ description: >-
   installed, and stores work records in the browser. This first-party TaskTime
   Pro skill lets same-device agents operate the app through scoped access and
   approval controls.
-version: 1.1.0
+version: 1.2.0
 metadata:
   openclaw:
     requires:
@@ -57,15 +57,17 @@ If the binary is not already installed, install the bridge package or let OpenCl
 npm install -g @tasktimepro/agent-bridge
 ```
 
-When installed through the TaskTime Pro OpenClaw bundle, use the bundle-provided MCP server instead of requiring a global binary. The bundle launches its vendored bridge through `.mcp.json`.
+For OpenClaw, prefer the complete native plugin installed with `openclaw plugins install @tasktimepro/openclaw`. Its Gateway service owns one vendored bridge across ordinary turns. Do not launch another bridge manually. The bundled `.mcp.json` is a compatibility artifact for non-native hosts; OpenClaw's native format takes precedence.
 
 The user grants first-use access in TaskTime Pro under Account > Agent Access. Require a running, paired browser session before reading or mutating data. After pairing, call `tools/list` because available tools depend on the granted scopes. Default scopes are `read`, `write`, and `navigation`; optional scopes are `billing`, `export`, and `email`. Current TaskTime Pro app builds show scopes after connection; do not tell the user to select scopes in the app unless a future scope picker is visible.
 
 OpenClaw may expose tools with the MCP server prefix, for example `tasktime__list_projects` instead of `list_projects`.
 
-For OpenClaw-managed installs, do not ask the user to run `tasktime-agent-bridge` manually in Terminal. Pair TaskTime Pro to the active OpenClaw-owned MCP bridge only. The bridge exposes `get_pairing_status` and `refresh_pairing`; use those setup tools to get the exact endpoint, launch URL, stable agent identity, current pairing expiry, and session state. If a pairing code expired or was already used, call `refresh_pairing` and open the returned launch URL.
+For OpenClaw-managed installs, pair TaskTime Pro only to the Gateway-owned native bridge. Use `tasktime__get_pairing_status` and `tasktime__refresh_pairing` (or the unprefixed names when exposed that way) to obtain the exact endpoint, short-lived launch URL, stable agent identity, pairing expiry, and session state.
 
-The OpenClaw bundle uses the stable agent identity `tasktime.agent.openclaw` with the label `OpenClaw on this device`. The WebSocket port is dynamic and must not be treated as identity. App sessions are intended to last through normal work sessions, while pairing codes stay short-lived and single-use. Within a running bridge process, browser reconnects resume with a memory-only app-session token; ask the user to re-pair only when status shows no paired session, the session expired, access was revoked, or the bridge process restarted.
+The OpenClaw plugin uses the stable display identity `tasktime.agent.openclaw` with the label `OpenClaw on this device`; that string is not authentication. The WebSocket port is dynamic. A refresh resumes from a current-tab session record. Closing and reopening TaskTime in the same browser profile uses a non-exportable proof-of-possession key to receive a fresh session without durably storing a bearer token. Re-pair after a Gateway/bridge restart, explicit disconnect, revoke, disable, expiry, forgotten browser authorization, or definitive reconnect rejection.
+
+If a native tool returns `legacy_mcp_conflict`, an older `mcp.servers.tasktime` owner is still enabled. Ask the user to disable that exact legacy TaskTime entry and restart the Gateway; do not remove config silently and do not start or kill another bridge.
 
 Trusted chat approvals default to until revoked for stable same-device managed agents. Shorter trust durations may be available, but do not tell the user they must re-trust every 30 days unless they chose a 30-day grant.
 
@@ -94,7 +96,7 @@ Trusted chat approvals default to until revoked for stable same-device managed a
 
 If a tool call returns an unavailable app-session error with `launch_tasktime`, open or guide the user to TaskTime Pro, pair Account > Agent Access, then retry. Do not treat this as a generic MCP failure.
 
-If `get_pairing_status` is available, inspect it before suggesting manual commands. If the status shows no paired app session, use its `launchUrl`; if the pairing is expired or consumed, call `refresh_pairing` and use the new `launchUrl`. Never pair the app to a separately launched terminal bridge when the MCP server is already OpenClaw-managed.
+If `get_pairing_status` is available, inspect it before suggesting manual commands. If the status shows no paired app session, use its ephemeral `launchUrl`; if the pairing is expired or consumed, call `refresh_pairing` and use the new URL. Never copy pairing URLs into logs or durable notes. Never pair the app to a separately launched terminal bridge when OpenClaw already owns the integration.
 
 If tool availability does not match the task, call `tools/list` again and check granted scopes. Ask the user to adjust TaskTime Pro Agent Access only when the missing scope is actually needed.
 

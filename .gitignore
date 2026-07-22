@@ -10,6 +10,8 @@ lerna-debug.log*
 
 node_modules
 dist
+!integrations/openclaw/tasktime/dist/
+!integrations/openclaw/tasktime/dist/index.js
 dist-ssr
 .astro
 *.local

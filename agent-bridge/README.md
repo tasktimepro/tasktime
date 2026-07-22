@@ -21,6 +21,10 @@ tasktime-agent-bridge --manifest
 tasktime-agent-bridge --app-url https://tasktime.pro
 ```
 
+Use `--status-file` only for non-secret process/endpoint discovery. Pairing IDs, pairing codes, and launch URLs remain available through interactive stderr and the `get_pairing_status`/`refresh_pairing` setup tools; the persisted status file intentionally excludes them and is removed on clean shutdown.
+
+The current browser tab can resume a bounded app session across refresh from `sessionStorage`. Same-profile close/reopen continuity uses a non-exportable browser signing key and a single-use bridge challenge to obtain a fresh session. No reusable bearer token is stored durably. Explicit disconnect/revoke/disable, expiry, or bridge restart requires pairing again.
+
 Official MCP Registry name: `pro.tasktime/agent-bridge`.
 
 Public docs:

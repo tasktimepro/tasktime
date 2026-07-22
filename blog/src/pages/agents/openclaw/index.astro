@@ -2,11 +2,11 @@
 import AgentDocsLayout from '../../../layouts/AgentDocsLayout.astro';
 
 const highlights = [
-    'Use public discovery first, then local binary discovery.',
-    'Install the compatible bundle package when OpenClaw manages the integration.',
-    'Launch the bridge as an MCP stdio server.',
+    'Install the complete native plugin as the primary OpenClaw path.',
+    'Let the supervised Gateway own one bridge across ordinary turns.',
     'Guide the user through one explicit first-use grant.',
-    'Use pairing status tools instead of starting a second bridge.',
+    'Refresh and same-profile reopen reconnect without persisting a bearer token.',
+    'Use setup tools instead of starting a second bridge.',
     'Use approval tokens only for exact confirmed sensitive actions.',
 ];
 ---
@@ -14,25 +14,24 @@ const highlights = [
 <AgentDocsLayout
     pageKey="openclaw"
     title="OpenClaw And Agent Platform Integration"
-    description="How OpenClaw-style local agent platforms can discover TaskTime Pro, launch the local MCP bridge, pair the browser app, and use Skill-style instructions safely."
+    description="Install the native TaskTime Pro OpenClaw plugin, pair the browser app once, and keep one Gateway-owned local bridge available across ordinary agent turns."
     canonicalPath="/agents/openclaw/"
     highlights={highlights}
 >
     <section>
-        <h2>Discovery Flow</h2>
+        <h2>Recommended Installation</h2>
         <p>
-            A local agent platform should discover TaskTime Pro in two stages. First, fetch the public discovery files from
-            TaskTime Pro. Then, when the user chooses TaskTime Pro locally, launch the packaged bridge and inspect its local
-            manifest.
+            Install the complete first-party plugin. It contributes the TaskTime skill, generated native tools, and one
+            Gateway-lifecycle bridge service. You do not need a global bridge binary or a separate terminal window.
         </p>
+        <pre><code>openclaw plugins install @tasktimepro/openclaw
+openclaw gateway restart
+openclaw plugins inspect tasktime --runtime</code></pre>
         <ol class="agent-step-list">
-            <li>Read <a href="/llms.txt"><code>/llms.txt</code></a> for the compact agent-oriented entry point.</li>
-            <li>Read <a href="/.well-known/tasktime-agent.json"><code>/.well-known/tasktime-agent.json</code></a> for public app and bridge metadata.</li>
-            <li>Launch <code>tasktime-agent-bridge --manifest</code> to confirm the installed local bridge contract.</li>
-            <li>Launch <code>tasktime-agent-bridge --app-url &lt;TaskTime Pro URL&gt;</code> as the MCP stdio server with a stable <code>--agent-id</code>, <code>--agent-label</code>, and <code>--status-file</code>.</li>
-            <li>Call <code>get_pairing_status</code> or read the status file to find the active bridge launch URL.</li>
-            <li>Open the TaskTime Pro pairing URL and ask the user to approve Account &gt; Agent Access.</li>
-            <li>Call <code>tools/list</code> and operate only within granted scopes.</li>
+            <li>Confirm the plugin is active and the TaskTime skill/tools are visible.</li>
+            <li>Call <code>tasktime__get_pairing_status</code> to obtain the active bridge's short-lived launch URL.</li>
+            <li>Open that URL and approve Account &gt; Agent Access in TaskTime Pro.</li>
+            <li>Make a read-only call such as <code>tasktime__list_projects</code> before normal writes.</li>
         </ol>
     </section>
 
@@ -51,40 +50,75 @@ const highlights = [
     </section>
 
     <section>
-        <h2>OpenClaw Bundle</h2>
+        <h2>What The Plugin Owns</h2>
         <p>
-            The prepared OpenClaw-compatible bundle package is <code>@tasktimepro/openclaw</code>. It ships a
-            Codex-compatible bundle marker, a TaskTime Pro skill root, and a <code>.mcp.json</code> entry that launches
-            the local bridge through <code>@tasktimepro/agent-bridge</code>.
+            <code>@tasktimepro/openclaw</code> is a native OpenClaw plugin. Its supervised service starts one vendored
+            bridge for the Gateway/profile lifetime and routes generated <code>tasktime__*</code> tools through the same
+            MCP validation, scopes, approvals, rate limits, and browser-owned command execution as the generic bridge.
         </p>
         <ul class="agent-check-list">
-            <li>Bundle marker: <code>.codex-plugin/plugin.json</code>.</li>
+            <li>Native manifest: <code>openclaw.plugin.json</code> with startup activation.</li>
             <li>Skill root: <code>skills/tasktime/SKILL.md</code>.</li>
-            <li>MCP server key: <code>tasktime</code>.</li>
-            <li>Bridge package: <code>@tasktimepro/agent-bridge</code>, binary <code>tasktime-agent-bridge</code>.</li>
+            <li>One Gateway-owned loopback bridge with a dynamic port.</li>
             <li>Stable agent identity: <code>tasktime.agent.openclaw</code>, label <code>OpenClaw on this device</code>.</li>
-            <li>Bridge status file: <code>tasktime-agent-bridge.status.json</code> beside the bundle launcher.</li>
-            <li>OpenClaw tool names can be prefixed, such as <code>tasktime__list_projects</code>.</li>
+            <li>Secret-free, owner-only operational discovery status; pairing URLs remain ephemeral setup output.</li>
+            <li>Bounded child restart behavior; a new bridge instance requires pairing again.</li>
         </ul>
         <p>
-            This bundle intentionally does not include <code>openclaw.plugin.json</code>. That keeps OpenClaw on the
-            safer compatible-bundle path where it maps the skill and MCP server directly. A native OpenClaw plugin
-            should be added only if TaskTime Pro needs in-process OpenClaw runtime entrypoints later.
+            The package retains <code>.mcp.json</code> and the Codex-compatible marker for compatible non-native hosts.
+            OpenClaw's native format takes precedence, so those artifacts must not start a second OpenClaw bridge.
         </p>
+    </section>
+
+    <section>
+        <h2>Connection Lifetime</h2>
+        <div class="agent-table-wrap">
+            <table class="agent-table">
+                <thead><tr><th>Event</th><th>Expected behavior</th></tr></thead>
+                <tbody>
+                    <tr><td>Later OpenClaw turn</td><td>The same Gateway-owned bridge remains active.</td></tr>
+                    <tr><td>Refresh TaskTime</td><td>The current tab resumes from a bounded <code>sessionStorage</code> record.</td></tr>
+                    <tr><td>Close and reopen TaskTime in the same browser profile</td><td>A non-exportable browser key proves possession and receives a fresh short-lived session; no bearer token is stored durably.</td></tr>
+                    <tr><td>Another browser profile/device</td><td>Pair explicitly.</td></tr>
+                    <tr><td>Disconnect, revoke, disable, forget, or expiry</td><td>Authorization ends and pairing is required.</td></tr>
+                    <tr><td>Gateway/bridge restart</td><td>The old in-memory authorization is gone; pair once to the new bridge instance.</td></tr>
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <section>
         <h2>First-Run Recovery</h2>
         <p>
             When TaskTime Pro reports no connected app session, OpenClaw should not ask the user to run a separate
-            terminal bridge. It should use the active MCP server's <code>get_pairing_status</code> tool, open the
+            terminal bridge. It should use <code>tasktime__get_pairing_status</code>, open the
             returned <code>launchUrl</code>, and retry the TaskTime Pro tool after the user approves. If the pairing
-            expired or was consumed by a stale browser attempt, call <code>refresh_pairing</code> and use the new
+            expired or was consumed by a stale browser attempt, call <code>tasktime__refresh_pairing</code> and use the new
             launch URL.
         </p>
         <p>
-            The bridge binds to a dynamic loopback port. The port is transport state, not trust identity. OpenClaw trust
-            should be associated with <code>tasktime.agent.openclaw</code>.
+            If the plugin reports <code>legacy_mcp_conflict</code>, disable the older <code>mcp.servers.tasktime</code>
+            entry explicitly and restart the Gateway. The plugin will not kill or silently rewrite user-owned processes
+            or configuration. A stable agent ID and dynamic loopback port are not authentication.
+        </p>
+        <pre><code>mkdir -p ~/.openclaw/backups
+chmod 700 ~/.openclaw/backups
+openclaw backup create --only-config --verify --output ~/.openclaw/backups
+openclaw config get mcp.servers.tasktime
+openclaw config unset mcp.servers.tasktime --dry-run
+openclaw config unset mcp.servers.tasktime
+openclaw config validate
+openclaw gateway restart
+openclaw plugins inspect tasktime --runtime</code></pre>
+        <p>
+            If the diagnostic names <code>mcpServers.tasktime</code>, use that exact historical path instead. Keep the
+            verified backup and saved TaskTime value until the native flow works. Rollback is explicit: disable the native
+            plugin, preview and restore the saved value with <code>openclaw config set</code>, validate, and restart. Never
+            enable both owners together.
+        </p>
+        <p>
+            If CLI and Gateway versions differ, run <code>openclaw --version</code>, <code>which openclaw</code>, and
+            <code>openclaw gateway status --deep</code> before changing TaskTime configuration.
         </p>
     </section>
 

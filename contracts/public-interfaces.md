@@ -106,6 +106,19 @@ Permission scopes: `read`, `write`, `billing`, `export`, `email`, `navigation`.
 
 Pairing launch URLs carry the requested scopes so TaskTime Pro can display them before the user approves the connection. Persistent approval grants are keyed to the configured stable agent ID and must not authorize a bridge process presenting a different agent identity, even when the requested scopes otherwise match.
 
+Browser continuity adds message types without changing the existing pairing, command, approval, or bearer-token resume shapes:
+
+- `agent_bridge_reconnect_register` is authenticated by the current app session and carries a public JWK only. The bridge accepts only an EC P-256 public key with no private component and binds it to the current bridge instance, allowed browser origin, agent identity, exact granted scopes, and an expiry no later than the paired session.
+- `agent_bridge_reconnect_registered` returns only an opaque key ID, opaque bridge instance ID, and absolute expiry. Those values are routing/binding metadata, not credentials.
+- A connection presenting a recognized reconnect key ID receives `agent_bridge_reconnect_challenge`, containing a cryptographically random nonce, opaque challenge ID, bridge/key IDs, allowed origin, and an expiry no more than 30 seconds in the future.
+- `agent_bridge_reconnect_proof` carries the challenge/key IDs and an ECDSA P-256/SHA-256 signature over the exact canonical UTF-8 JSON encoding of `{ domain: "tasktime.agent.browser-reconnect", protocolVersion: 1, bridgeInstanceId, keyId, challengeId, nonce, origin, expiresAt }` in that property order.
+- The bridge atomically consumes the challenge before verification/session issuance, rejects replay or any origin/instance/key/expiry mismatch, and returns the existing `agent_bridge_session` message with a fresh token and no broader scopes after successful proof.
+- An authenticated `agent_bridge_reconnect_forget` removes that browser key authorization and sessions issued through it without changing separately paired browser credentials. Existing `agent_bridge_control` revocation remains the all-session authority-ending path.
+
+The browser's current-tab bearer resume record is a closed, versioned `sessionStorage` shape containing the validated loopback endpoint, session token, exact scopes, created/expiry timestamps, and optional stable agent ID/label. The bearer token is never copied to another tab or durable store.
+
+Same-profile close/reopen uses a separate dedicated IndexedDB credential database. Its closed versioned record contains only the validated loopback endpoint, bridge instance ID, reconnect key ID, non-exportable sign-only P-256 private `CryptoKey`, stable agent ID/label, and finite created/expiry timestamps. It is not product data: it never enters Yjs, Drive, backup/export/import, cross-tab messages, or general entity hooks. Unknown/malformed/expired/algorithm-incompatible records are deleted and require explicit pairing. Browsers unable to persist the key safely fall back to current-tab resume or pairing.
+
 Command groups include:
 
 - projects, clients, tasks, cascade previews/deletions, archives
@@ -128,9 +141,11 @@ The authoritative command-name/metadata catalog is generated from `src/agent/com
 
 ## Local bridge process
 
-Configuration may be supplied by CLI flags or the documented `TASKTIME_AGENT_*` environment variables in `.env.example`. Defaults must remain loopback-safe. Status-file discovery may expose endpoint and pairing launch information but never app-session tokens.
+Configuration may be supplied by CLI flags or the documented `TASKTIME_AGENT_*` environment variables in `.env.example`. Defaults must remain loopback-safe. Status-file discovery may expose only non-secret operational metadata such as endpoint, process/instance identity, lifecycle state, connected browser-session count, and pairing expiry/readiness. New writers must not persist pairing IDs, pairing codes, credential-bearing launch URLs, app-session tokens, approval tokens, reconnect signatures, or private keys. Readers must tolerate the historical status shape during migration, and producers retain compatible non-secret fields while removing credential-bearing values as a security correction.
 
-Stable managed identities include platform-specific `agent-id` and `agent-label`; the dynamic port is not identity. Pairing codes are single-use/short-lived, and app sessions expire or end on revocation/process exit.
+Credential-bearing pairing information is limited to an explicit short-lived setup response or the interactive process terminal and must not be copied into persistent logs/files. Stable managed identities include platform-specific `agent-id` and `agent-label`; neither they nor the dynamic port authenticate a process. Pairing codes are single-use/short-lived, app sessions expire or end on revocation/process exit, and browser reconnect authorization also ends on expiry, forget/revoke, access disable, or bridge/Gateway exit.
+
+The official native OpenClaw plugin owns one packaged bridge child through `api.registerService(...)` only during OpenClaw's full Gateway runtime registration mode. It declares its generated tools in `openclaw.plugin.json`, registers the same tools through the supported plugin SDK, and keeps generic stdio/MCP package entrypoints available. Native-format precedence must prevent the compatibility `.mcp.json` from launching a second bridge. Recognized legacy `mcp.servers.tasktime` configuration is reported as an explicit migration conflict rather than killed or silently rewritten.
 
 ## Published artifacts
 

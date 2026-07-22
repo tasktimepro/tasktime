@@ -7,7 +7,8 @@
 [ ] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
-[ ] Then publish version 1 once we see that it's stable
+    [ ] Fix: tasktime-infra/docs/todo/openclaw-agent-bridge-lifecycle-and-pairing-ux-plan.md
+    [ ] Then publish version 1 once we see that it's stable
 
 [ ] Publish in more places:
     [ ] PulseMCP - VERIFY AUTO LISTING

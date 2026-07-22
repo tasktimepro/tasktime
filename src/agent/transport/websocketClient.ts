@@ -2,16 +2,24 @@ import type { AgentCommandContext, AgentCommandErrorCode } from '@/agent/types';
 import type { AgentBridgeSession } from '@/agent/session';
 import { isAgentBridgeSessionExpired } from '@/agent/session';
 import { buildAgentBridgeSessionUrl } from '@/agent/browser/bridgeEndpoint';
+import { buildAgentBridgeReconnectUrl } from '@/agent/browser/bridgeEndpoint';
+import {
+    signAgentBridgeReconnectChallenge,
+    type AgentBridgeReconnectCredential,
+} from '@/agent/browser/reconnectCredential';
 import {
     AGENT_APP_SESSION_PROTOCOL_VERSION,
     createAgentBridgeSessionFromPairingMessage,
     getAgentAppSessionRequestMetadata,
     handleAgentAppSessionRequest,
+    isAgentBridgeReconnectChallengeMessage,
+    isAgentBridgeReconnectRegisteredMessage,
     isAgentAppSessionPairingMessage,
     type AgentAppSessionApprovalGrantPayload,
     type AgentAppSessionApprovalRequest,
     type AgentAppSessionApprovalVerificationRequest,
     type AgentAppSessionResponse,
+    type AgentBridgeReconnectRegisteredMessage,
 } from './protocol';
 
 export type AgentWebSocketStatus =
@@ -50,6 +58,7 @@ export interface AgentAppSessionWebSocketClientOptions {
     context: AgentCommandContext;
     getContext?: () => AgentCommandContext;
     session?: AgentBridgeSession;
+    reconnectCredential?: AgentBridgeReconnectCredential;
     WebSocketCtor?: AgentWebSocketConstructor;
     requestTimeoutMs?: number;
     autoReconnect?: boolean;
@@ -57,6 +66,8 @@ export interface AgentAppSessionWebSocketClientOptions {
     maxReconnectAttempts?: number;
     onStatusChange?: (status: AgentWebSocketStatus) => void;
     onSessionChange?: (session: AgentBridgeSession) => void;
+    onReconnectRegistered?: (registration: AgentBridgeReconnectRegisteredMessage) => void;
+    onReconnectFailure?: () => void;
     onCommandApprovalRequest?: (request: AgentAppSessionApprovalRequest) => Promise<boolean>;
     verifyApprovalToken?: (request: AgentAppSessionApprovalVerificationRequest) => Promise<boolean>;
     onCommandStart?: (activity: AgentAppSessionCommandStart) => void;
@@ -114,6 +125,7 @@ export class AgentAppSessionWebSocketClient {
     private status: AgentWebSocketStatus = 'idle';
     private reconnectTimer: number | null = null;
     private reconnectAttempts = 0;
+    private reconnectFailureReported = false;
     private manualClose = false;
     private commandQueue: Promise<void> = Promise.resolve();
 
@@ -141,7 +153,9 @@ export class AgentAppSessionWebSocketClient {
         this.setStatus('connecting');
         this.socket = new WebSocketCtor(this.createConnectionUrl());
         this.socket.onopen = () => {
-            this.reconnectAttempts = 0;
+            if (!this.options.reconnectCredential || this.session) {
+                this.reconnectAttempts = 0;
+            }
             this.setStatus('open');
         };
         this.socket.onmessage = (event) => {
@@ -221,6 +235,40 @@ export class AgentAppSessionWebSocketClient {
         return true;
     }
 
+    registerReconnectPublicKey(publicKeyJwk: JsonWebKey): boolean {
+        const socket = this.socket;
+
+        if (!socket || socket.readyState !== 1 || !this.session || isAgentBridgeSessionExpired(this.session)) {
+            return false;
+        }
+
+        socket.send(JSON.stringify({
+            type: 'agent_bridge_reconnect_register',
+            protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+            sessionToken: this.session.sessionToken,
+            publicKeyJwk,
+        }));
+
+        return true;
+    }
+
+    forgetReconnectKey(keyId: string): boolean {
+        const socket = this.socket;
+
+        if (!socket || socket.readyState !== 1 || !this.session || isAgentBridgeSessionExpired(this.session) || !keyId.trim()) {
+            return false;
+        }
+
+        socket.send(JSON.stringify({
+            type: 'agent_bridge_reconnect_forget',
+            protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+            sessionToken: this.session.sessionToken,
+            keyId: keyId.trim(),
+        }));
+
+        return true;
+    }
+
     private setStatus(status: AgentWebSocketStatus): void {
         this.status = status;
         this.options.onStatusChange?.(status);
@@ -243,6 +291,10 @@ export class AgentAppSessionWebSocketClient {
         const maxAttempts = this.options.maxReconnectAttempts ?? Number.POSITIVE_INFINITY;
 
         if (this.reconnectAttempts >= maxAttempts) {
+            if (this.options.reconnectCredential && !this.session && !this.reconnectFailureReported) {
+                this.reconnectFailureReported = true;
+                this.options.onReconnectFailure?.();
+            }
             return;
         }
 
@@ -261,6 +313,13 @@ export class AgentAppSessionWebSocketClient {
 
     private createConnectionUrl(): string {
         if (!this.session || isAgentBridgeSessionExpired(this.session)) {
+            if (this.options.reconnectCredential) {
+                return buildAgentBridgeReconnectUrl({
+                    endpoint: this.options.url,
+                    keyId: this.options.reconnectCredential.keyId,
+                });
+            }
+
             return this.options.url;
         }
 
@@ -288,7 +347,45 @@ export class AgentAppSessionWebSocketClient {
 
         if (isAgentAppSessionPairingMessage(parsed)) {
             this.session = createAgentBridgeSessionFromPairingMessage(parsed);
+            this.reconnectAttempts = 0;
+            this.reconnectFailureReported = false;
             this.options.onSessionChange?.(this.session);
+            return;
+        }
+
+        if (isAgentBridgeReconnectRegisteredMessage(parsed)) {
+            this.options.onReconnectRegistered?.(parsed);
+            return;
+        }
+
+        if (isAgentBridgeReconnectChallengeMessage(parsed)) {
+            const credential = this.options.reconnectCredential;
+
+            if (!credential) {
+                this.options.onReconnectFailure?.();
+                socket.close();
+                return;
+            }
+
+            try {
+                const signature = await signAgentBridgeReconnectChallenge(
+                    credential,
+                    parsed,
+                    globalThis.location?.origin ?? parsed.origin
+                );
+
+                socket.send(JSON.stringify({
+                    type: 'agent_bridge_reconnect_proof',
+                    protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+                    keyId: parsed.keyId,
+                    challengeId: parsed.challengeId,
+                    signature,
+                }));
+            } catch {
+                this.options.onReconnectFailure?.();
+                socket.close();
+            }
+
             return;
         }
 

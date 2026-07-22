@@ -4,6 +4,7 @@ import { agentCommandRequiresApproval, executeAgentCommand, getAgentCommandMetad
 import { AGENT_APPROVAL_TOKEN_FORMAT } from '@/agent/approvalTokenFormat';
 
 export const AGENT_APP_SESSION_PROTOCOL_VERSION = 1;
+export const AGENT_BRIDGE_RECONNECT_SIGNATURE_DOMAIN = 'tasktime.agent.browser-reconnect';
 export { AGENT_APPROVAL_TOKEN_FORMAT } from '@/agent/approvalTokenFormat';
 
 export type AgentAppSessionRequest = {
@@ -37,6 +38,58 @@ export type AgentAppSessionControlMessage = {
     sessionToken: string;
     action: 'revoke';
 };
+
+export type AgentBridgeReconnectRegisterMessage = {
+    type: 'agent_bridge_reconnect_register';
+    protocolVersion: 1;
+    sessionToken: string;
+    publicKeyJwk: JsonWebKey;
+};
+
+export type AgentBridgeReconnectRegisteredMessage = {
+    type: 'agent_bridge_reconnect_registered';
+    protocolVersion: 1;
+    keyId: string;
+    bridgeInstanceId: string;
+    expiresAt: number;
+};
+
+export type AgentBridgeReconnectChallengeMessage = {
+    type: 'agent_bridge_reconnect_challenge';
+    protocolVersion: 1;
+    bridgeInstanceId: string;
+    keyId: string;
+    challengeId: string;
+    nonce: string;
+    origin: string;
+    expiresAt: number;
+};
+
+export type AgentBridgeReconnectProofMessage = {
+    type: 'agent_bridge_reconnect_proof';
+    protocolVersion: 1;
+    keyId: string;
+    challengeId: string;
+    signature: string;
+};
+
+export type AgentBridgeReconnectForgetMessage = {
+    type: 'agent_bridge_reconnect_forget';
+    protocolVersion: 1;
+    sessionToken: string;
+    keyId: string;
+};
+
+export interface AgentBridgeReconnectSignaturePayload {
+    domain: typeof AGENT_BRIDGE_RECONNECT_SIGNATURE_DOMAIN;
+    protocolVersion: 1;
+    bridgeInstanceId: string;
+    keyId: string;
+    challengeId: string;
+    nonce: string;
+    origin: string;
+    expiresAt: number;
+}
 
 export type AgentAppSessionApprovalGrantPayload = {
     id: string;
@@ -132,6 +185,101 @@ export function isAgentAppSessionControlMessage(value: unknown): value is AgentA
         && typeof candidate.sessionToken === 'string'
         && candidate.sessionToken.trim().length > 0
         && candidate.action === 'revoke';
+}
+
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+export function isAgentBridgeReconnectRegisterMessage(value: unknown): value is AgentBridgeReconnectRegisterMessage {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const candidate = value as Partial<AgentBridgeReconnectRegisterMessage>;
+
+    return candidate.type === 'agent_bridge_reconnect_register'
+        && candidate.protocolVersion === AGENT_APP_SESSION_PROTOCOL_VERSION
+        && isNonEmptyString(candidate.sessionToken)
+        && !!candidate.publicKeyJwk
+        && typeof candidate.publicKeyJwk === 'object';
+}
+
+export function isAgentBridgeReconnectRegisteredMessage(value: unknown): value is AgentBridgeReconnectRegisteredMessage {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const candidate = value as Partial<AgentBridgeReconnectRegisteredMessage>;
+
+    return candidate.type === 'agent_bridge_reconnect_registered'
+        && candidate.protocolVersion === AGENT_APP_SESSION_PROTOCOL_VERSION
+        && isNonEmptyString(candidate.keyId)
+        && isNonEmptyString(candidate.bridgeInstanceId)
+        && typeof candidate.expiresAt === 'number'
+        && Number.isFinite(candidate.expiresAt);
+}
+
+export function isAgentBridgeReconnectChallengeMessage(value: unknown): value is AgentBridgeReconnectChallengeMessage {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const candidate = value as Partial<AgentBridgeReconnectChallengeMessage>;
+
+    return candidate.type === 'agent_bridge_reconnect_challenge'
+        && candidate.protocolVersion === AGENT_APP_SESSION_PROTOCOL_VERSION
+        && isNonEmptyString(candidate.bridgeInstanceId)
+        && isNonEmptyString(candidate.keyId)
+        && isNonEmptyString(candidate.challengeId)
+        && isNonEmptyString(candidate.nonce)
+        && isNonEmptyString(candidate.origin)
+        && typeof candidate.expiresAt === 'number'
+        && Number.isFinite(candidate.expiresAt);
+}
+
+export function isAgentBridgeReconnectProofMessage(value: unknown): value is AgentBridgeReconnectProofMessage {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const candidate = value as Partial<AgentBridgeReconnectProofMessage>;
+
+    return candidate.type === 'agent_bridge_reconnect_proof'
+        && candidate.protocolVersion === AGENT_APP_SESSION_PROTOCOL_VERSION
+        && isNonEmptyString(candidate.keyId)
+        && isNonEmptyString(candidate.challengeId)
+        && isNonEmptyString(candidate.signature);
+}
+
+export function isAgentBridgeReconnectForgetMessage(value: unknown): value is AgentBridgeReconnectForgetMessage {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const candidate = value as Partial<AgentBridgeReconnectForgetMessage>;
+
+    return candidate.type === 'agent_bridge_reconnect_forget'
+        && candidate.protocolVersion === AGENT_APP_SESSION_PROTOCOL_VERSION
+        && isNonEmptyString(candidate.sessionToken)
+        && isNonEmptyString(candidate.keyId);
+}
+
+export function createAgentBridgeReconnectSignatureInput(
+    challenge: AgentBridgeReconnectChallengeMessage
+): string {
+    const payload: AgentBridgeReconnectSignaturePayload = {
+        domain: AGENT_BRIDGE_RECONNECT_SIGNATURE_DOMAIN,
+        protocolVersion: AGENT_APP_SESSION_PROTOCOL_VERSION,
+        bridgeInstanceId: challenge.bridgeInstanceId,
+        keyId: challenge.keyId,
+        challengeId: challenge.challengeId,
+        nonce: challenge.nonce,
+        origin: challenge.origin,
+        expiresAt: challenge.expiresAt,
+    };
+
+    return JSON.stringify(payload);
 }
 
 export function isAgentAppSessionApprovalGrantMessage(value: unknown): value is AgentAppSessionApprovalGrantMessage {

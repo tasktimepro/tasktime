@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 
 const bridgePath = new URL('../agent-bridge/dist/tasktime-agent-bridge.mjs', import.meta.url)
+const vitePath = fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url))
 const baseUrl = process.env.TASKTIME_AGENT_LIVE_BASE_URL || 'http://127.0.0.1:3101'
 const appOrigin = new URL(baseUrl).origin
 const host = process.env.TASKTIME_AGENT_LIVE_HOST || new URL(baseUrl).hostname || '127.0.0.1'
@@ -26,7 +28,7 @@ if (!existsSync(bridgePath)) {
 try {
   if (shouldStartApp) {
     log('starting Vite app server')
-    const vite = spawnProcess('vite', 'npm', ['run', 'dev', '--', '--host', host, '--port', port])
+    const vite = spawnProcess('vite', process.execPath, [vitePath, '--host', host, '--port', port])
     vite.stdout.on('data', (chunk) => process.stdout.write(`[vite] ${chunk}`))
     vite.stderr.on('data', (chunk) => process.stderr.write(`[vite] ${chunk}`))
   }

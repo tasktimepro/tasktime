@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -121,6 +121,8 @@ describe('TaskTime Pro agent bridge CLI', () => {
                 transport: 'mcp-stdio-json-rpc',
                 statusFile: expect.objectContaining({
                     argument: '--status-file',
+                    schemaVersion: 2,
+                    containsPairingCredentials: false,
                 }),
                 identity: expect.objectContaining({
                     defaultAgentId: 'tasktime.agent.local-bridge',
@@ -305,30 +307,90 @@ describe('TaskTime Pro agent bridge CLI', () => {
             stderr,
         });
 
+        let stopped = false;
+
         try {
             const firstStatus = JSON.parse(await readFile(statusFile, 'utf8'));
+            const firstStatusText = await readFile(statusFile, 'utf8');
 
             expect(firstStatus).toEqual(expect.objectContaining({
-                schemaVersion: 1,
+                schemaVersion: 2,
+                bridgeInstanceId: expect.any(String),
                 agent: {
                     id: 'tasktime.agent.openclaw',
                     label: 'OpenClaw on this device',
                 },
                 endpoint: expect.stringMatching(/^ws:\/\/127\.0\.0\.1:\d+\/tasktime-agent$/),
-                launchUrl: expect.stringContaining('agentBridgeAgentId=tasktime.agent.openclaw'),
                 session: expect.objectContaining({
                     paired: false,
                     clientCount: 0,
+                    connectedBrowserSessions: 0,
                 }),
             }));
+            expect(firstStatus).not.toHaveProperty('launchUrl');
+            expect(firstStatus.pairing).not.toHaveProperty('id');
+            expect(firstStatus.pairing).not.toHaveProperty('code');
+            expect(firstStatusText).not.toContain(runtime.challenge.id);
+            expect(firstStatusText).not.toContain(runtime.challenge.code);
+            expect((await stat(statusFile)).mode & 0o777).toBe(0o600);
 
             const refreshed = runtime.refreshPairing();
             const refreshedStatus = JSON.parse(await readFile(statusFile, 'utf8'));
 
-            expect(refreshed.pairing.id).not.toBe(firstStatus.pairing.id);
-            expect(refreshedStatus.pairing.id).toBe(refreshed.pairing.id);
-        } finally {
+            expect(refreshed.pairing.id).not.toBe(runtime.challenge.id);
+            expect(refreshed.launchUrl).toContain(`agentBridgePairingId=${refreshed.pairing.id}`);
+            expect(refreshedStatus).not.toHaveProperty('launchUrl');
+            expect(refreshedStatus.pairing).toEqual({
+                expiresAt: refreshed.pairing.expiresAt,
+                expired: false,
+            });
+
             await runtime.stop();
+            stopped = true;
+            await expect(readFile(statusFile, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+        } finally {
+            if (!stopped) {
+                await runtime.stop();
+            }
+            await rm(tempDir, { force: true, recursive: true });
+        }
+    });
+
+    it('keeps the bridge usable when a status target cannot be replaced safely', async () => {
+        const tempDir = await mkdtemp(path.join(tmpdir(), 'tasktime-agent-status-failure-'));
+        const stdin = new PassThrough();
+        const stdout = new PassThrough();
+        const stderr = new PassThrough();
+        let stderrText = '';
+        stderr.on('data', (chunk) => {
+            stderrText += chunk.toString('utf8');
+        });
+
+        const runtime = await startTaskTimeAgentBridgeCli({
+            host: '127.0.0.1',
+            port: 0,
+            path: '/tasktime-agent',
+            scopes: ['read'],
+            agentId: 'tasktime.agent.openclaw',
+            agentLabel: 'OpenClaw on this device',
+            pairingTtlMs: 300000,
+            commandTimeoutMs: 1000,
+            toolCallRateLimit: 120,
+            toolCallRateWindowMs: 60000,
+            statusFile: tempDir,
+            help: false,
+            manifest: false,
+        }, {
+            stdin,
+            stdout,
+            stderr,
+        });
+
+        try {
+            expect(runtime.getStatus().endpoint).toMatch(/^ws:\/\/127\.0\.0\.1:/);
+            expect(stderrText).toContain('status file write failed');
+        } finally {
+            await expect(runtime.stop()).resolves.toBeUndefined();
             await rm(tempDir, { force: true, recursive: true });
         }
     });

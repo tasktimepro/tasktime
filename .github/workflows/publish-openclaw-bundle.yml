@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build native plugin and refresh vendored bridge
+        run: |
+          npm run build:agent-bridge
+          cp agent-bridge/dist/tasktime-agent-bridge.mjs integrations/openclaw/tasktime/vendor/tasktime-agent-bridge.mjs
+          npm run build:openclaw-plugin
+
       - name: Smoke test OpenClaw bundle
         run: npm run smoke:agent-bundles
 

@@ -54,7 +54,12 @@
 - An unpaired, expired, revoked, out-of-scope, over-limit, or unapproved request cannot execute a protected command.
 - A paired allowed command produces the same business effect and validation as its UI counterpart.
 - Session tokens do not appear in status files, launch URLs, logs, docs, or error recovery payloads.
-- The installed integration can complete the long-running task/start/work/stop/verify flow.
+- Refreshing a paired TaskTime tab resumes the same live bridge session without reusing a pairing challenge.
+- Closing all TaskTime tabs and reopening the app in the same browser profile reconnects to the same live bridge through a fresh signed challenge and fresh app-session token, without persisting or broadcasting a bearer token.
+- A reconnect proof with an expired, replayed, wrong-origin, wrong-instance, unknown, or revoked challenge/key cannot create a session; explicit disconnect/forget, revocation, expiry, or bridge/Gateway restart requires pairing again.
+- Unsupported or unavailable browser credential storage degrades truthfully to current-tab recovery or explicit pairing without weakening validation.
+- The managed OpenClaw integration keeps one Gateway-owned bridge across ordinary turns, detects a recognized legacy TaskTime MCP configuration instead of starting a duplicate, and leaves generic MCP/Claude stdio behavior compatible.
+- The installed integration can complete the long-running task/start/work/refresh/close/reopen/stop/verify flow.
 - The discovery manifest and generated tool catalog agree on core-use, privacy, and canonical first-party ClawHub metadata.
 
 ## Quality evidence
