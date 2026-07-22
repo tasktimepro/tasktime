@@ -62,15 +62,20 @@ npm publishing uses GitHub Actions and the `NPM_TOKEN` repository secret:
 ```
 
 ClawHub publishing uses a manually dispatched, dry-run-first GitHub Actions
-workflow and the `CLAWHUB_TOKEN` repository secret:
+workflow and the `CLAWHUB_TOKEN` repository secret for skills and the initial
+native-plugin publication:
 
 ```text
 .github/workflows/publish-clawhub-skill.yml
+.github/workflows/publish-clawhub-plugin.yml
 ```
 
 ClawHub does not currently support GitHub OIDC trusted publishing for skills.
-Keep the token in GitHub Actions secrets; never place it in repository files,
-workflow inputs, logs, or release notes.
+The native plugin uses a one-time token-authenticated publication to establish
+the package, then configures GitHub Actions OIDC trusted publishing for
+`.github/workflows/publish-clawhub-plugin.yml`. Keep the break-glass token in
+GitHub Actions secrets; never place it in repository files, workflow inputs,
+logs, or release notes.
 
 One-time repository setup, performed interactively by an authorized maintainer:
 
@@ -367,12 +372,47 @@ The native plugin writes a secret-free discovery status below the OpenClaw state
 
 When bridge behavior changes, refresh `vendor/tasktime-agent-bridge.mjs` from `agent-bridge/dist/` after `build:agent-bridge`, then run `build:openclaw-plugin`. The publish workflow performs both steps before package smoke and packing.
 
-If the OpenClaw bundle package is published to npm, bump `integrations/openclaw/tasktime/package.json` and use the repo workflow:
+The OpenClaw bundle is published with matching versions to npm and ClawHub.
+Before either publication, bump `integrations/openclaw/tasktime/package.json`
+and `.codex-plugin/plugin.json`, keep `openclaw.build.openclawVersion` aligned
+with the verified Gateway build, and use the repository workflows:
 
 ```bash
 gh workflow run publish-openclaw-bundle.yml --ref main -f dry_run=true
 gh workflow run publish-openclaw-bundle.yml --ref main -f dry_run=false
 docker compose run --rm app npm view @tasktimepro/openclaw version
+
+# The first ClawHub package release uses the repository secret once.
+gh workflow run publish-clawhub-plugin.yml --ref main \
+  -f dry_run=true -f use_token=false -f configure_trusted_publisher=false
+gh workflow run publish-clawhub-plugin.yml --ref main \
+  -f dry_run=false -f use_token=true -f configure_trusted_publisher=true
+
+# Later manually dispatched releases use GitHub OIDC; no token is supplied.
+gh workflow run publish-clawhub-plugin.yml --ref main \
+  -f dry_run=false -f use_token=false -f configure_trusted_publisher=false
+```
+
+The canonical native-plugin ClawHub install is:
+
+```bash
+openclaw plugins install clawhub:@tasktimepro/openclaw
+```
+
+After publication, inspect the precise record and confirm that its package
+name, version, owner, source commit, compatibility metadata, and scan state
+match the release candidate:
+
+```bash
+docker run --rm \
+  -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
+  node:24-alpine \
+  sh -lc 'npx -y clawhub@0.23.1 package inspect @tasktimepro/openclaw --version 1.0.1 --json'
+
+docker run --rm \
+  -v "$HOME/Library/Application Support/clawhub:/root/.config/clawhub:ro" \
+  node:24-alpine \
+  sh -lc 'npx -y clawhub@0.23.1 package trusted-publisher get @tasktimepro/openclaw --json'
 ```
 
 ## Claude Code Plugin Bundle

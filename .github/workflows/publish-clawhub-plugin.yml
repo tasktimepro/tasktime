@@ -1,0 +1,166 @@
+name: Publish TaskTime Pro OpenClaw Plugin to ClawHub
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate the exact ClawHub package release without publishing"
+        required: true
+        default: true
+        type: boolean
+      use_token:
+        description: "Use CLAWHUB_TOKEN for first, break-glass, or tag release publishing"
+        required: true
+        default: false
+        type: boolean
+      configure_trusted_publisher:
+        description: "Configure this workflow as the package's trusted publisher after the first release"
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish-clawhub-tasktime-openclaw
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CLAWHUB_CLI_VERSION: "0.23.1"
+      PACKAGE_PATH: integrations/openclaw/tasktime
+      PACKAGE_NAME: "@tasktimepro/openclaw"
+
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Resolve and validate release identity
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REPOSITORY" != "tasktimepro/tasktime" ]]; then
+            echo "ClawHub package releases must run from tasktimepro/tasktime, not $GITHUB_REPOSITORY." >&2
+            exit 1
+          fi
+
+          PACKAGE_VERSION="$(node -p "require('./${PACKAGE_PATH}/package.json').version")"
+          if [[ ! "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "package.json must declare an explicit semantic version; found '$PACKAGE_VERSION'." >&2
+            exit 1
+          fi
+
+          BUILD_VERSION="$(node -p "require('./${PACKAGE_PATH}/package.json').openclaw?.build?.openclawVersion || ''")"
+          if [[ -z "$BUILD_VERSION" ]]; then
+            echo "package.json must declare openclaw.build.openclawVersion for ClawHub publication." >&2
+            exit 1
+          fi
+
+          git cat-file -e "$GITHUB_SHA:$PACKAGE_PATH/package.json"
+          git cat-file -e "$GITHUB_SHA:$PACKAGE_PATH/openclaw.plugin.json"
+          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing candidate $PACKAGE_NAME@$PACKAGE_VERSION from $GITHUB_REPOSITORY@$GITHUB_SHA ($PACKAGE_PATH), built against OpenClaw $BUILD_VERSION."
+
+      - name: Validate native plugin package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package validate "$PACKAGE_PATH" --json
+
+      - name: Configure ClawHub token authentication
+        if: ${{ inputs.dry_run == false && inputs.use_token == true }}
+        shell: bash
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+          CLAWHUB_CONFIG_PATH: ${{ runner.temp }}/clawhub-config.json
+        run: |
+          set -euo pipefail
+          if [[ -z "$CLAWHUB_TOKEN" ]]; then
+            echo "CLAWHUB_TOKEN is required when use_token is true." >&2
+            exit 1
+          fi
+
+          node -e 'const fs = require("node:fs"); fs.writeFileSync(process.env.CLAWHUB_CONFIG_PATH, JSON.stringify({ registry: "https://clawhub.ai", token: process.env.CLAWHUB_TOKEN }) + "\n", { mode: 0o600 });'
+          echo "CLAWHUB_CONFIG_PATH=$CLAWHUB_CONFIG_PATH" >> "$GITHUB_ENV"
+
+      - name: Dry-run ClawHub package release
+        if: ${{ inputs.dry_run == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
+            --family code-plugin \
+            --owner tasktimepro \
+            --version "${{ steps.release.outputs.version }}" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF" \
+            --source-path "$PACKAGE_PATH" \
+            --dry-run \
+            --json
+
+      - name: Publish ClawHub package release
+        if: ${{ inputs.dry_run == false }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
+            --family code-plugin \
+            --owner tasktimepro \
+            --version "${{ steps.release.outputs.version }}" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF" \
+            --source-path "$PACKAGE_PATH" \
+            --json
+
+      - name: Configure GitHub Actions trusted publisher
+        if: ${{ inputs.dry_run == false && inputs.configure_trusted_publisher == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package trusted-publisher set "$PACKAGE_NAME" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow-filename publish-clawhub-plugin.yml \
+            --json
+
+      - name: Verify published package identity
+        if: ${{ inputs.dry_run == false }}
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+          INSPECT_PATH: ${{ runner.temp }}/clawhub-package-inspect.json
+        run: |
+          set -euo pipefail
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package inspect "$PACKAGE_NAME" \
+            --version "$EXPECTED_VERSION" \
+            --json > "$INSPECT_PATH"
+
+          node -e '
+            const fs = require("node:fs");
+            const result = JSON.parse(fs.readFileSync(process.env.INSPECT_PATH, "utf8"));
+            const source = result.provenance ?? result.source ?? {};
+            const valid = result.name === "@tasktimepro/openclaw"
+              && result.version === process.env.EXPECTED_VERSION
+              && (result.ownerHandle === "tasktimepro" || result.owner?.handle === "tasktimepro")
+              && (source.commit === process.env.GITHUB_SHA || source.sourceCommit === process.env.GITHUB_SHA || source.commitSha === process.env.GITHUB_SHA);
+            if (!valid) {
+              console.error(JSON.stringify(result, null, 2));
+              process.exit(1);
+            }
+          '
+
+      - name: Remove temporary ClawHub credentials
+        if: ${{ always() && inputs.use_token == true }}
+        shell: bash
+        run: rm -f "${CLAWHUB_CONFIG_PATH:-${RUNNER_TEMP}/clawhub-config.json}"

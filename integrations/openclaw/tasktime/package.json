@@ -1,6 +1,6 @@
 {
   "name": "@tasktimepro/openclaw",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "First-party native OpenClaw plugin for TaskTime Pro's free, open-source, local-first work manager.",
   "type": "module",
   "main": "./dist/index.js",
@@ -52,6 +52,9 @@
     },
     "compat": {
       "pluginApi": ">=2026.6.11"
+    },
+    "build": {
+      "openclawVersion": "2026.7.1-2"
     }
   }
 }

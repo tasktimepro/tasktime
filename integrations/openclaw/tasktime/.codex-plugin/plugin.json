@@ -1,6 +1,6 @@
 {
   "name": "tasktime",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TaskTime Pro is a free, open-source, local-first work manager for freelancers, covering tasks, timers, expenses, invoices, and reports. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser. This first-party TaskTime Pro skill lets same-device agents operate the app through scoped access and approval controls.",
   "author": {
     "name": "TaskTime Pro",
