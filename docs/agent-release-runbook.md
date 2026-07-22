@@ -263,7 +263,7 @@ docker run --rm \
   -e SKILL_VERSION \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime --dry-run'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-ref main --source-path integrations/openclaw/tasktime/skills/tasktime --dry-run'
 ```
 
 Publish:
@@ -278,7 +278,7 @@ docker run --rm \
   -e SKILL_VERSION \
   -w /repo \
   node:24-alpine \
-  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-path integrations/openclaw/tasktime/skills/tasktime'
+  sh -lc 'npx -y clawhub@0.23.1 skill publish integrations/openclaw/tasktime/skills/tasktime --owner tasktimepro --slug tasktime-agent --name "TaskTime Pro" --version "$SKILL_VERSION" --source-repo tasktimepro/tasktime --source-commit "$SOURCE_COMMIT" --source-ref main --source-path integrations/openclaw/tasktime/skills/tasktime'
 ```
 
 Verify:

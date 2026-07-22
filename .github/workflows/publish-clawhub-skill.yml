@@ -64,6 +64,7 @@ jobs:
             --version "${{ steps.release.outputs.version }}" \
             --source-repo "$GITHUB_REPOSITORY" \
             --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF_NAME" \
             --source-path "$SKILL_PATH" \
             --dry-run \
             --json
@@ -96,6 +97,7 @@ jobs:
             --version "${{ steps.release.outputs.version }}" \
             --source-repo "$GITHUB_REPOSITORY" \
             --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF_NAME" \
             --source-path "$SKILL_PATH" \
             --json
 
@@ -108,7 +110,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in $(seq 1 30); do
             npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill verify @tasktimepro/tasktime-agent \
               --version "$EXPECTED_VERSION" > "$VERIFY_PATH" || true
 
@@ -127,7 +129,7 @@ jobs:
               exit 0
             fi
 
-            if [[ "$attempt" -lt 6 ]]; then
+            if [[ "$attempt" -lt 30 ]]; then
               sleep 10
             fi
           done
