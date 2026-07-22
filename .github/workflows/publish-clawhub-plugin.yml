@@ -142,18 +142,33 @@ jobs:
           INSPECT_PATH: ${{ runner.temp }}/clawhub-package-inspect.json
         run: |
           set -euo pipefail
-          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package inspect "$PACKAGE_NAME" \
-            --version "$EXPECTED_VERSION" \
-            --json > "$INSPECT_PATH"
+
+          for attempt in {1..12}; do
+            if npx -y "clawhub@$CLAWHUB_CLI_VERSION" package inspect "$PACKAGE_NAME" \
+              --version "$EXPECTED_VERSION" \
+              --json > "$INSPECT_PATH"; then
+              break
+            fi
+
+            if [[ "$attempt" == "12" ]]; then
+              echo "ClawHub did not make the published package visible before verification timed out." >&2
+              exit 1
+            fi
+
+            sleep 5
+          done
 
           node -e '
             const fs = require("node:fs");
             const result = JSON.parse(fs.readFileSync(process.env.INSPECT_PATH, "utf8"));
-            const source = result.provenance ?? result.source ?? {};
-            const valid = result.name === "@tasktimepro/openclaw"
-              && result.version === process.env.EXPECTED_VERSION
-              && (result.ownerHandle === "tasktimepro" || result.owner?.handle === "tasktimepro")
-              && (source.commit === process.env.GITHUB_SHA || source.sourceCommit === process.env.GITHUB_SHA || source.commitSha === process.env.GITHUB_SHA);
+            const packageRecord = result.package ?? {};
+            const versionRecord = result.version ?? {};
+            const source = versionRecord.verification ?? packageRecord.verification ?? {};
+            const valid = packageRecord.name === "@tasktimepro/openclaw"
+              && versionRecord.version === process.env.EXPECTED_VERSION
+              && result.owner?.handle === "tasktimepro"
+              && source.sourceRepo === process.env.GITHUB_REPOSITORY
+              && source.sourceCommit === process.env.GITHUB_SHA;
             if (!valid) {
               console.error(JSON.stringify(result, null, 2));
               process.exit(1);
