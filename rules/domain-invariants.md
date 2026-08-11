@@ -27,6 +27,7 @@ These invariants summarize critical production contracts. They supplement the de
 ## Invoices, expenses, and reporting
 
 - Invoice calculations, billed state, payments, undo operations, currency handling, expense inclusion, and report totals must agree on the same source records and rounding rules.
+- Current billing and report ranges assign a time entry wholly to the local calendar date of its start timestamp and include the complete selected end date. Historical snapshot-less invoice recovery retains the period-boundary behavior that produced the invoice's stored source totals.
 - UI badges, invoice composition, and agent preview/draft commands share one invoice-eligibility operation. Neither a task cutoff alone nor entry markers alone may redefine legacy eligibility: exact finalized-invoice evidence may suppress markerless historical entries, while ambiguous or later-arriving work remains eligible.
 - Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval; financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
 - Billing mutations must be explicit, reversible where supported, and idempotent against retries or repeated commands.

@@ -102,6 +102,69 @@ describe('invoiceEligibility', () => {
         }).map((candidate) => candidate.id)).toEqual(['entry-late']);
     });
 
+    it('includes the entire local end date and assigns cross-midnight work by its start date', () => {
+        const entries: TimeEntry[] = [
+            {
+                id: 'entry-end-date',
+                taskId: 'task-1',
+                start: new Date(2026, 4, 31, 23, 30).getTime(),
+                end: new Date(2026, 5, 1, 0, 30).getTime(),
+            },
+            {
+                id: 'entry-next-date',
+                taskId: 'task-1',
+                start: new Date(2026, 5, 1, 0, 0).getTime(),
+                end: new Date(2026, 5, 1, 1, 0).getTime(),
+            },
+        ];
+
+        expect(getInvoiceEligibleTimeEntries({
+            tasks: [task],
+            timeEntries: entries,
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31',
+        }).map((candidate) => candidate.id)).toEqual(['entry-end-date']);
+    });
+
+    it('preserves legacy invoice matching while exposing omitted end-date work for current billing', () => {
+        const entries: TimeEntry[] = [
+            {
+                id: 'entry-legacy-billed',
+                taskId: 'task-1',
+                start: new Date(2026, 4, 30, 9).getTime(),
+                end: new Date(2026, 4, 30, 10).getTime(),
+                createdAt: 15_000,
+            },
+            {
+                id: 'entry-end-date-unbilled',
+                taskId: 'task-1',
+                start: new Date(2026, 4, 31, 9).getTime(),
+                end: new Date(2026, 4, 31, 10).getTime(),
+                createdAt: 15_000,
+            },
+        ];
+        const invoice = legacyInvoice({
+            tasks: [{
+                id: 'task-1',
+                originalHours: 1,
+                originalTimeMs: 60 * 60 * 1000,
+            }],
+        });
+
+        expect(collectLegacyBilledTimeEntryIds({
+            tasks: [task],
+            timeEntries: entries,
+            invoices: [invoice],
+        })).toEqual(new Set(['entry-legacy-billed']));
+        expect(getInvoiceEligibleTimeEntries({
+            tasks: [task],
+            timeEntries: entries,
+            invoices: [invoice],
+            billingPeriodStart: '2026-05-01',
+            billingPeriodEnd: '2026-05-31',
+        }).map((candidate) => candidate.id)).toEqual(['entry-end-date-unbilled']);
+    });
+
     it('does not infer legacy allocations from drafts or modern selection snapshots', () => {
         const entry: TimeEntry = {
             id: 'entry-unbilled',

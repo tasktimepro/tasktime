@@ -7,13 +7,19 @@ import { toStorageDate } from './dateUtils';
  */
 export function isTimestampStartWithinStoredDateRange(
     timestamp: number,
-    startDate: string,
-    endDate: string,
+    startDate = '',
+    endDate = '',
 ): boolean {
     if (!Number.isFinite(timestamp)) return false;
+    if (!startDate && !endDate) return true;
 
-    const assignedDate = toStorageDate(timestamp);
-    return Boolean(assignedDate && assignedDate >= startDate && assignedDate <= endDate);
+    const assignedDate = toStorageDate(new Date(timestamp));
+    if (!assignedDate) return false;
+
+    if (startDate && assignedDate < startDate) return false;
+    if (endDate && assignedDate > endDate) return false;
+
+    return true;
 }
 
 export function isTimestampStartWithinRange(

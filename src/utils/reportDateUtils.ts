@@ -1,7 +1,9 @@
 import {
+    endOfDay,
     endOfMonth,
     endOfQuarter,
     endOfYear,
+    startOfDay,
     startOfMonth,
     startOfQuarter,
     startOfYear,
@@ -33,8 +35,8 @@ export type ReportDateRange = {
 const buildRange = (startDate: Date, endDate: Date): ReportDateRange => ({
     startDate: toStorageDate(startDate) || '',
     endDate: toStorageDate(endDate) || '',
-    startTimestamp: startDate.getTime(),
-    endTimestamp: endDate.getTime(),
+    startTimestamp: startOfDay(startDate).getTime(),
+    endTimestamp: endOfDay(endDate).getTime(),
 });
 
 export const getDefaultReportPeriod = (): ReportPeriodValue => 'last-month';

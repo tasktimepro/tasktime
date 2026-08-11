@@ -4,11 +4,12 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
-[ ] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
+[x] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
-    [ ] Fix: tasktime-infra/docs/todo/openclaw-agent-bridge-lifecycle-and-pairing-ux-plan.md
-    [ ] Then publish version 1 once we see that it's stable
+    [x] Fix: tasktime-infra/docs/todo/openclaw-agent-bridge-lifecycle-and-pairing-ux-plan.md
+    [x] Then publish version 1 once we see that it's stable
+    [ ] Perform one more manual test
 
 [ ] Publish in more places:
     [ ] PulseMCP - VERIFY AUTO LISTING
@@ -23,8 +24,7 @@
 ## Blog Posts
 
 - Always keep in mind trending words and most likely searched for words for better SEO reachability
-[ ] We should have a blog post that mentions task and time management for AI agents, another for Invoicing with AI agents, Expense management for AI agents etc. I need the most likely searched terms for people that want to do what this product can achieve but using their AI agent
-[ ] We must also have posts for open-source and that we mention something like "Open-source task management app", etc.
+[ ] ...
 
 
 ---
@@ -38,11 +38,6 @@
 ---
 
 ## Invoice updates
-
-[x] Cancel invoice implementation that places retained invoices in a Canceled tab and excludes them from financial reporting.
-    [x] Release only source work still billed by the canceled invoice so it becomes invoice-eligible again.
-    [x] Keep the canceled number permanently consumed; the next invoice uses the next sequential number.
-    [x] Deliver the minimal terminal cancellation workflow while leaving paid corrections, refunds, and credit notes as explicit non-goals.
 
 
 ---

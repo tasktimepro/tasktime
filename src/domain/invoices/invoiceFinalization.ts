@@ -122,6 +122,8 @@ export function planInvoiceFinalization({
 
         const cutoff = previousBillingCutoffs.get(entry.taskId) || 0;
         if (!selectedEntry && entry.start <= cutoff) return;
+        // Snapshot-less drafts retain the historical instant-to-midnight
+        // boundary that determined their displayed and stored source totals.
         if (!selectedEntry && !isStoredDateWithinBillingRange(entry.start, invoice.billingPeriodStart || undefined, invoice.billingPeriodEnd || undefined)) return;
 
         entriesToBill.push({

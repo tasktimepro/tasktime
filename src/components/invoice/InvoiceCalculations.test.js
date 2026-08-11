@@ -283,6 +283,11 @@ describe('buildInvoiceTaskData', () => {
             },
             {
                 taskId: 'task-1',
+                start: new Date(2026, 3, 30, 23, 0, 0).getTime(),
+                end: new Date(2026, 4, 1, 0, 0, 0).getTime()
+            },
+            {
+                taskId: 'task-1',
                 start: new Date(2026, 4, 2, 9, 0, 0).getTime(),
                 end: new Date(2026, 4, 2, 10, 0, 0).getTime()
             }
@@ -299,7 +304,7 @@ describe('buildInvoiceTaskData', () => {
         })
 
         expect(result).toHaveLength(1)
-        expect(result[0].originalTimeMs).toBe(2 * 60 * 60 * 1000)
-        expect(result[0].originalHours).toBe(2)
+        expect(result[0].originalTimeMs).toBe(3 * 60 * 60 * 1000)
+        expect(result[0].originalHours).toBe(3)
     })
 })

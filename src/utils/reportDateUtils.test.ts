@@ -53,6 +53,8 @@ describe('reportDateUtils', () => {
         })).toMatchObject({
             startDate: '2026-05-01',
             endDate: '2026-05-20',
+            startTimestamp: new Date(2026, 4, 1, 0, 0, 0, 0).getTime(),
+            endTimestamp: new Date(2026, 4, 20, 23, 59, 59, 999).getTime(),
         });
     });
 

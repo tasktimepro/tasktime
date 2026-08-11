@@ -79,7 +79,7 @@ Each invoice item requires description, quantity, rate, and amount and may refer
 
 Billing snapshots are immutable evidence used for reporting/undo. Historical invoices may lack newer snapshots and require compatible fallback behavior; their absence must not make old records unreadable.
 
-Supported finalized legacy invoices may retain composer `tasks[]` records with per-task `originalTimeMs` or `originalHours` and merged-subtask identity. These fields are read-only compatibility evidence for older markerless source entries: they affect eligibility only when the invoice billing period and stored source duration account for the complete candidate set. Ambiguous matches and entries created after that invoice remain unbilled candidates. No inferred marker is persisted.
+Supported finalized legacy invoices may retain composer `tasks[]` records with per-task `originalTimeMs` or `originalHours` and merged-subtask identity. These fields are read-only compatibility evidence for older markerless source entries: they affect eligibility only when the invoice billing period and stored source duration account for the complete candidate set. Their candidate reconstruction preserves the historical period-boundary behavior used to produce those stored totals, so correcting current local-calendar ranges cannot expose previously billed work. Ambiguous matches, omitted end-date work, and entries created after that invoice remain unbilled candidates. No inferred marker is persisted.
 
 ### Invoice billing operation journal
 

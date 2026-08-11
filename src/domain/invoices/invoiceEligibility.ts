@@ -2,6 +2,7 @@ import type { Invoice, Task, TimeEntry } from '@/stores/yjs/types';
 import { isStoredDateWithinBillingRange } from '@/utils/billingPeriodUtils';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 import { isInvoiceCanceled } from '@/utils/invoiceUtils';
+import { isTimestampStartWithinStoredDateRange } from '@/utils/reportDateBoundary';
 
 const HOUR_IN_MS = 60 * 60 * 1000;
 
@@ -141,6 +142,8 @@ export const collectLegacyBilledTimeEntryIds = ({
                 sourceTaskIds.has(entry.taskId)
                 && taskMap.has(entry.taskId)
                 && isValidSourceEntry(entry)
+                // Preserve the historical instant-to-midnight boundary used
+                // when snapshot-less invoices recorded their source totals.
                 && isStoredDateWithinBillingRange(
                     entry.start,
                     invoice.billingPeriodStart || '',
@@ -204,6 +207,6 @@ export const getInvoiceEligibleTimeEntries = ({
         && isValidSourceEntry(entry)
         && !hasExplicitBillingMarker(entry)
         && !legacyBilledEntryIds.has(entry.id)
-        && isStoredDateWithinBillingRange(entry.start, billingPeriodStart, billingPeriodEnd)
+        && isTimestampStartWithinStoredDateRange(entry.start, billingPeriodStart, billingPeriodEnd)
     ));
 };
