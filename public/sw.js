@@ -15,6 +15,7 @@ const APP_SHELL = [
 const BUILD_ASSETS = self.__WB_MANIFEST || [];
 const STATIC_PUBLIC_PATHS = [
     '/blog',
+    '/product',
     '/contact',
     '/privacy',
     '/terms',
@@ -195,7 +196,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Keep blog pages outside the app shell cache/fallback behavior.
+    // Keep public static pages outside the app shell cache/fallback behavior.
     if (
         requestUrl
         && appOrigin

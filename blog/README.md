@@ -1,6 +1,6 @@
 # TaskTime Pro Public Site
 
-Static Astro public pages served under `/blog`, `/agents`, `/privacy`, `/terms`, and `/contact`.
+Static Astro public pages served under `/product`, `/blog`, `/agents`, `/privacy`, `/terms`, and `/contact`.
 
 ## Commands
 
@@ -13,6 +13,8 @@ Run through the root Makefile:
 ## Content
 
 Posts live in `src/content/blog/` and use frontmatter metadata for SEO.
+
+The public product overview lives at `src/pages/product/index.astro`. Its labeled screenshot placeholders are intentionally retained until approved product captures replace them.
 
 Agent docs live in `src/pages/agents/`. Machine-readable agent discovery files include:
 

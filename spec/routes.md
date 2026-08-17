@@ -25,6 +25,7 @@ Unknown application paths currently fall back to the dashboard. Changes to that 
 
 The SPA/service-worker fallback must not claim these Astro/static prefixes:
 
+- `/product`
 - `/blog`
 - `/agents`
 - `/llms.txt`

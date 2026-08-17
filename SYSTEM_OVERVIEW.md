@@ -12,7 +12,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
-- **Public site:** Astro content under `blog/` builds the blog, legal pages, agent documentation, discovery metadata, and generated tool references.
+- **Public site:** Astro content under `blog/` builds the product overview, blog, legal pages, agent documentation, discovery metadata, and generated tool references.
 - **Operational evidence:** DebugBundle captures opted-in runtime incident evidence; local tests remain the first tool for deterministic failures.
 
 ## Data model and ownership

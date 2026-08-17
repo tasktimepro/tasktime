@@ -3,6 +3,11 @@ import { createPersonalProject, projectsHeadingName } from './helpers/tasktime.j
 
 const publicRouteExpectations = [
     {
+        path: '/product/',
+        title: 'TaskTime Pro — Local-first work and invoicing for freelancers',
+        heading: 'Your work. Your time. Your data.',
+    },
+    {
         path: '/blog/',
         title: 'TaskTime Pro Blog',
         heading: 'Our Blog',
@@ -48,6 +53,52 @@ async function expectStaticPublicRoute(page, { path, title, heading }) {
 }
 
 test.describe('PWA smoke', () => {
+    test('keeps the product page usable at a narrow mobile viewport', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 800 });
+        await page.goto('/product/');
+
+        await expect(page.getByRole('heading', { name: 'Your work. Your time. Your data.', level: 1 })).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Open App' }).first()).toBeVisible();
+        await expect(page.locator('[data-screenshot-slot]')).toHaveCount(3);
+
+        const horizontalLayout = await page.evaluate(() => {
+            const viewportWidth = window.innerWidth;
+            const offenders = Array.from(document.querySelectorAll('body *'))
+                .map((element) => {
+                    const bounds = element.getBoundingClientRect();
+
+                    return {
+                        tag: element.tagName.toLowerCase(),
+                        className: element.className || '',
+                        left: Math.round(bounds.left),
+                        right: Math.round(bounds.right),
+                    };
+                })
+                .filter(({ left, right }) => left < 0 || right > viewportWidth)
+                .slice(0, 10);
+
+            return {
+                documentWidth: document.documentElement.scrollWidth,
+                viewportWidth,
+                offenders,
+            };
+        });
+
+        expect(horizontalLayout).toEqual({
+            documentWidth: 320,
+            viewportWidth: 320,
+            offenders: [],
+        });
+
+        const footer = page.locator('footer');
+
+        await expect(footer.getByRole('link', { name: 'TaskTime Pro on GitHub' })).toBeVisible();
+        await expect(footer.getByRole('link', { name: 'Blog' })).toBeVisible();
+        await expect(footer.getByRole('link', { name: 'Contact' })).toBeVisible();
+        await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
+        await expect(footer.getByRole('link', { name: 'Privacy' })).toBeVisible();
+    });
+
     test('stays usable offline after the production service worker is active', async ({ browser }) => {
         const context = await browser.newContext();
 

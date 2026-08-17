@@ -35,7 +35,7 @@ Managed OpenClaw Gateway
 
 Public web build
 └── blog/ + scripts/build-pages.mjs
-    ├── blog and legal pages
+    ├── product overview, blog, and legal pages
     ├── /agents documentation and generated tool catalogs
     └── discovery manifests, sitemap, RSS, and llms.txt
 ```

@@ -1,5 +1,6 @@
 const PUBLIC_STATIC_ROUTE_PREFIXES = [
     '/blog',
+    '/product',
     '/agents',
     '/llms.txt',
     '/privacy',

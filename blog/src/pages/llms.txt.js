@@ -46,6 +46,7 @@ export function GET() {
         '',
         '## Public Pages',
         '',
+        '- Product overview: https://tasktime.pro/product/',
         '- Blog: https://tasktime.pro/blog/',
         '- Privacy: https://tasktime.pro/privacy/',
         '- Terms: https://tasktime.pro/terms/',

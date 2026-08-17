@@ -136,6 +136,21 @@ describe('service worker caching', () => {
         expect(globalThis.caches.open).not.toHaveBeenCalled()
     })
 
+    it('leaves the static product page outside the app-shell fallback', () => {
+
+        const event = createEvent()
+        event.request = {
+            url: 'https://tasktime.pro/product/',
+            mode: 'navigate',
+            method: 'GET'
+        }
+
+        handlers.fetch(event)
+
+        expect(event.respondWith).not.toHaveBeenCalled()
+        expect(globalThis.fetch).not.toHaveBeenCalled()
+    })
+
     it('removes the previous app-shell cache during the privacy cache upgrade', async () => {
         globalThis.caches.keys.mockResolvedValueOnce(['tasktime-cache-v4', 'tasktime-cache-v5'])
         const event = { waitUntil: vi.fn() }

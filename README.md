@@ -41,6 +41,7 @@ Open http://localhost:3101.
 During local development, the public Astro pages are served through the same origin, so these URLs work from the app server:
 
 - http://localhost:3101/blog
+- http://localhost:3101/product
 - http://localhost:3101/agents
 - http://localhost:3101/llms.txt
 
@@ -90,6 +91,7 @@ TaskTime Pro exposes a same-device local MCP bridge through the packaged `taskti
 Useful entry points:
 
 - `/agents/` - overview and integration model
+- `/product/` - static product overview and direct app entry point
 - `/agents/quickstart/` - bridge launch, pairing, and first MCP call
 - `/agents/security/` - scopes, approvals, revocation, and local-only rules
 - `/agents/tools/` - generated MCP tool reference

@@ -1146,6 +1146,15 @@ img {
         flex: 2 1 0;
     }
 
+    .site-nav-links:has(a + a + a),
+    .site-nav:has(.site-nav-links a:nth-child(3)) .site-nav-actions {
+        flex: 1 1 100%;
+    }
+
+    .site-nav-links:has(a + a + a) a {
+        padding-inline: 0.55rem;
+    }
+
     .site-nav-links a,
     .site-nav a.cta-button {
         flex: 1 1 0;

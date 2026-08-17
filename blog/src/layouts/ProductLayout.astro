@@ -1,11 +1,6 @@
 ---
 import '../styles/global.css';
-import {
-    AGENT_DISCOVERY_LINKS,
-    AGENT_DOCS_KEYWORDS,
-    AGENT_DOCS_LAST_UPDATED,
-    AGENT_DOCS_NAV_ITEMS,
-} from '../config/agents.js';
+import '../styles/product.css';
 import {
     DEFAULT_SOCIAL_IMAGE,
     DEFAULT_SOCIAL_IMAGE_ALT,
@@ -20,29 +15,21 @@ import {
 import { THEME_INIT_SCRIPT, THEME_TOGGLE_SCRIPT } from '../config/theme.js';
 
 const {
-    pageKey,
     title,
     description,
-    canonicalPath = Astro.url.pathname,
-    highlights = [],
-    keywords = AGENT_DOCS_KEYWORDS,
-    socialTitle = `${title} | TaskTime Pro Agent Docs`,
-    socialDescription = description,
+    canonicalPath = '/product/',
     socialImage = DEFAULT_SOCIAL_IMAGE,
     socialImageAlt = DEFAULT_SOCIAL_IMAGE_ALT,
 } = Astro.props;
 
 const siteUrl = Astro.site ?? new URL(SITE_URL);
 const canonicalUrl = toCanonicalUrl(canonicalPath, siteUrl);
-const pageTitle = `${title} | TaskTime Pro Agent Docs`;
 const socialImageUrl = new URL(socialImage, SITE_URL).toString();
-const keywordsContent = keywords.join(', ');
 const currentYear = new Date().getFullYear();
 const organizationId = toAbsoluteUrl('/#organization', SITE_URL);
 const websiteId = toAbsoluteUrl('/#website', SITE_URL);
 const webpageId = `${canonicalUrl}#webpage`;
-const breadcrumbId = `${canonicalUrl}#breadcrumb`;
-const docsId = `${toCanonicalUrl('/agents/', siteUrl)}#agent-docs`;
+const softwareId = `${canonicalUrl}#software`;
 const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -55,7 +42,10 @@ const structuredData = {
                 '@type': 'ImageObject',
                 url: toAbsoluteUrl(DEFAULT_SOCIAL_IMAGE, SITE_URL),
             },
-            sameAs: [TASKTIME_SOCIAL_URL],
+            sameAs: [
+                TASKTIME_SOCIAL_URL,
+                'https://github.com/tasktimepro/tasktime',
+            ],
         },
         {
             '@type': 'WebSite',
@@ -68,61 +58,45 @@ const structuredData = {
             },
         },
         {
-            '@type': 'TechArticle',
+            '@type': 'WebPage',
             '@id': webpageId,
             url: canonicalUrl,
-            headline: title,
+            name: title,
             description,
-            dateModified: AGENT_DOCS_LAST_UPDATED,
             isPartOf: {
-                '@id': docsId,
+                '@id': websiteId,
             },
-            publisher: {
-                '@id': organizationId,
-            },
-            about: [
-                'Model Context Protocol',
-                'local-first software',
-                'AI agent integration',
-                'time tracking',
-                'freelance invoicing',
-            ],
-            breadcrumb: {
-                '@id': breadcrumbId,
+            mainEntity: {
+                '@id': softwareId,
             },
         },
         {
-            '@type': 'CreativeWorkSeries',
-            '@id': docsId,
-            name: 'TaskTime Pro Agent Docs',
-            url: toCanonicalUrl('/agents/', siteUrl),
-            description: 'TaskTime Pro local AI agent and MCP bridge documentation.',
+            '@type': 'SoftwareApplication',
+            '@id': softwareId,
+            name: SITE_NAME,
+            url: toCanonicalUrl('/', siteUrl),
+            description,
+            applicationCategory: 'BusinessApplication',
+            operatingSystem: 'Any',
+            browserRequirements: 'Requires a modern web browser. Core use works offline after the app is loaded or installed.',
+            isAccessibleForFree: true,
+            image: socialImageUrl,
             publisher: {
                 '@id': organizationId,
             },
-        },
-        {
-            '@type': 'BreadcrumbList',
-            '@id': breadcrumbId,
-            itemListElement: [
-                {
-                    '@type': 'ListItem',
-                    position: 1,
-                    name: SITE_NAME,
-                    item: toCanonicalUrl('/', siteUrl),
-                },
-                {
-                    '@type': 'ListItem',
-                    position: 2,
-                    name: 'Agent Docs',
-                    item: toCanonicalUrl('/agents/', siteUrl),
-                },
-                {
-                    '@type': 'ListItem',
-                    position: 3,
-                    name: title,
-                    item: canonicalUrl,
-                },
+            offers: {
+                '@type': 'Offer',
+                price: '0',
+                priceCurrency: 'USD',
+            },
+            featureList: [
+                'Project and task planning',
+                'Multiple project timers and time entries',
+                'Expense and tax-period tracking',
+                'Quotes, invoices, and payment tracking',
+                'Reports and exports',
+                'Optional Google Drive synchronization',
+                'Optional same-device AI agent access',
             ],
         },
     ],
@@ -135,10 +109,9 @@ const structuredData = {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <script is:inline set:html={THEME_INIT_SCRIPT}></script>
-        <title>{pageTitle}</title>
+        <title>{title}</title>
         <meta name="description" content={description} />
         <meta name="robots" content="index,follow" />
-        <meta name="keywords" content={keywordsContent} />
         <link rel="canonical" href={canonicalUrl} />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
@@ -146,31 +119,28 @@ const structuredData = {
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="alternate" type="application/rss+xml" title="TaskTime Pro Blog" href="/blog/rss.xml" />
         <link rel="alternate" type="text/plain" title="TaskTime Pro llms.txt" href="/llms.txt" />
-        <link rel="alternate" type="application/json" title="TaskTime Pro MCP tools" href="/agents/mcp-tools.json" />
-        <meta property="og:type" content="article" />
-        <meta property="og:title" content={socialTitle} />
-        <meta property="og:description" content={socialDescription} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:image" content={socialImageUrl} />
         <meta property="og:image:alt" content={socialImageAlt} />
         <meta property="og:site_name" content="TaskTime Pro" />
         <meta property="og:locale" content="en_US" />
-        <meta property="article:modified_time" content={AGENT_DOCS_LAST_UPDATED} />
-        <meta property="article:section" content="Agent Documentation" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={socialTitle} />
-        <meta name="twitter:description" content={socialDescription} />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
         <meta name="twitter:image" content={socialImageUrl} />
         <meta name="twitter:image:alt" content={socialImageAlt} />
         <script type="application/ld+json" set:html={toJsonLd(structuredData)}></script>
     </head>
     <body>
-        <div class="page-shell">
+        <div class="page-shell product-page-shell">
             <header class="site-header">
                 <div class="site-header-top">
-                    <a class="brand" href="/agents/">
+                    <a class="brand" href="/product/" aria-current="page">
                         <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
-                        <span class="brand-label">TaskTime Pro Agent Docs</span>
+                        <span class="brand-label">TaskTime Pro</span>
                     </a>
                     <div class="site-header-controls">
                         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
@@ -194,8 +164,8 @@ const structuredData = {
                 </div>
                 <nav class="site-nav" aria-label="Primary">
                     <div class="site-nav-links">
-                        <a href="/product/">Product</a>
                         <a href="/blog/">Blog</a>
+                        <a href="/agents/">Agent Docs</a>
                     </div>
                     <div class="site-nav-actions">
                         <a href="/" class="cta-button">Open App</a>
@@ -203,64 +173,8 @@ const structuredData = {
                 </nav>
             </header>
 
-            <main class="site-main agent-docs-shell">
-                <div class="agent-docs-grid">
-                    <aside class="agent-docs-sidebar">
-                        <section class="agent-docs-panel">
-                            <h2>Agent docs</h2>
-                            <nav class="agent-docs-nav" aria-label="Agent documentation">
-                                {AGENT_DOCS_NAV_ITEMS.map((item) => (
-                                    <a
-                                        href={item.href}
-                                        aria-current={item.key === pageKey ? 'page' : undefined}
-                                        class:list={{
-                                            'is-active': item.key === pageKey,
-                                        }}
-                                    >
-                                        <span>{item.label}</span>
-                                        <small>{item.summary}</small>
-                                    </a>
-                                ))}
-                            </nav>
-                        </section>
-
-                        <section class="agent-docs-panel">
-                            <h2>Discovery files</h2>
-                            <ul class="agent-discovery-list">
-                                {AGENT_DISCOVERY_LINKS.map((link) => (
-                                    <li>
-                                        <a href={link.href}>{link.label}</a>
-                                        <p>{link.summary}</p>
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
-
-                        {highlights.length > 0 && (
-                            <section class="agent-docs-panel">
-                                <h2>At a glance</h2>
-                                <p class="agent-docs-updated">Updated {AGENT_DOCS_LAST_UPDATED}</p>
-                                <ul class="agent-highlight-list">
-                                    {highlights.map((item) => (
-                                        <li>{item}</li>
-                                    ))}
-                                </ul>
-                            </section>
-                        )}
-                    </aside>
-
-                    <article class="agent-docs-content">
-                        <header class="agent-docs-header">
-                            <p class="eyebrow">TaskTime Pro local agent bridge</p>
-                            <h1>{title}</h1>
-                            <p>{description}</p>
-                        </header>
-
-                        <div class="agent-docs-copy">
-                            <slot />
-                        </div>
-                    </article>
-                </div>
+            <main class="site-main product-main">
+                <slot />
             </main>
 
             <footer class="site-footer">
@@ -277,7 +191,6 @@ const structuredData = {
                             <path d="M12 2C6.477 2 2 6.596 2 12.265c0 4.535 2.865 8.382 6.839 9.74.5.095.682-.223.682-.495 0-.245-.008-.894-.013-1.754-2.782.617-3.369-1.387-3.369-1.387-.455-1.184-1.11-1.5-1.11-1.5-.908-.637.068-.624.068-.624 1.004.072 1.531 1.056 1.531 1.056.892 1.568 2.341 1.115 2.91.853.091-.665.35-1.116.636-1.373-2.22-.259-4.555-1.14-4.555-5.074 0-1.12.389-2.036 1.028-2.753-.103-.259-.446-1.301.098-2.711 0 0 .839-.276 2.75 1.052A9.325 9.325 0 0 1 12 6.836a9.29 9.29 0 0 1 2.504.349c1.91-1.328 2.747-1.052 2.747-1.052.546 1.41.203 2.452.1 2.711.64.717 1.026 1.633 1.026 2.753 0 3.944-2.339 4.812-4.566 5.066.359.317.679.943.679 1.9 0 1.371-.012 2.476-.012 2.813 0 .274.18.594.688.493A10.291 10.291 0 0 0 22 12.265C22 6.596 17.523 2 12 2Z" />
                         </svg>
                     </a>
-                    <a href="/product/">Product</a>
                     <a href="/agents/">Agent Docs</a>
                     <a href="/blog/">Blog</a>
                     <a href="/contact/">Contact</a>

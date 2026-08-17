@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import {
     ArrowUpTrayIcon,
@@ -207,6 +207,15 @@ const OnboardingModal = ({
                             <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
                                 TaskTime Pro is a local-first task and time management app that helps you plan your work, track your time and expenses, and easily generate invoices.
                             </p>
+                            <a
+                                href="/product/"
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                aria-label="Learn more about TaskTime Pro (opens in a new tab)"
+                                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                            >
+                                Learn more about TaskTime Pro
+                            </a>
                         </div>
                     </div>
 
