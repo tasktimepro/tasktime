@@ -4,9 +4,10 @@
 
 - [ ] Complete the remaining installed native-plugin write/timer journey: inspect/create task, start timer, later stop the same timer, and verify one time entry. Migration, pairing/read, refresh/reopen, and restart recovery are complete.
 - [x] Configure and verify the `CLAWHUB_TOKEN` GitHub Actions secret without exposing its value; dry runs require no secret.
-- [ ] Verify directory listings and publish the skill/MCP metadata to remaining appropriate registries.
-- [ ] Keep bridge package, vendored bundles, generated tool catalogs, public docs, and registry metadata synchronized.
-- [x] Add canonical provider-neutral cloud sync/backup commands for the Dropbox implementation, retain already-shipped Drive-named commands only as deprecated Google-only compatibility aliases, route hosted email through the active Google Drive or Dropbox session, and prepare the additive bridge `1.1.0`, OpenClaw `1.1.0`, Claude `1.1.0`, and Claude marketplace `1.3.0` artifacts locally without publishing them. The unchanged ClawHub skill remains `1.2.1`.
+- [ ] Complete the native OpenClaw `1.1.0` ClawHub publication after promoting the trusted-publisher workflow fix, then verify its exact owner/version/source identity. The unchanged skill requires no republication.
+- [x] Publish and verify agent bridge `1.1.0` on npm and MCP Registry, and publish OpenClaw `1.1.0` publicly on npm with exact source commit `5d4d02c`. The OpenClaw workflow's former access-mutation post-step failed after the package was already public; the local release fix replaces it with a read-only version check.
+- [x] Keep bridge package, vendored bundles, generated tool catalogs, public docs, and MCP Registry metadata synchronized for the provider-neutral release.
+- [x] Add canonical provider-neutral cloud sync/backup commands for the Dropbox implementation, retain already-shipped Drive-named commands only as deprecated Google-only compatibility aliases, route hosted email through the active Google Drive or Dropbox session, and prepare the additive bridge `1.1.0`, OpenClaw `1.1.0`, Claude `1.1.0`, and Claude marketplace `1.3.0` artifacts. The npm bridge/OpenClaw and MCP Registry records are published; the repository-backed Claude artifacts ship through `main`; the unchanged ClawHub skill remains `1.2.1`.
 - [x] Add approval-required, billing-scoped `cancel_invoice` with shared replay-safe behavior, canceled list/report schemas, sanitized failures, and live UI/agent parity coverage.
 - [x] Enforce current paid-only eligibility for `mark_invoice_unpaid` and current cancellation eligibility at first commit, returning sanitized conflicts without partial mutation.
 - [x] Add explicit free/no-account/offline/open-source/browser-storage/aggregate-metrics facts and canonical first-party ClawHub source metadata to discovery surfaces without hard-coding the tool count in promotional copy.
@@ -34,4 +35,7 @@
 
 Publishing details remain governed by `docs/agent-release-runbook.md`.
 
-The provider-neutral sync agent artifacts are locally prepared and validated. Do not tag, publish, or deploy them without separate explicit approval.
+The provider-neutral bridge `1.1.0`, OpenClaw npm bundle `1.1.0`, MCP Registry
+record, and repository-backed Claude artifacts are published from `5d4d02c`.
+The native OpenClaw ClawHub record remains pending the committed trusted-
+publisher workflow correction and exact post-publish identity verification.

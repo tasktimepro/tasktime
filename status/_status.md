@@ -48,7 +48,7 @@ The repository now has a zero-diagnostic TypeScript baseline enforced by the rel
 ## Blockers and open questions
 
 - See `spec/ambiguities.md`. Remaining decisions concern future product work or compatibility-policy evolution; none blocks the completed assurance slice.
-- Provider-neutral sync is promoted as core app `1.5.0`; the compatible Worker/app rollout and focused production canary are complete. Agent bridge/MCP Registry `1.1.0`, OpenClaw and Claude bundles `1.1.0`, and Claude marketplace `1.3.0` have passed their local package and live MCP gates and remain to be published. The unchanged ClawHub skill stays at `1.2.1` and does not require republication.
+- Provider-neutral sync is promoted as core app `1.5.0`; the compatible Worker/app rollout and focused production canary are complete. Agent bridge `1.1.0` is public on npm and MCP Registry, OpenClaw `1.1.0` is public on npm, and the repository-backed Claude `1.1.0` / marketplace `1.3.0` artifacts ship from `main`. Native OpenClaw `1.1.0` on ClawHub remains pending the local trusted-publisher workflow correction; the unchanged ClawHub skill stays at `1.2.1` and does not require republication.
 
 ## Quality gate
 
