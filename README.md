@@ -7,7 +7,7 @@
 
 TaskTime Pro is a free, open-source, local-first work manager for freelancers, covering tasks, timers, expenses, invoices, and reports. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser.
 
-The app stores user work data locally with Yjs and IndexedDB, supports optional Google Drive sync, and exposes an optional first-party same-device MCP bridge for AI agents after explicit pairing. The production app sends limited aggregate usage metrics without project, task, client, invoice, expense, note, or time-entry content.
+The app stores user work data locally with Yjs and IndexedDB, supports optional Google Drive or Dropbox sync, and exposes an optional first-party same-device MCP bridge for AI agents after explicit pairing. The production app sends limited aggregate usage metrics without project, task, client, invoice, expense, note, or time-entry content.
 
 - Production app: https://tasktime.pro
 - Agent docs: https://tasktime.pro/agents/
@@ -19,7 +19,7 @@ The app stores user work data locally with Yjs and IndexedDB, supports optional 
 - Multiple project timers with pause, stop, and automatic time-entry creation
 - Expenses, tax-return periods, recurring expenses, and backup/restore flows
 - Invoice drafts, terminal cancellation of finalized unpaid invoices, templates, PDF export, payments, quotes, and reports
-- Local-first storage with browser persistence and optional Drive-backed sync
+- Local-first storage with browser persistence and optional provider-backed sync
 - Agent-ready local MCP bridge with scopes, approval tokens, and generated tool docs
 
 ## Quick Start
@@ -66,7 +66,7 @@ make npm CMD="run build:agent-bridge" # build the agent bridge package
 - React 19 and Vite for the app
 - Tailwind CSS, Radix, and shadcn-style UI primitives
 - Yjs CRDT documents with IndexedDB persistence
-- Optional Google Drive sync sends routine sync files directly from your browser to your own Google Drive; the private edge service handles only OAuth and short-lived token issuance
+- Optional Google Drive or Dropbox sync sends routine sync files directly from your browser to your own selected provider; the private edge service handles OAuth, short-lived token issuance, revocation, and provider-neutral hosted identity
 - Astro for the public blog, agent docs, `llms.txt`, and sitemap output
 - Vitest for unit/integration tests and Playwright for browser smoke tests
 
@@ -103,13 +103,13 @@ Useful entry points:
 
 ## Data Compatibility
 
-TaskTime Pro is a production local-first app. Browser IndexedDB data, Yjs document shapes, export files, and Drive sync state must be treated as live user data.
+TaskTime Pro is a production local-first app. Browser IndexedDB data, Yjs document shapes, export files, and cloud sync state must be treated as live user data.
 
 When changing persisted data:
 
 - Prefer additive fields and backward-compatible validation.
 - Include migrations when existing records need new structure.
-- Do not require users to clear browser data or Drive sync state.
+- Do not require users to clear browser data or cloud sync state.
 - Keep destructive sync, deletion, and billing actions explicit.
 - Use the existing Yjs-backed hooks, stores, and command layers instead of adding parallel storage paths.
 

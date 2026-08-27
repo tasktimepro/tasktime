@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     AuthorizationError,
+    CloudManifestManager,
     DriveStorageQuotaError,
     ManifestManager,
     isDriveFileNotFoundError,
     mergeConcurrentManifests,
 } from './ManifestManager.ts'
 import { DriveAccessTokenError } from './DriveAccessTokenProvider.ts'
+import legacyGoogleManifest from './fixtures/google-manifest-v1.json'
 
 function directManager(tokenProvider = { getToken: vi.fn(async () => 'direct-token'), clearToken: vi.fn() }) {
     return {
@@ -44,8 +46,211 @@ describe('ManifestManager', () => {
     })
 
     afterEach(() => {
+        vi.restoreAllMocks()
         vi.unstubAllGlobals()
         vi.useRealTimers()
+    })
+
+    it('loads the supported legacy Google manifest names without rewriting its shape', async () => {
+        const files = [
+            { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2025-11-08T14:30:00.000Z' },
+            { id: 'core-id', name: 'tasktime-yjs-core.bin', modifiedTime: '2025-11-08T14:00:00.000Z' },
+            { id: 'core-delta-id', name: 'tasktime-yjs-core-delta-legacy-core-delta.bin', modifiedTime: '2025-11-08T14:20:00.000Z' },
+            { id: 'active-id', name: 'tasktime-yjs-entries-active.bin', modifiedTime: '2025-11-08T14:05:00.000Z' },
+            { id: 'history-id', name: 'tasktime-yjs-entries-2024.bin', modifiedTime: '2025-01-02T08:00:00.000Z' },
+        ]
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(jsonResponse({ files }))
+            .mockResolvedValueOnce(jsonResponse(legacyGoogleManifest))
+        vi.stubGlobal('fetch', fetchMock)
+
+        const manager = new ManifestManager('legacy-google-access-token')
+
+        await expect(manager.load()).resolves.toStrictEqual(legacyGoogleManifest)
+        expect(manager.isDirty()).toBe(false)
+        expect(files.map(({ name }) => name)).toStrictEqual([
+            'tasktime-yjs-manifest.json',
+            'tasktime-yjs-core.bin',
+            'tasktime-yjs-core-delta-legacy-core-delta.bin',
+            'tasktime-yjs-entries-active.bin',
+            'tasktime-yjs-entries-2024.bin',
+        ])
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(fetchMock.mock.calls.every(([, options]) => options?.method === undefined || options.method === 'GET')).toBe(true)
+    })
+
+    it('preserves the Google manifest filename and pretty-printed JSON byte contract', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-08-19T09:15:00.000Z'))
+        const randomUuid = vi.spyOn(globalThis.crypto, 'randomUUID')
+            .mockReturnValueOnce('google-writer-fixture')
+            .mockReturnValueOnce('google-write-fixture')
+        const manager = new ManifestManager('legacy-google-access-token')
+        manager.manifest = structuredClone(legacyGoogleManifest)
+        let uploadedManifest = null
+        manager.createFile = vi.fn(async (name, blob) => {
+            expect(name).toBe('tasktime-yjs-manifest.json')
+            uploadedManifest = blob
+            return 'manifest-id'
+        })
+
+        await manager.save()
+
+        const expectedManifest = {
+            ...legacyGoogleManifest,
+            lastSync: '2026-08-19T09:15:00.000Z',
+            revision: 1,
+            lastWriterId: 'google-writer-fixture',
+            writeId: 'google-write-fixture',
+        }
+        vi.useRealTimers()
+        expect(await readBlob(uploadedManifest)).toBe(JSON.stringify(expectedManifest, null, 2))
+        expect(randomUuid).toHaveBeenCalledTimes(2)
+    })
+
+    it('runs through an injected provider-neutral file store without Google requests', async () => {
+        const manifestBytes = new TextEncoder().encode(JSON.stringify(legacyGoogleManifest)).buffer
+        const fileStore = {
+            provider: 'dropbox',
+            list: vi.fn(async (namespace) => namespace === 'sync'
+                ? [{
+                    logicalName: 'tasktime-yjs-manifest.json',
+                    opaqueId: 'provider-manifest-id',
+                    revision: 'provider-manifest-rev-1',
+                    modifiedTime: '2026-08-19T08:00:00.000Z',
+                }]
+                : []),
+            getMetadata: vi.fn(async () => null),
+            download: vi.fn(async () => manifestBytes),
+            create: vi.fn(async (_namespace, logicalName) => ({
+                logicalName,
+                opaqueId: 'provider-core-id',
+                modifiedTime: '2026-08-19T08:01:00.000Z',
+            })),
+            replace: vi.fn(async (object) => ({
+                ...object,
+                modifiedTime: '2026-08-19T08:02:00.000Z',
+            })),
+            delete: vi.fn(async () => undefined),
+        }
+        const fetchMock = vi.fn(() => {
+            throw new Error('Google transport must not be reached')
+        })
+        vi.stubGlobal('fetch', fetchMock)
+        const manager = new CloudManifestManager({
+            fileStore,
+        })
+
+        await expect(manager.load()).resolves.toStrictEqual(legacyGoogleManifest)
+        expect(fileStore.list).toHaveBeenNthCalledWith(1, 'sync')
+        expect(fileStore.list).toHaveBeenCalledTimes(1)
+
+        await manager.listBackupFiles()
+        expect(fileStore.list).toHaveBeenNthCalledWith(2, 'backups')
+
+        await manager.updateFile(
+            'provider-manifest-id',
+            'tasktime-yjs-manifest.json',
+            new Blob(['manifest'], { type: 'application/json' }),
+        )
+        expect(fileStore.replace).toHaveBeenLastCalledWith(
+            expect.objectContaining({ revision: 'provider-manifest-rev-1' }),
+            expect.any(Blob),
+            'provider-manifest-rev-1',
+        )
+
+        const coreId = await manager.createFile(
+            'tasktime-yjs-core.bin',
+            new Blob(['state'], { type: 'application/octet-stream' }),
+        )
+        expect(coreId).toBe('provider-core-id')
+        expect(fileStore.create).toHaveBeenCalledWith(
+            'sync',
+            'tasktime-yjs-core.bin',
+            expect.any(Blob),
+        )
+
+        await expect(manager.updateFile(
+            coreId,
+            'tasktime-yjs-core.bin',
+            new Blob(['next-state'], { type: 'application/octet-stream' }),
+        )).resolves.toBe('2026-08-19T08:02:00.000Z')
+        await manager.deleteFileByName('tasktime-yjs-core.bin')
+
+        expect(fileStore.replace).toHaveBeenCalledTimes(2)
+        expect(fileStore.delete).toHaveBeenCalledTimes(1)
+        expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('reads, conditionally writes, and validates provider-neutral workspace bindings', async () => {
+        let bindingMetadata = null
+        let bindingValue = null
+        const fileStore = {
+            provider: 'dropbox',
+            list: vi.fn(async () => []),
+            getMetadata: vi.fn(async (_namespace, logicalName) => (
+                logicalName === 'tasktime-yjs-manifest.json'
+                    ? {
+                        logicalName,
+                        opaqueId: 'id:manifest',
+                        revision: 'manifest-rev-4',
+                        modifiedTime: '2026-08-19T10:00:00.000Z',
+                        contentHash: 'manifest-hash',
+                        size: 42,
+                    }
+                    : bindingMetadata
+            )),
+            download: vi.fn(async () => new TextEncoder().encode(
+                JSON.stringify(bindingValue),
+            ).buffer),
+            create: vi.fn(async (_namespace, logicalName, body) => {
+                bindingValue = JSON.parse(await readBlob(body))
+                bindingMetadata = {
+                    logicalName,
+                    opaqueId: 'id:binding',
+                    revision: 'binding-rev-1',
+                    modifiedTime: '2026-08-19T10:01:00.000Z',
+                }
+                return bindingMetadata
+            }),
+            replace: vi.fn(async (current, body) => {
+                bindingValue = JSON.parse(await readBlob(body))
+                bindingMetadata = { ...current, revision: 'binding-rev-2' }
+                return bindingMetadata
+            }),
+            delete: vi.fn(),
+        }
+        const manager = new CloudManifestManager({ fileStore })
+        const marker = {
+            version: 1,
+            workspaceId: '42de9b18-445c-4d28-b5c9-88bc476fc7f1',
+            generation: 3,
+            activeProvider: 'dropbox',
+            state: 'active',
+            updatedAt: '2026-08-19T10:00:00.000Z',
+        }
+
+        await expect(manager.getRemoteManifestFingerprint()).resolves.toEqual({
+            revision: 'manifest-rev-4',
+            modifiedTime: '2026-08-19T10:00:00.000Z',
+            contentHash: 'manifest-hash',
+            size: 42,
+        })
+        await expect(manager.readCloudBindingMarker()).resolves.toBeNull()
+        await manager.writeCloudBindingMarker(marker)
+        await expect(manager.readCloudBindingMarker()).resolves.toEqual(marker)
+        await manager.writeCloudBindingMarker({ ...marker, state: 'moved' })
+        expect(fileStore.replace).toHaveBeenCalledWith(
+            expect.objectContaining({ revision: 'binding-rev-1' }),
+            expect.any(Blob),
+            'binding-rev-1',
+        )
+
+        bindingValue = { ...marker, email: 'must-not-be-accepted@example.com' }
+        await expect(manager.readCloudBindingMarker()).rejects.toMatchObject({
+            code: 'invalid-response',
+            provider: 'dropbox',
+        })
     })
 
     it('merges simultaneous writer deltas into one revision regardless of save order', () => {
@@ -166,7 +371,7 @@ describe('ManifestManager', () => {
                 },
             },
         }))
-        manager.listAppDataFiles = vi.fn(async () => ([
+        manager.listSyncFiles = vi.fn(async () => ([
             { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-07-11T00:00:03.000Z' },
             { id: 'base', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-07-11T00:00:00.000Z' },
             { id: 'remote', name: 'tasktime-yjs-core-delta-remote.bin', modifiedTime: '2026-07-11T00:00:01.000Z' },
@@ -181,7 +386,7 @@ describe('ManifestManager', () => {
         await manager.save()
 
         expect(manager.downloadFileAsJson).toHaveBeenCalledWith('manifest-id')
-        expect(manager.listAppDataFiles).toHaveBeenCalledTimes(1)
+        expect(manager.listSyncFiles).toHaveBeenCalledTimes(1)
         expect(manager.updateFile).toHaveBeenCalledTimes(1)
         expect(manager.isDirty()).toBe(false)
     })

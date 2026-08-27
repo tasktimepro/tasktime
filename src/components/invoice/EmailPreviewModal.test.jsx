@@ -14,7 +14,7 @@ const mockUpdateInvoice = vi.fn();
 const mockShowSuccess = vi.fn();
 const mockOnClose = vi.fn();
 const mockGeneratePDFBase64 = vi.fn(async () => 'bW9ja3BkZg==');
-let mockDriveSessionId = 'sess-abc';
+let mockHostedServiceSessionId = 'sess-abc';
 let mockEmailTemplates = [];
 const mockGetByType = vi.fn((type) => mockEmailTemplates.filter((template) => template.type === type));
 const mockGetDefaultForType = vi.fn((type) => mockEmailTemplates.find((template) => template.type === type && template.isDefault) || null);
@@ -75,7 +75,7 @@ vi.mock('../modals/EmailTemplateModal.jsx', () => ({
 }));
 
 vi.mock('@/contexts/YjsContext', () => ({
-    useYjs: () => ({ driveSessionId: mockDriveSessionId }),
+    useYjs: () => ({ hostedServiceSessionId: mockHostedServiceSessionId }),
 }));
 
 vi.mock('@/hooks/useInvoices.ts', () => ({
@@ -186,7 +186,7 @@ describe('EmailPreviewModal', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mockDriveSessionId = 'sess-abc';
+        mockHostedServiceSessionId = 'sess-abc';
         mockEmailTemplates = [];
         mockSendInvoiceEmail.mockReset();
         mockGeneratePDFBase64.mockReset();
@@ -270,13 +270,13 @@ describe('EmailPreviewModal', () => {
         expect(screen.getByRole('checkbox', { name: 'Forward this email to me' })).toBeTruthy();
     });
 
-    it('shows warning when no drive session', () => {
+    it('shows a provider-neutral warning when no active cloud session is available', () => {
 
-        mockDriveSessionId = null;
+        mockHostedServiceSessionId = null;
 
         render(<EmailPreviewModal {...defaultProps} />);
 
-        expect(screen.getByText(/Cloud sync required/)).toBeTruthy();
+        expect(screen.getByText(/Cloud provider required/)).toBeTruthy();
     });
 
     it('blocks canceled invoices before generating or sending an email', async () => {
@@ -718,7 +718,7 @@ describe('EmailPreviewModal', () => {
     it('does not call send when no session', async () => {
 
         const user = userEvent.setup();
-        mockDriveSessionId = null;
+        mockHostedServiceSessionId = null;
 
         render(<EmailPreviewModal {...defaultProps} />);
 
@@ -726,7 +726,7 @@ describe('EmailPreviewModal', () => {
         await user.click(sendButton);
 
         await waitFor(() => {
-            expect(screen.getAllByText((content) => content.includes('Connect cloud sync')).length).toBeGreaterThan(0);
+            expect(screen.getAllByText((content) => content.includes('Connect a cloud provider')).length).toBeGreaterThan(0);
         });
 
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();

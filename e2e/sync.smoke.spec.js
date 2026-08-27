@@ -100,7 +100,7 @@ test.describe('Cloud sync smoke', () => {
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toBeVisible();
 
         await createPersonalProject(page, projectTitle);
 
@@ -146,7 +146,7 @@ test.describe('Cloud sync smoke', () => {
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toBeVisible();
 
         await createPersonalProject(page, localProjectTitle);
 
@@ -398,7 +398,7 @@ test.describe('Cloud sync smoke', () => {
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toBeVisible();
-        await expect(page.getByRole('button', { name: /Connect Google Drive|Reconnect to Drive/ })).toBeVisible();
+        await expect(page.getByRole('button', { name: /^(?:Connect|Reconnect to) cloud storage$/ })).toBeVisible();
 
         await editProjectFromList(page, {
             currentTitle: originalTitle,
@@ -719,7 +719,7 @@ test.describe('Cloud sync smoke', () => {
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toBeVisible();
 
         await seedStoredGoogleSession(page, {
             sessionId: `playwright-valid-session-${Date.now()}`,
@@ -731,8 +731,8 @@ test.describe('Cloud sync smoke', () => {
 
         const connectedButton = page.getByRole('button', { name: 'In sync' });
         await expect(connectedButton).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Reconnect to Drive' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Reconnect to cloud storage' })).toHaveCount(0);
 
         await connectedButton.click();
 
@@ -786,7 +786,7 @@ test.describe('Cloud sync smoke', () => {
         await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
         await expect(page.getByText('Not connected')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Reconnect to Drive' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Reconnect to cloud storage' })).toBeVisible();
     });
 
     test('shows reconnect state when a previous Drive session is no longer valid', async ({ page }) => {
@@ -800,7 +800,7 @@ test.describe('Cloud sync smoke', () => {
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toBeVisible();
 
         await seedStoredGoogleSession(page, {
             sessionId: `playwright-invalid-session-${Date.now()}`,
@@ -811,8 +811,8 @@ test.describe('Cloud sync smoke', () => {
         await page.reload();
 
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Reconnect to Drive' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Reconnect to cloud storage' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toHaveCount(0);
     });
 
     test('shows a sync service error when Google Drive auth init cannot be reached', async ({ page }) => {
@@ -823,6 +823,9 @@ test.describe('Cloud sync smoke', () => {
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
 
+        await page.getByRole('button', { name: 'Connect cloud storage' }).click();
+
+        await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
         await page.getByRole('button', { name: 'Connect Google Drive' }).click();
 
         await expect(page.getByText(/Unable to reach the Google Drive sync service/i)).toBeVisible();

@@ -189,7 +189,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Cache only same-origin app-shell/assets. Worker auth/proxy requests and
-    // direct Google Drive traffic must remain network-only so credentials and
+    // direct Google Drive/Dropbox traffic must remain network-only so credentials and
     // synced content can never enter Cache Storage.
     if (requestUrl && appOrigin && requestUrl.origin !== appOrigin) {
         return;

@@ -2,8 +2,8 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/terms' } = Astro.props;
-const LAST_UPDATED = '17 July 2026';
-const LAST_UPDATED_ISO = '2026-07-17';
+const LAST_UPDATED = '27 August 2026';
+const LAST_UPDATED_ISO = '2026-08-27';
 ---
 
 <PublicPageLayout
@@ -13,7 +13,7 @@ const LAST_UPDATED_ISO = '2026-07-17';
     lastUpdated={LAST_UPDATED}
     lastUpdatedIso={LAST_UPDATED_ISO}
     highlights={[
-        'TaskTime Pro is local-first — work records live in your browser and, optionally, your own Google Drive.',
+        'TaskTime Pro is local-first — work records live in your browser and, optionally, your own Google Drive or Dropbox.',
         'The app is provided as-is without warranties. Keep your own backups.',
         'Liability is limited to the fullest extent permitted by law.',
     ]}
@@ -39,14 +39,14 @@ const LAST_UPDATED_ISO = '2026-07-17';
     <section>
         <h2>3. Your data, your responsibility</h2>
         <p>
-            Because your work records live primarily in your browser (and optionally in your own Google Drive), you are responsible for keeping backups, maintaining accurate records, and securing your devices and accounts. If you clear your browser data and have no sync or export, that data is gone &mdash; we cannot recover it because TaskTime Pro does not maintain a hosted workspace copy.
+            Because your work records live primarily in your browser (and optionally in your own Google Drive or Dropbox), you are responsible for keeping backups, maintaining accurate records, and securing your devices and accounts. If you clear your browser data and have no sync or export, that data is gone &mdash; we cannot recover it because TaskTime Pro does not maintain a hosted workspace copy.
         </p>
     </section>
 
     <section>
-        <h2>4. Google Drive sync</h2>
+        <h2>4. Cloud sync</h2>
         <p>
-            Google Drive sync is optional. When enabled, it stores sync documents in <strong>your own</strong> Google Drive account. Routine sync file requests travel directly between your browser and Google Drive. TaskTime Pro&apos;s edge service securely maintains the Google connection and issues a short-lived browser token, but does not receive routine Drive file bodies. The sync feature depends on Google&apos;s and Cloudflare&apos;s services and is governed by their applicable terms and privacy policies. We are not responsible for their availability, outages, or policy changes.
+            Cloud sync is optional. When enabled, it stores sync documents in <strong>your own</strong> selected Google Drive or Dropbox account. Routine sync file requests travel directly between your browser and that provider. TaskTime Pro&apos;s edge service securely maintains the provider connection and issues a short-lived browser token, but does not receive routine sync file bodies. The sync feature depends on Google&apos;s or Dropbox&apos;s services and Cloudflare, and is governed by their applicable terms and privacy policies. We are not responsible for their availability, outages, or policy changes.
         </p>
     </section>
 

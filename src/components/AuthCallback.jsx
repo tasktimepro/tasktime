@@ -1,7 +1,7 @@
 /**
  * OAuth Callback Page Component
  * 
- * This page handles the redirect from Google OAuth when using Worker-based auth.
+ * This page handles Google or Dropbox redirects when using Worker-based auth.
  * It extracts the authorization code from the URL and sends it to the opener window.
  */
 
@@ -11,13 +11,15 @@ import { Spinner } from '@/components/ui/spinner';
 export const AuthCallback = () => {
 
     useEffect(() => {
+        const isDropboxCallback = window.location.pathname === '/auth/dropbox/callback';
+        const provider = isDropboxCallback ? 'dropbox' : 'google';
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
         const state = params.get('state');
         const error = params.get('error');
 
         const payload = {
-            type: 'google-auth-callback',
+            type: `${provider}-auth-callback`,
             code,
             state,
             error,
@@ -39,7 +41,7 @@ export const AuthCallback = () => {
         // is lost after cross-origin Google OAuth redirects
         if (!delivered && typeof BroadcastChannel !== 'undefined') {
             try {
-                const channel = new BroadcastChannel('google-auth-callback');
+                const channel = new BroadcastChannel(`${provider}-auth-callback`);
                 channel.postMessage(payload);
 
                 // Keep channel open long enough for the message to propagate

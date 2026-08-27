@@ -239,6 +239,82 @@ describe('useGoogleAuth', () => {
         expect(fetch).toHaveBeenCalledTimes(2)
     })
 
+    it('returns only a freshly validated direct Google storage session for provider transfer', async () => {
+        const storedSession = {
+            sessionId: 'session-transfer-direct',
+            userId: 'user-transfer-direct',
+            email: 'transfer@example.com',
+            createdAt: new Date().toISOString(),
+        }
+        getStoredSession.mockResolvedValue(storedSession)
+        fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'direct',
+                    transportPolicyVersion: 1,
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'direct',
+                    transportPolicyVersion: 1,
+                }),
+            })
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.driveTransport).toBe('direct'))
+
+        await expect(result.current.getValidatedDriveStorageSession()).resolves.toEqual({
+            sessionId: 'session-transfer-direct',
+            driveTransport: 'direct',
+        })
+        expect(fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('refuses a missing or proxy-only Google storage session for provider transfer', async () => {
+        getStoredSession.mockResolvedValue(null)
+        const missing = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(missing.result.current.isLoading).toBe(false))
+        await expect(missing.result.current.getValidatedDriveStorageSession()).rejects.toThrow(
+            /Connect Google Drive before transferring/i,
+        )
+        missing.unmount()
+
+        const storedSession = {
+            sessionId: 'session-transfer-proxy',
+            userId: 'user-transfer-proxy',
+            email: 'proxy@example.com',
+            createdAt: new Date().toISOString(),
+        }
+        getStoredSession.mockResolvedValue(storedSession)
+        fetch
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'proxy',
+                    transportPolicyVersion: 1,
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'proxy',
+                    transportPolicyVersion: 1,
+                }),
+            })
+        const proxy = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(proxy.result.current.isSignedIn).toBe(true))
+
+        await expect(proxy.result.current.getValidatedDriveStorageSession()).rejects.toThrow(
+            /Direct Google Drive access is required/i,
+        )
+    })
+
     it.each([
         { driveTransport: 'proxy', transportPolicyVersion: 1 },
         { driveTransport: 'direct', transportPolicyVersion: 2 },
@@ -1057,6 +1133,14 @@ describe('useGoogleAuth', () => {
 
         expect(result.current.isSignedIn).toBe(true)
         expect(popup.focus).toHaveBeenCalledTimes(1)
+        const callbackCall = fetch.mock.calls.find(([input]) => (
+            input === 'https://worker.example/auth/callback'
+        ))
+        expect(JSON.parse(callbackCall[1].body)).toEqual({
+            code: 'auth-code',
+            redirectUri: `${window.location.origin}/auth/callback`,
+            state: 'oauth-state',
+        })
     })
 
     it('does not read popup.closed after navigating to Google OAuth', async () => {

@@ -19,12 +19,16 @@ export function useProjectNotes(projectId: string, initialNotes?: ProjectNotes |
     const { updateProject } = useProjects();
     const {
         isDriveConnected,
+        isCloudConnected,
         isSyncing,
         manualSyncInProgress,
         pendingSyncChanges,
         lastSyncedAt,
         forceSyncDrive,
+        forceSyncCloud,
     } = useYjs();
+    const cloudConnected = isCloudConnected ?? isDriveConnected;
+    const syncCloud = forceSyncCloud ?? forceSyncDrive;
 
     const initialDocumentRef = useRef<TipTapJsonNode>(
         cloneProjectNotesDocument(initialNotes?.content ?? createEmptyProjectNotesDocument())
@@ -128,13 +132,13 @@ export function useProjectNotes(projectId: string, initialNotes?: ProjectNotes |
     const saveNotesToCloud = useCallback(async () => {
         flushPendingNotes();
 
-        if (!isDriveConnected) {
+        if (!cloudConnected) {
             return false;
         }
 
-        await forceSyncDrive({ allowPull: false });
+        await syncCloud({ allowPull: false });
         return true;
-    }, [flushPendingNotes, forceSyncDrive, isDriveConnected]);
+    }, [cloudConnected, flushPendingNotes, syncCloud]);
 
     useEffect(() => {
         const handleVisibilityChange = () => {
@@ -169,7 +173,8 @@ export function useProjectNotes(projectId: string, initialNotes?: ProjectNotes |
         initialDocument: initialDocumentRef.current,
         isDirty,
         isSavingLocal,
-        isDriveConnected,
+        // Retain the public hook names while using the active provider.
+        isDriveConnected: cloudConnected,
         isDriveSyncing: isSyncing || manualSyncInProgress,
         manualSyncInProgress,
         pendingSyncChanges,

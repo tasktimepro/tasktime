@@ -5,7 +5,7 @@
  * 
  * Provides the YjsStore to all components and handles:
  * - Store initialization on mount
- * - Auto-connect to Google Drive when authenticated
+ * - Auto-connect to the lifecycle-selected cloud provider when authenticated
  * - Sync state tracking
  */
 
@@ -18,15 +18,23 @@ import {
     SyncPhase,
     AutoSyncMode,
     AuthorizationError,
+    CloudFileStoreError,
+    CloudManifestManager,
+    DropboxFileStore,
     DriveTransportDisabledError,
 } from '@/stores/yjs';
 /* eslint-disable react-refresh/only-export-components */
 import type { BackupInfo } from '@/stores/yjs';
+import type { CloudProviderId } from '@/stores/yjs';
 import type { BackupImportPayload } from '@/utils/backupData';
 import type { TimeEntry } from '@/stores/yjs/types';
 import type * as Y from 'yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { useCloudStorageLifecycle } from '@/hooks/useCloudStorageLifecycle';
+import { useDropboxAuth } from '@/hooks/useDropboxAuth';
+import { resolveCloudStorageIdentity } from '@/stores/yjs/cloudStorageLifecycle';
 import { driveAccessTokenProvider } from '@/stores/yjs/providers/DriveAccessTokenProvider';
+import { dropboxAccessTokenProvider } from '@/stores/yjs/providers/DropboxAccessTokenProvider';
 import { useToast } from '@/hooks/useToast';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
@@ -45,7 +53,7 @@ export interface YjsContextValue {
     store: YjsStore;
     /** Whether the store is ready (core docs loaded) */
     isReady: boolean;
-    /** Whether actively syncing with Drive */
+    /** Whether actively syncing with the selected cloud provider */
     isSyncing: boolean;
     /** Current sync state */
     syncState: SyncState;
@@ -53,8 +61,18 @@ export interface YjsContextValue {
     syncPhase: SyncPhase;
     /** Whether connected to Google Drive */
     isDriveConnected: boolean;
+    /** Whether connected to the active cloud-storage provider */
+    isCloudConnected: boolean;
     /** Current Drive session ID in Worker mode */
     driveSessionId: string | null;
+    /** Provider allowed to perform cloud storage work in this browser profile */
+    activeStorageProvider: CloudProviderId | null;
+    /** Provider-bound Worker session reference for active storage only */
+    activeStorageSessionId: string | null;
+    /** Generation fence for the active storage connection */
+    activeStorageGeneration: number | null;
+    /** Active provider session used for hosted email, metrics, and future entitlements */
+    hostedServiceSessionId: string | null;
     /** Whether a Drive connection is in progress */
     isConnecting: boolean;
     /** Whether at least one sync completed */
@@ -73,10 +91,18 @@ export interface YjsContextValue {
     autoSyncMode: AutoSyncMode;
     /** Manually trigger Drive sync */
     forceSyncDrive: (options?: { allowPull?: boolean; forceFullState?: boolean }) => Promise<void>;
+    /** Manually trigger sync on the active provider */
+    forceSyncCloud: (options?: { allowPull?: boolean; forceFullState?: boolean }) => Promise<void>;
     /** Disconnect Drive sync */
     disconnectDrive: () => void;
+    /** Disconnect the active provider runtime without revoking authorization */
+    disconnectCloud: () => void;
+    /** Disconnect the lifecycle-selected provider session, optionally revoking its authorization */
+    disconnectActiveCloudSession: (options?: { revoke?: boolean }) => Promise<void>;
     /** Wipe all TaskTime Pro files from Drive */
     wipeDriveData: () => Promise<void>;
+    /** Wipe validated TaskTime Pro sync files from the active provider */
+    wipeCloudData: () => Promise<void>;
     /** Load time entries for a specific year */
     loadEntriesForYear: (year: number) => Promise<Y.Map<string, TimeEntry>>;
     /** Load archived tasks */
@@ -91,13 +117,13 @@ export interface YjsContextValue {
     clearAllData: () => Promise<void>;
     /** Replace all local data with a backup, rolling back on application failure */
     restoreBackupData: (data: BackupImportPayload) => Promise<void>;
-    /** List all available backups from Google Drive */
+    /** List all available backups from the selected cloud provider */
     listBackups: () => Promise<BackupInfo[]>;
     /** Create a backup on demand */
     createBackup: () => Promise<string | null>;
     /** Download a specific backup's data */
     downloadBackup: (fileId: string) => Promise<unknown>;
-    /** Delete all backup files from Google Drive */
+    /** Delete all backup files from the selected cloud provider */
     deleteAllBackups: () => Promise<void>;
 }
 
@@ -115,8 +141,13 @@ type DriveSyncOptions = {
 
 type RunSyncWithAuthHandling = (options?: DriveSyncOptions) => Promise<void>;
 
+type CloudConnectionAttempt = {
+    key: string;
+};
+
 const VISIBILITY_SYNC_COOLDOWN_MS = 60 * 1000;
 const ONLINE_SYNC_COOLDOWN_MS = 60 * 1000;
+const FOREGROUND_SYNC_COALESCE_MS = 1000;
 const YJS_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
 
 export function YjsProvider({ children }: YjsProviderProps) {
@@ -138,7 +169,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const [isReady, setIsReady] = useState(false);
     const [syncState, setSyncState] = useState<SyncState>('idle');
     const [syncPhase, setSyncPhase] = useState<SyncPhase>('idle');
-    const [isDriveConnected, setIsDriveConnected] = useState(false);
+    const [isCloudConnected, setIsCloudConnected] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
     const [hasSynced, setHasSynced] = useState(false);
     const [manualSyncInProgress, setManualSyncInProgress] = useState(false);
@@ -152,6 +183,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const [isReconnectProcessing, setIsReconnectProcessing] = useState(false);
     const hasCheckedPersistedState = useRef(false);
     const consecutiveSyncErrors = useRef(0);
+    const cloudConnectionAttempt = useRef<CloudConnectionAttempt | null>(null);
     
     // Auth hook for Google Drive connection
     const {
@@ -161,9 +193,108 @@ export function YjsProvider({ children }: YjsProviderProps) {
         isLoading: authLoading,
         signIn,
         signOut,
+        revokeAccess,
         invalidateSession,
         refreshDriveTransport,
     } = useGoogleAuth();
+    const {
+        isSignedIn: isDropboxSignedIn,
+        isLoading: dropboxAuthLoading,
+        sessionId: dropboxSessionId,
+        storageGeneration: dropboxStorageGeneration,
+        disconnect: disconnectDropbox,
+    } = useDropboxAuth();
+    const {
+        state: storageLifecycle,
+        isLoading: storageLifecycleLoading,
+        claimActive: claimActiveStorage,
+        clear: clearStorageSession,
+    } = useCloudStorageLifecycle();
+    const {
+        activeStorageProvider,
+        activeStorageSessionId,
+        activeStorageGeneration,
+        hostedServiceSessionId,
+        isGoogleStorageActive,
+    } = resolveCloudStorageIdentity(storageLifecycle, {
+        googleSessionId: sessionId,
+        dropboxSessionId,
+    });
+    const isDropboxStorageActive = Boolean(
+        isDropboxSignedIn
+        && dropboxSessionId
+        && activeStorageProvider === 'dropbox'
+        && activeStorageSessionId === dropboxSessionId
+        && activeStorageGeneration === dropboxStorageGeneration,
+    );
+    const isDriveConnected = isCloudConnected && activeStorageProvider === 'google-drive';
+
+    // Only an absent or already-Google storage binding may be claimed here; a
+    // Dropbox binding always wins until explicit transfer. Hosted services use
+    // the lifecycle-selected provider session rather than this Google session.
+    useEffect(() => {
+        if (authLoading || storageLifecycleLoading || !isSignedIn || !sessionId) return;
+        if (activeStorageProvider && activeStorageProvider !== 'google-drive') return;
+        if (activeStorageSessionId === sessionId) return;
+        void claimActiveStorage('google-drive', sessionId).catch((error) => {
+            console.error('[YjsContext] Could not bind the Google storage session:', error);
+        });
+    }, [
+        authLoading,
+        storageLifecycleLoading,
+        isSignedIn,
+        sessionId,
+        activeStorageProvider,
+        activeStorageSessionId,
+        claimActiveStorage,
+    ]);
+
+    // When Google auth is explicitly gone, retire only the exact Google storage
+    // generation. A Dropbox active session remains independently authenticated.
+    useEffect(() => {
+        if (authLoading || storageLifecycleLoading || isSignedIn) return;
+        if (activeStorageProvider !== 'google-drive'
+            || !activeStorageSessionId
+            || activeStorageGeneration === null) return;
+        void clearStorageSession({
+            provider: activeStorageProvider,
+            sessionId: activeStorageSessionId,
+            generation: activeStorageGeneration,
+        }, { force: true }).catch((error) => {
+            console.error('[YjsContext] Could not clear the Google storage binding:', error);
+        });
+    }, [
+        authLoading,
+        storageLifecycleLoading,
+        isSignedIn,
+        activeStorageProvider,
+        activeStorageSessionId,
+        activeStorageGeneration,
+        clearStorageSession,
+    ]);
+
+    // Apply provider/generation changes before any automatic sync can run. A
+    // cross-tab activation invalidates the old runtime connection immediately.
+    useEffect(() => {
+        if (storageLifecycleLoading
+            || !activeStorageProvider
+            || activeStorageGeneration === null) return;
+        const runtimeScope = store.getActiveCloudStorageScope();
+        if (store.isCloudConnected()
+            && (runtimeScope.provider !== activeStorageProvider
+                || runtimeScope.generation !== activeStorageGeneration)) {
+            store.disconnectCloud();
+        }
+        store.setActiveCloudStorageScope({
+            provider: activeStorageProvider,
+            generation: activeStorageGeneration,
+        });
+    }, [
+        storageLifecycleLoading,
+        activeStorageProvider,
+        activeStorageGeneration,
+        store,
+    ]);
 
     const handleAuthorizationFailure = useCallback(async (error: unknown): Promise<boolean> => {
         if (!(error instanceof AuthorizationError)) {
@@ -173,7 +304,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         await invalidateSession();
 
         store.disconnectDrive();
-        setIsDriveConnected(false);
+        setIsCloudConnected(false);
         setIsConnecting(false);
         setSyncState('error');
         setSyncPhase('error');
@@ -190,7 +321,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         if (error instanceof DriveTransportDisabledError) {
             driveAccessTokenProvider.clearToken();
             store.disconnectDrive();
-            setIsDriveConnected(false);
+            setIsCloudConnected(false);
             setIsConnecting(false);
             setSyncState('idle');
             setSyncPhase('idle');
@@ -205,17 +336,40 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return handleAuthorizationFailure(error);
     }, [handleAuthorizationFailure, refreshDriveTransport, store]);
 
+    const handleCloudBoundaryFailure = useCallback(async (error: unknown): Promise<boolean> => {
+        if (activeStorageProvider === 'google-drive') {
+            return handleDriveBoundaryFailure(error);
+        }
+        if (activeStorageProvider !== 'dropbox'
+            || !(error instanceof CloudFileStoreError)
+            || !['unauthenticated', 'missing-scope', 'policy-disabled'].includes(error.code)) {
+            return false;
+        }
+
+        dropboxAccessTokenProvider.clearToken();
+        store.disconnectCloud('dropbox');
+        setIsCloudConnected(false);
+        setIsConnecting(false);
+        setSyncState(error.code === 'policy-disabled' ? 'idle' : 'error');
+        setSyncPhase(error.code === 'policy-disabled' ? 'idle' : 'error');
+        setHasSynced(false);
+        setManualSyncInProgress(false);
+        setDriveBindingVersion(previous => previous + 1);
+        hasCheckedPersistedState.current = false;
+        return true;
+    }, [activeStorageProvider, handleDriveBoundaryFailure, store]);
+
     const runSyncWithAuthHandling = useCallback<RunSyncWithAuthHandling>(async (options) => {
         try {
-            await store.syncDrive(options);
+            await store.syncCloud(options);
         } catch (error) {
-            if (await handleDriveBoundaryFailure(error)) {
+            if (await handleCloudBoundaryFailure(error)) {
                 return;
             }
 
             throw error;
         }
-    }, [store, handleDriveBoundaryFailure]);
+    }, [store, handleCloudBoundaryFailure]);
 
     // Initialize store on mount
     useEffect(() => {
@@ -226,7 +380,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 if (mounted) {
                     setIsReady(true);
                     // Check if already connected (e.g., from previous session)
-                    setIsDriveConnected(store.isDriveConnected());
+                    setIsCloudConnected(store.isCloudConnected());
                     setHasSynced(false);
                     console.log('[YjsContext] Store initialized');
                 }
@@ -292,7 +446,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
             setAutoSyncEnabled(enabled);
             setAutoSyncMode(mode);
-            store.setDriveSyncPreferences(enabled, mode);
+            store.setCloudSyncPreferences(enabled, mode);
         };
 
         syncPreferences();
@@ -303,25 +457,48 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return () => store.preferences.unobserve(handler);
     }, [isReady, store]);
 
-    // Connect/disconnect Drive based on auth state
+    // Connect only the lifecycle-selected provider. An inactive provider session
+    // never authorizes hosted services while the selected provider owns storage.
     // NOTE: Do NOT include autoSyncEnabled/autoSyncMode in deps - those are handled
-    // by the preference sync effect calling store.setDriveSyncPreferences()
+    // by the preference sync effect calling store.setCloudSyncPreferences().
     useEffect(() => {
-        if (!isReady || authLoading) return;
+        if (!isReady || authLoading || dropboxAuthLoading || storageLifecycleLoading) return;
 
         const hasWorkerAuth = Boolean(sessionId);
+        const runtimeScope = store.getActiveCloudStorageScope();
+        if (store.isCloudConnected()
+            && runtimeScope.provider === activeStorageProvider
+            && runtimeScope.generation === activeStorageGeneration) {
+            setIsCloudConnected(true);
+            setSyncState(store.getSyncState());
+            setSyncPhase(store.getSyncPhase());
+            setLastSyncedAt(store.getLastSyncedAt());
+            setDriveBindingVersion(previous => previous + 1);
+            return;
+        }
 
-        if (isSignedIn && hasWorkerAuth) {
+        if (isSignedIn && hasWorkerAuth && isGoogleStorageActive) {
+            const attemptKey = JSON.stringify([
+                'google-drive',
+                activeStorageGeneration ?? 0,
+                sessionId,
+                driveTransport,
+            ]);
+            if (cloudConnectionAttempt.current?.key === attemptKey) return;
+            const attempt = { key: attemptKey };
+            cloudConnectionAttempt.current = attempt;
             setHasSynced(false);
             setIsConnecting(true);
 
             store.connectDrive({
                 transport: driveTransport,
                 sessionId,
+                generation: activeStorageGeneration ?? 0,
                 tokenProvider: driveTransport === 'direct' ? driveAccessTokenProvider : null,
             })
                 .then(async () => {
-                    setIsDriveConnected(true);
+                    if (cloudConnectionAttempt.current !== attempt) return;
+                    setIsCloudConnected(true);
                     setSyncState(store.getSyncState());
                     setSyncPhase(store.getSyncPhase());
                     setLastSyncedAt(store.getLastSyncedAt());
@@ -331,62 +508,141 @@ export function YjsProvider({ children }: YjsProviderProps) {
                     // no need for a follow-up forceDriveSync
                 })
                 .catch(async (error) => {
+                    if (cloudConnectionAttempt.current !== attempt) return;
                     if (await handleDriveBoundaryFailure(error)) {
                         return;
                     }
 
-                    setIsDriveConnected(false);
+                    setIsCloudConnected(false);
                     setSyncState('error');
                     setSyncPhase('error');
                     console.error('[YjsContext] Failed to connect Drive:', error);
                 })
                 .finally(() => {
+                    if (cloudConnectionAttempt.current !== attempt) return;
+                    cloudConnectionAttempt.current = null;
                     setIsConnecting(false);
                 });
-        } else if (!isSignedIn) {
-            store.disconnectDrive();
-            setIsDriveConnected(false);
-            setIsConnecting(false);
-            setSyncState('idle');
-            setSyncPhase('idle');
-            setHasSynced(false);
-            setLastSyncedAt(null);
-            setManualSyncInProgress(false);
-            setDriveBindingVersion(previous => previous + 1);
+            return;
         }
-    }, [isReady, isSignedIn, sessionId, driveTransport, authLoading, store, handleDriveBoundaryFailure]);
+
+        if (isDropboxStorageActive
+            && dropboxSessionId
+            && activeStorageGeneration !== null) {
+            const attemptKey = JSON.stringify([
+                'dropbox',
+                activeStorageGeneration,
+                dropboxSessionId,
+            ]);
+            if (cloudConnectionAttempt.current?.key === attemptKey) return;
+            const attempt = { key: attemptKey };
+            cloudConnectionAttempt.current = attempt;
+            setHasSynced(false);
+            setIsConnecting(true);
+            dropboxAccessTokenProvider.setSession(dropboxSessionId);
+            const manifest = new CloudManifestManager({
+                fileStore: new DropboxFileStore({
+                    tokenProvider: dropboxAccessTokenProvider,
+                }),
+            });
+
+            store.connectCloud({
+                provider: 'dropbox',
+                generation: activeStorageGeneration,
+                manifest,
+            })
+                .then(() => {
+                    if (cloudConnectionAttempt.current !== attempt) return;
+                    setIsCloudConnected(true);
+                    setSyncState(store.getSyncState());
+                    setSyncPhase(store.getSyncPhase());
+                    setLastSyncedAt(store.getLastSyncedAt());
+                    setDriveBindingVersion(previous => previous + 1);
+                })
+                .catch(async (error) => {
+                    if (cloudConnectionAttempt.current !== attempt) return;
+                    if (await handleCloudBoundaryFailure(error)) return;
+                    setIsCloudConnected(false);
+                    setSyncState('error');
+                    setSyncPhase('error');
+                    console.error('[YjsContext] Failed to connect Dropbox:', error);
+                })
+                .finally(() => {
+                    if (cloudConnectionAttempt.current !== attempt) return;
+                    cloudConnectionAttempt.current = null;
+                    setIsConnecting(false);
+                });
+            return;
+        }
+
+        cloudConnectionAttempt.current = null;
+        store.disconnectCloud();
+        if (activeStorageProvider !== 'dropbox') {
+            dropboxAccessTokenProvider.clearToken();
+        }
+        setIsCloudConnected(false);
+        setIsConnecting(false);
+        setSyncState('idle');
+        setSyncPhase('idle');
+        setHasSynced(false);
+        setLastSyncedAt(null);
+        setManualSyncInProgress(false);
+        setDriveBindingVersion(previous => previous + 1);
+    }, [
+        isReady,
+        isSignedIn,
+        sessionId,
+        driveTransport,
+        authLoading,
+        dropboxAuthLoading,
+        isDropboxStorageActive,
+        dropboxSessionId,
+        storageLifecycleLoading,
+        isGoogleStorageActive,
+        activeStorageProvider,
+        activeStorageGeneration,
+        store,
+        handleDriveBoundaryFailure,
+        handleCloudBoundaryFailure,
+    ]);
 
     // Update session ID when it changes (Worker mode)
     useEffect(() => {
-        if (store.isDriveConnected()) {
+        if (store.isDriveConnected() && isGoogleStorageActive) {
             store.updateDriveSessionId(sessionId);
         }
-    }, [sessionId, store]);
+    }, [sessionId, isGoogleStorageActive, store]);
 
     // Track when at least one sync has completed
     useEffect(() => {
-        if (syncState === 'idle' && isDriveConnected) {
+        if (syncState === 'idle' && isCloudConnected) {
             setHasSynced(true);
             setLastSyncedAt(store.getLastSyncedAt());
             consecutiveSyncErrors.current = 0;
         }
-    }, [syncState, isDriveConnected, store]);
+    }, [syncState, isCloudConnected, store]);
 
     // Notify user on repeated sync failures
     useEffect(() => {
-        if (syncState !== 'error' || !isDriveConnected) return;
+        if (syncState !== 'error' || !isCloudConnected) return;
 
         consecutiveSyncErrors.current += 1;
 
         if (consecutiveSyncErrors.current === 2) {
             showWarning('Cloud sync is having trouble. Your data is safe locally.');
         } else if (consecutiveSyncErrors.current >= 5) {
-            showError('Cloud sync has failed multiple times. Check your connection or reconnect Google Drive.');
+            const providerLabel = activeStorageProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+            showError(`Cloud sync has failed multiple times. Check your connection or reconnect ${providerLabel}.`);
             captureDebugBundleIncident({
-                incidentKey: 'drive.sync_failed_repeatedly',
-                name: 'TaskTimeDriveSyncError',
-                message: 'TaskTime Pro Drive sync failed repeatedly',
+                incidentKey: activeStorageProvider === 'dropbox'
+                    ? 'dropbox.sync_failed_repeatedly'
+                    : 'drive.sync_failed_repeatedly',
+                name: activeStorageProvider === 'dropbox'
+                    ? 'TaskTimeDropboxSyncError'
+                    : 'TaskTimeDriveSyncError',
+                message: `TaskTime Pro ${providerLabel} sync failed repeatedly`,
                 context: {
+                    provider: activeStorageProvider,
                     autoSyncEnabled,
                     autoSyncMode,
                     consecutiveErrors: consecutiveSyncErrors.current,
@@ -394,15 +650,23 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 throttleMs: 30 * 60 * 1000,
             });
         }
-    }, [syncState, isDriveConnected, showWarning, showError, autoSyncEnabled, autoSyncMode]);
+    }, [
+        syncState,
+        isCloudConnected,
+        activeStorageProvider,
+        showWarning,
+        showError,
+        autoSyncEnabled,
+        autoSyncMode,
+    ]);
 
     // Subscribe to sync state/phase/pending changes
-    // Re-subscribe when isDriveConnected changes because that's when provider is created
+    // Re-subscribe when the active provider changes because that's when its runtime is created.
     useEffect(() => {
         if (!isReady) return;
 
         // If not connected, reset to idle and don't subscribe
-        if (!isDriveConnected) {
+        if (!isCloudConnected) {
             setSyncState('idle');
             setSyncPhase('idle');
             setPendingSyncChanges(false);
@@ -424,7 +688,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             unsubPhase();
             unsubPending();
         };
-    }, [store, isReady, isDriveConnected, driveBindingVersion]);
+    }, [store, isReady, isCloudConnected, driveBindingVersion]);
 
     // --- Callbacks ---
 
@@ -445,9 +709,26 @@ export function YjsProvider({ children }: YjsProviderProps) {
         }
     }, [store, handleAuthorizationFailure]);
 
+    const forceSyncCloud = useCallback<YjsContextValue['forceSyncCloud']>(async (options) => {
+        setManualSyncInProgress(true);
+        try {
+            try {
+                await store.forceCloudSync(options);
+            } catch (error) {
+                if (await handleCloudBoundaryFailure(error)) return;
+                throw error;
+            }
+        } finally {
+            setManualSyncInProgress(false);
+        }
+    }, [store, handleCloudBoundaryFailure]);
+
     // Trigger a sync when tab becomes visible or when network reconnects
     useEffect(() => {
-        if (!isDriveConnected) return;
+        if (!isCloudConnected) return;
+
+        let foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
+        let foregroundSyncCooldownMs = VISIBILITY_SYNC_COOLDOWN_MS;
 
         const shouldTriggerForegroundSync = (cooldownMs: number) => {
             if (store.hasPendingSyncChanges()) {
@@ -462,39 +743,48 @@ export function YjsProvider({ children }: YjsProviderProps) {
             return (Date.now() - lastSuccessfulSyncAt) >= cooldownMs;
         };
 
-        const handleVisibility = () => {
-            if (document.visibilityState !== 'visible') return;
+        const runForegroundSync = () => {
+            foregroundSyncTimer = null;
+
             if (!autoSyncEnabled) return;
 
             if (autoSyncMode === 'sync') {
-                if (!shouldTriggerForegroundSync(VISIBILITY_SYNC_COOLDOWN_MS)) {
+                if (!shouldTriggerForegroundSync(foregroundSyncCooldownMs)) {
                     return;
                 }
 
                 runSyncWithAuthHandling({ force: false }).catch(console.error);
             } else if (autoSyncMode === 'backup' && store.hasPendingSyncChanges()) {
-                // Backup mode: only push pending local changes on tab focus
                 runSyncWithAuthHandling({ allowPull: false, force: false }).catch(console.error);
             }
         };
 
-        const handleOnline = () => {
-            if (!autoSyncEnabled) {
-                return;
-            }
+        const scheduleForegroundSync = (cooldownMs: number) => {
+            if (!autoSyncEnabled) return;
 
             if (autoSyncMode === 'sync') {
-                if (!shouldTriggerForegroundSync(ONLINE_SYNC_COOLDOWN_MS)) {
+                if (!shouldTriggerForegroundSync(cooldownMs)) {
                     return;
                 }
-
-                runSyncWithAuthHandling({ force: false }).catch(console.error);
+            } else if (autoSyncMode !== 'backup' || !store.hasPendingSyncChanges()) {
                 return;
             }
 
-            if (autoSyncMode === 'backup' && store.hasPendingSyncChanges()) {
-                runSyncWithAuthHandling({ allowPull: false, force: false }).catch(console.error);
+            if (foregroundSyncTimer !== null) {
+                clearTimeout(foregroundSyncTimer);
             }
+
+            foregroundSyncCooldownMs = cooldownMs;
+            foregroundSyncTimer = setTimeout(runForegroundSync, FOREGROUND_SYNC_COALESCE_MS);
+        };
+
+        const handleVisibility = () => {
+            if (document.visibilityState !== 'visible') return;
+            scheduleForegroundSync(VISIBILITY_SYNC_COOLDOWN_MS);
+        };
+
+        const handleOnline = () => {
+            scheduleForegroundSync(ONLINE_SYNC_COOLDOWN_MS);
         };
 
         document.addEventListener('visibilitychange', handleVisibility);
@@ -503,24 +793,34 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibility);
             window.removeEventListener('online', handleOnline);
+            if (foregroundSyncTimer !== null) {
+                clearTimeout(foregroundSyncTimer);
+            }
         };
 
-    }, [isDriveConnected, autoSyncEnabled, autoSyncMode, store, runSyncWithAuthHandling]);
+    }, [isCloudConnected, autoSyncEnabled, autoSyncMode, store, runSyncWithAuthHandling]);
 
-    // Handle persisted pending changes or interrupted syncs on load
-    // This runs once after Drive connects to recover from page refresh mid-sync
+    // Recover only the active provider generation after a refresh or interrupted pass.
     useEffect(() => {
         // Only run once per connection, and only after first successful sync state
-        if (!isDriveConnected || hasCheckedPersistedState.current) return;
+        if (!isCloudConnected
+            || !activeStorageProvider
+            || activeStorageGeneration === null
+            || hasCheckedPersistedState.current) return;
+
+        const recoveryScope = {
+            provider: activeStorageProvider,
+            generation: activeStorageGeneration,
+        };
         
-        const needsSync = shouldSyncOnLoad();
+        const needsSync = shouldSyncOnLoad(recoveryScope);
         if (!needsSync) {
             hasCheckedPersistedState.current = true;
             return;
         }
 
-        const wasInterrupted = wasSyncInterrupted();
-        const hasPending = hasPersistedPendingChanges();
+        const wasInterrupted = wasSyncInterrupted(recoveryScope);
+        const hasPending = hasPersistedPendingChanges(recoveryScope);
         console.log('[YjsContext] Detected persisted sync state:', { wasInterrupted, hasPending });
 
         hasCheckedPersistedState.current = true;
@@ -536,9 +836,17 @@ export function YjsProvider({ children }: YjsProviderProps) {
             }
         }
         // For manual mode: pendingSyncChanges will show "Sync changes" in UI
-        // because GoogleDriveProvider.updatePendingState() now checks persisted state
+        // because the shared provider checks generation-scoped persisted state.
 
-    }, [isDriveConnected, autoSyncEnabled, store, autoSyncMode, runSyncWithAuthHandling]);
+    }, [
+        isCloudConnected,
+        activeStorageProvider,
+        activeStorageGeneration,
+        autoSyncEnabled,
+        store,
+        autoSyncMode,
+        runSyncWithAuthHandling,
+    ]);
 
     const handleReconnectNow = useCallback(async () => {
         setIsReconnectProcessing(true);
@@ -555,8 +863,9 @@ export function YjsProvider({ children }: YjsProviderProps) {
     }, [signIn, signOut]);
 
     const disconnectDrive = useCallback(() => {
+        if (activeStorageProvider !== 'google-drive') return;
         store.disconnectDrive();
-        setIsDriveConnected(false);
+        setIsCloudConnected(false);
         setIsConnecting(false);
         setSyncState('idle');
         setSyncPhase('idle');
@@ -564,10 +873,70 @@ export function YjsProvider({ children }: YjsProviderProps) {
         setManualSyncInProgress(false);
         setDriveBindingVersion(previous => previous + 1);
         hasCheckedPersistedState.current = false; // Reset for next connection
+    }, [activeStorageProvider, store]);
+
+    const disconnectCloud = useCallback(() => {
+        store.disconnectCloud();
+        dropboxAccessTokenProvider.clearToken();
+        setIsCloudConnected(false);
+        setIsConnecting(false);
+        setSyncState('idle');
+        setSyncPhase('idle');
+        setHasSynced(false);
+        setManualSyncInProgress(false);
+        setDriveBindingVersion(previous => previous + 1);
+        hasCheckedPersistedState.current = false;
     }, [store]);
+
+    const disconnectActiveCloudSession = useCallback<YjsContextValue['disconnectActiveCloudSession']>(async (
+        { revoke = false } = {},
+    ) => {
+        if (!activeStorageProvider || !activeStorageSessionId || activeStorageGeneration === null) {
+            throw new Error('Reconnect your cloud provider before disconnecting.');
+        }
+        if (storageLifecycle?.stagedTarget) {
+            throw new Error('Cancel the provider transfer before disconnecting its source.');
+        }
+
+        const activeSession = {
+            provider: activeStorageProvider,
+            sessionId: activeStorageSessionId,
+            generation: activeStorageGeneration,
+        };
+
+        // Remote revocation must succeed before local state is reported as
+        // disconnected. This keeps a transient provider failure retryable.
+        if (activeStorageProvider === 'dropbox') {
+            await disconnectDropbox({ revoke });
+        } else if (revoke) {
+            await revokeAccess();
+        } else {
+            await signOut();
+        }
+
+        // Dropbox clears this binding inside its auth hook. Repeating the
+        // exact fenced clear is intentionally idempotent and keeps the shared
+        // lifecycle contract identical for every provider.
+        await clearStorageSession(activeSession);
+        disconnectCloud();
+    }, [
+        activeStorageGeneration,
+        activeStorageProvider,
+        activeStorageSessionId,
+        clearStorageSession,
+        disconnectCloud,
+        disconnectDropbox,
+        revokeAccess,
+        signOut,
+        storageLifecycle?.stagedTarget,
+    ]);
 
     const wipeDriveData = useCallback(async () => {
         await store.wipeDriveData();
+    }, [store]);
+
+    const wipeCloudData = useCallback(async () => {
+        await store.wipeCloudData();
     }, [store]);
 
     const loadEntriesForYear = useCallback<YjsContextValue['loadEntriesForYear']>(async (year) => {
@@ -601,7 +970,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         await store.initialize();
 
         setIsReady(true);
-        setIsDriveConnected(store.isDriveConnected());
+        setIsCloudConnected(store.isCloudConnected());
         setSyncState(store.getSyncState());
         setSyncPhase(store.getSyncPhase());
         setLastSyncedAt(store.getLastSyncedAt());
@@ -618,7 +987,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
             await store.replaceAllDataWithBackup(data);
         } finally {
             setIsReady(store.isReady);
-            setIsDriveConnected(store.isDriveConnected());
+            setIsCloudConnected(store.isCloudConnected());
             setSyncState(store.getSyncState());
             setSyncPhase(store.getSyncPhase());
             setLastSyncedAt(store.getLastSyncedAt());
@@ -654,6 +1023,11 @@ export function YjsProvider({ children }: YjsProviderProps) {
         syncState,
         syncPhase,
         isDriveConnected,
+        isCloudConnected,
+        activeStorageProvider,
+        activeStorageSessionId,
+        activeStorageGeneration,
+        hostedServiceSessionId,
         driveSessionId: sessionId,
         isConnecting,
         hasSynced,
@@ -664,8 +1038,12 @@ export function YjsProvider({ children }: YjsProviderProps) {
         autoSyncEnabled,
         autoSyncMode,
         forceSyncDrive,
+        forceSyncCloud,
         disconnectDrive,
+        disconnectCloud,
+        disconnectActiveCloudSession,
         wipeDriveData,
+        wipeCloudData,
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,
@@ -683,6 +1061,11 @@ export function YjsProvider({ children }: YjsProviderProps) {
         syncState,
         syncPhase,
         isDriveConnected,
+        isCloudConnected,
+        activeStorageProvider,
+        activeStorageSessionId,
+        activeStorageGeneration,
+        hostedServiceSessionId,
         sessionId,
         isConnecting,
         hasSynced,
@@ -693,8 +1076,12 @@ export function YjsProvider({ children }: YjsProviderProps) {
         autoSyncEnabled,
         autoSyncMode,
         forceSyncDrive,
+        forceSyncCloud,
         disconnectDrive,
+        disconnectCloud,
+        disconnectActiveCloudSession,
         wipeDriveData,
+        wipeCloudData,
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,

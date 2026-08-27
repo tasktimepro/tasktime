@@ -9,17 +9,44 @@
  * - Device identity for conflict detection
  * - Last sync timestamp
  * 
- * Supports two modes:
- * - Direct mode: Uses access token to call Google Drive API directly
- * - Worker mode: Uses session ID to call through Cloudflare Worker proxy
+ * Shared behavior uses a CloudFileStore. The ManifestManager compatibility
+ * facade still accepts the legacy Google direct/proxy constructor shapes.
  */
 
-import { SYNC_WORKER_CONFIG } from '@/config/google';
-import { DriveAccessTokenError } from './DriveAccessTokenProvider';
+import type {
+    CloudFileStore,
+    CloudNamespace,
+    CloudObjectMetadata,
+    CloudProviderId,
+} from './CloudFileStore';
+import { CloudFileStoreError } from './CloudFileStore';
+import {
+    GoogleDriveFileStore,
+    type DriveTokenProvider,
+    type DriveTransport,
+    type GoogleDriveFileStoreOptions,
+} from './GoogleDriveFileStore';
+import {
+    AuthorizationError,
+    DriveConnectivityError,
+    DriveFileNotFoundError,
+    DriveRateLimitError,
+    DriveStorageQuotaError,
+    DriveTransportDisabledError,
+} from './GoogleDriveErrors';
 
-const DRIVE_API = 'https://www.googleapis.com/drive/v3';
-const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
+export {
+    AuthorizationError,
+    DriveConnectivityError,
+    DriveFileNotFoundError,
+    DriveRateLimitError,
+    DriveStorageQuotaError,
+    DriveTransportDisabledError,
+} from './GoogleDriveErrors';
+export type { DriveTokenProvider, DriveTransport } from './GoogleDriveFileStore';
+
 const MANIFEST_FILE_NAME = 'tasktime-yjs-manifest.json';
+const CLOUD_BINDING_FILE_NAME = 'tasktime-cloud-binding.json';
 const SYNC_FILE_PREFIX = 'tasktime-yjs-';
 const SYNC_FILE_SUFFIX = '.bin';
 const DELTA_FILE_MARKER = '-delta-';
@@ -28,6 +55,9 @@ export interface AppDataFile {
     id: string;
     name: string;
     modifiedTime: string;
+    revision?: string;
+    contentHash?: string;
+    size?: number;
 }
 
 export interface DeltaInfo {
@@ -54,25 +84,28 @@ export interface Manifest {
     writeId?: string;
 }
 
-export type DriveTransport = 'proxy' | 'direct';
-
-export interface DriveTokenProvider {
-    getToken(options?: { forceRefresh?: boolean }): Promise<string>;
-    clearToken(): void;
+export interface CloudBindingMarkerV1 {
+    version: 1;
+    workspaceId: string;
+    generation: number;
+    activeProvider: CloudProviderId;
+    state: 'active' | 'transfer-prepared' | 'moved';
+    operationId?: string;
+    updatedAt: string;
 }
 
-export interface ManifestManagerOptions {
-    transport: DriveTransport;
-    sessionId?: string | null;
-    tokenProvider?: DriveTokenProvider | null;
-    /** Legacy direct-auth compatibility for tests and non-Worker consumers. */
-    accessToken?: string | null;
+export interface CloudManifestFingerprint {
+    revision?: string;
+    modifiedTime: string;
+    contentHash?: string;
+    size?: number;
 }
 
-interface NormalizedDriveError {
-    status: number;
-    reasons: Set<string>;
+export interface CloudManifestManagerOptions {
+    fileStore: CloudFileStore;
 }
+
+export type ManifestManagerOptions = GoogleDriveFileStoreOptions | CloudManifestManagerOptions;
 
 const MAX_COMPACTED_DELTA_TOMBSTONES = 512;
 
@@ -113,7 +146,7 @@ function parseSyncFileName(fileName: string): { docName: string; deltaId?: strin
 
 /**
  * Merge a locally changed manifest with the latest remote snapshot while
- * treating the Drive file list as authoritative evidence for uploaded deltas.
+ * treating the provider file list as authoritative evidence for uploaded deltas.
  * Compaction tombstones prevent a concurrent stale writer from resurrecting
  * delta references that are about to be deleted.
  */
@@ -219,7 +252,57 @@ function isManifest(value: unknown): value is Manifest {
         && Boolean(candidate.documents && typeof candidate.documents === 'object' && !Array.isArray(candidate.documents));
 }
 
+function parseCloudBindingMarker(
+    value: unknown,
+    provider: CloudProviderId,
+): CloudBindingMarkerV1 {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new CloudFileStoreError(
+            'invalid-response',
+            'Cloud storage returned an invalid TaskTime workspace binding.',
+            { provider },
+        );
+    }
+    const marker = value as Record<string, unknown>;
+    const allowedKeys = new Set([
+        'version',
+        'workspaceId',
+        'generation',
+        'activeProvider',
+        'state',
+        'operationId',
+        'updatedAt',
+    ]);
+    if (Object.keys(marker).some(key => !allowedKeys.has(key))
+        || marker.version !== 1
+        || typeof marker.workspaceId !== 'string'
+        || !/^[a-f0-9-]{20,80}$/i.test(marker.workspaceId)
+        || typeof marker.generation !== 'number'
+        || !Number.isSafeInteger(marker.generation)
+        || marker.generation < 0
+        || (marker.activeProvider !== 'google-drive' && marker.activeProvider !== 'dropbox')
+        || !['active', 'transfer-prepared', 'moved'].includes(String(marker.state))
+        || (marker.operationId !== undefined
+            && (typeof marker.operationId !== 'string'
+                || !/^[a-f0-9-]{20,80}$/i.test(marker.operationId)))
+        || typeof marker.updatedAt !== 'string'
+        || !Number.isFinite(Date.parse(marker.updatedAt))) {
+        throw new CloudFileStoreError(
+            'invalid-response',
+            'Cloud storage returned an invalid TaskTime workspace binding.',
+            { provider },
+        );
+    }
+    return marker as unknown as CloudBindingMarkerV1;
+}
+
 export function isDriveFileNotFoundError(error: unknown): boolean {
+    return isCloudFileNotFoundError(error);
+}
+
+/** Provider-neutral missing-object detection used by the shared sync core. */
+export function isCloudFileNotFoundError(error: unknown): boolean {
+    if (error instanceof CloudFileStoreError) return error.code === 'not-found';
     if (error instanceof DriveFileNotFoundError) return true;
     const message = error instanceof Error ? error.message : String(error);
     const lowerMessage = message.toLowerCase();
@@ -228,154 +311,65 @@ export function isDriveFileNotFoundError(error: unknown): boolean {
 }
 
 /**
- * AuthorizationError for expired/invalid tokens
+ * Manages the provider-neutral sync manifest through a CloudFileStore.
  */
-export class AuthorizationError extends Error {
-
-    constructor(message: string) {
-        super(message);
-        this.name = 'AuthorizationError';
-    }
-}
-
-export class DriveStorageQuotaError extends Error {
-
-    constructor() {
-        super('Google Drive storage is full. Free space and try syncing again.');
-        this.name = 'DriveStorageQuotaError';
-    }
-}
-
-export class DriveRateLimitError extends Error {
-
-    constructor() {
-        super('Google Drive is temporarily rate limited. Try syncing again shortly.');
-        this.name = 'DriveRateLimitError';
-    }
-}
-
-export class DriveFileNotFoundError extends Error {
-
-    constructor() {
-        super('Drive API error 404: file not found');
-        this.name = 'DriveFileNotFoundError';
-    }
-}
-
-export class DriveConnectivityError extends Error {
-
-    constructor() {
-        super('Unable to reach Google Drive. Your local changes remain saved and will retry.');
-        this.name = 'DriveConnectivityError';
-    }
-}
-
-export class DriveTransportDisabledError extends Error {
-
-    constructor() {
-        super('Direct Google Drive access was disabled. Sync will return to the compatibility transport.');
-        this.name = 'DriveTransportDisabledError';
-    }
-}
-
-/**
- * Manages the manifest.json file in Google Drive appDataFolder
- */
-export class ManifestManager {
-
-    private accessToken: string;
-    private readonly transport: DriveTransport;
-    private readonly tokenProvider: DriveTokenProvider | null;
-    private sessionId: string | null;
+export class CloudManifestManager {
+    private readonly fileStore: CloudFileStore;
+    private readonly googleFileStore: GoogleDriveFileStore | null;
+    private readonly providerLabel: string;
     private manifestFileId: string | null = null;
     private manifest: Manifest | null = null;
     private fileIdCache: Map<string, string> = new Map();
+    private fileMetadataCache: Map<string, CloudObjectMetadata> = new Map();
     private lastManifestModifiedTime: string | null = null;
     private _dirty: boolean = false;
     private readonly localWriterId = crypto.randomUUID();
-    private readonly pendingCreateIds: Map<string, string> = new Map();
 
     constructor(options: ManifestManagerOptions | string, legacySessionId?: string | null) {
         if (typeof options === 'string') {
-            this.accessToken = options;
-            this.sessionId = legacySessionId ?? null;
-            this.transport = legacySessionId ? 'proxy' : 'direct';
-            this.tokenProvider = null;
+            this.googleFileStore = new GoogleDriveFileStore(options, legacySessionId);
+            this.fileStore = this.googleFileStore;
+            this.providerLabel = 'Drive';
             return;
         }
 
-        this.transport = options.transport;
-        this.sessionId = options.sessionId ?? null;
-        this.tokenProvider = options.tokenProvider ?? null;
-        this.accessToken = options.accessToken ?? '';
-
-        if (this.transport === 'proxy' && !this.sessionId) {
-            throw new Error('Worker proxy transport requires a session.');
+        if ('fileStore' in options) {
+            this.fileStore = options.fileStore;
+            this.googleFileStore = options.fileStore instanceof GoogleDriveFileStore
+                ? options.fileStore
+                : null;
+            this.providerLabel = this.getProviderLabel(options.fileStore.provider);
+            return;
         }
 
-        if (this.transport === 'direct' && !this.tokenProvider && !this.accessToken) {
-            throw new Error('Direct Drive transport requires a token provider.');
-        }
+        this.googleFileStore = new GoogleDriveFileStore(options);
+        this.fileStore = this.googleFileStore;
+        this.providerLabel = 'Drive';
+    }
+
+    /** Durable provider identity for lifecycle and diagnostic consumers. */
+    getProviderId(): CloudProviderId {
+        return this.fileStore.provider;
     }
 
     /**
-     * Reset cached manifest state (used after a full Drive wipe)
+     * Reset cached manifest state after a full provider wipe.
      */
     reset(): void {
         this.manifestFileId = null;
         this.manifest = null;
         this.fileIdCache.clear();
+        this.fileMetadataCache.clear();
         this.lastManifestModifiedTime = null;
         this._dirty = false;
-        this.pendingCreateIds.clear();
+        this.googleFileStore?.clearCache();
     }
 
     /**
-     * Check if using Worker proxy mode
-     */
-    private get useWorker(): boolean {
-        return this.transport === 'proxy';
-    }
-
-    /**
-     * Get the base URL for Drive API calls
-     */
-    private get driveBaseUrl(): string {
-        return this.useWorker ? SYNC_WORKER_CONFIG.endpoints.drive : DRIVE_API;
-    }
-
-    /**
-     * Get auth headers for API calls
-     */
-    private async getAuthHeaders(forceRefresh = false): Promise<Record<string, string>> {
-        if (this.useWorker) {
-            return { 'X-Session-Id': this.sessionId! };
-        }
-
-        try {
-            const token = this.tokenProvider
-                ? await this.tokenProvider.getToken({ forceRefresh })
-                : this.accessToken;
-            return { 'Authorization': `Bearer ${token}` };
-        } catch (error) {
-            if (error instanceof DriveAccessTokenError) {
-                if (error.code === 'DIRECT_TRANSPORT_DISABLED') {
-                    throw new DriveTransportDisabledError();
-                }
-                if (error.code === 'SESSION_NOT_FOUND' || error.code === 'REFRESH_FAILED') {
-                    throw new AuthorizationError('Google session expired. Reconnect Google Drive.');
-                }
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Load manifest from Google Drive (or create new one)
+     * Load the provider manifest (or create a new in-memory manifest).
      */
     async load(): Promise<Manifest> {
-        // List all files in appDataFolder
-        const files = await this.listAppDataFiles();
+        const files = await this.listSyncFiles();
 
         // Find manifest
         const manifestFile = files.find(f => f.name === MANIFEST_FILE_NAME);
@@ -385,7 +379,7 @@ export class ManifestManager {
             this.lastManifestModifiedTime = manifestFile.modifiedTime;
             const content = await this.downloadFileAsJson(manifestFile.id);
             this.manifest = content as Manifest;
-            console.log('[ManifestManager] Loaded manifest from Drive');
+            console.log(`[ManifestManager] Loaded manifest from ${this.providerLabel}`);
             console.log('[ManifestManager] State snapshot:', {
                 docs: this.manifest?.documents,
                 lastSync: this.manifest?.lastSync,
@@ -403,10 +397,7 @@ export class ManifestManager {
         }
 
         // Build file ID cache for quick lookups
-        this.fileIdCache.clear();
-        for (const file of files) {
-            this.fileIdCache.set(file.name, file.id);
-        }
+        this.rebuildFileCache(files);
 
         this.reconcileManifestWithFiles(files);
 
@@ -414,7 +405,7 @@ export class ManifestManager {
     }
 
     /**
-     * Save manifest to Google Drive
+     * Save the manifest through the active file store.
      */
     async save(): Promise<void> {
         if (!this.manifest) return;
@@ -425,7 +416,7 @@ export class ManifestManager {
             const localSnapshot = structuredClone(this.manifest);
             const [remoteContent, files] = await Promise.all([
                 this.downloadFileAsJson(this.manifestFileId),
-                this.listAppDataFiles(),
+                this.listSyncFiles(),
             ]);
             const remoteManifest = isManifest(remoteContent) ? remoteContent : localSnapshot;
 
@@ -436,8 +427,7 @@ export class ManifestManager {
                 this.localWriterId,
                 crypto.randomUUID()
             );
-            this.fileIdCache.clear();
-            files.forEach((file) => this.fileIdCache.set(file.name, file.id));
+            this.rebuildFileCache(files);
         } else {
             this.manifest.revision = (this.manifest.revision || 0) + 1;
             this.manifest.lastWriterId = this.localWriterId;
@@ -456,7 +446,7 @@ export class ManifestManager {
 
         if (this.manifestFileId) {
             const modifiedTime = await this.updateFile(this.manifestFileId, MANIFEST_FILE_NAME, blob);
-            // Track Drive's actual modifiedTime so hasManifestChanged() won't false-positive
+            // Track the provider's actual modified time so checks do not false-positive.
             if (modifiedTime) {
                 this.lastManifestModifiedTime = modifiedTime;
             }
@@ -467,7 +457,7 @@ export class ManifestManager {
 
         this._dirty = false;
 
-        console.log('[ManifestManager] Saved manifest to Drive');
+        console.log(`[ManifestManager] Saved manifest to ${this.providerLabel}`);
     }
 
     /**
@@ -505,19 +495,22 @@ export class ManifestManager {
         try {
             // Fetch manifest metadata, content, and the file list so orphaned
             // delta files from concurrent manifest writes can be recovered.
-            const [metaResponse, content, files] = await Promise.all([
-                this.request(`/files/${this.manifestFileId}?fields=modifiedTime`),
+            const [metadata, content, files] = await Promise.all([
+                this.getManifestMetadata(),
                 this.downloadFileAsJson(this.manifestFileId),
-                this.listAppDataFiles(),
+                this.listSyncFiles(),
             ]);
 
-            const { modifiedTime } = await metaResponse.json();
-            this.lastManifestModifiedTime = modifiedTime;
-            this.manifest = content as Manifest;
-            this.fileIdCache.clear();
-            for (const file of files) {
-                this.fileIdCache.set(file.name, file.id);
+            if (!metadata) {
+                throw new CloudFileStoreError(
+                    'not-found',
+                    `${this.providerLabel} manifest was not found.`,
+                    { provider: this.fileStore.provider },
+                );
             }
+            this.lastManifestModifiedTime = metadata.modifiedTime;
+            this.manifest = content as Manifest;
+            this.rebuildFileCache(files);
             this.reconcileManifestWithFiles(files);
 
             console.log('[ManifestManager] Reloaded manifest (lightweight)');
@@ -529,7 +522,7 @@ export class ManifestManager {
     }
 
     /**
-     * Check if manifest has changed on Drive since last load
+     * Check if the manifest has changed at the provider since last load.
      * Does a lightweight metadata check instead of full download
      * @returns true if changed or unknown, false if definitely unchanged
      */
@@ -540,14 +533,12 @@ export class ManifestManager {
         }
 
         try {
-            // Fetch just the manifest file metadata
-            const response = await this.request(
-                `/files/${this.manifestFileId}?fields=modifiedTime`
-            );
-            const { modifiedTime } = await response.json();
+            const metadata = await this.getManifestMetadata();
+            if (!metadata) return true;
+            const { modifiedTime } = metadata;
 
             if (modifiedTime !== this.lastManifestModifiedTime) {
-                console.log('[ManifestManager] Manifest changed on Drive', {
+                console.log(`[ManifestManager] Manifest changed on ${this.providerLabel}`, {
                     cached: this.lastManifestModifiedTime,
                     remote: modifiedTime,
                 });
@@ -570,10 +561,69 @@ export class ManifestManager {
     }
 
     /**
-     * Whether this instance has loaded a Drive-backed manifest with metadata.
+     * Whether this instance has loaded a provider manifest with metadata.
      */
     canCheckRemoteManifestChanges(): boolean {
         return Boolean(this.manifestFileId && this.lastManifestModifiedTime);
+    }
+
+    /** Exact metadata used to detect source movement during provider transfer. */
+    async getRemoteManifestFingerprint(): Promise<CloudManifestFingerprint | null> {
+        const metadata = await this.getManifestMetadata();
+        if (!metadata) return null;
+        return {
+            ...(metadata.revision ? { revision: metadata.revision } : {}),
+            modifiedTime: metadata.modifiedTime,
+            ...(metadata.contentHash ? { contentHash: metadata.contentHash } : {}),
+            ...(metadata.size !== undefined ? { size: metadata.size } : {}),
+        };
+    }
+
+    /** Read the non-sensitive workspace lineage and migration marker. */
+    async readCloudBindingMarker(): Promise<CloudBindingMarkerV1 | null> {
+        const object = await this.fileStore.getMetadata('sync', CLOUD_BINDING_FILE_NAME);
+        if (!object) return null;
+        const bytes = await this.fileStore.download(object);
+        let value: unknown;
+        try {
+            value = JSON.parse(new TextDecoder().decode(bytes));
+        } catch {
+            throw new CloudFileStoreError(
+                'invalid-response',
+                'Cloud storage returned an invalid TaskTime workspace binding.',
+                { provider: this.fileStore.provider },
+            );
+        }
+        this.cacheObject(object);
+        return parseCloudBindingMarker(value, this.fileStore.provider);
+    }
+
+    /** Read a binding discovered by the normal sync listing without another metadata request. */
+    async readCachedCloudBindingMarker(): Promise<CloudBindingMarkerV1 | null> {
+        const fileId = this.fileIdCache.get(CLOUD_BINDING_FILE_NAME);
+        if (!fileId) return null;
+        const value = await this.downloadFileAsJson(fileId);
+        return parseCloudBindingMarker(value, this.fileStore.provider);
+    }
+
+    /** Create or conditionally replace the fixed workspace binding marker. */
+    async writeCloudBindingMarker(marker: CloudBindingMarkerV1): Promise<void> {
+        const validated = parseCloudBindingMarker(marker, this.fileStore.provider);
+        const blob = new Blob([JSON.stringify(validated)], { type: 'application/json' });
+        const current = await this.fileStore.getMetadata('sync', CLOUD_BINDING_FILE_NAME);
+        if (current) {
+            const replaced = await this.fileStore.replace(current, blob, current.revision);
+            this.cacheObject(replaced);
+            return;
+        }
+        try {
+            const created = await this.fileStore.create('sync', CLOUD_BINDING_FILE_NAME, blob);
+            this.cacheObject(created);
+        } catch (error) {
+            if (!(error instanceof CloudFileStoreError) || error.code !== 'conflict') throw error;
+            const concurrent = await this.readCloudBindingMarker();
+            if (JSON.stringify(concurrent) !== JSON.stringify(validated)) throw error;
+        }
     }
 
     /**
@@ -711,14 +761,14 @@ export class ManifestManager {
      * Update access token (for token refresh)
      */
     updateAccessToken(token: string): void {
-        this.accessToken = token;
+        this.googleFileStore?.updateAccessToken(token);
     }
 
     /**
      * Update session ID (for Worker mode)
      */
     updateSessionId(sessionId: string | null): void {
-        this.sessionId = sessionId;
+        this.googleFileStore?.updateSessionId(sessionId);
     }
 
     // =========================================================================
@@ -732,8 +782,16 @@ export class ManifestManager {
         return this.fileIdCache.get(fileName) ?? null;
     }
 
+    /** Resolve exact provider metadata without a namespace listing. */
+    async getFileMetadata(fileName: string): Promise<AppDataFile | null> {
+        const object = await this.fileStore.getMetadata(this.getNamespace(fileName), fileName);
+        if (!object) return null;
+        this.cacheObject(object);
+        return this.toAppDataFile(object);
+    }
+
     /**
-     * Get file ID, with fallback to Drive lookup if not in cache
+     * Get an opaque object ID, with an exact provider lookup fallback.
      * Use this for critical files that must be found
      */
     async getFileIdWithFallback(fileName: string): Promise<string | null> {
@@ -741,20 +799,15 @@ export class ManifestManager {
         const cached = this.fileIdCache.get(fileName);
         if (cached) return cached;
 
-        // Fallback: search Drive for the file
-        console.log(`[ManifestManager] File not in cache, searching Drive: ${fileName}`);
+        // Fallback: ask the provider adapter for exact logical-name metadata.
+        console.log(`[ManifestManager] File not in cache, searching ${this.providerLabel}: ${fileName}`);
         try {
-            const query = encodeURIComponent(`name='${fileName}' and trashed=false`);
-            const response = await this.request(
-                `/files?spaces=appDataFolder&q=${query}&fields=files(id,name)`
-            );
-            const { files } = await response.json();
-            
-            if (files && files.length > 0) {
-                const fileId = files[0].id;
-                this.fileIdCache.set(fileName, fileId);
-                console.log(`[ManifestManager] Found file on Drive: ${fileName} -> ${fileId}`);
-                return fileId;
+            const metadata = await this.fileStore.getMetadata(this.getNamespace(fileName), fileName);
+
+            if (metadata) {
+                this.cacheObject(metadata);
+                console.log(`[ManifestManager] Found file on ${this.providerLabel}: ${fileName} -> ${metadata.opaqueId}`);
+                return metadata.opaqueId;
             }
         } catch (error) {
             console.warn(`[ManifestManager] Failed to search for file ${fileName}:`, error);
@@ -768,14 +821,11 @@ export class ManifestManager {
     }
 
     /**
-     * Refresh file ID cache from Drive
+     * Refresh the sync-object cache from the provider.
      */
     async refreshFileCache(): Promise<AppDataFile[]> {
-        const files = await this.listAppDataFiles();
-        this.fileIdCache.clear();
-        for (const file of files) {
-            this.fileIdCache.set(file.name, file.id);
-        }
+        const files = await this.listSyncFiles();
+        this.rebuildFileCache(files);
         return files;
     }
 
@@ -852,7 +902,7 @@ export class ManifestManager {
         }
 
         if (recoveredDocCount > 0 || recoveredDeltaCount > 0) {
-            console.warn('[ManifestManager] Recovered missing sync file references from Drive file list', {
+            console.warn(`[ManifestManager] Recovered missing sync file references from ${this.providerLabel} file list`, {
                 documents: recoveredDocCount,
                 deltas: recoveredDeltaCount,
             });
@@ -864,6 +914,15 @@ export class ManifestManager {
      */
     setFileId(fileName: string, fileId: string): void {
         this.fileIdCache.set(fileName, fileId);
+        const cached = this.fileMetadataCache.get(fileName);
+        if (!cached || cached.opaqueId !== fileId) {
+            this.fileMetadataCache.set(fileName, {
+                logicalName: fileName,
+                opaqueId: fileId,
+                modifiedTime: '',
+            });
+        }
+        this.googleFileStore?.setCachedObject(fileName, fileId);
     }
 
     /**
@@ -871,597 +930,154 @@ export class ManifestManager {
      */
     deleteFileId(fileName: string): void {
         this.fileIdCache.delete(fileName);
+        this.fileMetadataCache.delete(fileName);
+        this.googleFileStore?.deleteCachedObject(fileName);
     }
 
     // =========================================================================
-    // Drive API Helpers
+    // Provider adapter compatibility helpers
     // =========================================================================
 
-    private static readonly REQUEST_TIMEOUT_MS = 30_000;
-    private static readonly UPLOAD_TIMEOUT_MS = 60_000;
-    private static readonly MAX_RETRIES = 3;
+    private getNamespace(logicalName: string): CloudNamespace {
+        return logicalName.startsWith('tasktime-backup-') ? 'backups' : 'sync';
+    }
 
-    private static async normalizeDriveError(response: Response): Promise<NormalizedDriveError & { code?: string }> {
-        const reasons = new Set<string>();
-        let code: string | undefined;
+    private toAppDataFile(object: CloudObjectMetadata): AppDataFile {
+        return {
+            id: object.opaqueId,
+            name: object.logicalName,
+            modifiedTime: object.modifiedTime,
+            ...(object.revision ? { revision: object.revision } : {}),
+            ...(object.contentHash ? { contentHash: object.contentHash } : {}),
+            ...(object.size !== undefined ? { size: object.size } : {}),
+        };
+    }
 
-        try {
-            const payload = await response.clone().json() as {
-                code?: unknown;
-                error?: unknown;
-            };
-
-            if (typeof payload.code === 'string') code = payload.code;
-
-            if (typeof payload.error === 'string') {
-                const lower = payload.error.toLowerCase();
-                if (lower.includes('insufficient')) reasons.add('insufficientPermissions');
-                if (lower.includes('rate limit')) reasons.add('rateLimitExceeded');
-                if (lower.includes('quota')) reasons.add('storageQuotaExceeded');
-            } else if (payload.error && typeof payload.error === 'object') {
-                const googleError = payload.error as {
-                    errors?: unknown;
-                    status?: unknown;
-                };
-                if (Array.isArray(googleError.errors)) {
-                    for (const item of googleError.errors) {
-                        if (item && typeof item === 'object' && typeof (item as { reason?: unknown }).reason === 'string') {
-                            reasons.add((item as { reason: string }).reason);
-                        }
-                    }
-                }
-                if (typeof googleError.status === 'string') reasons.add(googleError.status);
-            }
-        } catch {
-            // Provider response bodies are untrusted and never included in errors.
+    private async getManifestMetadata(): Promise<CloudObjectMetadata | null> {
+        if (this.manifestFileId) {
+            this.googleFileStore?.setCachedObject(MANIFEST_FILE_NAME, this.manifestFileId);
         }
 
-        return { status: response.status, reasons, code };
-    }
-
-    private static isRateLimited(error: NormalizedDriveError): boolean {
-        return error.status === 429
-            || error.reasons.has('rateLimitExceeded')
-            || error.reasons.has('userRateLimitExceeded');
-    }
-
-    private static isPermissionFailure(error: NormalizedDriveError): boolean {
-        return error.reasons.has('insufficientPermissions')
-            || error.reasons.has('PERMISSION_DENIED');
+        const metadata = await this.fileStore.getMetadata('sync', MANIFEST_FILE_NAME);
+        if (metadata) this.cacheObject(metadata);
+        return metadata;
     }
 
     /**
-     * Compute retry delay: honor Retry-After header, otherwise exponential backoff (max 30s)
-     */
-    private static getRetryDelay(response: Response, retryCount: number): number {
-        const retryAfter = response.headers.get('Retry-After');
-
-        if (retryAfter) {
-            const seconds = Number(retryAfter);
-
-            if (!Number.isNaN(seconds) && seconds > 0) {
-                // Cap at 60s to avoid extremely long waits
-                return Math.min(seconds * 1000, 60_000);
-            }
-
-            // Could be an HTTP-date; fall through to exponential backoff
-        }
-
-        return Math.min(1000 * Math.pow(2, retryCount), 30_000);
-    }
-
-    /**
-     * Make an authenticated request to Drive API
-     */
-    private async request(
-        endpoint: string,
-        options: RequestInit = {},
-        retryCount = 0,
-        authRetried = false,
-    ): Promise<Response> {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.REQUEST_TIMEOUT_MS);
-
-        let response: Response;
-
-        try {
-            const authHeaders = await this.getAuthHeaders(authRetried);
-            response = await fetch(`${this.driveBaseUrl}${endpoint}`, {
-                ...options,
-                signal: options.signal ?? controller.signal,
-                headers: {
-                    ...authHeaders,
-                    ...options.headers,
-                },
-                cache: 'no-store',
-                credentials: 'omit',
-                referrerPolicy: 'no-referrer',
-            });
-        } catch (error) {
-            clearTimeout(timeoutId);
-
-            if (
-                error instanceof AuthorizationError
-                || error instanceof DriveTransportDisabledError
-                || error instanceof DriveAccessTokenError
-            ) {
-                throw error;
-            }
-
-            // Retry on network / timeout errors
-            if (retryCount < ManifestManager.MAX_RETRIES) {
-                const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
-                console.warn(`[ManifestManager] request ${endpoint} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
-                await new Promise(r => setTimeout(r, delay));
-                return this.request(endpoint, options, retryCount + 1, authRetried);
-            }
-
-            throw new DriveConnectivityError();
-        } finally {
-            clearTimeout(timeoutId);
-        }
-
-        if (!response.ok) {
-            const driveError = await ManifestManager.normalizeDriveError(response);
-
-            const shouldRefreshDirectAuth = !this.useWorker
-                && Boolean(this.tokenProvider)
-                && !authRetried
-                && (response.status === 401 || (response.status === 403 && ManifestManager.isPermissionFailure(driveError)));
-            if (shouldRefreshDirectAuth) {
-                this.tokenProvider?.clearToken();
-                return this.request(endpoint, options, retryCount, true);
-            }
-
-            // Retry transient errors with exponential backoff (honors Retry-After)
-            if ((response.status >= 500 || ManifestManager.isRateLimited(driveError)) && retryCount < ManifestManager.MAX_RETRIES) {
-                const delay = ManifestManager.getRetryDelay(response, retryCount);
-                console.warn(`[ManifestManager] request ${endpoint} failed with ${response.status}, retrying in ${delay}ms...`);
-                await new Promise(r => setTimeout(r, delay));
-                return this.request(endpoint, options, retryCount + 1, authRetried);
-            }
-
-            if (response.status === 401) {
-                const message = driveError.code === 'SESSION_NOT_FOUND' || driveError.code === 'REFRESH_FAILED'
-                    ? 'Google session expired. Reconnect Google Drive.'
-                    : 'Google authorization expired. Reconnect Google Drive.';
-                throw new AuthorizationError(message);
-            }
-            if (response.status === 403 && driveError.reasons.has('storageQuotaExceeded')) {
-                throw new DriveStorageQuotaError();
-            }
-            if (response.status === 403 && ManifestManager.isPermissionFailure(driveError)) {
-                throw new AuthorizationError('Google Drive permission is missing for this session. Reconnect and allow Drive access.');
-            }
-            if (response.status === 403 && !ManifestManager.isRateLimited(driveError)) {
-                throw new AuthorizationError('Google Drive access was denied. Reconnect Google Drive.');
-            }
-            if (ManifestManager.isRateLimited(driveError)) {
-                throw new DriveRateLimitError();
-            }
-            if (response.status === 404) {
-                throw new DriveFileNotFoundError();
-            }
-            if (response.status >= 500) {
-                throw new DriveConnectivityError();
-            }
-            throw new Error(`Google Drive request failed (${response.status}).`);
-        }
-
-        return response;
-    }
-
-    /**
-     * List all files in appDataFolder
+     * List all files in the existing mixed Google appDataFolder.
+     *
+     * Google keeps the one-request compatibility path. A future provider with
+     * physically separate namespaces may require one list per namespace.
      */
     async listAppDataFiles(): Promise<AppDataFile[]> {
-        const allFiles: AppDataFile[] = [];
-        const query = encodeURIComponent('trashed=false');
-        let pageToken: string | null = null;
+        if (this.googleFileStore) {
+            const objects = await this.googleFileStore.listAll();
+            const files = objects.map((object) => this.toAppDataFile(object));
+            this.rebuildFileCache(files);
+            return files;
+        }
 
-        do {
-            const pageTokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
-            const response = await this.request(
-                `/files?spaces=appDataFolder&q=${query}&pageSize=1000&fields=nextPageToken,files(id,name,modifiedTime)${pageTokenParam}`
-            );
-            const { files, nextPageToken } = await response.json();
+        const [syncObjects, backupObjects] = await Promise.all([
+            this.fileStore.list('sync'),
+            this.fileStore.list('backups'),
+        ]);
+        const objects = [...syncObjects, ...backupObjects];
+        const files = objects.map((object) => this.toAppDataFile(object));
+        this.rebuildFileCache(files);
+        return files;
+    }
 
-            allFiles.push(...(files || []));
-            pageToken = typeof nextPageToken === 'string' && nextPageToken.length > 0
-                ? nextPageToken
-                : null;
-        } while (pageToken);
+    /** List sync objects without spending a backup-namespace request. */
+    async listSyncFiles(): Promise<AppDataFile[]> {
+        if (this.googleFileStore) {
+            const objects = await this.googleFileStore.listAll();
+            const files = objects.map((object) => this.toAppDataFile(object));
+            this.rebuildFileCache(files);
+            return files.filter((file) => this.getNamespace(file.name) === 'sync');
+        }
 
-        return allFiles;
+        const files = (await this.fileStore.list('sync'))
+            .map((object) => this.toAppDataFile(object));
+        this.replaceNamespaceCache('sync', files);
+        return files;
+    }
+
+    /** List backup objects without spending a sync-namespace request. */
+    async listBackupFiles(): Promise<AppDataFile[]> {
+        if (this.googleFileStore) {
+            const objects = await this.googleFileStore.listAll();
+            const files = objects.map((object) => this.toAppDataFile(object));
+            this.rebuildFileCache(files);
+            return files.filter((file) => this.getNamespace(file.name) === 'backups');
+        }
+
+        const files = (await this.fileStore.list('backups'))
+            .map((object) => this.toAppDataFile(object));
+        this.replaceNamespaceCache('backups', files);
+        return files;
     }
 
     /**
-     * Download a file as JSON
+     * Download a file as JSON.
      */
     async downloadFileAsJson(fileId: string): Promise<unknown> {
-        const response = await this.request(`/files/${fileId}?alt=media`);
-        return response.json();
+        const object = this.getObjectById(fileId);
+        const bytes = await this.fileStore.download(object);
+        return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
     }
 
     /**
-     * Download a file as ArrayBuffer
+     * Download a file as an ArrayBuffer.
      */
     async downloadFileAsArrayBuffer(fileId: string): Promise<ArrayBuffer> {
-        const response = await this.request(`/files/${fileId}?alt=media`);
-        return response.arrayBuffer();
-    }
-
-    private async generateDirectFileId(): Promise<string> {
-        const response = await this.request('/files/generateIds?count=1&space=appDataFolder&type=files');
-        const payload = await response.json() as { ids?: unknown };
-        const id = Array.isArray(payload.ids) && typeof payload.ids[0] === 'string'
-            ? payload.ids[0]
-            : null;
-
-        if (!id) {
-            throw new Error('Google Drive did not allocate a file ID.');
-        }
-
-        return id;
-    }
-
-    private async fetchUpload(
-        url: string,
-        method: 'POST' | 'PATCH',
-        body: BodyInit,
-        contentType?: string,
-        authRetried = false,
-    ): Promise<Response> {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.UPLOAD_TIMEOUT_MS);
-
-        let response: Response;
-        try {
-            const authHeaders = await this.getAuthHeaders(authRetried);
-            response = await fetch(url, {
-                method,
-                headers: contentType
-                    ? { ...authHeaders, 'Content-Type': contentType }
-                    : authHeaders,
-                body,
-                signal: controller.signal,
-                cache: 'no-store',
-                credentials: 'omit',
-                referrerPolicy: 'no-referrer',
-            });
-        } catch (error) {
-            if (
-                error instanceof AuthorizationError
-                || error instanceof DriveTransportDisabledError
-                || error instanceof DriveAccessTokenError
-            ) {
-                throw error;
-            }
-            throw new DriveConnectivityError();
-        } finally {
-            clearTimeout(timeoutId);
-        }
-
-        if (!response.ok && !this.useWorker && Boolean(this.tokenProvider) && !authRetried) {
-            const driveError = await ManifestManager.normalizeDriveError(response);
-            if (response.status === 401 || (response.status === 403 && ManifestManager.isPermissionFailure(driveError))) {
-                this.tokenProvider?.clearToken();
-                return this.fetchUpload(url, method, body, contentType, true);
-            }
-        }
-
-        return response;
+        return this.fileStore.download(this.getObjectById(fileId));
     }
 
     /**
-     * Build the standards-defined Drive multipart body without FormData.
-     *
-     * WebKit can serialize a JSON Blob appended to FormData as an empty part.
-     * Keeping this direct-only avoids changing the established Worker proxy
-     * wire format while giving every supported direct browser the same
-     * `multipart/related` representation Google documents.
+     * Create a new file while preserving the existing ID-returning facade.
      */
-    private createDirectMultipartBody(metadata: Record<string, unknown>, blob: Blob): {
-        body: Blob;
-        contentType: string;
-    } {
-        const boundary = `tasktime-${crypto.randomUUID()}`;
-        const contentType = `multipart/related; boundary=${boundary}`;
-        const fileType = blob.type || 'application/octet-stream';
-        const prefix = [
-            `--${boundary}`,
-            'Content-Type: application/json; charset=UTF-8',
-            '',
-            JSON.stringify(metadata),
-            `--${boundary}`,
-            `Content-Type: ${fileType}`,
-            '',
-            '',
-        ].join('\r\n');
-        const suffix = `\r\n--${boundary}--\r\n`;
-
-        return {
-            body: new Blob([prefix, blob, suffix], { type: contentType }),
-            contentType,
-        };
-    }
-
-    private async throwUploadError(response: Response): Promise<never> {
-        const driveError = await ManifestManager.normalizeDriveError(response);
-
-        if (response.status === 401) {
-            throw new AuthorizationError('Google authorization expired. Reconnect Google Drive.');
-        }
-        if (response.status === 403 && driveError.reasons.has('storageQuotaExceeded')) {
-            throw new DriveStorageQuotaError();
-        }
-        if (response.status === 403 && ManifestManager.isPermissionFailure(driveError)) {
-            throw new AuthorizationError('Google Drive permission is missing for this session. Reconnect and allow Drive access.');
-        }
-        if (response.status === 403 && !ManifestManager.isRateLimited(driveError)) {
-            throw new AuthorizationError('Google Drive access was denied. Reconnect Google Drive.');
-        }
-        if (ManifestManager.isRateLimited(driveError)) {
-            throw new DriveRateLimitError();
-        }
-        if (response.status === 404) {
-            throw new DriveFileNotFoundError();
-        }
-        if (response.status >= 500) {
-            throw new DriveConnectivityError();
-        }
-        throw new Error(`Google Drive upload failed (${response.status}).`);
-    }
-
-    private async reconcileDirectCreate(fileId: string, name: string, mimeType: string): Promise<boolean> {
-        try {
-            const fields = encodeURIComponent('id,name,mimeType,parents,trashed');
-            const response = await this.request(`/files/${encodeURIComponent(fileId)}?fields=${fields}`);
-            const file = await response.json() as {
-                id?: unknown;
-                name?: unknown;
-                mimeType?: unknown;
-                parents?: unknown;
-                trashed?: unknown;
-            };
-            const matches = file.id === fileId
-                && file.name === name
-                && file.mimeType === mimeType
-                && Array.isArray(file.parents)
-                && file.parents.includes('appDataFolder')
-                && file.trashed !== true;
-
-            if (!matches) {
-                throw new Error('Google Drive returned conflicting metadata for an allocated TaskTime file ID.');
-            }
-
-            this.fileIdCache.set(name, fileId);
-            this.pendingCreateIds.delete(name);
-            return true;
-        } catch (error) {
-            if (error instanceof DriveFileNotFoundError) return false;
-            throw error;
-        }
+    async createFile(name: string, blob: Blob, _retryCount = 0): Promise<string> {
+        void _retryCount;
+        const object = await this.fileStore.create(this.getNamespace(name), name, blob);
+        this.cacheObject(object);
+        this.googleFileStore?.setCachedObject(name, object.opaqueId);
+        return object.opaqueId;
     }
 
     /**
-     * Create a new file in appDataFolder
+     * Replace a known file while preserving the existing modifiedTime facade.
      */
-    async createFile(name: string, blob: Blob, retryCount = 0): Promise<string> {
-        if (!this.useWorker) {
-            return this.createDirectFile(name, blob, retryCount);
-        }
-
-        const metadata = {
-            name,
-            mimeType: blob.type,
-            parents: ['appDataFolder'],
-        };
-
-        const form = new FormData();
-        form.append(
-            'metadata',
-            new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-        );
-        form.append('file', blob);
-
-        const uploadUrl = `${SYNC_WORKER_CONFIG.endpoints.drive}/files?uploadType=multipart`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), ManifestManager.UPLOAD_TIMEOUT_MS);
-
-        let response: Response;
-
-        try {
-            const authHeaders = await this.getAuthHeaders();
-            response = await fetch(uploadUrl, {
-                method: 'POST',
-                headers: authHeaders,
-                body: form,
-                signal: controller.signal,
-                cache: 'no-store',
-                credentials: 'omit',
-                referrerPolicy: 'no-referrer',
-            });
-        } catch (error) {
-            clearTimeout(timeoutId);
-
-            if (retryCount < ManifestManager.MAX_RETRIES) {
-                const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
-                console.warn(`[ManifestManager] createFile ${name} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
-                await new Promise(r => setTimeout(r, delay));
-                return this.createFile(name, blob, retryCount + 1);
-            }
-
-            throw error;
-        } finally {
-            clearTimeout(timeoutId);
-        }
-
-        if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
-                throw new AuthorizationError('Google authorization expired.');
-            }
-
-            // Retry transient errors with exponential backoff (honors Retry-After)
-            if ((response.status >= 500 || response.status === 429) && retryCount < ManifestManager.MAX_RETRIES) {
-                const delay = ManifestManager.getRetryDelay(response, retryCount);
-                console.warn(`[ManifestManager] createFile ${name} failed with ${response.status}, retrying in ${delay}ms...`);
-                await new Promise(r => setTimeout(r, delay));
-                return this.createFile(name, blob, retryCount + 1);
-            }
-
-            throw new Error(`Drive upload error ${response.status}.`);
-        }
-
-        const result = await response.json();
-        this.fileIdCache.set(name, result.id);
-        return result.id;
-    }
-
-    private async createDirectFile(name: string, blob: Blob, retryCount = 0): Promise<string> {
-        const fileId = this.pendingCreateIds.get(name) ?? await this.generateDirectFileId();
-        this.pendingCreateIds.set(name, fileId);
-        const metadata = {
-            id: fileId,
-            name,
-            mimeType: blob.type,
-            parents: ['appDataFolder'],
-        };
-        const multipart = this.createDirectMultipartBody(metadata, blob);
-
-        let response: Response;
-        try {
-            response = await this.fetchUpload(
-                `${DRIVE_UPLOAD_API}/files?uploadType=multipart`,
-                'POST',
-                multipart.body,
-                multipart.contentType,
-            );
-        } catch (error) {
-            if (error instanceof DriveConnectivityError) {
-                if (await this.reconcileDirectCreate(fileId, name, blob.type)) return fileId;
-            }
-            throw error;
-        }
-
-        if (response.ok) {
-            const result = await response.json() as { id?: unknown };
-            if (result.id !== fileId) {
-                throw new Error('Google Drive returned an unexpected file ID for a TaskTime upload.');
-            }
-            this.fileIdCache.set(name, fileId);
-            this.pendingCreateIds.delete(name);
-            return fileId;
-        }
-
-        const driveError = await ManifestManager.normalizeDriveError(response);
-        const ambiguous = response.status === 409 || response.status >= 500;
-        if (ambiguous && await this.reconcileDirectCreate(fileId, name, blob.type)) {
-            return fileId;
-        }
-
-        const retryable = ambiguous || ManifestManager.isRateLimited(driveError);
-        if (retryable && retryCount < ManifestManager.MAX_RETRIES) {
-            const delay = ManifestManager.getRetryDelay(response, retryCount);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return this.createDirectFile(name, blob, retryCount + 1);
-        }
-
-        await this.throwUploadError(response);
+    async updateFile(
+        fileId: string,
+        name: string,
+        blob: Blob,
+        _retryCount = 0,
+    ): Promise<string | undefined> {
+        void _retryCount;
+        const current = this.getObjectById(fileId, name);
+        const replaced = await this.fileStore.replace(current, blob, current.revision);
+        this.cacheObject(replaced);
+        this.googleFileStore?.setCachedObject(name, replaced.opaqueId);
+        return replaced.modifiedTime || undefined;
     }
 
     /**
-     * Update an existing file
-     * Returns the updated modifiedTime from Drive if available
-     */
-    async updateFile(fileId: string, name: string, blob: Blob, retryCount = 0): Promise<string | undefined> {
-        const metadata = {
-            name,
-            mimeType: blob.type,
-        };
-
-        const uploadUrl = this.useWorker
-            ? `${SYNC_WORKER_CONFIG.endpoints.drive}/files/${fileId}?uploadType=multipart&fields=modifiedTime`
-            : `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=multipart&fields=modifiedTime`;
-        const multipart = this.useWorker ? null : this.createDirectMultipartBody(metadata, blob);
-        const form = this.useWorker ? new FormData() : null;
-
-        if (form) {
-            form.append(
-                'metadata',
-                new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-            );
-            form.append('file', blob);
-        }
-
-        let response: Response;
-
-        try {
-            response = await this.fetchUpload(
-                uploadUrl,
-                'PATCH',
-                multipart?.body ?? form!,
-                multipart?.contentType,
-            );
-        } catch (error) {
-            if (
-                error instanceof AuthorizationError
-                || error instanceof DriveTransportDisabledError
-                || error instanceof DriveAccessTokenError
-                || error instanceof DriveStorageQuotaError
-            ) {
-                throw error;
-            }
-            if (retryCount < ManifestManager.MAX_RETRIES) {
-                const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
-                console.warn(`[ManifestManager] updateFile ${name} failed (${error instanceof Error ? error.message : error}), retrying in ${delay}ms...`);
-                await new Promise(r => setTimeout(r, delay));
-                return this.updateFile(fileId, name, blob, retryCount + 1);
-            }
-            throw error;
-        }
-
-        if (!response.ok) {
-            // Retry transient errors with exponential backoff (honors Retry-After)
-            const driveError = await ManifestManager.normalizeDriveError(response);
-            if ((response.status >= 500 || ManifestManager.isRateLimited(driveError)) && retryCount < ManifestManager.MAX_RETRIES) {
-                const delay = ManifestManager.getRetryDelay(response, retryCount);
-                console.warn(`[ManifestManager] updateFile ${name} failed with ${response.status}, retrying in ${delay}ms...`);
-                await new Promise(r => setTimeout(r, delay));
-                return this.updateFile(fileId, name, blob, retryCount + 1);
-            }
-
-            await this.throwUploadError(response);
-        }
-
-        try {
-            const result = await response.json();
-            return result?.modifiedTime;
-        } catch {
-            return undefined;
-        }
-    }
-
-    /**
-     * Delete a file by ID
+     * Delete a file by opaque provider ID.
      */
     async deleteFileById(fileId: string): Promise<void> {
-        try {
-            await this.request(`/files/${fileId}`, { method: 'DELETE' });
-        } catch (error) {
-            // If the file is already gone, treat as success to avoid breaking sync
-            const message = error instanceof Error ? error.message : String(error);
-            if (message.includes('404')) {
-                console.warn('[ManifestManager] deleteFileById: file missing, skipping');
-                return;
-            }
-            throw error;
+        const object = this.getObjectById(fileId);
+        await this.fileStore.delete(object, object.revision);
+
+        for (const [name, cachedId] of this.fileIdCache) {
+            if (cachedId !== fileId) continue;
+            this.fileIdCache.delete(name);
+            this.fileMetadataCache.delete(name);
+            this.googleFileStore?.deleteCachedObject(name);
         }
     }
 
     /**
-     * Delete a file by name
+     * Delete a file by logical name.
      */
     async deleteFileByName(name: string): Promise<void> {
         const fileId = this.fileIdCache.get(name);
@@ -1469,5 +1085,74 @@ export class ManifestManager {
 
         await this.deleteFileById(fileId);
         this.fileIdCache.delete(name);
+        this.fileMetadataCache.delete(name);
+        this.googleFileStore?.deleteCachedObject(name);
+    }
+
+    private getObjectById(fileId: string, logicalName?: string): CloudObjectMetadata {
+        const cachedName = logicalName ?? Array.from(this.fileIdCache.entries())
+            .find(([, cachedId]) => cachedId === fileId)?.[0]
+            ?? '';
+        const cachedObject = this.fileMetadataCache.get(cachedName);
+
+        if (cachedObject?.opaqueId === fileId) {
+            return cachedObject;
+        }
+
+        return {
+            logicalName: cachedName,
+            opaqueId: fileId,
+            modifiedTime: '',
+        };
+    }
+
+    private cacheObject(object: CloudObjectMetadata): void {
+        this.fileIdCache.set(object.logicalName, object.opaqueId);
+        this.fileMetadataCache.set(object.logicalName, object);
+    }
+
+    private rebuildFileCache(files: AppDataFile[]): void {
+        this.fileIdCache.clear();
+        this.fileMetadataCache.clear();
+
+        for (const file of files) {
+            this.cacheObject({
+                logicalName: file.name,
+                opaqueId: file.id,
+                modifiedTime: file.modifiedTime,
+                ...(file.revision ? { revision: file.revision } : {}),
+                ...(file.contentHash ? { contentHash: file.contentHash } : {}),
+                ...(file.size !== undefined ? { size: file.size } : {}),
+            });
+        }
+    }
+
+    private replaceNamespaceCache(namespace: CloudNamespace, files: AppDataFile[]): void {
+        for (const logicalName of this.fileIdCache.keys()) {
+            if (this.getNamespace(logicalName) !== namespace) continue;
+            this.fileIdCache.delete(logicalName);
+            this.fileMetadataCache.delete(logicalName);
+        }
+
+        for (const file of files) {
+            this.cacheObject({
+                logicalName: file.name,
+                opaqueId: file.id,
+                modifiedTime: file.modifiedTime,
+                ...(file.revision ? { revision: file.revision } : {}),
+                ...(file.contentHash ? { contentHash: file.contentHash } : {}),
+                ...(file.size !== undefined ? { size: file.size } : {}),
+            });
+        }
+    }
+
+    private getProviderLabel(provider: CloudProviderId): string {
+        return provider === 'google-drive' ? 'Drive' : 'Dropbox';
     }
 }
+
+/**
+ * Google-compatible facade retained for existing imports and consumers.
+ * The shared manifest algorithm lives in CloudManifestManager.
+ */
+export class ManifestManager extends CloudManifestManager {}

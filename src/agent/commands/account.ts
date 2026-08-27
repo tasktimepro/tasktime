@@ -20,16 +20,21 @@ export interface RestoreBackupJsonCommandInput extends BackupJsonCommandInput {
     confirmationText?: string;
 }
 
-export interface DriveBackupCommandInput {
+export interface CloudBackupCommandInput {
     backupId?: string;
     filename?: string;
 }
 
-export interface RestoreDriveBackupCommandInput {
+export interface RestoreCloudBackupCommandInput {
     backupId?: string;
     confirmRestore?: boolean;
     confirmationText?: string;
 }
+
+/** @deprecated Use CloudBackupCommandInput with the provider-neutral commands. */
+export type DriveBackupCommandInput = CloudBackupCommandInput;
+/** @deprecated Use RestoreCloudBackupCommandInput with the provider-neutral commands. */
+export type RestoreDriveBackupCommandInput = RestoreCloudBackupCommandInput;
 
 export interface UpdateSyncSettingsCommandInput {
     autoSyncEnabled?: boolean;
@@ -43,6 +48,8 @@ export interface UpdateSyncSettingsCommandInput {
 export interface DeleteAllAccountDataCommandInput {
     confirmDelete?: boolean;
     confirmationText?: string;
+    includeCloudData?: boolean;
+    /** @deprecated Use includeCloudData. */
     includeDriveData?: boolean;
 }
 
@@ -81,21 +88,53 @@ const summarizeBackupInfo = (backup: { id: string; name: string; date: string; m
     ...(backup.sizeLabel ? { sizeLabel: backup.sizeLabel } : {}),
 });
 
-const parseDownloadedBackup = (data: unknown) => {
+const parseDownloadedBackup = (data: unknown, providerLabel = 'Cloud') => {
     const serialized = JSON.stringify(data);
 
     if (!serialized) {
-        throw new AgentCommandError('INVALID_INPUT', 'Downloaded Drive backup is empty or invalid.');
+        throw new AgentCommandError('INVALID_INPUT', `Downloaded ${providerLabel} backup is empty or invalid.`);
     }
 
     return parseBackupImportJson(serialized);
 };
 
-async function downloadDriveBackup(context: AgentCommandContext, backupId: string) {
+function getActiveCloudProvider(context: AgentCommandContext) {
+    return context.store.getActiveCloudProviderId();
+}
+
+function getActiveCloudProviderLabel(context: AgentCommandContext) {
+    return getActiveCloudProvider(context) === 'dropbox' ? 'Dropbox' : 'Google Drive';
+}
+
+function assertGoogleDriveBackupAvailable(context: AgentCommandContext) {
+    if (getActiveCloudProvider(context) !== 'google-drive' || !context.store.isDriveConnected()) {
+        throw new AgentCommandError(
+            'UNAVAILABLE',
+            'This Drive-named command requires Google Drive to be the active connected provider.',
+        );
+    }
+}
+
+function assertCloudBackupAvailable(context: AgentCommandContext) {
+    const provider = getActiveCloudProvider(context);
+    if (!provider || !context.store.isCloudConnected()) {
+        throw new AgentCommandError('UNAVAILABLE', 'Connect cloud storage and try again.');
+    }
+    return provider;
+}
+
+async function downloadCloudBackup(
+    context: AgentCommandContext,
+    backupId: string,
+    options: { googleOnly?: boolean } = {},
+) {
+    if (options.googleOnly) assertGoogleDriveBackupAvailable(context);
+    else assertCloudBackupAvailable(context);
     try {
         return await context.store.downloadBackup(backupId);
     } catch {
-        throw new AgentCommandError('UNAVAILABLE', 'Drive backup is unavailable. Connect Google Drive and try again.', {
+        const providerLabel = options.googleOnly ? 'Drive' : getActiveCloudProviderLabel(context);
+        throw new AgentCommandError('UNAVAILABLE', `${providerLabel} backup is unavailable. Connect ${providerLabel} and try again.`, {
             backupId,
         });
     }
@@ -105,10 +144,16 @@ function getCurrentSyncSettings(context: AgentCommandContext) {
     const autoSyncEnabled = context.store.preferences.get('autoSyncEnabled') === true;
     const autoSyncMode: AutoSyncMode = context.store.preferences.get('autoSyncMode') === 'backup' ? 'backup' : 'sync';
 
+    const activeStorageProvider = getActiveCloudProvider(context);
+    const isCloudConnected = context.store.isCloudConnected();
+
     return {
+        activeStorageProvider,
+        isCloudConnected,
         isDriveConnected: context.store.isDriveConnected(),
         syncState: context.store.getSyncState(),
         syncPhase: context.store.getSyncPhase(),
+        cloudSyncMode: context.store.getDriveSyncMode(),
         driveSyncMode: context.store.getDriveSyncMode(),
         lastSyncedAt: context.store.getLastSyncedAt(),
         pendingSyncChanges: context.store.hasPendingSyncChanges(),
@@ -165,6 +210,7 @@ export async function listDriveBackupsCommand(context: AgentCommandContext) {
     assertPermission(context, 'read');
     assertPermission(context, 'export');
 
+    assertGoogleDriveBackupAvailable(context);
     const backups = await context.store.listBackups();
 
     return {
@@ -178,6 +224,7 @@ export async function createDriveBackupCommand(context: AgentCommandContext) {
     assertPermission(context, 'read');
     assertPermission(context, 'export');
 
+    assertGoogleDriveBackupAvailable(context);
     try {
         const fileId = await context.store.createBackup();
 
@@ -196,8 +243,8 @@ export async function downloadDriveBackupJsonCommand(context: AgentCommandContex
     assertPermission(context, 'export');
 
     const backupId = requireString(input.backupId, 'backupId');
-    const data = await downloadDriveBackup(context, backupId);
-    const backup = parseDownloadedBackup(data);
+    const data = await downloadCloudBackup(context, backupId, { googleOnly: true });
+    const backup = parseDownloadedBackup(data, 'Drive');
     const filename = normalizeJsonFilename(input.filename || getDefaultBackupFilename(context.now?.() || Date.now()));
 
     downloadJsonFile(filename, data);
@@ -299,14 +346,108 @@ export async function restoreDriveBackupCommand(context: AgentCommandContext, in
     }
 
     const backupId = requireString(input.backupId, 'backupId');
-    const data = await downloadDriveBackup(context, backupId);
-    const backup = parseDownloadedBackup(data);
+    const data = await downloadCloudBackup(context, backupId, { googleOnly: true });
+    const backup = parseDownloadedBackup(data, 'Drive');
     const counts = getBackupImportCounts(backup);
 
     await replaceAllDataForRestore(context, backup);
 
     return {
         restored: true,
+        backupId,
+        version: backup.version || null,
+        exportDate: backup.exportDate || null,
+        backupType: backup.backupType || null,
+        counts,
+        replacedCurrentData: true,
+    };
+}
+
+export async function listCloudBackupsCommand(context: AgentCommandContext) {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'export');
+    const provider = assertCloudBackupAvailable(context);
+    const backups = await context.store.listBackups();
+
+    return {
+        provider,
+        backups: backups.map(summarizeBackupInfo),
+        count: backups.length,
+    };
+}
+
+export async function createCloudBackupCommand(context: AgentCommandContext) {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'export');
+    const provider = assertCloudBackupAvailable(context);
+
+    try {
+        const fileId = await context.store.createBackup();
+        return { created: true, provider, fileId };
+    } catch {
+        throw new AgentCommandError(
+            'UNAVAILABLE',
+            `${getActiveCloudProviderLabel(context)} backup creation is unavailable. Reconnect cloud storage and try again.`,
+        );
+    }
+}
+
+export async function downloadCloudBackupJsonCommand(
+    context: AgentCommandContext,
+    input: CloudBackupCommandInput = {},
+) {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'export');
+    const provider = assertCloudBackupAvailable(context);
+    const backupId = requireString(input.backupId, 'backupId');
+    const data = await downloadCloudBackup(context, backupId);
+    const backup = parseDownloadedBackup(data, getActiveCloudProviderLabel(context));
+    const filename = normalizeJsonFilename(input.filename || getDefaultBackupFilename(context.now?.() || Date.now()));
+
+    downloadJsonFile(filename, data);
+    return {
+        provider,
+        backupId,
+        filename,
+        version: backup.version || null,
+        exportDate: backup.exportDate || null,
+        backupType: backup.backupType || null,
+        counts: getBackupImportCounts(backup),
+        downloadStarted: true,
+    };
+}
+
+export async function restoreCloudBackupCommand(
+    context: AgentCommandContext,
+    input: RestoreCloudBackupCommandInput = {},
+) {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'write');
+    assertPermission(context, 'export');
+    const provider = assertCloudBackupAvailable(context);
+
+    if (input.confirmRestore !== true) {
+        throw new AgentCommandError('INVALID_INPUT', 'Restoring a cloud backup requires confirmRestore: true.');
+    }
+    if (input.confirmationText?.trim() !== 'RESTORE') {
+        throw new AgentCommandError('INVALID_INPUT', 'confirmationText must be RESTORE to restore cloud backup data.', {
+            field: 'confirmationText',
+        });
+    }
+
+    const backupId = requireString(input.backupId, 'backupId');
+    const data = await downloadCloudBackup(context, backupId);
+    const backup = parseDownloadedBackup(data, getActiveCloudProviderLabel(context));
+    const counts = getBackupImportCounts(backup);
+    await replaceAllDataForRestore(context, backup);
+
+    return {
+        restored: true,
+        provider,
         backupId,
         version: backup.version || null,
         exportDate: backup.exportDate || null,
@@ -357,7 +498,12 @@ export async function updateSyncSettingsCommand(context: AgentCommandContext, in
 
     context.store.preferences.set('autoSyncEnabled', nextAutoSyncEnabled);
     context.store.preferences.set('autoSyncMode', nextAutoSyncMode);
-    context.store.setDriveSyncPreferences(nextAutoSyncEnabled, nextAutoSyncMode);
+    const activeProvider = getActiveCloudProvider(context);
+    if (activeProvider === 'google-drive') {
+        context.store.setDriveSyncPreferences(nextAutoSyncEnabled, nextAutoSyncMode);
+    } else {
+        context.store.setCloudSyncPreferences(nextAutoSyncEnabled, nextAutoSyncMode);
+    }
 
     if (input.backupEnabled !== undefined) {
         context.store.preferences.set('backupEnabled', input.backupEnabled);
@@ -369,12 +515,13 @@ export async function updateSyncSettingsCommand(context: AgentCommandContext, in
 
     let syncTriggered = false;
 
-    if (input.runSync === true && context.store.isDriveConnected()) {
+    if (input.runSync === true && context.store.isCloudConnected()) {
         try {
-            await context.store.forceDriveSync();
+            if (activeProvider === 'google-drive') await context.store.forceDriveSync();
+            else await context.store.forceCloudSync();
             syncTriggered = true;
         } catch {
-            throw new AgentCommandError('UNAVAILABLE', 'Sync settings were saved, but the requested sync failed. Check Google Drive connection and try Sync Now.');
+            throw new AgentCommandError('UNAVAILABLE', 'Sync settings were saved, but the requested sync failed. Check the active cloud connection and try Sync Now.');
         }
     }
 
@@ -400,28 +547,45 @@ export async function deleteAllAccountDataCommand(context: AgentCommandContext, 
         });
     }
 
-    const isDriveConnected = context.store.isDriveConnected();
+    const activeProvider = getActiveCloudProvider(context);
+    const isCloudConnected = context.store.isCloudConnected();
+    if (activeProvider && !isCloudConnected) {
+        throw new AgentCommandError(
+            'UNAVAILABLE',
+            `Reconnect ${getActiveCloudProviderLabel(context)} before deleting all account data.`,
+        );
+    }
+    if (isCloudConnected && !activeProvider) {
+        throw new AgentCommandError('UNAVAILABLE', 'The active cloud provider could not be verified.');
+    }
 
-    if (isDriveConnected && input.includeDriveData !== true) {
-        throw new AgentCommandError('INVALID_INPUT', 'includeDriveData must be true when Google Drive is connected.', {
-            field: 'includeDriveData',
+    const includeCloudData = input.includeCloudData === true || input.includeDriveData === true;
+    if (isCloudConnected && !includeCloudData) {
+        throw new AgentCommandError('INVALID_INPUT', 'includeCloudData (or legacy includeDriveData) must be true when cloud storage is connected.', {
+            field: 'includeCloudData',
         });
     }
 
-    let driveDataDeleted = false;
-    let driveBackupsDeleted = false;
-    let driveAccessRevoked = false;
+    let cloudDataDeleted = false;
+    let cloudBackupsDeleted = false;
+    let cloudAccessRevoked = false;
 
-    if (isDriveConnected) {
-        await context.store.wipeDriveData();
-        driveDataDeleted = true;
+    if (isCloudConnected) {
+        await context.store.wipeCloudData();
+        cloudDataDeleted = true;
 
         await context.store.deleteAllBackups();
-        driveBackupsDeleted = true;
+        cloudBackupsDeleted = true;
 
-        if (context.revokeDriveAccess) {
+        if (context.disconnectActiveCloudSession) {
+            await context.disconnectActiveCloudSession({ revoke: true });
+            cloudAccessRevoked = true;
+        } else if (activeProvider === 'google-drive' && context.revokeDriveAccess) {
+            // Compatibility for older embedded clients during rolling upgrade.
             await context.revokeDriveAccess();
-            driveAccessRevoked = true;
+            cloudAccessRevoked = true;
+        } else {
+            throw new AgentCommandError('UNAVAILABLE', 'Cloud authorization could not be revoked safely.');
         }
     }
 
@@ -431,9 +595,14 @@ export async function deleteAllAccountDataCommand(context: AgentCommandContext, 
     return {
         deleted: true,
         localDataDeleted: true,
-        driveDataDeleted,
-        driveBackupsDeleted,
-        driveAccessRevoked,
+        cloudProvider: activeProvider,
+        cloudDataDeleted,
+        cloudBackupsDeleted,
+        cloudAccessRevoked,
+        // Preserve the legacy Google result fields for existing agent clients.
+        driveDataDeleted: activeProvider === 'google-drive' && cloudDataDeleted,
+        driveBackupsDeleted: activeProvider === 'google-drive' && cloudBackupsDeleted,
+        driveAccessRevoked: activeProvider === 'google-drive' && cloudAccessRevoked,
         reloadRecommended: true,
     };
 }

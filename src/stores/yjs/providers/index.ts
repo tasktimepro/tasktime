@@ -5,6 +5,7 @@
  */
 
 export {
+    CloudManifestManager,
     ManifestManager,
     AuthorizationError,
     DriveConnectivityError,
@@ -12,8 +13,12 @@ export {
     DriveRateLimitError,
     DriveStorageQuotaError,
     DriveTransportDisabledError,
+    isCloudFileNotFoundError,
 } from './ManifestManager';
 export type {
+    CloudBindingMarkerV1,
+    CloudManifestFingerprint,
+    CloudManifestManagerOptions,
     Manifest,
     DocManifest,
     DeltaInfo,
@@ -22,8 +27,33 @@ export type {
     ManifestManagerOptions,
 } from './ManifestManager';
 
-export { YjsDriveProvider } from './GoogleDriveProvider';
-export type { DriveConnectionOptions } from './GoogleDriveProvider';
+export { CloudFileStoreError } from './CloudFileStore';
+export type {
+    CloudFileStore,
+    CloudFileStoreErrorCode,
+    CloudNamespace,
+    CloudObjectMetadata,
+    CloudProviderId,
+} from './CloudFileStore';
+
+export { GoogleDriveFileStore } from './GoogleDriveFileStore';
+export type { GoogleDriveFileStoreOptions } from './GoogleDriveFileStore';
+
+export { DropboxFileStore, calculateDropboxContentHash } from './DropboxFileStore';
+export type { DropboxTokenProvider } from './DropboxFileStore';
+
+export {
+    CloudProviderMovedError,
+    YjsCloudSyncProvider,
+    YjsDriveProvider,
+    withCloudSyncExclusiveLock,
+} from './GoogleDriveProvider';
+export type {
+    CloudSyncConnectionOptions,
+    CloudSyncLockPermit,
+    CloudSyncLockResult,
+    DriveConnectionOptions,
+} from './GoogleDriveProvider';
 
 export {
     DriveAccessTokenError,
@@ -31,5 +61,11 @@ export {
     driveAccessTokenProvider,
 } from './DriveAccessTokenProvider';
 
-export { BackupManager } from './BackupManager';
-export type { BackupInfo } from './BackupManager';
+export {
+    DropboxAccessTokenError,
+    DropboxAccessTokenProvider,
+    dropboxAccessTokenProvider,
+} from './DropboxAccessTokenProvider';
+
+export { BackupManager, CloudBackupManager } from './BackupManager';
+export type { BackupInfo, CloudBackupManagerOptions } from './BackupManager';

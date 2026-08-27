@@ -29,6 +29,11 @@ export interface GoogleUser {
 
 export type DriveTransport = 'proxy' | 'direct';
 
+export interface ValidatedDriveStorageSession {
+    sessionId: string;
+    driveTransport: DriveTransport;
+}
+
 interface AuthState {
     isSignedIn: boolean;
     isLoading: boolean;
@@ -470,6 +475,30 @@ export const useGoogleAuth = () => {
         return driveTransport;
     }, [isOnline, state.sessionId, validateWorkerSession]);
 
+    /**
+     * Resolve the current persisted Google session after a possible OAuth
+     * popup. Provider transfer uses this instead of a stale render closure and
+     * requires the direct data plane before staging Google as a target.
+     */
+    const getValidatedDriveStorageSession = useCallback(async (): Promise<ValidatedDriveStorageSession> => {
+        const session = await getStoredSession();
+        if (!session) throw new Error('Connect Google Drive before transferring your workspace.');
+        const isValid = await validateWorkerSession(session, { force: true });
+        if (!isValid) {
+            throw new Error('Google Drive access is no longer authorized. Reconnect and try again.');
+        }
+        const validatedTransport = getLastValidatedDriveTransport(session.sessionId);
+        if (validatedTransport !== 'direct') {
+            driveAccessTokenProvider.clearToken();
+            throw new Error('Direct Google Drive access is required before transferring your workspace.');
+        }
+        driveAccessTokenProvider.setSession(session.sessionId);
+        return {
+            sessionId: session.sessionId,
+            driveTransport: validatedTransport,
+        };
+    }, [validateWorkerSession]);
+
 
     const signInWithWorker = useCallback(async (): Promise<void> => {
 
@@ -521,6 +550,7 @@ export const useGoogleAuth = () => {
                 body: JSON.stringify({
                     code,
                     redirectUri,
+                    state: authState,
                 }),
             });
 
@@ -885,6 +915,7 @@ export const useGoogleAuth = () => {
         revokeAccess: () => signOutFromWorker({ revoke: true }),
         invalidateSession: invalidateStoredSession,
         refreshDriveTransport,
+        getValidatedDriveStorageSession,
     };
 };
 

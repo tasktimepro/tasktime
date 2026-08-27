@@ -12,7 +12,9 @@ vi.mock('@/utils/debugbundle', () => ({
     captureDebugBundleIncident: captureDebugBundleIncidentSpy,
 }))
 
-import { YjsDriveProvider } from './GoogleDriveProvider.ts'
+import { CloudProviderMovedError, YjsCloudSyncProvider, YjsDriveProvider } from './GoogleDriveProvider.ts'
+import { CloudFileStoreError } from './CloudFileStore.ts'
+import { getSyncPersistenceState, markPendingChanges } from '@/utils/syncPersistence'
 
 function objectToYMap(data) {
     const map = new Y.Map()
@@ -51,6 +53,133 @@ describe('YjsDriveProvider', () => {
             storage.clear()
         })
         localStorage.clear()
+    })
+
+    it('constructs the reusable sync core from an injected manifest and provider scope', () => {
+        const manifest = { getProviderId: () => 'dropbox' }
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => [],
+            getDocSync: () => null,
+        }, {
+            provider: 'dropbox',
+            generation: 3,
+            manifest,
+        })
+
+        expect(provider.getManifest()).toBe(manifest)
+    })
+
+    it('rejects a provider scope that does not match the injected file store', () => {
+        expect(() => new YjsCloudSyncProvider({
+            getLoadedDocs: () => [],
+            getDocSync: () => null,
+        }, {
+            provider: 'dropbox',
+            generation: 3,
+            manifest: { getProviderId: () => 'google-drive' },
+        })).toThrow('does not match')
+    })
+
+    it('rejects an invalid provider generation before reading or writing recovery state', () => {
+        expect(() => new YjsCloudSyncProvider({
+            getLoadedDocs: () => [],
+            getDocSync: () => null,
+        }, {
+            provider: 'dropbox',
+            generation: -1,
+            manifest: { getProviderId: () => 'dropbox' },
+        })).toThrow('non-negative safe integer')
+    })
+
+    it('stops an upgraded source client after a verified provider migration marker', async () => {
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => [],
+            getDocSync: () => null,
+        }, {
+            provider: 'google-drive',
+            generation: 2,
+            manifest: {
+                getProviderId: () => 'google-drive',
+                load: vi.fn(async () => {}),
+                readCachedCloudBindingMarker: vi.fn(async () => ({
+                    version: 1,
+                    workspaceId: '42de9b18-445c-4d28-b5c9-88bc476fc7f1',
+                    generation: 3,
+                    activeProvider: 'dropbox',
+                    state: 'moved',
+                    operationId: 'f85f92e3-1584-4d77-8292-3a9977adcf44',
+                    updatedAt: '2026-08-19T10:00:00.000Z',
+                })),
+            },
+        })
+        provider.isOnline = () => true
+
+        await expect(provider.connect('manual')).rejects.toBeInstanceOf(CloudProviderMovedError)
+        expect(provider.isConnected()).toBe(false)
+    })
+
+    it('uses Dropbox-scoped diagnostics in the reusable sync core', async () => {
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => [],
+            getDocSync: () => null,
+        }, {
+            provider: 'dropbox',
+            generation: 3,
+            manifest: {
+                getProviderId: () => 'dropbox',
+                hasManifestChanged: vi.fn(async () => {
+                    throw new CloudFileStoreError(
+                        'transient-unavailable',
+                        'Dropbox is temporarily unavailable.',
+                        { provider: 'dropbox' },
+                    )
+                }),
+            },
+        })
+
+        provider.connected = true
+        provider.isOnline = () => true
+
+        await provider.sync(false, { allowPull: true })
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'dropbox.sync_failed',
+            name: 'TaskTimeCloudSyncError',
+            message: 'TaskTime Pro Dropbox sync failed',
+        }))
+    })
+
+    it('recovers provider-neutral missing-object errors without Drive-specific error classes', async () => {
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => [],
+            getDocSync: () => null,
+        }, {
+            provider: 'dropbox',
+            generation: 4,
+            manifest: {
+                getProviderId: () => 'dropbox',
+                deleteFileId: vi.fn(),
+                downloadFileAsArrayBuffer: vi.fn(async () => {
+                    throw new CloudFileStoreError(
+                        'not-found',
+                        'Dropbox object was not found.',
+                        { provider: 'dropbox' },
+                    )
+                }),
+                refreshFileCache: vi.fn(async () => {}),
+                getFileIdWithFallback: vi.fn(async () => null),
+            },
+        })
+
+        await expect(provider.downloadFileWithRecovery(
+            'tasktime-yjs-core.bin',
+            'stale-dropbox-id',
+        )).resolves.toBeNull()
+
+        expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
+            incidentKey: 'dropbox.remote_file_missing_after_recovery',
+            name: 'TaskTimeCloudSyncError',
+        }))
     })
 
     it('only establishes the connection without syncing on manual-mode connect', async () => {
@@ -211,6 +340,387 @@ describe('YjsDriveProvider', () => {
         expect(callbackCompleted).toBe(true)
         expect(provider.syncDoc).toHaveBeenCalledTimes(2)
         expect(provider.getPendingDocNames()).toEqual([])
+    })
+
+    it('waits for an active sync before syncing an externally loaded lazy document', async () => {
+        const coreDoc = new Y.Doc()
+        const archivedTasksDoc = new Y.Doc()
+        const loadedDocs = ['core']
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => [...loadedDocs],
+            getDocSync: (name) => ({
+                core: coreDoc,
+                'tasks-archived': archivedTasksDoc,
+            })[name] ?? null,
+        }, 'playwright-access-token')
+        let releaseCoreSync
+        const coreSyncStarted = new Promise((resolve) => {
+            releaseCoreSync = resolve
+        })
+        let unblockCoreSync
+        const coreSyncBlocked = new Promise((resolve) => {
+            unblockCoreSync = resolve
+        })
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.manifest = {
+            getManifest: vi.fn(() => ({ documents: {} })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async (docName) => {
+            if (docName === 'core') {
+                releaseCoreSync()
+                await coreSyncBlocked
+            }
+        })
+        provider.subscribeToDoc = vi.fn()
+
+        const activeSync = provider.sync(true, { allowPull: false })
+        await coreSyncStarted
+        loadedDocs.push('tasks-archived')
+        const lazySync = provider.syncAndSubscribeDoc('tasks-archived')
+        await Promise.resolve()
+
+        expect(provider.syncDoc).toHaveBeenCalledTimes(1)
+
+        unblockCoreSync()
+        await Promise.all([activeSync, lazySync])
+
+        expect(provider.syncDoc.mock.calls.map(([docName]) => docName)).toEqual([
+            'core',
+            'tasks-archived',
+        ])
+
+        coreDoc.destroy()
+        archivedTasksDoc.destroy()
+    })
+
+    it('defers a callback-loaded lazy manifest write to the owning sync pass', async () => {
+        const coreDoc = new Y.Doc()
+        const archivedInvoicesDoc = new Y.Doc()
+        const loadedDocs = ['core']
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => [...loadedDocs],
+            getDocSync: (name) => ({
+                core: coreDoc,
+                'invoices-archived': archivedInvoicesDoc,
+            })[name] ?? null,
+        }, 'playwright-access-token')
+        let manifestDirty = false
+        const saveManifest = vi.fn(async () => {
+            manifestDirty = false
+        })
+
+        provider.connected = true
+        provider.isOnline = () => true
+        provider.manifest = {
+            getManifest: vi.fn(() => ({ documents: {} })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => manifestDirty),
+            save: saveManifest,
+        }
+        provider.syncDoc = vi.fn(async (docName) => {
+            if (docName === 'invoices-archived') {
+                manifestDirty = true
+            }
+        })
+        provider.subscribeToDoc = vi.fn()
+        provider.onSyncComplete(async () => {
+            loadedDocs.push('invoices-archived')
+            await provider.syncAndSubscribeDoc('invoices-archived')
+            expect(saveManifest).not.toHaveBeenCalled()
+        })
+
+        await provider.sync(true, { allowPull: false })
+
+        expect(saveManifest).toHaveBeenCalledTimes(1)
+
+        coreDoc.destroy()
+        archivedInvoicesDoc.destroy()
+    })
+
+    it('clears exact persisted recovery evidence after sync-mode connect succeeds', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async (docName) => {
+            expect(provider.forceFullStateDocs.has(docName)).toBe(true)
+            provider.forceFullStateDocs.delete(docName)
+        })
+        provider.subscribeToDoc = vi.fn()
+        markPendingChanges('core')
+
+        await provider.connect('sync')
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+        }))
+
+        provider.disconnect()
+        liveDoc.destroy()
+    })
+
+    it('retains exact persisted recovery evidence when new local work remains after connect', async () => {
+        const liveDoc = new Y.Doc()
+        const provider = createProviderWithCoreDoc(liveDoc)
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: { core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] } } })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async (docName) => {
+            provider.forceFullStateDocs.delete(docName)
+            provider.pendingDeltas.set(docName, [new Uint8Array([1])])
+        })
+        provider.subscribeToDoc = vi.fn()
+        markPendingChanges('core')
+
+        await provider.connect('sync')
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        }))
+
+        provider.disconnect()
+        liveDoc.destroy()
+    })
+
+    it('loads and recovers an exact lazy reconnect document during sync-mode connect', async () => {
+        const coreDoc = new Y.Doc()
+        const historicalEntriesDoc = new Y.Doc()
+        const loadedDocs = ['core']
+        const getDoc = vi.fn(async (docName) => {
+            if (!loadedDocs.includes(docName)) loadedDocs.push(docName)
+            return docName === 'entries-2026' ? historicalEntriesDoc : coreDoc
+        })
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => [...loadedDocs],
+            getDocSync: (docName) => ({
+                core: coreDoc,
+                'entries-2026': historicalEntriesDoc,
+            })[docName] ?? null,
+            getDoc,
+        }, 'playwright-access-token')
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: {
+                core: { stateVersion: 1, stateFile: 'tasktime-yjs-core.bin', deltas: [] },
+                'entries-2026': { stateVersion: 1, stateFile: 'tasktime-yjs-entries-2026.bin', deltas: [] },
+            } })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async (docName) => {
+            provider.forceFullStateDocs.delete(docName)
+        })
+        provider.subscribeToDoc = vi.fn()
+        provider.markDocsForFullStateUpload(['entries-2026'])
+
+        await provider.connect('sync')
+
+        expect(getDoc).toHaveBeenCalledWith('entries-2026')
+        expect(provider.syncDoc).toHaveBeenCalledWith('entries-2026')
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+        }))
+
+        provider.disconnect()
+        coreDoc.destroy()
+        historicalEntriesDoc.destroy()
+    })
+
+    it('clears exact persisted recovery evidence after a direct lazy document sync succeeds', async () => {
+        const coreDoc = new Y.Doc()
+        const archivedTasksDoc = new Y.Doc()
+        const loadedDocs = ['core']
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => [...loadedDocs],
+            getDocSync: (name) => ({
+                core: coreDoc,
+                'tasks-archived': archivedTasksDoc,
+            })[name] ?? null,
+        }, 'playwright-access-token')
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: {} })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async (docName) => {
+            if (docName === 'tasks-archived') {
+                expect(provider.forceFullStateDocs.has(docName)).toBe(true)
+                provider.forceFullStateDocs.delete(docName)
+            }
+        })
+        provider.subscribeToDoc = vi.fn()
+
+        await provider.connect('manual', { bootstrapPullIfPristine: false })
+        markPendingChanges('tasks-archived')
+        loadedDocs.push('tasks-archived')
+
+        await provider.syncAndSubscribeDoc('tasks-archived', { allowPull: true })
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+        }))
+
+        provider.disconnect()
+        coreDoc.destroy()
+        archivedTasksDoc.destroy()
+    })
+
+    it('retains exact persisted recovery evidence when a direct lazy document sync fails', async () => {
+        const coreDoc = new Y.Doc()
+        const archivedTasksDoc = new Y.Doc()
+        const loadedDocs = ['core']
+        const provider = new YjsDriveProvider({
+            getLoadedDocs: () => [...loadedDocs],
+            getDocSync: (name) => ({
+                core: coreDoc,
+                'tasks-archived': archivedTasksDoc,
+            })[name] ?? null,
+        }, 'playwright-access-token')
+
+        provider.isOnline = () => true
+        provider.manifest = {
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: {} })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        provider.syncDoc = vi.fn(async (docName) => {
+            if (docName === 'tasks-archived') throw new Error('lazy Dropbox sync failed')
+        })
+        provider.subscribeToDoc = vi.fn()
+
+        await provider.connect('manual', { bootstrapPullIfPristine: false })
+        markPendingChanges('tasks-archived')
+        loadedDocs.push('tasks-archived')
+
+        await provider.syncAndSubscribeDoc('tasks-archived', { allowPull: true }).catch(() => {})
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            pendingDocNames: ['tasks-archived'],
+        }))
+
+        provider.disconnect()
+        coreDoc.destroy()
+        archivedTasksDoc.destroy()
+    })
+
+    it.each([
+        {
+            label: 'Google Drive',
+            scope: { provider: 'google-drive', generation: 0 },
+        },
+        {
+            label: 'Dropbox',
+            scope: { provider: 'dropbox', generation: 3 },
+        },
+    ])('loads and recovers exact unloaded documents during a forced $label sync', async ({ scope }) => {
+        const docs = new Map([
+            ['core', new Y.Doc()],
+            ['entries-active', new Y.Doc()],
+            ['tasks-archived', new Y.Doc()],
+            ['entries-2026', new Y.Doc()],
+        ])
+        const loadedDocs = ['core', 'entries-active']
+        const getDoc = vi.fn(async (docName) => {
+            if (!loadedDocs.includes(docName)) loadedDocs.push(docName)
+            return docs.get(docName)
+        })
+        const manifest = {
+            getProviderId: () => scope.provider,
+            load: vi.fn(async () => {}),
+            getManifest: vi.fn(() => ({ documents: {} })),
+            getLastSync: vi.fn(() => null),
+            isDirty: vi.fn(() => false),
+            save: vi.fn(async () => {}),
+        }
+        const provider = scope.provider === 'dropbox'
+            ? new YjsCloudSyncProvider({
+                getLoadedDocs: () => [...loadedDocs],
+                getDocSync: (docName) => loadedDocs.includes(docName) ? docs.get(docName) : null,
+                getDoc,
+            }, {
+                provider: 'dropbox',
+                generation: scope.generation,
+                manifest,
+            })
+            : new YjsDriveProvider({
+                getLoadedDocs: () => [...loadedDocs],
+                getDocSync: (docName) => loadedDocs.includes(docName) ? docs.get(docName) : null,
+                getDoc,
+            }, 'playwright-access-token')
+
+        provider.isOnline = () => true
+        provider.manifest = manifest
+        provider.syncDoc = vi.fn(async (docName) => {
+            // Mirror the production priority: a recovery upload consumes the
+            // force queue first, while an ordinary Sync Now consumes the
+            // verification queue. A document must never occupy both queues and
+            // therefore require two provider writes in one forced pass.
+            if (provider.forceFullStateDocs.has(docName)) {
+                provider.forceFullStateDocs.delete(docName)
+            } else {
+                provider.verifyFullStateDocs.delete(docName)
+            }
+            provider.pendingDeltas.set(docName, [])
+        })
+        provider.subscribeToDoc = vi.fn()
+        const pendingStates = []
+
+        await provider.connect('manual', { bootstrapPullIfPristine: false })
+        provider.onPendingChange((hasPending) => pendingStates.push(hasPending))
+        markPendingChanges('tasks-archived', scope)
+        markPendingChanges('entries-2026', scope)
+
+        await provider.sync(true, { allowPull: false, forceFullState: true })
+
+        expect(getDoc).toHaveBeenCalledWith('tasks-archived')
+        expect(getDoc).toHaveBeenCalledWith('entries-2026')
+        expect(provider.syncDoc).toHaveBeenCalledWith('tasks-archived', false)
+        expect(provider.syncDoc).toHaveBeenCalledWith('entries-2026', false)
+        expect(provider.syncDoc.mock.calls.filter(([docName]) => docName === 'tasks-archived')).toHaveLength(1)
+        expect(provider.syncDoc.mock.calls.filter(([docName]) => docName === 'entries-2026')).toHaveLength(1)
+        expect(provider.subscribeToDoc).toHaveBeenCalledWith('tasks-archived')
+        expect(provider.subscribeToDoc).toHaveBeenCalledWith('entries-2026')
+        expect(getSyncPersistenceState(scope)).toEqual(expect.objectContaining({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+        }))
+        expect(provider.hasLocalChangesToPush()).toBe(false)
+        expect(pendingStates).toEqual([true, false])
+
+        provider.disconnect()
+        docs.forEach((doc) => doc.destroy())
     })
 
     it('keeps sync in an error state when post-sync consistency replay fails', async () => {
@@ -1166,15 +1676,12 @@ describe('YjsDriveProvider', () => {
         provider.connected = true
         provider.isOnline = () => true
         provider.manifest = {
-            listAppDataFiles: vi.fn()
+            listSyncFiles: vi.fn()
                 .mockResolvedValueOnce([
                     { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:00.000Z' },
                     { id: 'core-id', name: 'tasktime-yjs-core.bin', modifiedTime: '2026-06-04T00:00:01.000Z' },
-                    { id: 'backup-id', name: 'tasktime-backup-2026-06-04-0700.json', modifiedTime: '2026-06-04T00:00:02.000Z' },
                 ])
-                .mockResolvedValueOnce([
-                    { id: 'backup-id', name: 'tasktime-backup-2026-06-04-0700.json', modifiedTime: '2026-06-04T00:00:02.000Z' },
-                ]),
+                .mockResolvedValueOnce([]),
             deleteFileById: vi.fn(async () => {}),
             reset: vi.fn(),
         }
@@ -1194,7 +1701,7 @@ describe('YjsDriveProvider', () => {
         provider.connected = true
         provider.isOnline = () => true
         provider.manifest = {
-            listAppDataFiles: vi.fn(async () => [
+            listSyncFiles: vi.fn(async () => [
                 { id: 'manifest-id', name: 'tasktime-yjs-manifest.json', modifiedTime: '2026-06-04T00:00:00.000Z' },
             ]),
             deleteFileById: vi.fn(async () => {}),

@@ -151,6 +151,35 @@ describe('useProjectNotes', () => {
         }), { origin: PROJECT_NOTES_LOCAL_SAVE_ORIGIN });
     });
 
+    it('uses the active cloud provider when Dropbox owns storage', async () => {
+        const updateProject = vi.fn(() => ({ id: 'project-1' }));
+        const forceSyncCloud = vi.fn().mockResolvedValue(undefined);
+        const forceSyncDrive = vi.fn().mockResolvedValue(undefined);
+
+        mockUseProjects.mockReturnValue({ updateProject });
+        mockUseYjs.mockReturnValue({
+            isDriveConnected: false,
+            isCloudConnected: true,
+            isSyncing: false,
+            manualSyncInProgress: false,
+            pendingSyncChanges: false,
+            lastSyncedAt: null,
+            forceSyncCloud,
+            forceSyncDrive,
+        });
+
+        const { result } = renderHook(() => useProjectNotes('project-1', null));
+
+        act(() => {
+            result.current.updateDraft(createDocument('Dropbox note'));
+        });
+        await act(async () => result.current.saveNotesToCloud());
+
+        expect(result.current.isDriveConnected).toBe(true);
+        expect(forceSyncCloud).toHaveBeenCalledWith({ allowPull: false });
+        expect(forceSyncDrive).not.toHaveBeenCalled();
+    });
+
     it('reuses the pending commit timer and saves only the latest draft', () => {
         vi.useFakeTimers();
 

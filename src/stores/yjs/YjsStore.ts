@@ -13,9 +13,16 @@
 
 import * as Y from 'yjs';
 import { YjsDocManager } from './YjsDocManager';
-import { YjsDriveProvider, type DriveConnectionOptions } from './providers/GoogleDriveProvider';
-import { BackupManager } from './providers/BackupManager';
+import {
+    YjsCloudSyncProvider,
+    YjsDriveProvider,
+    type CloudSyncConnectionOptions,
+    type CloudSyncLockPermit,
+    type DriveConnectionOptions,
+} from './providers/GoogleDriveProvider';
+import { BackupManager, CloudBackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
+import type { CloudManifestManager } from './providers/ManifestManager';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 import { createBackupPayload, validateBackupImportPayload, type BackupImportPayload, type BackupPayload } from '@/utils/backupData';
 import { parseStoredDate } from '@/utils/dateUtils';
@@ -23,7 +30,13 @@ import { getTaskIdsWithDescendants } from '@/utils/taskUtils';
 import { generateId } from '@/utils/idUtils';
 import { readEntity, objectToYMap, collectEntities, forEachEntity, updateEntityFields } from './entityUtils';
 import { collectValidatedEntities, validateCollectionEntity } from './validation';
-import { clearSyncPersistence } from '@/utils/syncPersistence';
+import {
+    clearSyncPersistence,
+    getDisconnectedDirtyDocNames,
+    setDisconnectedDirtyDocNames,
+    DEFAULT_GOOGLE_SYNC_SCOPE,
+    type SyncPersistenceScope,
+} from '@/utils/syncPersistence';
 import {
     clearRestoreJournal,
     readRestoreJournal,
@@ -76,7 +89,22 @@ import {
 } from '@/domain/invoices/invoiceBillingOperation';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
-const DISCONNECTED_DIRTY_DOCS_STORAGE_KEY = 'tasktime-disconnected-dirty-docs';
+
+export interface CloudTransferDocumentSnapshot {
+    docName: DocName;
+    update: Uint8Array;
+    stateVector: Uint8Array;
+}
+
+export interface CloudTransferWorkspaceSnapshot {
+    documents: CloudTransferDocumentSnapshot[];
+    portableBackup: BackupPayload;
+}
+
+function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
+    return left.byteLength === right.byteLength
+        && left.every((value, index) => value === right[index]);
+}
 
 type DocUpdateHandler = (...args: unknown[]) => void;
 type ArchiveEntity = Task | TimeEntry | Invoice | Expense;
@@ -139,8 +167,10 @@ function areRecordsEquivalent(
 export class YjsStore {
 
     private docManager: YjsDocManager;
-    private driveProvider: YjsDriveProvider | null = null;
-    private backupManager: BackupManager | null = null;
+    private driveProvider: YjsCloudSyncProvider | null = null;
+    private activeCloudProviderId: SyncPersistenceScope['provider'] | null = null;
+    private activeSyncScope: SyncPersistenceScope = { ...DEFAULT_GOOGLE_SYNC_SCOPE };
+    private backupManager: CloudBackupManager | null = null;
     private _isReady: boolean = false;
     private driveSyncMode: DriveSyncMode = 'manual';
 
@@ -1196,18 +1226,41 @@ export class YjsStore {
         connection: DriveConnectionOptions | string,
         legacySessionId?: string | null,
     ): Promise<void> {
-        if (this.driveProvider) {
-            this.driveProvider.disconnect();
-        }
+        const generation = typeof connection === 'string' ? 0 : (connection.generation ?? 0);
+        await this.connectConfiguredCloudProvider(
+            new YjsDriveProvider(this.docManager, connection, legacySessionId),
+            { provider: 'google-drive', generation },
+        );
+    }
 
-        this.driveProvider = new YjsDriveProvider(this.docManager, connection, legacySessionId);
+    /** Connect the reusable sync core to a lifecycle-fenced cloud provider. */
+    async connectCloud(
+        connection: CloudSyncConnectionOptions,
+        lockPermit?: CloudSyncLockPermit,
+    ): Promise<void> {
+        await this.connectConfiguredCloudProvider(
+            new YjsCloudSyncProvider(this.docManager, connection),
+            { provider: connection.provider, generation: connection.generation },
+            lockPermit,
+        );
+    }
+
+    private async connectConfiguredCloudProvider(
+        provider: YjsCloudSyncProvider,
+        scope: SyncPersistenceScope,
+        lockPermit?: CloudSyncLockPermit,
+    ): Promise<void> {
+        this.disconnectCloud();
+        this.setActiveCloudStorageScope(scope);
+        this.driveProvider = provider;
+        this.activeCloudProviderId = scope.provider;
         this.driveProvider.setSyncMode(this.driveSyncMode);
 
         const bootstrapPullIfPristine = this.driveSyncMode === 'manual' && this.shouldBootstrapRemotePullOnManualConnect();
 
         if (bootstrapPullIfPristine) {
             this.clearDisconnectedDirtyDocs();
-            clearSyncPersistence();
+            clearSyncPersistence(this.activeSyncScope);
         }
 
         const disconnectedDirtyDocs = bootstrapPullIfPristine ? [] : this.getDisconnectedDirtyDocs();
@@ -1216,7 +1269,16 @@ export class YjsStore {
         }
 
         // Set up backup manager with access to the provider's manifest
-        this.backupManager = new BackupManager(this.driveProvider.getManifest(), this);
+        this.backupManager = scope.provider === 'google-drive'
+            ? new BackupManager(this.driveProvider.getManifest(), this)
+            : new CloudBackupManager(
+                this.driveProvider.getManifest(),
+                this,
+                {
+                    providerLabel: 'Dropbox',
+                    collisionSafeFileNames: true,
+                },
+            );
 
         // After each successful sync, reconcile cross-document operations and maybe create a backup
         this.driveProvider.onSyncComplete(async () => {
@@ -1241,9 +1303,14 @@ export class YjsStore {
             await this.backupManager.maybeCreateBackup(frequencyHours);
         });
 
-        await this.driveProvider.connect(this.driveSyncMode, {
+        const connectOptions = {
             bootstrapPullIfPristine,
-        });
+        };
+        if (lockPermit) {
+            await this.driveProvider.connect(this.driveSyncMode, connectOptions, lockPermit);
+        } else {
+            await this.driveProvider.connect(this.driveSyncMode, connectOptions);
+        }
 
         // Clear disconnected dirty docs after a successful online reconnect
         // only when connect() actually reconciled them. Manual mode keeps
@@ -1255,10 +1322,59 @@ export class YjsStore {
         }
     }
 
+    /** Select where disconnected dirty evidence is read/written before connect. */
+    setActiveCloudStorageScope(scope: SyncPersistenceScope): void {
+        if (!Number.isSafeInteger(scope.generation) || scope.generation < 0) {
+            throw new Error('Cloud storage generation must be a non-negative safe integer.');
+        }
+        const sameScope = this.activeSyncScope.provider === scope.provider
+            && this.activeSyncScope.generation === scope.generation;
+        if (this.driveProvider && !sameScope) {
+            throw new Error('Disconnect the active cloud provider before changing its scope.');
+        }
+        if (sameScope) return;
+        const previousScope = this.activeSyncScope;
+        const previousDirtyDocs = new Set(this.disconnectedDirtyDocs);
+        this.persistDisconnectedDirtyDocs();
+        this.activeSyncScope = { ...scope };
+        this.disconnectedDirtyDocs = this.readDisconnectedDirtyDocs();
+
+        // Reauthentication fences the old credential generation, not the
+        // local workspace. Move unsynced local document identities forward
+        // when the same provider receives a replacement generation. Leaving
+        // the source marker behind would let a later store initialization
+        // resurrect already-synced work. Cross-provider changes stay isolated
+        // and are handled only by transfer.
+        if (previousScope.provider === scope.provider && previousDirtyDocs.size > 0) {
+            for (const docName of previousDirtyDocs) {
+                this.disconnectedDirtyDocs.add(docName);
+            }
+            this.persistDisconnectedDirtyDocs();
+
+            // localStorage writes can fail (for example, quota exhaustion).
+            // Clear the fenced generation only after every carried document
+            // can be read back from the target generation.
+            const persistedTargetDocs = new Set(getDisconnectedDirtyDocNames(scope));
+            const targetOwnsPreviousWork = Array.from(previousDirtyDocs).every(
+                (docName) => persistedTargetDocs.has(docName),
+            );
+            if (targetOwnsPreviousWork) {
+                setDisconnectedDirtyDocNames([], previousScope);
+            }
+        }
+    }
+
     /**
      * Disconnect from Google Drive
      */
     disconnectDrive(): void {
+        if (this.activeCloudProviderId !== 'google-drive') return;
+        this.disconnectCloud('google-drive');
+    }
+
+    /** Disconnect the active provider without touching another provider by mistake. */
+    disconnectCloud(expectedProvider?: SyncPersistenceScope['provider']): void {
+        if (expectedProvider && this.activeCloudProviderId !== expectedProvider) return;
         if (this.driveProvider) {
             // Provider disconnect clears its in-memory queue and generic sync
             // flags. Persist document identity first so authentication expiry,
@@ -1272,27 +1388,109 @@ export class YjsStore {
         }
         this.driveProvider = null;
         this.backupManager = null;
+        this.activeCloudProviderId = null;
     }
 
     /**
      * Check if connected to Google Drive
      */
     isDriveConnected(): boolean {
+        return this.activeCloudProviderId === 'google-drive'
+            && (this.driveProvider?.isConnected() ?? false);
+    }
+
+    isCloudConnected(): boolean {
         return this.driveProvider?.isConnected() ?? false;
+    }
+
+    getActiveCloudProviderId(): SyncPersistenceScope['provider'] | null {
+        return this.activeCloudProviderId;
+    }
+
+    getActiveCloudStorageScope(): SyncPersistenceScope {
+        return { ...this.activeSyncScope };
+    }
+
+    getActiveCloudManifest(): CloudManifestManager | null {
+        return this.driveProvider?.getManifest() ?? null;
+    }
+
+    /** Materialize every managed document and capture one internally consistent handoff. */
+    async createCloudTransferSnapshot(): Promise<CloudTransferWorkspaceSnapshot> {
+        const portableBackup = await this.exportBackupData({
+            backupType: 'manual',
+            refreshLazyDocsFromCloud: true,
+        });
+        await this.docManager.flushPersistence();
+        const documents = this.docManager.getLoadedDocs()
+            .sort()
+            .map((docName) => {
+                const doc = this.docManager.getDocSync(docName);
+                if (!doc) throw new Error(`Cloud transfer could not materialize ${docName}.`);
+                return {
+                    docName,
+                    update: Y.encodeStateAsUpdate(doc),
+                    stateVector: Y.encodeStateVector(doc),
+                };
+            });
+        return { documents, portableBackup };
+    }
+
+    /** Merge same-lineage target CRDT updates before taking the handoff snapshot. */
+    async mergeCloudTransferUpdates(
+        updates: Array<{ docName: DocName; update: Uint8Array }>,
+    ): Promise<void> {
+        for (const { docName, update } of updates) {
+            const doc = await this.docManager.getDoc(docName);
+            const projected = new Y.Doc();
+            try {
+                Y.applyUpdate(projected, Y.encodeStateAsUpdate(doc));
+                Y.applyUpdate(projected, update);
+            } catch {
+                throw new Error(`Cloud transfer rejected corrupt ${docName} data.`);
+            } finally {
+                projected.destroy();
+            }
+            Y.applyUpdate(doc, update, 'remote');
+        }
+        await this.docManager.flushPersistence();
+        await this.reconcileInvoiceBillingOperations({ includeCompleted: true });
+        this.reconcileLoadedArchiveTransitions();
+        this.reconcileOrphanedTimers();
+    }
+
+    isCloudTransferSnapshotCurrent(snapshot: CloudTransferWorkspaceSnapshot): boolean {
+        return snapshot.documents.every(({ docName, stateVector }) => {
+            const doc = this.docManager.getDocSync(docName);
+            return Boolean(doc && equalBytes(Y.encodeStateVector(doc), stateVector));
+        });
     }
 
     /**
      * Trigger Drive sync with optional force control.
      */
     async syncDrive(options?: { allowPull?: boolean; force?: boolean; forceFullState?: boolean }): Promise<void> {
+        if (this.activeCloudProviderId !== 'google-drive') return;
+        await this.syncCloud(options);
+    }
+
+    async syncCloud(
+        options?: { allowPull?: boolean; force?: boolean; forceFullState?: boolean },
+        lockPermit?: CloudSyncLockPermit,
+    ): Promise<void> {
         if (!this.driveProvider) {
             return;
         }
 
-        await this.driveProvider.sync(options?.force ?? false, {
+        const syncOptions = {
             allowPull: options?.allowPull,
             forceFullState: options?.forceFullState,
-        });
+        };
+        if (lockPermit) {
+            await this.driveProvider.sync(options?.force ?? false, syncOptions, lockPermit);
+        } else {
+            await this.driveProvider.sync(options?.force ?? false, syncOptions);
+        }
 
         const syncState = this.driveProvider.getState();
         if (syncState === 'offline') {
@@ -1300,7 +1498,8 @@ export class YjsStore {
         }
 
         if (syncState === 'error') {
-            throw new Error('Drive sync failed. Your local changes are still saved and will retry.');
+            const providerLabel = this.activeCloudProviderId === 'dropbox' ? 'Dropbox' : 'Drive';
+            throw new Error(`${providerLabel} sync failed. Your local changes are still saved and will retry.`);
         }
 
         // After a successful sync, clear any leftover disconnected dirty docs
@@ -1315,17 +1514,30 @@ export class YjsStore {
      * @param options - Optional sync options (e.g., allowPull: false for backup mode)
      */
     async forceDriveSync(options?: { allowPull?: boolean; forceFullState?: boolean }): Promise<void> {
-        await this.syncDrive({
+        if (this.activeCloudProviderId !== 'google-drive') return;
+        await this.forceCloudSync(options);
+    }
+
+    async forceCloudSync(
+        options?: { allowPull?: boolean; forceFullState?: boolean },
+        lockPermit?: CloudSyncLockPermit,
+    ): Promise<void> {
+        await this.syncCloud({
             ...options,
             force: true,
             forceFullState: options?.forceFullState ?? options?.allowPull !== false,
-        });
+        }, lockPermit);
     }
 
     /**
      * Set Drive auto-sync preferences (manual/backup/sync)
      */
     setDriveSyncPreferences(autoSyncEnabled: boolean, autoSyncMode: AutoSyncMode): void {
+        this.setCloudSyncPreferences(autoSyncEnabled, autoSyncMode);
+    }
+
+    /** Apply the existing three-mode behavior to whichever provider is active. */
+    setCloudSyncPreferences(autoSyncEnabled: boolean, autoSyncMode: AutoSyncMode): void {
         const resolvedMode: DriveSyncMode = autoSyncEnabled
             ? (autoSyncMode === 'backup' ? 'backup' : 'sync')
             : 'manual';
@@ -1404,6 +1616,7 @@ export class YjsStore {
      * Update access token (for token refresh)
      */
     updateDriveAccessToken(token: string): void {
+        if (this.activeCloudProviderId !== 'google-drive') return;
         this.driveProvider?.updateAccessToken(token);
     }
 
@@ -1411,6 +1624,7 @@ export class YjsStore {
      * Update session ID (for Worker proxy mode)
      */
     updateDriveSessionId(sessionId: string | null): void {
+        if (this.activeCloudProviderId !== 'google-drive') return;
         this.driveProvider?.updateSessionId(sessionId);
     }
 
@@ -1418,11 +1632,20 @@ export class YjsStore {
      * Wipe all TaskTime Pro files from Google Drive (appDataFolder)
      */
     async wipeDriveData(): Promise<void> {
-        if (!this.driveProvider) {
+        if (!this.driveProvider || this.activeCloudProviderId !== 'google-drive') {
             throw new Error('Drive not connected');
         }
 
-        await this.driveProvider.wipeDriveData();
+        await this.wipeCloudData();
+    }
+
+    /** Remove validated TaskTime sync objects from the active cloud provider. */
+    async wipeCloudData(): Promise<void> {
+        if (!this.driveProvider || !this.activeCloudProviderId) {
+            throw new Error('Cloud storage is not connected');
+        }
+
+        await this.driveProvider.wipeCloudData();
     }
 
     /**
@@ -2143,7 +2366,7 @@ export class YjsStore {
 
         if (shouldRefreshFromCloud) {
             try {
-                await this.forceDriveSync({ allowPull: true, forceFullState: false });
+                await this.forceCloudSync({ allowPull: true, forceFullState: false });
             } catch {
                 throw new Error('Unable to refresh cloud data before export. Please check your connection and try again.');
             }
@@ -2154,12 +2377,27 @@ export class YjsStore {
             }
         }
 
-        const [tasks, timeEntries, invoices, expenses] = await Promise.all([
-            this.getAllTasks(loadOptions),
-            this.loadAllTimeEntries(loadOptions),
-            this.getAllInvoices(loadOptions),
-            this.getAllExpenses(loadOptions),
-        ]);
+        let tasks: Task[];
+        let timeEntries: TimeEntry[];
+        let invoices: Invoice[];
+        let expenses: Expense[];
+
+        if (shouldRefreshLazyDocs) {
+            // Each on-demand refresh may update the shared cloud manifest. Keep
+            // those revision-sensitive writes ordered while constructing a
+            // complete backup or transfer snapshot.
+            tasks = await this.getAllTasks(loadOptions);
+            timeEntries = await this.loadAllTimeEntries(loadOptions);
+            invoices = await this.getAllInvoices(loadOptions);
+            expenses = await this.getAllExpenses(loadOptions);
+        } else {
+            [tasks, timeEntries, invoices, expenses] = await Promise.all([
+                this.getAllTasks(loadOptions),
+                this.loadAllTimeEntries(loadOptions),
+                this.getAllInvoices(loadOptions),
+                this.getAllExpenses(loadOptions),
+            ]);
+        }
 
         return createBackupPayload({
             exportDate: options.exportDate,
@@ -2528,9 +2766,12 @@ export class YjsStore {
 
         const persistedDocs = await this.docManager.listPersistedDocs();
 
-        // Disconnect from Drive sync first
+        // Disconnect from cloud sync first. This does not revoke or delete
+        // provider data; the account flow owns those separate operations.
         this.driveProvider?.disconnect();
         this.driveProvider = null;
+        this.backupManager = null;
+        this.activeCloudProviderId = null;
 
         // Destroy in-memory docs and remove IndexedDB persistence to avoid syncing deletions
         this.docManager.destroy();
@@ -2571,7 +2812,7 @@ export class YjsStore {
         this._archivedExpensesLoading = null;
         this.disconnectedDirtyDocHandlers.clear();
         this.clearDisconnectedDirtyDocs();
-        clearSyncPersistence();
+        clearSyncPersistence(this.activeSyncScope);
         this._isReady = false;
 
         console.log('[YjsStore] All data cleared');
@@ -2585,6 +2826,7 @@ export class YjsStore {
         this.driveProvider?.disconnect();
         this.driveProvider = null;
         this.backupManager = null;
+        this.activeCloudProviderId = null;
         this.docManager.destroy();
         this._coreDoc = null;
         this._activeEntriesDoc = null;
@@ -2766,22 +3008,10 @@ export class YjsStore {
             return new Set();
         }
 
-        try {
-            const stored = localStorage.getItem(DISCONNECTED_DIRTY_DOCS_STORAGE_KEY);
-            if (!stored) {
-                return new Set();
-            }
-
-            const parsed = JSON.parse(stored);
-            if (!Array.isArray(parsed)) {
-                return new Set();
-            }
-
-            return new Set(parsed as DocName[]);
-        } catch (error) {
-            console.warn('[YjsStore] Failed to read disconnected dirty docs:', error);
-            return new Set();
-        }
+        return new Set(
+            getDisconnectedDirtyDocNames(this.activeSyncScope)
+                .filter((docName): docName is DocName => docName.length > 0),
+        );
     }
 
     private persistDisconnectedDirtyDocs(): void {
@@ -2789,19 +3019,7 @@ export class YjsStore {
             return;
         }
 
-        try {
-            if (this.disconnectedDirtyDocs.size === 0) {
-                localStorage.removeItem(DISCONNECTED_DIRTY_DOCS_STORAGE_KEY);
-                return;
-            }
-
-            localStorage.setItem(
-                DISCONNECTED_DIRTY_DOCS_STORAGE_KEY,
-                JSON.stringify(Array.from(this.disconnectedDirtyDocs)),
-            );
-        } catch (error) {
-            console.warn('[YjsStore] Failed to persist disconnected dirty docs:', error);
-        }
+        setDisconnectedDirtyDocNames(Array.from(this.disconnectedDirtyDocs), this.activeSyncScope);
     }
 }
 

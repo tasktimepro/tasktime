@@ -8,7 +8,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
-- **Drive sync:** The PWA uses direct browser-to-Google Drive requests with a short-lived memory-only access token. The public `https://sync.tasktime.pro` Worker retains OAuth code exchange, encrypted refresh-token storage, token issuance, and revocation; it does not receive routine Drive file bodies. The private Worker implementation is outside this repository.
+- **Cloud sync:** Production remains direct browser-to-Google Drive with a short-lived memory-only access token. Next-release source enables the provider-neutral lifecycle and Dropbox entry points by default, backed by the shared sync/manifest/backup core, direct Dropbox App Folder adapter, verified transfer coordinator, provider-aware UI/agents, and active-provider hosted-service identity. An explicit false build value remains an emergency UI opt-out, and Worker policy remains fail-closed. Prepared private Worker source maps hashed provider subjects to an opaque principal for email/metrics/future Pro continuity and links that principal during verified transfer; routine file bodies still bypass the Worker. Owner-only Dropbox development credentials, local identity binding, local migration, and next-release public/legal copy are prepared; production credentials, the remote identity migration, compatible Worker deployment, supported-browser canaries, and live enablement remain incomplete.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
@@ -37,7 +37,7 @@ The Yjs store is split into documents so current work stays loaded and historica
 3. Record expenses and recurrences, organize tax-return periods, and track paid/claimed states.
 4. Generate invoice drafts or quotes from unbilled work and expenses, finalize them, record payments, cancel finalized unpaid invoices as retained audit records, export/send valid documents, and undo supported billing operations.
 5. Review dashboard metrics and reports, then export CSV, PDF, ZIP, backup, or accountant artifacts.
-6. Optionally connect Google Drive using manual, backup, or bidirectional sync modes.
+6. Optionally connect Google Drive or Dropbox using manual, backup, or bidirectional sync modes.
 7. Optionally pair a same-device agent bridge and grant scoped business-action access.
 
 ## Reliability and security model
@@ -51,9 +51,14 @@ The Yjs store is split into documents so current work stays loaded and historica
 - UI hooks and agent commands share domain operations for timer lifecycle/recovered stops, protected manual time-entry mutations, task completion/recurrence state, duplicate-safe entity identity, protected expense deletion, and relationship-safe project/client/task writes.
 - Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.
-- Sync mode performs a lightweight manifest check every five minutes only while visible, and genuine pending local work blocked by an active pass or cross-tab lock retries with bounded backoff after the lock can be released.
-- Google-grant revocation is confirmed before the browser clears its Worker session; transient refresh, rate-limit, Drive-status, and revocation failures preserve retryable credentials, while explicit local disconnect remains separate.
+- Sync mode performs a lightweight manifest check every five minutes only while visible, coalesces tab-visible/browser-online signals within one second into one foreground pass, and lets genuine pending local work blocked by an active pass or cross-tab lock retry with bounded backoff after the lock can be released. External lazy-document loads serialize behind an active provider pass; lazy loads owned by that pass defer their manifest commit to the owner so revision-sensitive writes cannot overlap.
+- Provider-grant revocation is confirmed before the browser clears its Worker session; transient refresh, rate-limit, provider-status, and revocation failures preserve retryable credentials and runtime state. Google Drive and Dropbox expose the same Disconnect and Wipe data & disconnect flows, and Account sign-out/deletion reuse the active-provider lifecycle rather than assuming Google.
 - Direct transport keeps Google access tokens in one per-tab module instance only, clears them on expiry/session generation/cross-tab invalidation, removes any retired persisted-token record, deduplicates concurrent same-tab session validation, and keeps all Worker/Google API traffic outside service-worker Cache Storage. Direct reads/writes use retry-safe Google operations and the Worker does not receive routine Drive file bodies.
+- In the provider-neutral path, the active cloud session also authenticates
+  hosted email, privacy-safe synced metrics, and future Pro state. Provider
+  subjects are domain-separated hashes; transfer links them only after target
+  readback verification and before activation. This control-plane identity does
+  not expose product records or turn the Worker into a file proxy.
 - Destructive data, billing, deletion, and sync actions require explicit intent and safe preview/confirmation where available.
 - Agent access is loopback-only with short-lived pairing, scoped permissions, approvals, rate limits, and revocation. App-session bearer tokens are bounded to memory/current-tab resume state. Same-profile browser reopen uses a non-exportable origin-local P-256 key and replay-safe challenge to obtain a fresh token; the matching public authorization remains only in the live bridge, so Gateway restart requires pairing.
 - Private Worker source, secrets, provider identifiers, and internal operational material do not enter the public repository.

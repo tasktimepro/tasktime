@@ -25,7 +25,7 @@ OpenClaw skills are instruction files that teach an agent when and how to use to
 
 That last part matters.
 
-The agent should not edit browser storage, IndexedDB, Yjs documents, Google Drive sync files, invoice records, or billing state directly. It should use TaskTime Pro's MCP tools and let the visible browser app validate the work.
+The agent should not edit browser storage, IndexedDB, Yjs documents, cloud sync files, invoice records, or billing state directly. It should use TaskTime Pro's MCP tools and let the visible browser app validate the work.
 
 The prepared OpenClaw-compatible TaskTime Pro bundle is `@tasktimepro/openclaw`. It includes:
 

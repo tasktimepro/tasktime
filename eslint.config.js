@@ -23,7 +23,7 @@ const REACT_HOOKS_COMPILER_RULES = {
 }
 
 export default [
-  { ignores: ['coverage', 'dist', 'test-results'] },
+  { ignores: ['coverage', 'dist', 'test-results', 'tasktime-infra/**'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {

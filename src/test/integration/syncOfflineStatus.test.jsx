@@ -43,6 +43,15 @@ vi.mock('../../hooks/useGoogleAuth', () => ({
     })
 }))
 
+vi.mock('../../hooks/useDropboxAuth', () => ({
+
+    useDropboxAuth: () => ({
+        signIn: vi.fn(),
+        isLoading: false,
+        sessionId: null
+    })
+}))
+
 vi.mock('../../hooks/useUrlState', () => ({
 
     useUrlState: () => ({
@@ -92,10 +101,11 @@ describe('Sync and offline status integration', () => {
             <YjsSyncStatus />
         )
 
-        const connectButton = screen.getByRole('button', { name: 'Connect Google Drive' })
+        const connectButton = screen.getByRole('button', { name: 'Connect cloud storage' })
         await user.click(connectButton)
 
-        expect(authMocks.signIn).toHaveBeenCalled()
+        expect(urlStateMocks.navigateToAccount).toHaveBeenCalledWith({ section: 'sync' })
+        expect(authMocks.signIn).not.toHaveBeenCalled()
     })
 
     it('renders nothing while offline', () => {

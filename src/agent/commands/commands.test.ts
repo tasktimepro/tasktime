@@ -35,6 +35,7 @@ import {
     deleteExpenseCategoryCommand,
     deleteEmailTemplateCommand,
     createInvoiceDraftFromUnbilledWorkCommand,
+    createCloudBackupCommand,
     createDriveBackupCommand,
     deleteInvoiceTemplateCommand,
     deletePaymentMethodCommand,
@@ -62,6 +63,7 @@ import {
     getReportSummaryCommand,
     getPreferencesCommand,
     getSyncStatusCommand,
+    listCloudBackupsCommand,
     listDriveBackupsCommand,
     listDailyGoalsCommand,
     listInvoicesCommand,
@@ -94,7 +96,9 @@ import {
     previewProjectQuoteEmailCommand,
     previewInvoiceEmailCommand,
     restoreBackupJsonCommand,
+    restoreCloudBackupCommand,
     restoreDriveBackupCommand,
+    downloadCloudBackupJsonCommand,
     downloadDriveBackupJsonCommand,
     removeDailyGoalCommand,
     removePlannerAttachmentCommand,
@@ -551,8 +555,11 @@ function createContext(): AgentCommandContext & {
         createBackup: vi.fn(async () => 'drive-backup-new'),
         downloadBackup: vi.fn(async () => driveBackupPayload),
         wipeDriveData: vi.fn(async () => undefined),
+        wipeCloudData: vi.fn(async () => undefined),
         deleteAllBackups: vi.fn(async () => undefined),
         isDriveConnected: vi.fn(() => true),
+        isCloudConnected: vi.fn(() => true),
+        getActiveCloudProviderId: vi.fn(() => 'google-drive'),
         getSyncState: vi.fn(() => 'idle'),
         getSyncPhase: vi.fn(() => 'idle'),
         getDriveSyncMode: vi.fn(() => {
@@ -565,7 +572,9 @@ function createContext(): AgentCommandContext & {
         getLastSyncedAt: vi.fn(() => Date.parse('2026-06-25T12:00:00.000Z')),
         hasPendingSyncChanges: vi.fn(() => true),
         setDriveSyncPreferences: vi.fn(),
+        setCloudSyncPreferences: vi.fn(),
         forceDriveSync: vi.fn(async () => undefined),
+        forceCloudSync: vi.fn(async () => undefined),
         loadArchivedTasks: vi.fn(async () => archivedTasks),
         loadArchivedExpenses: vi.fn(async () => archivedExpenses),
         archiveTask: vi.fn(async (taskId: string) => {
@@ -599,6 +608,7 @@ function createContext(): AgentCommandContext & {
         generateId: () => `agent-id-${nextId++}`,
         permissions: new Set(['read', 'write', 'navigation']),
         idempotency: new Map(),
+        disconnectActiveCloudSession: vi.fn(async () => undefined),
         revokeDriveAccess: vi.fn(async () => undefined),
         navigation: {
             openRoute: (route) => {
@@ -3013,9 +3023,12 @@ describe('agent commands', () => {
         context.maps.preferences.set('backupFrequencyHours', 24);
 
         expect(getSyncStatusCommand(context)).toEqual({
+            activeStorageProvider: 'google-drive',
+            isCloudConnected: true,
             isDriveConnected: true,
             syncState: 'idle',
             syncPhase: 'idle',
+            cloudSyncMode: 'manual',
             driveSyncMode: 'manual',
             lastSyncedAt: Date.parse('2026-06-25T12:00:00.000Z'),
             pendingSyncChanges: true,
@@ -3075,6 +3088,105 @@ describe('agent commands', () => {
         }));
     });
 
+    it('uses provider-neutral sync and backup commands for Dropbox while Drive-named commands fail closed', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'export']);
+        vi.mocked(context.store.getActiveCloudProviderId).mockReturnValue('dropbox');
+        vi.mocked(context.store.isCloudConnected).mockReturnValue(true);
+        vi.mocked(context.store.isDriveConnected).mockReturnValue(false);
+
+        expect(getSyncStatusCommand(context)).toEqual(expect.objectContaining({
+            activeStorageProvider: 'dropbox',
+            isCloudConnected: true,
+            isDriveConnected: false,
+            cloudSyncMode: 'manual',
+            driveSyncMode: 'manual',
+        }));
+
+        const updated = await updateSyncSettingsCommand(context, {
+            autoSyncEnabled: true,
+            autoSyncMode: 'sync',
+            runSync: true,
+        });
+        expect(updated).toEqual(expect.objectContaining({
+            activeStorageProvider: 'dropbox',
+            syncTriggered: true,
+        }));
+        expect(context.store.setCloudSyncPreferences).toHaveBeenCalledWith(true, 'sync');
+        expect(context.store.forceCloudSync).toHaveBeenCalledOnce();
+        expect(context.store.setDriveSyncPreferences).not.toHaveBeenCalled();
+        expect(context.store.forceDriveSync).not.toHaveBeenCalled();
+
+        await expect(listCloudBackupsCommand(context)).resolves.toEqual(expect.objectContaining({
+            provider: 'dropbox',
+            count: 1,
+        }));
+        await expect(createCloudBackupCommand(context)).resolves.toEqual({
+            created: true,
+            provider: 'dropbox',
+            fileId: 'drive-backup-new',
+        });
+        await expect(downloadCloudBackupJsonCommand(context, {
+            backupId: 'drive-backup-1',
+        })).resolves.toEqual(expect.objectContaining({
+            provider: 'dropbox',
+            backupId: 'drive-backup-1',
+            downloadStarted: true,
+        }));
+        await expect(restoreCloudBackupCommand(context, {
+            backupId: 'drive-backup-1',
+            confirmRestore: true,
+            confirmationText: 'RESTORE',
+        })).resolves.toEqual(expect.objectContaining({
+            provider: 'dropbox',
+            restored: true,
+        }));
+
+        await expect(listDriveBackupsCommand(context)).rejects.toThrow(/requires Google Drive/);
+        await expect(createDriveBackupCommand(context)).rejects.toThrow(/requires Google Drive/);
+        await expect(downloadDriveBackupJsonCommand(context, {
+            backupId: 'drive-backup-1',
+        })).rejects.toThrow(/requires Google Drive/);
+        await expect(restoreDriveBackupCommand(context, {
+            backupId: 'drive-backup-1',
+            confirmRestore: true,
+            confirmationText: 'RESTORE',
+        })).rejects.toThrow(/requires Google Drive/);
+
+        await expect(executeAgentCommand(context, 'list_cloud_backups', {})).resolves.toEqual(expect.objectContaining({
+            ok: true,
+            command: 'list_cloud_backups',
+            data: expect.objectContaining({ provider: 'dropbox' }),
+        }));
+    });
+
+    it('deletes Dropbox and local account data through the shared active-provider lifecycle', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'export']);
+        vi.mocked(context.store.getActiveCloudProviderId).mockReturnValue('dropbox');
+        vi.mocked(context.store.isCloudConnected).mockReturnValue(true);
+        vi.mocked(context.store.isDriveConnected).mockReturnValue(false);
+
+        const deleted = await deleteAllAccountDataCommand(context, {
+            confirmDelete: true,
+            confirmationText: 'DELETE ALL DATA',
+            includeCloudData: true,
+        });
+
+        expect(deleted).toEqual(expect.objectContaining({
+            deleted: true,
+            cloudProvider: 'dropbox',
+            cloudDataDeleted: true,
+            cloudBackupsDeleted: true,
+            cloudAccessRevoked: true,
+            localDataDeleted: true,
+        }));
+        expect(context.store.wipeCloudData).toHaveBeenCalledTimes(1);
+        expect(context.store.deleteAllBackups).toHaveBeenCalledTimes(1);
+        expect(context.disconnectActiveCloudSession).toHaveBeenCalledWith({ revoke: true });
+        expect(context.store.clearAllData).toHaveBeenCalledTimes(1);
+    });
+
     it('deletes all account data only with explicit confirmation and Drive inclusion when connected', async () => {
         const context = createContext();
         context.permissions = new Set(['read', 'write', 'export']);
@@ -3105,14 +3217,18 @@ describe('agent commands', () => {
         expect(deleted).toEqual({
             deleted: true,
             localDataDeleted: true,
+            cloudProvider: 'google-drive',
+            cloudDataDeleted: true,
+            cloudBackupsDeleted: true,
+            cloudAccessRevoked: true,
             driveDataDeleted: true,
             driveBackupsDeleted: true,
             driveAccessRevoked: true,
             reloadRecommended: true,
         });
-        expect(context.store.wipeDriveData).toHaveBeenCalledTimes(1);
+        expect(context.store.wipeCloudData).toHaveBeenCalledTimes(1);
         expect(context.store.deleteAllBackups).toHaveBeenCalledTimes(1);
-        expect(context.revokeDriveAccess).toHaveBeenCalledTimes(1);
+        expect(context.disconnectActiveCloudSession).toHaveBeenCalledWith({ revoke: true });
         expect(context.store.clearAllData).toHaveBeenCalledTimes(1);
         expect(context.store.initialize).toHaveBeenCalledTimes(1);
         expect(context.maps.projects.size).toBe(0);
@@ -7411,7 +7527,7 @@ describe('agent commands', () => {
     it('previews and sends invoice email through the browser app context', async () => {
         const context = createContext();
         context.permissions = new Set(['read', 'write', 'email']);
-        context.driveSessionId = 'drive-session-1';
+        context.hostedServiceSessionId = 'dropbox-hosted-session-1';
         context.now = () => Date.parse('2026-06-25T15:00:00Z');
         context.maps.clients.set('client-1', objectToYMap({
             id: 'client-1',
@@ -7484,7 +7600,7 @@ describe('agent commands', () => {
         );
         expect(pdfMocks.generatePDFBase64).toHaveBeenCalledWith('<div>Invoice HTML</div>');
         expect(emailMocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({
-            sessionId: 'drive-session-1',
+            sessionId: 'dropbox-hosted-session-1',
             invoiceId: 'invoice-email',
             invoiceNumber: 'INV-EMAIL',
             to: 'billing@example.com',
@@ -7549,7 +7665,7 @@ describe('agent commands', () => {
     it('previews, exports, and sends non-persistent project quotes without invoice mutations', async () => {
         const context = createContext();
         context.permissions = new Set(['read', 'export', 'email']);
-        context.driveSessionId = 'drive-session-quote';
+        context.hostedServiceSessionId = 'dropbox-hosted-session-quote';
         context.now = () => Date.parse('2026-06-26T09:10:11Z');
         context.maps.clients.set('client-1', objectToYMap({
             id: 'client-1',
@@ -7697,7 +7813,7 @@ describe('agent commands', () => {
 
         expect(repeated).toBe(sent);
         expect(emailMocks.sendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({
-            sessionId: 'drive-session-quote',
+            sessionId: 'dropbox-hosted-session-quote',
             invoiceId: 'QUOTE-project-1-26091011',
             invoiceNumber: '26091011',
             to: 'quote@example.com',

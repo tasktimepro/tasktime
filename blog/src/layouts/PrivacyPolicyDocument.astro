@@ -2,18 +2,18 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/privacy' } = Astro.props;
-const LAST_UPDATED = '17 July 2026';
-const LAST_UPDATED_ISO = '2026-07-17';
+const LAST_UPDATED = '27 August 2026';
+const LAST_UPDATED_ISO = '2026-08-27';
 ---
 
 <PublicPageLayout
     pageKey="privacy"
     title="Privacy Policy"
-    summary="TaskTime Pro is a local-first app. Your work data lives in your browser and, if you choose, in your own Google Drive. Connected services process only what their requested features need."
+    summary="TaskTime Pro is a local-first app. Your work data lives in your browser and, if you choose, in your own Google Drive or Dropbox. Connected services process only what their requested features need."
     lastUpdated={LAST_UPDATED}
     lastUpdatedIso={LAST_UPDATED_ISO}
     highlights={[
-        'Your app records stay in your browser and, if you choose, your own Google Drive.',
+        'Your app records stay in your browser and, if you choose, your own Google Drive or Dropbox.',
         'There is no TaskTime-hosted workspace database containing your projects, tasks, invoices, or expenses.',
         'No advertising cookies, tracking pixels, or cross-site ad tracking.',
     ]}
@@ -22,7 +22,7 @@ const LAST_UPDATED_ISO = '2026-07-17';
     <section>
         <h2>1. Your work records are local by default</h2>
         <p>
-            TaskTime Pro stores all of your projects, tasks, time entries, expenses, invoices, and preferences directly in your browser using IndexedDB. Those records stay on your device unless you explicitly choose a connected feature such as Google Drive sync or invoice email delivery.
+            TaskTime Pro stores all of your projects, tasks, time entries, expenses, invoices, and preferences directly in your browser using IndexedDB. Those records stay on your device unless you explicitly choose a connected feature such as cloud sync or invoice email delivery.
         </p>
         <p>
             There is no TaskTime-hosted workspace database where we can look up or recover your work records as an account service. Connected services process only the information needed to perform the feature you request, as described below.
@@ -30,12 +30,12 @@ const LAST_UPDATED_ISO = '2026-07-17';
     </section>
 
     <section>
-        <h2>2. Google Drive sync goes to your own Drive</h2>
+        <h2>2. Cloud sync goes to your own storage</h2>
         <p>
-            If you connect Google Drive, TaskTime Pro syncs your data between your browser and a hidden app-data folder inside <strong>your own</strong> Google Drive storage. The synced copies belong to your Google account and are not stored as a TaskTime-hosted workspace.
+            If you connect Google Drive or Dropbox, TaskTime Pro syncs your data between your browser and a TaskTime application folder inside <strong>your own</strong> provider storage. The synced copies belong to your provider account and are not stored as a TaskTime-hosted workspace.
         </p>
         <p>
-            To make sync work, a small edge service securely maintains your Google connection, stores its encrypted refresh token, issues short-lived access tokens to authorized browser sessions, and supports revocation. Routine sync file requests travel directly between your browser and Google Drive. The access token stays only in active-browser memory, and the edge service does not receive or retain routine Drive file bodies. It does not keep your Drive file content as a TaskTime-hosted workspace.
+            To make sync work, a small edge service securely maintains your selected provider connection, stores its encrypted refresh token, issues short-lived access tokens to authorized browser sessions, and supports revocation. Routine sync file requests travel directly between your browser and Google Drive or Dropbox. The access token stays only in active-browser memory, and the edge service does not receive or retain routine sync file bodies. It does not keep your cloud file content as a TaskTime-hosted workspace.
         </p>
         <p>
             Sync is entirely optional. TaskTime Pro works fully offline without it, and you can disconnect at any time.
@@ -48,17 +48,17 @@ const LAST_UPDATED_ISO = '2026-07-17';
             TaskTime Pro does not use cookies, advertising pixels, or any form of cross-site tracking. The app uses your browser&apos;s local storage (localStorage and IndexedDB) only to keep your workspace available and to remember your preferences.
         </p>
         <p>
-            The production app may send limited aggregate usage counters &mdash; things like whether a session happened or how often broad action categories were used. Metrics may include the app version, a generated device-install identifier, local day buckets, session and action totals, and whether sync was enabled. They contain no project names, task names, client names, invoice or expense data, notes, report contents, email bodies, Drive file contents, tracked hours, or raw work records.
+            The production app may send limited aggregate usage counters &mdash; things like whether a session happened or how often broad action categories were used. Metrics may include the app version, a generated device-install identifier, local day buckets, session and action totals, and whether sync was enabled. They contain no project names, task names, client names, invoice or expense data, notes, report contents, email bodies, cloud sync file contents, tracked hours, or raw work records.
         </p>
     </section>
 
     <section>
         <h2>4. What optional services store</h2>
         <p>
-            Google Drive stores the sync documents and backups you choose to place in your own account. While Drive remains connected, TaskTime Pro&apos;s edge service stores the encrypted OAuth refresh token needed to keep that session alive. Disconnecting sync discards that token.
+            Google Drive or Dropbox stores the sync documents and backups you choose to place in your own account. While cloud authorization remains active, TaskTime Pro&apos;s edge service stores the encrypted OAuth refresh token needed to issue short-lived browser access. Disconnect detaches the current browser without deleting your provider files; Wipe data &amp; disconnect removes validated TaskTime sync files and backups, revokes access, and disconnects the browser.
         </p>
         <p>
-            The aggregate usage data described in section 3 may include a generated device-install identifier and, when Drive is connected, a sync-session header used by the service boundary. These are technical identifiers rather than names or email addresses, and the metrics exclude raw work-record content.
+            The aggregate usage data described in section 3 may include a generated device-install identifier and, when cloud sync is connected, a sync-session header used by the service boundary. These are technical identifiers rather than names or email addresses, and the metrics exclude raw work-record content. Dropbox storage identity uses a TaskTime-scoped account pseudonym rather than requesting your Dropbox email address.
         </p>
         <p>
             When you send an invoice by email, a minimal audit record is saved: a hashed identifier derived from your sync session, a hashed form of the recipient&apos;s address, and a timestamp. This is used only to enforce monthly sending limits and prevent duplicate sends. No invoice content, PDF data, or message body is stored server-side.
@@ -87,28 +87,28 @@ const LAST_UPDATED_ISO = '2026-07-17';
             TaskTime Pro may use DebugBundle or similar diagnostic tooling for production runtime failures when configured. Diagnostics are for investigating crashes, sync failures, email delivery failures, PDF generation failures, and other operational incidents.
         </p>
         <p>
-            Diagnostics may include error messages, stack traces, environment labels, app service names, source filenames, line numbers, and limited incident metadata. They are not intended to include your projects, tasks, invoices, expenses, notes, Drive file contents, or other private app records.
+            Diagnostics may include error messages, stack traces, environment labels, app service names, source filenames, line numbers, and limited incident metadata. They are not intended to include your projects, tasks, invoices, expenses, notes, cloud sync file contents, or other private app records.
         </p>
     </section>
 
     <section>
         <h2>7. Data retention</h2>
         <p>
-            Your local data stays on your device until you delete it or clear your browser storage. Synced copies stay in your Google Drive until you remove them through TaskTime Pro controls or your Google account. The encrypted refresh token is kept only while your sync connection is active. Aggregate metrics and operational audit data may be retained for abuse prevention, reliability analysis, and product maintenance, but should remain minimized and exclude private app records.
+            Your local data stays on your device until you delete it or clear your browser storage. Synced copies stay in Google Drive or Dropbox until you remove them through TaskTime Pro controls or your provider account. The encrypted refresh token is kept only while the related provider authorization remains active. Aggregate metrics and operational audit data may be retained for abuse prevention, reliability analysis, and product maintenance, but should remain minimized and exclude private app records.
         </p>
     </section>
 
     <section>
         <h2>8. Security</h2>
         <p>
-            Because your work records live primarily in your browser and, if enabled, your own Google Drive, their security depends on your device, browser, and Google account. We cannot guarantee the security of those systems, but the architecture minimizes TaskTime-hosted data and limits connected services to their stated product functions.
+            Because your work records live primarily in your browser and, if enabled, your own Google Drive or Dropbox, their security depends on your device, browser, and provider account. We cannot guarantee the security of those systems, but the architecture minimizes TaskTime-hosted data and limits connected services to their stated product functions.
         </p>
     </section>
 
     <section>
         <h2>9. You are in control</h2>
         <p>
-            You can use TaskTime Pro without an account, work offline without Drive sync, export your records, disconnect sync, explicitly remove TaskTime Pro sync data and backups from Drive, disable reminders, and delete local app data from the Account page. TaskTime Pro does not maintain a hosted workspace copy from which it can recover your projects, tasks, invoices, expenses, or time entries.
+            You can use TaskTime Pro without an account, work offline without cloud sync, export your records, disconnect sync, explicitly remove TaskTime Pro sync data and backups from your connected provider, disable reminders, and delete local app data from the Account page. TaskTime Pro does not maintain a hosted workspace copy from which it can recover your projects, tasks, invoices, expenses, or time entries.
         </p>
     </section>
 

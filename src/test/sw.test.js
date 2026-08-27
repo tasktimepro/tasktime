@@ -125,6 +125,8 @@ describe('service worker caching', () => {
         'https://sync.tasktime.pro/auth/status',
         'https://www.googleapis.com/drive/v3/files',
         'https://www.googleapis.com/upload/drive/v3/files',
+        'https://api.dropboxapi.com/2/files/get_metadata',
+        'https://content.dropboxapi.com/2/files/download',
     ])('leaves authenticated cross-origin API traffic network-only for %s', (url) => {
         const event = createEvent()
         event.request = { url, mode: 'cors', method: 'GET' }

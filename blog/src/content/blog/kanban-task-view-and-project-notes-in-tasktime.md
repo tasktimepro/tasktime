@@ -46,7 +46,7 @@ You can use it for:
 - Headings and bullet lists
 - Client reminders
 
-Notes save locally right away so writing stays fast. If you use Google Drive sync, you can keep notes synced through your own Drive without moving project details into a separate document tool; routine Drive file requests go directly from your browser to Google.
+Notes save locally right away so writing stays fast. If you use Google Drive or Dropbox sync, you can keep notes synced through your own provider account without moving project details into a separate document tool; routine sync file requests go directly from your browser to that provider.
 
 ## Why this matters
 

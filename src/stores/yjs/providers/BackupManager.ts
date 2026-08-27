@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * BackupManager - Automated daily backups to Google Drive
+ * BackupManager - Automated daily backups through a cloud file store
  *
  * Sync contract source of truth: ../../../components/sync/README.md
  * 
@@ -15,7 +15,7 @@
  * File naming: tasktime-backup-YYYY-MM-DD-HHmm.json
  */
 
-import { ManifestManager } from './ManifestManager';
+import { CloudManifestManager } from './ManifestManager';
 import type { YjsStore } from '../YjsStore';
 
 const BACKUP_PREFIX = 'tasktime-backup-';
@@ -34,15 +34,28 @@ export interface BackupInfo {
     sizeLabel?: string;
 }
 
-export class BackupManager {
+export interface CloudBackupManagerOptions {
+    providerLabel?: string;
+    collisionSafeFileNames?: boolean;
+}
 
-    private manifest: ManifestManager;
+export class CloudBackupManager {
+
+    private manifest: CloudManifestManager;
     private store: YjsStore;
     private lastBackupAt: number | null = null;
+    private readonly providerLabel: string;
+    private readonly collisionSafeFileNames: boolean;
 
-    constructor(manifest: ManifestManager, store: YjsStore) {
+    constructor(
+        manifest: CloudManifestManager,
+        store: YjsStore,
+        options: CloudBackupManagerOptions = {},
+    ) {
         this.manifest = manifest;
         this.store = store;
+        this.providerLabel = options.providerLabel ?? 'cloud provider';
+        this.collisionSafeFileNames = options.collisionSafeFileNames === true;
     }
 
     /**
@@ -60,7 +73,7 @@ export class BackupManager {
      */
     async maybeCreateBackup(frequencyHours: number): Promise<boolean> {
         try {
-            // Fast path: skip Drive listing if we know it's too soon
+            // Fast path: skip provider listing if we know it's too soon.
             const frequencyMs = frequencyHours * 60 * 60 * 1000;
             if (this.lastBackupAt != null && (Date.now() - this.lastBackupAt) < frequencyMs) {
                 return false;
@@ -104,7 +117,10 @@ export class BackupManager {
         const now = new Date();
         const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
         const timeStr = now.toISOString().slice(11, 16).replace(':', ''); // HHmm
-        const fileName = `${BACKUP_PREFIX}${dateStr}-${timeStr}.json`;
+        const collisionSuffix = this.collisionSafeFileNames
+            ? `${now.toISOString().slice(17, 19)}-${crypto.randomUUID().slice(0, 8)}`
+            : '';
+        const fileName = `${BACKUP_PREFIX}${dateStr}-${timeStr}${collisionSuffix ? `-${collisionSuffix}` : ''}.json`;
 
         const fileId = await this.manifest.createFile(fileName, blob);
         console.log(`[BackupManager] Created backup: ${fileName}`);
@@ -115,10 +131,10 @@ export class BackupManager {
      * List all backups, sorted by date (newest first)
      */
     async listBackups(): Promise<BackupInfo[]> {
-        const allFiles = await this.manifest.listAppDataFiles();
+        const allFiles = await this.manifest.listBackupFiles();
 
         return allFiles
-            .filter(f => BackupManager.isBackupFile(f.name))
+            .filter(f => CloudBackupManager.isBackupFile(f.name))
             .sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime))
             .map(f => ({
                 id: f.id,
@@ -159,8 +175,8 @@ export class BackupManager {
             ]);
 
             throw new Error(
-                `Could not delete ${failedNames.size} Drive backup${failedNames.size === 1 ? '' : 's'}. `
-                + 'Your account data was not fully deleted. Check your connection and retry before disconnecting Drive.'
+                `Could not delete ${failedNames.size} ${this.providerLabel} backup${failedNames.size === 1 ? '' : 's'}. `
+                + `Your account data was not fully deleted. Check your connection and retry before disconnecting ${this.providerLabel}.`
             );
         }
 
@@ -236,5 +252,12 @@ export class BackupManager {
         // tasktime-backup-YYYY-MM-DD-HHmm.json → YYYY-MM-DD
         const match = name.match(/tasktime-backup-(\d{4}-\d{2}-\d{2})/);
         return match?.[1] ?? 'unknown';
+    }
+}
+
+/** Google-compatible backup facade retained for existing imports and copy. */
+export class BackupManager extends CloudBackupManager {
+    constructor(manifest: CloudManifestManager, store: YjsStore) {
+        super(manifest, store, { providerLabel: 'Drive' });
     }
 }

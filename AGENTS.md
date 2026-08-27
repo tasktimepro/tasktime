@@ -54,7 +54,7 @@ Ongoing agent workflows are available in `.github/prompts/`. `status/` is the ex
 - **Storage:** Yjs CRDT with IndexedDB persistence (via `y-indexeddb`)
 - **State:** Yjs-backed React hooks in App.jsx
 - **Routing:** Path-based via `useUrlState` hook (e.g., `/projects`, `/clients/123`)
-- **Sync:** Yjs + Google Drive (delta-based, conflict-free)
+- **Sync:** Yjs + Google Drive or Dropbox (delta-based, conflict-free)
 
 ---
 
@@ -70,13 +70,13 @@ Ongoing agent workflows are available in `.github/prompts/`. `status/` is the ex
 - **Engine:** Yjs for conflict-free sync
 - **Persistence:** y-indexeddb for local storage
 - **Multi-doc architecture:** Data split by type/time period
-- **Sync provider:** Google Drive (delta uploads)
+- **Sync provider:** One active Google Drive or Dropbox provider (direct delta uploads)
 
 ### Schema Changes & Cloud Sync (Production)
 - Schema changes must be additive or include an explicit migration path.
-- Existing IndexedDB and Google Drive state must be considered live customer data.
+- Existing IndexedDB, Google Drive, and Dropbox state must be considered live customer data.
 - Old cloud state can reintroduce incompatible records after local changes; compatibility must be handled in validation, migrations, and sync code.
-- Test schema changes against realistic existing local and Drive-backed data before release.
+- Test schema changes against realistic existing local and provider-backed data before release.
 - Never auto-sync destructive resets across devices.
 
 **Document structure:**
@@ -200,11 +200,12 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 **Key rules:**
 - **Backup = push-only by default.** No automatic pulling of remote changes. Users must click "Sync Now" or reload to get remote changes.
 - **Sync = full bidirectional.** Pulls + pushes on all triggers with cooldowns.
-- **Manual = user-controlled.** Only "Sync Now" triggers sync after setup. Page reload and reconnect normally only establish the Drive connection without pulling or pushing, except a pristine first device may do one bootstrap pull so existing Drive data appears immediately.
+- **Manual = user-controlled.** Only "Sync Now" triggers sync after setup. Page reload and reconnect normally only establish the cloud connection without pulling or pushing, except a pristine first device may do one bootstrap pull so existing provider data appears immediately.
 - **Sync Now = full-state verification.** The user-facing action pulls and verifies every loaded document by uploading its full current state; refresh-only internal callers explicitly disable full-state verification.
-- **Pull efficiency:** Before downloading, a lightweight `modifiedTime` metadata check determines if the manifest changed. No download if unchanged.
+- **Pull efficiency:** Before downloading, a lightweight provider metadata check determines if the manifest changed. No download if unchanged.
 - **Pull throttle:** 30 seconds — skips manifest reload if no local changes and last pull was recent.
-- **Foreground request budget:** A clean focus/online event inside the 60-second cooldown makes zero Worker/Drive requests. Once stale, an unchanged clean check makes one manifest-metadata request, advances the local cooldown, and performs no document transfer, manifest save, backup listing, or full app-data listing.
+- **Foreground request budget:** A clean focus/online event inside the 60-second cooldown makes zero Worker/provider requests. Once stale, an unchanged clean check makes one manifest-metadata request, advances the local cooldown, and performs no document transfer, manifest save, backup listing, or full provider-namespace listing.
+- **Foreground wake coalescing:** Tab-visible and browser-online signals arriving within one second schedule one eligibility check and at most one sync pass. A genuinely later online event remains a normal recovery trigger.
 - **Cross-tab lock:** Web Locks API prevents duplicate syncs across tabs.
 - **Pending local retry:** If an automatic upload meets an active sync or occupied Web Lock, genuine pending local work retries with bounded exponential backoff after the current pass can release the lock. Clean checks do not retry, and failed network/conflict passes wait for the normal recovery triggers.
 - **Page-exit serialization:** Hiding or exiting during an active sync does not enqueue a second forced pass.
@@ -212,7 +213,7 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 - **Idempotent reconciliation:** Archive and persisted-record reconciliation emits no Yjs update after records are already settled.
 - **Never auto-sync destructive resets across devices** — e.g., `resetExpiredSkips` must not undo a valid skip from another device.
 
-### 🔐 Google Drive Auth - Cloudflare Worker
+### 🔐 Cloud Provider Auth - Cloudflare Worker
 
 **Token persistence is handled by a Cloudflare Worker** to solve OAuth token expiry:
 
@@ -224,8 +225,8 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 1. OAuth popup → Worker exchanges code for tokens
 2. Worker encrypts and stores refresh token in KV
 3. Worker returns session ID to app (stored in localStorage)
-4. Worker status selects direct Google Drive for the next connection
-5. The browser receives a short-lived access token kept only in tab memory and sends routine Drive file requests directly to Google
+4. Provider-bound Worker status selects direct Google Drive or Dropbox for the next connection
+5. The browser receives a short-lived access token kept only in tab memory and sends routine sync file requests directly to the selected provider
 6. Worker auto-refreshes access tokens as needed; it never returns a refresh token to the browser
 
 **Worker operations:** Deployment, logs, D1/KV commands, and secret management live in the private infrastructure repository, not in the public app Makefile.

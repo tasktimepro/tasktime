@@ -87,8 +87,9 @@ function getParamsFromUrl(): UrlParams {
                 view = 'account';
                 break;
             case 'auth':
-                // Handle /auth/callback path
-                if (pathParts[1] === 'callback') {
+                // Handle Google and provider-specific OAuth callback paths.
+                if (pathParts[1] === 'callback'
+                    || (pathParts[1] === 'dropbox' && pathParts[2] === 'callback')) {
                     view = 'auth-callback';
                 }
                 break;

@@ -6,6 +6,7 @@
 - [x] Configure and verify the `CLAWHUB_TOKEN` GitHub Actions secret without exposing its value; dry runs require no secret.
 - [ ] Verify directory listings and publish the skill/MCP metadata to remaining appropriate registries.
 - [ ] Keep bridge package, vendored bundles, generated tool catalogs, public docs, and registry metadata synchronized.
+- [x] Add canonical provider-neutral cloud sync/backup commands for the Dropbox implementation, retain already-shipped Drive-named commands only as deprecated Google-only compatibility aliases, route hosted email through the active Google Drive or Dropbox session, and prepare the additive bridge `1.1.0`, OpenClaw `1.1.0`, Claude `1.1.0`, and Claude marketplace `1.3.0` artifacts locally without publishing them. The unchanged ClawHub skill remains `1.2.1`.
 - [x] Add approval-required, billing-scoped `cancel_invoice` with shared replay-safe behavior, canceled list/report schemas, sanitized failures, and live UI/agent parity coverage.
 - [x] Enforce current paid-only eligibility for `mark_invoice_unpaid` and current cancellation eligibility at first commit, returning sanitized conflicts without partial mutation.
 - [x] Add explicit free/no-account/offline/open-source/browser-storage/aggregate-metrics facts and canonical first-party ClawHub source metadata to discovery surfaces without hard-coding the tool count in promotional copy.
@@ -21,7 +22,7 @@
 - [x] Implement the durability v1 candidate: secret-free lifecycle-managed discovery, same-tab and same-profile browser continuity, Gateway-owned native OpenClaw service, duplicate-owner blocking, explicit validated migration guidance, shutdown cleanup, and synchronized public/source-of-truth docs.
 - [x] Pass `make release-gate`, `release:agent`, focused lifecycle/plugin tests, isolated and live OpenClaw install/inspect/doctor, package dry-runs, and aligned `2026.7.1-2` native Gateway migration/rollback checks; keep only the installed native write/timer leg pending.
 - [x] Align the shell CLI and Gateway at OpenClaw `2026.7.1-2`, update the drifted official Codex plugin, and verify healthy loopback Gateway connectivity with no plugin diagnostics.
-- [x] Prepare but do not publish the coordinated candidate versions: core app `1.4.0`, agent bridge/MCP Registry `1.0.0`, OpenClaw and Claude bundles `1.0.0`, and ClawHub skill/Claude marketplace `1.2.0`.
+- [x] Prepare the earlier durability-only candidate as core app `1.4.0`, agent bridge/MCP Registry `1.0.0`, OpenClaw and Claude bundles `1.0.0`, and ClawHub skill/Claude marketplace `1.2.0`; the current provider-neutral release train above supersedes that unpublished candidate.
 
 ## Production baseline
 
@@ -33,4 +34,4 @@
 
 Publishing details remain governed by `docs/agent-release-runbook.md`.
 
-The implemented durability phase is the agent integration v1 candidate. Do not commit, tag, publish, or deploy it until the remaining installed native write/timer decision is resolved and the user explicitly approves those actions.
+The provider-neutral sync agent artifacts are locally prepared and validated. Do not tag, publish, or deploy them without separate explicit approval.

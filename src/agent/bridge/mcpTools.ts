@@ -2103,20 +2103,46 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
         },
     },
     {
+        name: 'list_cloud_backups',
+        description: 'List TaskTime Pro backup snapshots in the active cloud provider without returning backup contents.',
+        scopes: ['read', 'export'],
+        inputSchema: emptySchema,
+    },
+    {
+        name: 'create_cloud_backup',
+        description: 'Create a TaskTime Pro backup snapshot in the active cloud provider using the existing backup manager.',
+        scopes: ['read', 'export'],
+        inputSchema: emptySchema,
+    },
+    {
+        name: 'download_cloud_backup_json',
+        description: 'Download a selected backup from the active cloud provider as a browser JSON file without returning backup contents through the bridge.',
+        scopes: ['read', 'export'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                backupId: optionalString,
+                filename: optionalString,
+            },
+            required: ['backupId'],
+            additionalProperties: false,
+        },
+    },
+    {
         name: 'list_drive_backups',
-        description: 'List TaskTime Pro backup snapshots available in Google Drive without returning backup contents.',
+        description: 'Deprecated Google Drive compatibility alias for list_cloud_backups. List TaskTime Pro backup snapshots in Google Drive without returning backup contents.',
         scopes: ['read', 'export'],
         inputSchema: emptySchema,
     },
     {
         name: 'create_drive_backup',
-        description: 'Create a TaskTime Pro backup snapshot in Google Drive using the existing backup manager.',
+        description: 'Deprecated Google Drive compatibility alias for create_cloud_backup. Create a TaskTime Pro backup snapshot in Google Drive.',
         scopes: ['read', 'export'],
         inputSchema: emptySchema,
     },
     {
         name: 'download_drive_backup_json',
-        description: 'Download a selected Google Drive backup as a browser JSON file without returning backup contents through the bridge.',
+        description: 'Deprecated Google Drive compatibility alias for download_cloud_backup_json. Download a selected Google Drive backup as a browser JSON file without returning backup contents through the bridge.',
         scopes: ['read', 'export'],
         inputSchema: {
             type: 'object',
@@ -2157,8 +2183,23 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
         },
     },
     {
+        name: 'restore_cloud_backup',
+        description: 'Replace current local TaskTime Pro data from a selected backup in the active cloud provider after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.',
+        scopes: ['read', 'write', 'export'],
+        inputSchema: {
+            type: 'object',
+            properties: {
+                backupId: optionalString,
+                confirmRestore: optionalBoolean,
+                confirmationText: optionalString,
+            },
+            required: ['backupId', 'confirmRestore', 'confirmationText'],
+            additionalProperties: false,
+        },
+    },
+    {
         name: 'restore_drive_backup',
-        description: 'Replace current local TaskTime Pro data from a selected Google Drive backup after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.',
+        description: 'Deprecated Google Drive compatibility alias for restore_cloud_backup. Replace current local TaskTime Pro data from a selected Google Drive backup after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
@@ -2173,13 +2214,13 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'get_sync_status',
-        description: 'Read current Google Drive sync status, auto-sync mode, pending changes, and backup preference metadata.',
+        description: 'Read the active cloud provider, sync status, auto-sync mode, pending changes, and backup preference metadata.',
         scopes: ['read'],
         inputSchema: emptySchema,
     },
     {
         name: 'update_sync_settings',
-        description: 'Update explicit Google Drive sync and backup preferences. Backup mode requires confirmBackupMode: true. Optional runSync triggers Sync Now after saving.',
+        description: 'Update explicit cloud sync and backup preferences for the active provider. Backup mode requires confirmBackupMode: true. Optional runSync triggers Sync Now after saving.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
@@ -2196,13 +2237,14 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'delete_all_account_data',
-        description: 'Delete all local TaskTime Pro data and, when Drive is connected, wipe Drive sync data and backups after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal DELETE ALL DATA.',
+        description: 'Delete all local TaskTime Pro data and, when cloud storage is connected, wipe all TaskTime sync data and backups and revoke the active provider after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal DELETE ALL DATA.',
         scopes: ['read', 'write', 'export'],
         inputSchema: {
             type: 'object',
             properties: {
                 confirmDelete: optionalBoolean,
                 confirmationText: optionalString,
+                includeCloudData: optionalBoolean,
                 includeDriveData: optionalBoolean,
             },
             required: ['confirmDelete', 'confirmationText'],

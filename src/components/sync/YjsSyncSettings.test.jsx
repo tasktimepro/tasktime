@@ -5,17 +5,40 @@ import userEvent from '@testing-library/user-event'
 import YjsSyncSettings from './YjsSyncSettings'
 
 const signInMock = vi.hoisted(() => vi.fn())
+const signInDropboxMock = vi.hoisted(() => vi.fn())
+const disconnectDropboxMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const updatePreferencesMock = vi.hoisted(() => vi.fn())
 const setDriveSyncPreferencesMock = vi.hoisted(() => vi.fn())
 const storeIsDriveConnectedMock = vi.hoisted(() => vi.fn())
+const storeIsCloudConnectedMock = vi.hoisted(() => vi.fn())
 const wipeDriveDataMock = vi.hoisted(() => vi.fn())
+const wipeCloudDataMock = vi.hoisted(() => vi.fn())
 const deleteAllBackupsMock = vi.hoisted(() => vi.fn())
+const forceSyncCloudMock = vi.hoisted(() => vi.fn())
+const disconnectCloudMock = vi.hoisted(() => vi.fn())
+const disconnectActiveCloudSessionMock = vi.hoisted(() => vi.fn())
+const startTransferMock = vi.hoisted(() => vi.fn())
+const resumeTransferMock = vi.hoisted(() => vi.fn())
+const dropboxFeatureState = vi.hoisted(() => ({ enabled: false }))
+const transferState = vi.hoisted(() => ({
+    status: 'idle',
+    stage: null,
+    targetProvider: null,
+    error: null,
+    canResume: false,
+    isTransferInProgress: false,
+}))
 const yjsSyncSettingsMocks = vi.hoisted(() => ({
     isDriveConnected: false,
+    isCloudConnected: false,
+    activeStorageProvider: null,
     isConnecting: false,
     isSignedIn: false,
+    isDropboxSignedIn: false,
+    dropboxSessionId: null,
+    dropboxAuthError: null,
     isMobileLayout: false,
     user: null,
     pendingSyncChanges: false,
@@ -34,6 +57,7 @@ vi.mock('@/contexts/YjsContext', () => ({
     useYjs: () => ({
         store: {
             isDriveConnected: storeIsDriveConnectedMock,
+            isCloudConnected: storeIsCloudConnectedMock,
             setDriveSyncPreferences: setDriveSyncPreferencesMock,
         },
         isReady: true,
@@ -41,14 +65,20 @@ vi.mock('@/contexts/YjsContext', () => ({
         syncState: yjsSyncSettingsMocks.syncState,
         syncPhase: yjsSyncSettingsMocks.syncPhase,
         isDriveConnected: yjsSyncSettingsMocks.isDriveConnected,
+        isCloudConnected: yjsSyncSettingsMocks.isCloudConnected,
+        activeStorageProvider: yjsSyncSettingsMocks.activeStorageProvider,
         isConnecting: yjsSyncSettingsMocks.isConnecting,
         hasSynced: false,
         manualSyncInProgress: false,
         lastSyncedAt: yjsSyncSettingsMocks.lastSyncedAt,
         pendingSyncChanges: yjsSyncSettingsMocks.pendingSyncChanges,
         forceSyncDrive: yjsSyncSettingsMocks.forceSyncDrive,
+        forceSyncCloud: forceSyncCloudMock,
         disconnectDrive: yjsSyncSettingsMocks.disconnectDrive,
+        disconnectCloud: disconnectCloudMock,
+        disconnectActiveCloudSession: disconnectActiveCloudSessionMock,
         wipeDriveData: wipeDriveDataMock,
+        wipeCloudData: wipeCloudDataMock,
         deleteAllBackups: deleteAllBackupsMock,
     }),
 }))
@@ -60,7 +90,33 @@ vi.mock('@/hooks/useGoogleAuth', () => ({
         user: yjsSyncSettingsMocks.user,
         signIn: signInMock,
         signOut: yjsSyncSettingsMocks.signOut,
+        revokeAccess: vi.fn(),
+        hadPreviousSession: false,
     }),
+}))
+
+vi.mock('@/hooks/useDropboxAuth', () => ({
+    useDropboxAuth: () => ({
+        isSignedIn: yjsSyncSettingsMocks.isDropboxSignedIn,
+        isLoading: false,
+        sessionId: yjsSyncSettingsMocks.dropboxSessionId,
+        error: yjsSyncSettingsMocks.dropboxAuthError,
+        signIn: signInDropboxMock,
+        disconnect: disconnectDropboxMock,
+        refresh: vi.fn(),
+    }),
+}))
+
+vi.mock('@/hooks/useCloudProviderTransfer', () => ({
+    useCloudProviderTransfer: () => ({
+        ...transferState,
+        startTransfer: startTransferMock,
+        resumeTransfer: resumeTransferMock,
+    }),
+}))
+
+vi.mock('@/config/cloudProviders', () => ({
+    isDropboxCloudUiEnabled: () => dropboxFeatureState.enabled,
 }))
 
 vi.mock('@/hooks/usePreferences', () => ({
@@ -101,8 +157,13 @@ describe('YjsSyncSettings', () => {
             HTMLElement.prototype.scrollIntoView = vi.fn()
         }
         yjsSyncSettingsMocks.isDriveConnected = false
+        yjsSyncSettingsMocks.isCloudConnected = false
+        yjsSyncSettingsMocks.activeStorageProvider = null
         yjsSyncSettingsMocks.isConnecting = false
         yjsSyncSettingsMocks.isSignedIn = false
+        yjsSyncSettingsMocks.isDropboxSignedIn = false
+        yjsSyncSettingsMocks.dropboxSessionId = null
+        yjsSyncSettingsMocks.dropboxAuthError = null
         yjsSyncSettingsMocks.isMobileLayout = false
         yjsSyncSettingsMocks.user = null
         yjsSyncSettingsMocks.pendingSyncChanges = false
@@ -111,9 +172,21 @@ describe('YjsSyncSettings', () => {
         yjsSyncSettingsMocks.syncPhase = 'idle'
         yjsSyncSettingsMocks.autoSyncEnabled = false
         yjsSyncSettingsMocks.autoSyncMode = 'sync'
+        dropboxFeatureState.enabled = false
+        Object.assign(transferState, {
+            status: 'idle',
+            stage: null,
+            targetProvider: null,
+            error: null,
+            canResume: false,
+            isTransferInProgress: false,
+        })
         storeIsDriveConnectedMock.mockReturnValue(false)
+        storeIsCloudConnectedMock.mockReturnValue(false)
         wipeDriveDataMock.mockResolvedValue(undefined)
+        wipeCloudDataMock.mockResolvedValue(undefined)
         deleteAllBackupsMock.mockResolvedValue(undefined)
+        disconnectActiveCloudSessionMock.mockResolvedValue(undefined)
         yjsSyncSettingsMocks.signOut.mockResolvedValue(undefined)
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     })
@@ -133,6 +206,135 @@ describe('YjsSyncSettings', () => {
         expect(showSuccessMock).not.toHaveBeenCalled()
     })
 
+    it('keeps Dropbox entry points hidden until the client feature flag is enabled', () => {
+        render(<YjsSyncSettings />)
+
+        expect(screen.queryByRole('button', { name: /connect dropbox/i })).toBeNull()
+        expect(screen.getByRole('button', { name: /connect google drive/i })).toBeInTheDocument()
+    })
+
+    it('gives both provider choices equal primary emphasis and provider-specific marks', () => {
+        dropboxFeatureState.enabled = true
+
+        render(<YjsSyncSettings />)
+
+        const googleDriveButton = screen.getByRole('button', { name: /connect google drive/i })
+        const dropboxButton = screen.getByRole('button', { name: /connect dropbox/i })
+
+        expect(googleDriveButton).toHaveClass('bg-primary')
+        expect(dropboxButton).toHaveClass('bg-primary')
+        expect(googleDriveButton.querySelector('[data-provider-icon="google-drive"]')).toHaveAttribute('aria-hidden', 'true')
+        expect(dropboxButton.querySelector('[data-provider-icon="dropbox"]')).toHaveAttribute('aria-hidden', 'true')
+    })
+
+    it('shows the active provider mark and switches it with the active provider title', () => {
+        dropboxFeatureState.enabled = true
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        const { rerender } = render(<YjsSyncSettings />)
+
+        const googleTitle = screen.getByText('Google Drive')
+        expect(googleTitle.parentElement?.querySelector('[data-provider-icon="google-drive"]')).toHaveAttribute('aria-hidden', 'true')
+
+        yjsSyncSettingsMocks.isDriveConnected = false
+        yjsSyncSettingsMocks.activeStorageProvider = 'dropbox'
+        yjsSyncSettingsMocks.isSignedIn = false
+        yjsSyncSettingsMocks.isDropboxSignedIn = true
+        yjsSyncSettingsMocks.user = null
+        rerender(<YjsSyncSettings />)
+
+        const dropboxTitle = screen.getByText('Dropbox')
+        expect(dropboxTitle.parentElement?.querySelector('[data-provider-icon="dropbox"]')).toHaveAttribute('aria-hidden', 'true')
+    })
+
+    it('places durable transfer progress above the active provider card', () => {
+        dropboxFeatureState.enabled = true
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+        Object.assign(transferState, {
+            status: 'transferring',
+            stage: 'target-prepared',
+            targetProvider: 'dropbox',
+            error: null,
+            canResume: true,
+            isTransferInProgress: true,
+        })
+
+        render(<YjsSyncSettings />)
+
+        const transferTitle = screen.getByText('Moving to Dropbox')
+        const providerTitle = screen.getByText('Google Drive')
+        expect(transferTitle.compareDocumentPosition(providerTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+        const progress = screen.getByRole('progressbar', { name: 'Transfer to Dropbox progress' })
+        expect(progress).toHaveAttribute('aria-valuenow', '55')
+        const progressFill = progress.querySelector('[data-transfer-progress-fill]')
+        const progressActivity = progress.querySelector('[data-transfer-progress-activity]')
+        expect(progressFill).toContainElement(progressActivity)
+        expect(progressActivity).toHaveClass('transfer-progress-activity')
+        expect(screen.getByText('55%')).toBeInTheDocument()
+        expect(screen.getByText('Verifying your data in Dropbox')).toBeInTheDocument()
+        expect(screen.getByText(
+            'Do not use TaskTime on other devices during this transfer. Then connect them to Dropbox before making changes.',
+        )).toBeInTheDocument()
+    })
+
+    it('starts transfer progress at zero until the first durable stage', () => {
+        dropboxFeatureState.enabled = true
+        Object.assign(transferState, {
+            status: 'authorizing',
+            stage: null,
+            targetProvider: 'dropbox',
+            error: null,
+            canResume: false,
+            isTransferInProgress: true,
+        })
+
+        render(<YjsSyncSettings />)
+
+        const progress = screen.getByRole('progressbar', { name: 'Transfer to Dropbox progress' })
+        expect(progress).toHaveAttribute('aria-valuenow', '0')
+        expect(screen.getByText('0%')).toBeInTheDocument()
+        expect(screen.getByText('Waiting for provider authorization')).toBeInTheDocument()
+    })
+
+    it('removes completed transfer progress after success takes over', () => {
+        dropboxFeatureState.enabled = true
+        Object.assign(transferState, {
+            status: 'complete',
+            stage: 'finalizing',
+            targetProvider: 'dropbox',
+            error: null,
+            canResume: false,
+            isTransferInProgress: false,
+        })
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.queryByText('Moved to Dropbox')).toBeNull()
+        expect(screen.queryByRole('progressbar', { name: 'Transfer to Dropbox progress' })).toBeNull()
+    })
+
+    it('offers Dropbox as a direct cloud provider when the client feature flag is enabled', async () => {
+        dropboxFeatureState.enabled = true
+        signInDropboxMock.mockResolvedValueOnce({ sessionId: 'dropbox-session' })
+
+        render(<YjsSyncSettings />)
+
+        await userEvent.click(screen.getByRole('button', { name: /connect dropbox/i }))
+
+        expect(signInDropboxMock).toHaveBeenCalledOnce()
+        expect(signInMock).not.toHaveBeenCalled()
+        expect(screen.getByText(/one cloud provider for private, direct browser-to-provider sync/i)).toBeInTheDocument()
+    })
+
     it('does not show a stale connect error after Drive is already connected', async () => {
         signInMock.mockImplementationOnce(async () => {
             storeIsDriveConnectedMock.mockReturnValue(true)
@@ -149,6 +351,8 @@ describe('YjsSyncSettings', () => {
 
     it('uses a full-width action row for disconnect and sync on mobile', () => {
         yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
         yjsSyncSettingsMocks.isSignedIn = true
         yjsSyncSettingsMocks.isMobileLayout = true
         yjsSyncSettingsMocks.user = { email: 'user@example.com' }
@@ -161,6 +365,8 @@ describe('YjsSyncSettings', () => {
 
     it('shows manual-mode connected wording before the first manual sync', () => {
         yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
         yjsSyncSettingsMocks.isSignedIn = true
         yjsSyncSettingsMocks.user = { email: 'user@example.com' }
 
@@ -171,6 +377,8 @@ describe('YjsSyncSettings', () => {
 
     it('shows waiting manual-sync wording when local changes are pending', () => {
         yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
         yjsSyncSettingsMocks.isSignedIn = true
         yjsSyncSettingsMocks.user = { email: 'user@example.com' }
         yjsSyncSettingsMocks.pendingSyncChanges = true
@@ -203,8 +411,24 @@ describe('YjsSyncSettings', () => {
         expect(screen.getByText('Not connected')).toBeInTheDocument()
     })
 
+    it('offers retry and local disconnect when a retained Dropbox session cannot be validated', async () => {
+        dropboxFeatureState.enabled = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'dropbox'
+        yjsSyncSettingsMocks.dropboxSessionId = 'retained-dropbox-session'
+        yjsSyncSettingsMocks.dropboxAuthError = 'The Dropbox connection service is temporarily unavailable.'
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.getByText('Connection unavailable')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Connect Dropbox' })).toBeNull()
+    })
+
     it('labels sync as recommended and backup as device-only', () => {
         yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
         yjsSyncSettingsMocks.isSignedIn = true
         yjsSyncSettingsMocks.user = { email: 'user@example.com' }
         yjsSyncSettingsMocks.autoSyncEnabled = true
@@ -218,6 +442,8 @@ describe('YjsSyncSettings', () => {
 
     it('requires confirmation before switching to device backup mode', async () => {
         yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
         yjsSyncSettingsMocks.isSignedIn = true
         yjsSyncSettingsMocks.user = { email: 'user@example.com' }
         yjsSyncSettingsMocks.autoSyncEnabled = true
@@ -238,11 +464,13 @@ describe('YjsSyncSettings', () => {
             autoSyncMode: 'backup',
         })
         expect(setDriveSyncPreferencesMock).toHaveBeenCalledWith(true, 'backup')
-        expect(yjsSyncSettingsMocks.forceSyncDrive).toHaveBeenCalled()
+        expect(forceSyncCloudMock).toHaveBeenCalled()
     })
 
     it('shows Sync Now needed when backup mode is blocked with pending changes', () => {
         yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
         yjsSyncSettingsMocks.isSignedIn = true
         yjsSyncSettingsMocks.user = { email: 'user@example.com' }
         yjsSyncSettingsMocks.autoSyncEnabled = true
@@ -255,45 +483,132 @@ describe('YjsSyncSettings', () => {
         expect(screen.getByText('Sync Now needed')).toBeInTheDocument()
     })
 
-    it('preserves backup snapshots by default when wiping Drive sync data', async () => {
+    it('offers only disconnect and wipe actions for a connected provider', async () => {
         yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
         yjsSyncSettingsMocks.isSignedIn = true
         yjsSyncSettingsMocks.user = { email: 'user@example.com' }
 
         render(<YjsSyncSettings />)
 
+        expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument()
         await userEvent.click(screen.getByRole('button', { name: /more actions/i }))
-        await userEvent.click(screen.getByText('Wipe & Disconnect'))
-
-        expect(screen.getByText('Also delete backup snapshots')).toBeInTheDocument()
-
-        await userEvent.type(screen.getByLabelText(/wipe drive/i), 'wipe drive')
-        await userEvent.click(screen.getByRole('button', { name: 'Wipe & Disconnect' }))
-
-        expect(wipeDriveDataMock).toHaveBeenCalledTimes(1)
-        expect(deleteAllBackupsMock).not.toHaveBeenCalled()
-        expect(yjsSyncSettingsMocks.disconnectDrive).toHaveBeenCalledTimes(1)
-        expect(yjsSyncSettingsMocks.signOut).toHaveBeenCalledTimes(1)
-        expect(showSuccessMock).toHaveBeenCalledWith('Google Drive sync data wiped and disconnected')
+        expect(screen.getByText('Wipe data & disconnect')).toBeInTheDocument()
+        expect(screen.queryByText('Revoke access')).toBeNull()
     })
 
-    it('deletes backup snapshots when the wipe backup option is selected', async () => {
+    it.each([
+        ['google-drive', true, false, 'Google Drive'],
+        ['dropbox', false, true, 'Dropbox'],
+    ])('wipes all cloud data and revokes %s before disconnecting', async (provider, driveSignedIn, dropboxSignedIn, providerName) => {
         yjsSyncSettingsMocks.isDriveConnected = true
-        yjsSyncSettingsMocks.isSignedIn = true
-        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = provider
+        yjsSyncSettingsMocks.isSignedIn = driveSignedIn
+        yjsSyncSettingsMocks.isDropboxSignedIn = dropboxSignedIn
+        yjsSyncSettingsMocks.user = driveSignedIn ? { email: 'user@example.com' } : null
 
         render(<YjsSyncSettings />)
 
         await userEvent.click(screen.getByRole('button', { name: /more actions/i }))
-        await userEvent.click(screen.getByText('Wipe & Disconnect'))
-        await userEvent.click(screen.getByText('Also delete backup snapshots'))
-        await userEvent.type(screen.getByLabelText(/wipe drive/i), 'wipe drive')
-        await userEvent.click(screen.getByRole('button', { name: 'Wipe & Disconnect' }))
+        await userEvent.click(screen.getByText('Wipe data & disconnect'))
+        expect(screen.queryByText('Also delete backup snapshots')).toBeNull()
+        await userEvent.type(screen.getByLabelText(/wipe data/i), 'wipe data')
+        await userEvent.click(screen.getByRole('button', { name: 'Wipe & disconnect' }))
 
-        expect(wipeDriveDataMock).toHaveBeenCalledTimes(1)
+        expect(wipeCloudDataMock).toHaveBeenCalledTimes(1)
         expect(deleteAllBackupsMock).toHaveBeenCalledTimes(1)
-        expect(wipeDriveDataMock.mock.invocationCallOrder[0]).toBeLessThan(deleteAllBackupsMock.mock.invocationCallOrder[0])
-        expect(deleteAllBackupsMock.mock.invocationCallOrder[0]).toBeLessThan(yjsSyncSettingsMocks.disconnectDrive.mock.invocationCallOrder[0])
-        expect(showSuccessMock).toHaveBeenCalledWith('Google Drive data and backups wiped and disconnected')
+        expect(disconnectActiveCloudSessionMock).toHaveBeenCalledWith({ revoke: true })
+        expect(wipeCloudDataMock.mock.invocationCallOrder[0]).toBeLessThan(deleteAllBackupsMock.mock.invocationCallOrder[0])
+        expect(deleteAllBackupsMock.mock.invocationCallOrder[0]).toBeLessThan(disconnectActiveCloudSessionMock.mock.invocationCallOrder[0])
+        expect(showSuccessMock).toHaveBeenCalledWith(`${providerName} data wiped and disconnected`)
+    })
+
+    it.each([
+        ['google-drive', true, false, 'dropbox', 'Dropbox'],
+        ['dropbox', false, true, 'google-drive', 'Google Drive'],
+    ])('keeps the %s transfer action in the overflow menu with the destination provider mark', async (
+        provider,
+        driveSignedIn,
+        dropboxSignedIn,
+        targetProvider,
+        targetProviderName,
+    ) => {
+        dropboxFeatureState.enabled = true
+        yjsSyncSettingsMocks.isDriveConnected = provider === 'google-drive'
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = provider
+        yjsSyncSettingsMocks.isSignedIn = driveSignedIn
+        yjsSyncSettingsMocks.isDropboxSignedIn = dropboxSignedIn
+        yjsSyncSettingsMocks.user = driveSignedIn ? { email: 'user@example.com' } : null
+        startTransferMock.mockResolvedValueOnce(undefined)
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.queryByText(`Transfer to ${targetProviderName}`)).toBeNull()
+
+        await userEvent.click(screen.getByRole('button', { name: /more actions/i }))
+
+        const transferAction = screen.getByText(`Transfer to ${targetProviderName}`).closest('[role="menuitem"]')
+        expect(transferAction).toBeInTheDocument()
+        expect(transferAction.querySelector(`[data-provider-icon="${targetProvider}"]`)).toHaveAttribute('aria-hidden', 'true')
+
+        await userEvent.click(transferAction)
+
+        expect(screen.getByText(`Transfer to ${targetProviderName}?`)).toBeInTheDocument()
+        expect(screen.getByText(`Your ${provider === 'google-drive' ? 'Google Drive' : 'Dropbox'} data and backups will stay there.`)).toBeInTheDocument()
+        expect(screen.getByText(
+            `Do not use TaskTime on other devices during this transfer. Then connect them to ${targetProviderName} before making changes.`,
+        )).toBeInTheDocument()
+        expect(screen.queryByText('On your other devices')).toBeNull()
+        expect(screen.queryByText(/copy every managed document/i)).toBeNull()
+        expect(screen.queryByText(/directly to the target/i)).toBeNull()
+        expect(startTransferMock).not.toHaveBeenCalled()
+
+        const confirmTransferButton = screen.getByRole('button', { name: 'Connect & transfer' })
+        expect(confirmTransferButton.querySelector(`[data-provider-icon="${targetProvider}"]`)).toHaveAttribute('aria-hidden', 'true')
+        expect(confirmTransferButton.firstElementChild).toHaveAttribute('data-provider-icon', targetProvider)
+
+        await userEvent.click(confirmTransferButton)
+
+        expect(startTransferMock).toHaveBeenCalledWith(targetProvider)
+    })
+
+    it('keeps the destination-marked transfer action in the mobile overflow menu', async () => {
+        dropboxFeatureState.enabled = true
+        yjsSyncSettingsMocks.isDriveConnected = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'google-drive'
+        yjsSyncSettingsMocks.isSignedIn = true
+        yjsSyncSettingsMocks.isMobileLayout = true
+        yjsSyncSettingsMocks.user = { email: 'user@example.com' }
+
+        render(<YjsSyncSettings />)
+
+        expect(screen.queryByText('Transfer to Dropbox')).toBeNull()
+
+        await userEvent.click(screen.getByRole('button', { name: /more actions/i }))
+
+        const transferAction = screen.getByText('Transfer to Dropbox').closest('[role="menuitem"]')
+        expect(transferAction).toBeInTheDocument()
+        expect(transferAction.querySelector('[data-provider-icon="dropbox"]')).toHaveAttribute('aria-hidden', 'true')
+    })
+
+    it('puts the concise destructive Dropbox consequences in the warning notice', async () => {
+        dropboxFeatureState.enabled = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'dropbox'
+        yjsSyncSettingsMocks.isDropboxSignedIn = true
+
+        render(<YjsSyncSettings />)
+
+        await userEvent.click(screen.getByRole('button', { name: /more actions/i }))
+        await userEvent.click(screen.getByText('Wipe data & disconnect'))
+
+        expect(screen.getByText('Cloud data will be wiped')).toBeInTheDocument()
+        expect(screen.getByText(/Deletes all TaskTime sync files and backups from Dropbox, revokes access, and disconnects this browser/i)).toBeInTheDocument()
+        expect(screen.getByText(/Dropbox may retain deleted files temporarily for recovery/i)).toBeInTheDocument()
+        expect(screen.getByText('wipe data')).toBeInTheDocument()
     })
 })
