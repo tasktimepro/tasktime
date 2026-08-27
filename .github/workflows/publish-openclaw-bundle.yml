@@ -68,8 +68,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Ensure public package access
+      - name: Verify public package release
         if: ${{ inputs.dry_run == false }}
-        run: npm access set status=public @tasktimepro/openclaw
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          EXPECTED_VERSION: ${{ steps.package_version.outputs.version }}
+        run: |
+          PUBLISHED_VERSION="$(npm view "@tasktimepro/openclaw@${EXPECTED_VERSION}" version)"
+          test "$PUBLISHED_VERSION" = "$EXPECTED_VERSION"

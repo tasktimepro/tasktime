@@ -98,9 +98,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          PUBLISH_ARGS=(--family code-plugin)
+          if [[ "${{ inputs.use_token }}" == "true" ]]; then
+            PUBLISH_ARGS+=(--owner tasktimepro)
+          fi
+
           npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
-            --family code-plugin \
-            --owner tasktimepro \
+            "${PUBLISH_ARGS[@]}" \
             --version "${{ steps.release.outputs.version }}" \
             --source-repo "$GITHUB_REPOSITORY" \
             --source-commit "$GITHUB_SHA" \
@@ -114,9 +118,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          PUBLISH_ARGS=(--family code-plugin)
+          if [[ "${{ inputs.use_token }}" == "true" ]]; then
+            PUBLISH_ARGS+=(--owner tasktimepro)
+          fi
+
           npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
-            --family code-plugin \
-            --owner tasktimepro \
+            "${PUBLISH_ARGS[@]}" \
             --version "${{ steps.release.outputs.version }}" \
             --source-repo "$GITHUB_REPOSITORY" \
             --source-commit "$GITHUB_SHA" \

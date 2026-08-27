@@ -389,6 +389,7 @@ gh workflow run publish-clawhub-plugin.yml --ref main \
   -f dry_run=false -f use_token=true -f configure_trusted_publisher=true
 
 # Later manually dispatched releases use GitHub OIDC; no token is supplied.
+# The workflow omits the token-only owner override for this trusted path.
 gh workflow run publish-clawhub-plugin.yml --ref main \
   -f dry_run=false -f use_token=false -f configure_trusted_publisher=false
 ```
