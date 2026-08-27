@@ -33,7 +33,7 @@ import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 
-type ConfirmDialogType = 'disconnect' | 'transfer' | 'wipe' | null;
+type ConfirmDialogType = 'disconnect' | 'transfer' | 'wipe' | 'replace-moved' | null;
 type PendingBackupModeChange = {
     autoSyncEnabled: boolean;
     autoSyncMode: 'backup';
@@ -83,6 +83,7 @@ export default function YjsSyncSettings() {
         isDriveConnected,
         isCloudConnected,
         activeStorageProvider,
+        movedToStorageProvider,
         isConnecting,
         hasSynced,
         manualSyncInProgress,
@@ -91,6 +92,7 @@ export default function YjsSyncSettings() {
         forceSyncCloud,
         disconnectActiveCloudSession,
         wipeCloudData,
+        replaceMovedCloudWorkspace,
         deleteAllBackups,
         listBackups,
         createBackup,
@@ -124,6 +126,8 @@ export default function YjsSyncSettings() {
     const transferTargetName = transferTargetProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
     const TransferTargetIcon = transferTargetProvider === 'dropbox' ? DropboxBrandIcon : GoogleDriveBrandIcon;
     const ProviderIcon = provider === 'dropbox' ? DropboxBrandIcon : GoogleDriveBrandIcon;
+    const movedTargetName = movedToStorageProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const MovedTargetIcon = movedToStorageProvider === 'dropbox' ? DropboxBrandIcon : GoogleDriveBrandIcon;
     const providerIsSignedIn = provider === 'dropbox' ? isDropboxSignedIn : isSignedIn;
     const showAuthActions = isReady && !authLoading && !dropboxAuthLoading;
     const showConnectButton = showAuthActions
@@ -137,6 +141,12 @@ export default function YjsSyncSettings() {
         && !isOffline
         && providerIsSignedIn
         && cloudConnected;
+    const showMovedRecoveryActions = showAuthActions
+        && !isOffline
+        && Boolean(provider)
+        && Boolean(movedToStorageProvider)
+        && !cloudConnected
+        && !isConnecting;
     const showProviderRecoveryActions = showAuthActions
         && provider === 'dropbox'
         && Boolean(dropboxSessionId)
@@ -190,6 +200,14 @@ export default function YjsSyncSettings() {
                 text: 'Currently offline',
                 tone: 'status-warning-text-strong',
                 icon: CloudOffIcon
+            };
+        }
+
+        if (movedToStorageProvider) {
+            return {
+                text: `Moved to ${movedTargetName}`,
+                tone: 'status-warning-text-strong',
+                icon: ExclamationTriangleIcon,
             };
         }
 
@@ -298,7 +316,7 @@ export default function YjsSyncSettings() {
             icon: CheckIcon
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is a tick dependency that forces recomputation of relative-time strings
-    }, [isReady, authLoading, dropboxAuthLoading, cloudConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges, autoSyncEnabled, autoSyncMode, provider, dropboxSessionId, dropboxAuthError]);
+    }, [isReady, authLoading, dropboxAuthLoading, cloudConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges, autoSyncEnabled, autoSyncMode, provider, dropboxSessionId, dropboxAuthError, movedToStorageProvider, movedTargetName]);
 
     const handleConnect = async () => {
         try {
@@ -329,6 +347,36 @@ export default function YjsSyncSettings() {
         } catch (error) {
             console.error('[YjsSyncSettings] Dropbox reconnect check failed:', error);
             showError(error instanceof Error ? error.message : 'Dropbox connection could not be checked.');
+        }
+    };
+
+    const handleConnectMovedTarget = async () => {
+        if (!movedToStorageProvider) return;
+        try {
+            await disconnectActiveCloudSession({ revoke: false });
+            if (movedToStorageProvider === 'dropbox') {
+                await signInDropbox();
+            } else {
+                await signIn();
+            }
+        } catch (error) {
+            console.error('[YjsSyncSettings] Moved provider recovery failed:', error);
+            showError(error instanceof Error ? error.message : `Could not connect ${movedTargetName}.`);
+        }
+    };
+
+    const confirmReplaceMovedWorkspace = async () => {
+        if (!movedToStorageProvider) return;
+        setIsProcessing(true);
+        try {
+            await replaceMovedCloudWorkspace(movedToStorageProvider);
+            showSuccess(`${providerName} is ready as a new workspace`);
+            setConfirmDialog(null);
+        } catch (error) {
+            console.error('[YjsSyncSettings] Moved source replacement failed:', error);
+            showError(error instanceof Error ? error.message : `${providerName} could not be cleared.`);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -688,6 +736,11 @@ export default function YjsSyncSettings() {
                                             {dropboxAuthError ?? 'App Folder access · storage identity only'}
                                         </div>
                                     )}
+                                    {provider && movedToStorageProvider && (
+                                        <div className="mt-1 text-xs status-warning-text-strong">
+                                            TaskTime data in this {providerName} was moved to {movedTargetName}.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             {showConnectedActions && isMobileLayout && (
@@ -748,6 +801,26 @@ export default function YjsSyncSettings() {
                                             </DropdownMenu>
                                         )}
                                     </>
+                            ) : showMovedRecoveryActions ? (
+                                <div className={cn('flex gap-2', isMobileLayout && 'w-full flex-col')}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setConfirmDialog('replace-moved')}
+                                        disabled={isProcessing}
+                                        leadingIcon={ProviderIcon}
+                                        className={cn(isMobileLayout && 'w-full')}
+                                    >
+                                        Use {providerName}
+                                    </Button>
+                                    <Button
+                                        onClick={handleConnectMovedTarget}
+                                        disabled={isProcessing}
+                                        leadingIcon={MovedTargetIcon}
+                                        className={cn(isMobileLayout && 'w-full')}
+                                    >
+                                        Connect {movedTargetName}
+                                    </Button>
+                                </div>
                             ) : showProviderRecoveryActions ? (
                                 <>
                                     <Button
@@ -979,10 +1052,10 @@ export default function YjsSyncSettings() {
                         <Button
                             onClick={confirmDisconnect}
                             disabled={isProcessing}
+                            loading={isProcessing}
+                            loadingText="Disconnecting..."
                         >
-                            {isProcessing
-                                ? 'Disconnecting...'
-                                : (cloudConnected && providerIsSignedIn ? 'Sync & Disconnect' : 'Disconnect')}
+                            {cloudConnected && providerIsSignedIn ? 'Sync & disconnect' : 'Disconnect'}
                         </Button>
                     </div>
                 }
@@ -1034,6 +1107,39 @@ export default function YjsSyncSettings() {
                 </div>
             </Modal>
 
+            <Modal
+                isOpen={confirmDialog === 'replace-moved'}
+                onClose={() => !isProcessing && setConfirmDialog(null)}
+                title={`Use ${providerName} for a new workspace?`}
+                size="md"
+                footer={
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmDialog(null)}
+                            disabled={isProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmReplaceMovedWorkspace}
+                            disabled={isProcessing}
+                            loading={isProcessing}
+                            loadingText={`Resetting ${providerName}...`}
+                        >
+                            Clear & use {providerName}
+                        </Button>
+                    </div>
+                }
+            >
+                <Notice
+                    variant="warning"
+                    icon={ExclamationTriangleIcon}
+                    description={`This permanently deletes all TaskTime sync files and backups in ${providerName}. ${movedTargetName} stays unchanged. This device will then start a new ${providerName} workspace.`}
+                />
+            </Modal>
+
             {/* Backup Mode Confirmation Modal */}
             <Modal
                 isOpen={pendingBackupModeChange !== null}
@@ -1083,8 +1189,10 @@ export default function YjsSyncSettings() {
                             variant="destructive"
                             onClick={confirmWipeAndDisconnect}
                             disabled={isProcessing || wipeConfirmText.trim().toLowerCase() !== 'wipe data'}
+                            loading={isProcessing}
+                            loadingText="Wiping..."
                         >
-                            {isProcessing ? 'Wiping...' : 'Wipe & disconnect'}
+                            Wipe & disconnect
                         </Button>
                     </div>
                 }

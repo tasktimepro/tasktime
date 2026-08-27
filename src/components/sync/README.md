@@ -4,14 +4,16 @@ This file is the source of truth for TaskTime Pro cloud sync behavior. Read it b
 
 Handled production incident captures are documented in the private operations runbook. Update that runbook when adding or removing sync/auth/persistence incidents.
 
-TaskTime Pro is in production. Existing IndexedDB and Google Drive appDataFolder state is live customer data. Changes must be backwards compatible and must not require users to clear local storage or Drive files.
+TaskTime Pro is in production. Existing IndexedDB, Google Drive appDataFolder,
+and Dropbox App Folder state is live customer data. Changes must be backwards
+compatible and must not require users to clear local or provider data.
 
 ## Architecture
 
 - Storage is local-first Yjs CRDT data persisted in IndexedDB.
-- `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own shared behavior. `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google-only compatibility facades. Dropbox entry points are enabled by default for the next release, with an explicit false emergency UI opt-out; compatible Worker controls remain the fail-closed runtime boundary.
+- `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own shared behavior. `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google-only compatibility facades. Dropbox entry points are enabled, with an explicit false emergency UI opt-out; compatible Worker controls remain the fail-closed runtime boundary, and provider transfers remain disabled pending the final canary.
 - Drive sync stores Yjs base-state files, delta files, and one manifest in Google Drive appDataFolder.
-- The Worker retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, and revocation. Routine Google Drive requests go directly from the browser to Google.
+- The Worker retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, and revocation. Routine Google Drive and Dropbox requests go directly from the browser to the selected provider.
 - In the provider-neutral implementation, the lifecycle-selected
   Google Drive or Dropbox session also authenticates hosted email, privacy-safe
   synced metrics, agent email, and future Pro state. The private Worker derives
@@ -152,6 +154,17 @@ Import:
 - Transfer copy names the providers directly and avoids storage terminology.
   Its compact title-free warning says not to use TaskTime on other devices
   during transfer and to connect them to the new provider before editing.
+- Reopening a retained transfer source stops at its verified move marker. The
+  primary action connects the recorded destination without deleting source
+  data. Sidebar and mobile sync status name the destination and open Cloud Sync
+  choices rather than reconnecting the retained source directly. A secondary
+  provider-marked action may reuse the source only after a
+  destructive warning; it deletes and verifies all TaskTime source backups and
+  sync files, removes the move marker last, leaves the destination untouched,
+  and pushes the complete local workspace into the now-empty source.
+- Sync & disconnect, Wipe & disconnect, and moved-source replacement use the
+  shared disabled loading-button state with its spinner before the progress
+  label for the full duration of each operation.
 - Disconnect first completes a forced provider-neutral sync, then detaches this
   browser session without revoking the provider authorization. Provider sync
   files, backup snapshots, and local data remain in place.

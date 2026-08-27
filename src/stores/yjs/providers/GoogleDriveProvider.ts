@@ -16,6 +16,7 @@ import { encodeStateAsUpdate, applyUpdate, mergeUpdates } from 'yjs';
 import { YjsDocManager } from '../YjsDocManager';
 import {
     CloudManifestManager,
+    CLOUD_BINDING_FILE_NAME,
     ManifestManager,
     AuthorizationError,
     DriveTransportDisabledError,
@@ -946,6 +947,16 @@ export class YjsCloudSyncProvider {
                 return;
             }
 
+            if (error instanceof CloudProviderMovedError) {
+                // A verified transfer fence is an expected recovery state, not
+                // an operational sync failure. Keep the source disconnected and
+                // let the account UI offer the target provider or an explicit
+                // destructive fresh start on this source.
+                this.setState('idle');
+                this.setPhase('idle');
+                throw error;
+            }
+
             console.error(`[${this.providerDetails.logPrefix}] Connection failed:`, error);
             if (!isCloudAuthorizationError(error) && !isCloudTransportDisabledError(error)) {
                 this.captureIncident({
@@ -959,6 +970,132 @@ export class YjsCloudSyncProvider {
             this.setPhase('error');
             throw error;
         }
+    }
+
+    /**
+     * Permanently retire the retained data in a source provider that has a
+     * verified moved marker. Backups are deleted and verified first, sync
+     * objects next, and the binding marker last so an interrupted operation
+     * stays fenced until every earlier destructive step has completed.
+     */
+    async replaceMovedCloudWorkspace(
+        expectedTargetProvider: CloudProviderId,
+        deleteBackups: () => Promise<void>,
+    ): Promise<void> {
+        if (this.connected) {
+            throw new Error(`Disconnect ${this.providerDetails.displayName} before replacing its moved workspace.`);
+        }
+        if (!this.isOnline()) {
+            throw new Error(`Cannot replace ${this.providerDetails.displayName} data while offline.`);
+        }
+        if (expectedTargetProvider === this.persistenceScope.provider) {
+            throw new Error('The moved workspace target must be a different cloud provider.');
+        }
+
+        const targetName = getCloudProviderDetails(expectedTargetProvider).displayName;
+        const validateMovedMarker = async (): Promise<void> => {
+            const marker = await this.manifest.readCloudBindingMarker();
+            if (marker?.state !== 'moved'
+                || marker.activeProvider !== expectedTargetProvider
+                || marker.generation < this.persistenceScope.generation) {
+                throw new Error(
+                    `${this.providerDetails.displayName} is no longer marked as moved to ${targetName}. Nothing was deleted.`,
+                );
+            }
+        };
+
+        const initialMarker = await this.manifest.readCloudBindingMarker();
+        if (!initialMarker) {
+            const existingSyncFiles = await this.manifest.listSyncFiles();
+            if (existingSyncFiles.length > 0) {
+                throw new Error(
+                    `${this.providerDetails.displayName} is no longer marked as moved to ${targetName}. Nothing was deleted.`,
+                );
+            }
+
+            // Recovery after the previous attempt deleted the marker but the
+            // browser stopped before reconnecting. An empty sync namespace is
+            // the only marker-free state that is safe to continue from.
+            await deleteBackups();
+            this.manifest.reset();
+            this.pendingDeltas.clear();
+            this.verifyFullStateDocs.clear();
+            this.appliedStateVersions.clear();
+            this.appliedDeltaIds.clear();
+            this.markDocsForFullStateUpload(this.docManager.getLoadedDocs());
+            this.setState('idle');
+            this.setPhase('idle');
+            this.log('resuming cleared moved workspace replacement');
+            return;
+        }
+
+        if (initialMarker.state !== 'moved'
+            || initialMarker.activeProvider !== expectedTargetProvider
+            || initialMarker.generation < this.persistenceScope.generation) {
+            throw new Error(
+                `${this.providerDetails.displayName} is no longer marked as moved to ${targetName}. Nothing was deleted.`,
+            );
+        }
+
+        await deleteBackups();
+        await validateMovedMarker();
+
+        let syncFiles = await this.manifest.listSyncFiles();
+        const bindingFile = syncFiles.find((file) => file.name === CLOUD_BINDING_FILE_NAME);
+        if (!bindingFile) {
+            throw new Error(
+                `${this.providerDetails.displayName} no longer contains the expected moved-workspace marker. Nothing was deleted.`,
+            );
+        }
+
+        for (const file of syncFiles) {
+            if (file.name === CLOUD_BINDING_FILE_NAME) continue;
+            await this.manifest.deleteFileById(file.id);
+        }
+
+        for (let attempt = 1; attempt <= WIPE_VERIFY_ATTEMPTS; attempt++) {
+            syncFiles = await this.manifest.listSyncFiles();
+            const remainingDataFiles = syncFiles.filter((file) => file.name !== CLOUD_BINDING_FILE_NAME);
+            if (remainingDataFiles.length === 0) break;
+            if (attempt === WIPE_VERIFY_ATTEMPTS) {
+                throw new Error(
+                    `${this.providerDetails.displayName} replacement stopped safely because ${remainingDataFiles.length} TaskTime sync file(s) remain.`,
+                );
+            }
+        }
+
+        // Revalidate immediately before removing the final safety fence. A
+        // concurrent transfer or provider change must never be mistaken for
+        // the marker the user explicitly approved replacing.
+        await validateMovedMarker();
+        const verifiedBinding = (await this.manifest.listSyncFiles())
+            .find((file) => file.name === CLOUD_BINDING_FILE_NAME);
+        if (!verifiedBinding) {
+            throw new Error(
+                `${this.providerDetails.displayName} no longer contains the expected moved-workspace marker.`,
+            );
+        }
+        await this.manifest.deleteFileById(verifiedBinding.id);
+
+        for (let attempt = 1; attempt <= WIPE_VERIFY_ATTEMPTS; attempt++) {
+            const remainingSyncFiles = await this.manifest.listSyncFiles();
+            if (remainingSyncFiles.length === 0) break;
+            if (attempt === WIPE_VERIFY_ATTEMPTS) {
+                throw new Error(
+                    `${this.providerDetails.displayName} replacement is incomplete. ${remainingSyncFiles.length} TaskTime sync file(s) remain.`,
+                );
+            }
+        }
+
+        this.manifest.reset();
+        this.pendingDeltas.clear();
+        this.verifyFullStateDocs.clear();
+        this.appliedStateVersions.clear();
+        this.appliedDeltaIds.clear();
+        this.markDocsForFullStateUpload(this.docManager.getLoadedDocs());
+        this.setState('idle');
+        this.setPhase('idle');
+        this.log('moved workspace cleared for a new local workspace');
     }
 
     /**

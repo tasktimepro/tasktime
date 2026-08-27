@@ -26,6 +26,7 @@ export const SYNC_STATUS_KIND = {
     SYNCING: 'syncing',
     PENDING: 'pending',
     SYNCED: 'synced',
+    MOVED: 'moved',
 };
 
 export function getYjsSyncStatusDescriptor({
@@ -36,6 +37,7 @@ export function getYjsSyncStatusDescriptor({
     isConnecting,
     hadPreviousSession,
     providerName = 'Google Drive',
+    movedToProviderName = null,
     syncState,
     syncPhase,
     lastSyncedAt,
@@ -67,6 +69,16 @@ export function getYjsSyncStatusDescriptor({
             text: 'Currently offline',
             icon: CloudOffIcon,
             tone: 'status-warning-text-strong',
+        };
+    }
+
+    if (movedToProviderName) {
+        return {
+            kind: SYNC_STATUS_KIND.MOVED,
+            text: `Moved to ${movedToProviderName}`,
+            icon: ExclamationTriangleIcon,
+            tone: 'status-warning-text-strong',
+            onClick: onCloudOptions,
         };
     }
 

@@ -60,10 +60,10 @@ The detailed finding-by-finding execution checklist and validation state live in
 - Public positioning continues to say TaskTime is free, open source, and local-first; Pro is an optional time-saving upgrade rather than a prerequisite for core use.
 - Success evidence requires Worker tests/typecheck, the core release gate, exact one-time trial/expiry proof, UI/agent parity, Reports/email/free-path and tax-correction coverage, multi-device/offline/downgrade/account-switch evidence, Stripe test-mode lifecycle evidence, approved live trial and low-value purchase validation, exact deployed-version evidence, owner approval, and separately tested Reports/email rollback flags.
 
-## Phase 7 — Provider-neutral cloud sync and Dropbox (implemented locally; rollout gated)
+## Phase 7 — Provider-neutral cloud sync and Dropbox (connections deployed; transfer gated)
 
-- The behavior contract is `spec/features/provider-neutral-cloud-sync-and-dropbox.md`; deployed production remains Google-only until the coordinated rollout is complete.
-- Product and agent parity, owner-only Dropbox App Console setup, local Worker configuration, public/legal next-release copy, and owner Edge real-credential canaries are complete. Compatible Worker deployment, remote D1 migration, production secrets/flags, and production supported-browser canaries remain intentionally last.
+- The behavior contract is `spec/features/provider-neutral-cloud-sync-and-dropbox.md`; Google Drive and Dropbox connections are deployed, while provider transfers remain fail-closed until the production canary is green.
+- Product and agent parity, Dropbox App Console setup, compatible Worker/app deployment, remote D1 migration, production secrets/flags, and initial owner Edge canary are complete. The canary exposed a moved-source recovery dead end; its compatibility fix and the remaining supported-browser production canaries are the current gate before transfers are enabled.
 - Preserve the deployed direct Google Drive flow while extracting one provider-neutral sync/manifest/backup core and adding Dropbox through a least-privilege App Folder adapter.
 - Keep exactly one active provider per browser profile. Do not mirror providers. A verified, crash-resumable transfer copies the complete live workspace in either direction, creates one target handoff backup, activates the target only after readback verification, and retains source files and historical backups.
 - Keep routine manifests, Yjs state/deltas, backups, restores, wipes, and transfer bodies directly between the browser and the selected provider. The Worker remains an OAuth/encrypted-refresh-token/short-lived-token/revocation control plane and never becomes a Dropbox file proxy.

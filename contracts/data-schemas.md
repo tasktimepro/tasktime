@@ -26,6 +26,21 @@ and re-evaluate whether it still meets the archive predicate.
 
 Validated collection keys are: `projects`, `tasks`, `timeEntries`, `clients`, `businessInfos`, `businessBrandAssets`, `invoices`, `invoiceTemplates`, `emailTemplates`, `paymentMethods`, `expenseCategories`, `taxReturnPeriods`, `expenses`, `expenseRecurrences`, `plannerAttachments`, `dailyGoals`, `preferences`, and `timers`.
 
+## Cloud workspace binding
+
+Each provider may contain `tasktime-cloud-binding.json`, a version 1 lifecycle
+marker with `workspaceId`, non-negative `generation`, `activeProvider`, `state`
+(`active|transfer-prepared|moved`), optional `operationId`, and ISO `updatedAt`.
+Unknown or malformed marker fields fail closed.
+
+A `moved` marker prevents the retained source from reconnecting as an active
+workspace. Reusing that source is destructive and provider-local: verify the
+recorded target, delete and verify all source backups and sync objects, remove
+the binding marker last, then seed the complete local IndexedDB workspace with
+a push-only full-state pass. The destination provider is not read, written, or
+deleted by source replacement. Marker-free continuation is valid only when the
+source sync namespace is already empty after an interrupted replacement.
+
 ## Core work entities
 
 ### Project

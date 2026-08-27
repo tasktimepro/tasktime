@@ -1,12 +1,11 @@
 # Provider-Neutral Cloud Sync And Dropbox
 
-> **State:** Next-release behavior; implementation, internal documentation, local automated validation, the owner-only development app/setup, the complete local Microsoft Edge real-credential canary, and next-release public/legal copy are complete through the local portion of Slice 10. The client now enables Dropbox entry points by default, with an explicit false emergency opt-out. Production configuration/deployment, production supported-browser canaries, and live enablement remain deferred
+> **State:** The compatible Worker and app are deployed, and new Dropbox connections are enabled with transfers still fail-closed. A production canary exposed the moved-source recovery case described below; its compatibility fix and local regression validation are complete, with promotion and production re-canary still pending.
 >
-> **Current production behavior:** Google Drive only
+> **Current production behavior:** Google Drive and Dropbox connections are available; provider transfers remain disabled until the production canary is green.
 
-This specification locks the approved product behavior for adding Dropbox in
-the next release. The deployed production service remains Google Drive-only
-until the compatible Worker and client release are promoted together.
+This specification locks the approved product behavior for Google Drive and
+Dropbox, including the staged rollout of provider transfer.
 
 ## User outcome
 
@@ -97,6 +96,20 @@ until the compatible Worker and client release are promoted together.
 - Successful activation locally disconnects the former provider so storage,
   hosted email, metrics, and future Pro state all use the target. Revoking the
   former provider grant and deleting its retained files remain separate actions.
+- When a retained source is opened after a verified transfer, its move marker is
+  a safety fence rather than a generic sync failure. The app stops reconnect
+  retries and makes connecting the recorded destination the primary action.
+  Global sync status names that destination and routes to Cloud Sync choices
+  instead of offering a direct reconnect to the retained source.
+- The user may instead explicitly reuse the retained source as a new independent
+  workspace. That destructive action verifies the expected move marker, deletes
+  and verifies every TaskTime backup and sync object in the source with the move
+  marker removed last, leaves the destination untouched, and seeds the complete
+  local IndexedDB workspace through one push-only full-state pass. It never
+  merges the retained source and destination workspaces.
+- An interrupted source replacement may resume without its marker only when the
+  source sync namespace is already empty. Durable per-document dirty evidence
+  retains the local workspace until its first source upload succeeds.
 - For the currently active provider, Disconnect performs a final sync and
   detaches only this browser while retaining authorization and provider data.
   Wipe data & disconnect verifies removal of all TaskTime sync files and backup

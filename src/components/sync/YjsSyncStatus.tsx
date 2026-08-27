@@ -40,6 +40,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         isDriveConnected,
         isCloudConnected,
         activeStorageProvider,
+        movedToStorageProvider,
         isConnecting,
         hasSynced,
         manualSyncInProgress,
@@ -66,6 +67,11 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         : (provider === 'google-drive' || !isDropboxCloudUiEnabled()
             ? 'Google Drive'
             : 'cloud storage');
+    const movedTargetName = movedToStorageProvider === 'dropbox'
+        ? 'Dropbox'
+        : movedToStorageProvider === 'google-drive'
+            ? 'Google Drive'
+            : null;
 
     useEffect(() => {
         const updateOfflineState = () => {
@@ -124,6 +130,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
                 ? Boolean(dropboxSessionId)
                 : hadPreviousSession,
             providerName,
+            movedToProviderName: movedTargetName,
             syncState,
             syncPhase,
             lastSyncedAt,
@@ -154,6 +161,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         isSyncing,
         lastSyncedAt,
         manualSyncInProgress,
+        movedTargetName,
         pendingSyncChanges,
         provider,
         providerName,

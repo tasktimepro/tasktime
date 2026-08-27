@@ -139,6 +139,7 @@ vi.mock('@/components/Modal', () => ({
 }));
 
 import { useYjs, YjsProvider, type YjsContextValue } from './YjsContext';
+import { CloudProviderMovedError } from '@/stores/yjs';
 
 afterEach(() => {
     mocks.store.isCloudConnected.mockReturnValue(true);
@@ -378,6 +379,46 @@ describe('YjsProvider cloud connection lifecycle', () => {
             finishConnect?.();
             await Promise.resolve();
         });
+    });
+
+    it('surfaces a moved workspace target and does not retry the fenced source connection', async () => {
+        let contextValue: YjsContextValue | null = null;
+        const movedError = new CloudProviderMovedError('dropbox', 3);
+        mocks.store.connectDrive.mockRejectedValue(movedError);
+
+        function ContextProbe() {
+            contextValue = useYjs();
+            return null;
+        }
+
+        const view = render(
+            <YjsProvider>
+                <ContextProbe />
+            </YjsProvider>,
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(1);
+        expect(contextValue?.movedToStorageProvider).toBe('dropbox');
+
+        mocks.authCallbacks.refreshDriveTransport = vi.fn(async () => 'direct');
+        view.rerender(
+            <YjsProvider>
+                <ContextProbe />
+            </YjsProvider>,
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(1);
     });
 });
 

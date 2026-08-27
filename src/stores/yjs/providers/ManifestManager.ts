@@ -46,7 +46,7 @@ export {
 export type { DriveTokenProvider, DriveTransport } from './GoogleDriveFileStore';
 
 const MANIFEST_FILE_NAME = 'tasktime-yjs-manifest.json';
-const CLOUD_BINDING_FILE_NAME = 'tasktime-cloud-binding.json';
+export const CLOUD_BINDING_FILE_NAME = 'tasktime-cloud-binding.json';
 const SYNC_FILE_PREFIX = 'tasktime-yjs-';
 const SYNC_FILE_SUFFIX = '.bin';
 const DELTA_FILE_MARKER = '-delta-';

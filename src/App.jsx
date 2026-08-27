@@ -157,6 +157,7 @@ function AppContent() {
         isCloudConnected,
         activeStorageProvider,
         activeStorageSessionId,
+        movedToStorageProvider,
         isConnecting,
         hasSynced,
         manualSyncInProgress,
@@ -173,6 +174,11 @@ function AppContent() {
     const cloudConnected = isCloudConnected ?? isDriveConnected;
     const cloudProvider = activeStorageProvider ?? (isDriveConnected ? 'google-drive' : null);
     const cloudProviderName = cloudProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const movedTargetName = movedToStorageProvider === 'dropbox'
+        ? 'Dropbox'
+        : movedToStorageProvider === 'google-drive'
+            ? 'Google Drive'
+            : null;
     const cloudAuthLoading = cloudProvider === 'dropbox' ? false : authLoading;
     const cloudHadPreviousSession = cloudProvider === 'dropbox'
         ? Boolean(activeStorageSessionId)
@@ -915,6 +921,7 @@ function AppContent() {
             isConnecting,
             hadPreviousSession: cloudHadPreviousSession,
             providerName: cloudProviderName,
+            movedToProviderName: movedTargetName,
             syncState,
             syncPhase,
             lastSyncedAt,
@@ -942,6 +949,7 @@ function AppContent() {
         isSyncing,
         lastSyncedAt,
         manualSyncInProgress,
+        movedTargetName,
         pendingSyncChanges,
         syncPhase,
         syncState,
@@ -1046,6 +1054,13 @@ function AppContent() {
             };
         }
 
+        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.MOVED) {
+            return {
+                description: `Cloud sync moved to ${movedTargetName}. Open More to choose how to continue.`,
+                toneClassName: 'status-warning-fill',
+            };
+        }
+
         if (mobileSyncStatus.kind === SYNC_STATUS_KIND.DISCONNECTED && cloudHadPreviousSession && !cloudAuthLoading && !cloudProviderSignedIn) {
             return {
                 description: `${cloudProviderName} disconnected. Open More to reconnect sync.`,
@@ -1063,7 +1078,7 @@ function AppContent() {
 
 
         return null;
-    }, [cloudAuthLoading, cloudHadPreviousSession, cloudProviderName, cloudProviderSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
+    }, [cloudAuthLoading, cloudHadPreviousSession, cloudProviderName, cloudProviderSignedIn, mobileSyncStatus.kind, movedTargetName, showMobileSyncButton]);
     
     const activeView = urlParams.view;
 

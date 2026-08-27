@@ -740,6 +740,51 @@ test.describe('Cloud sync smoke', () => {
         await expect(page.getByText('playwright-sync@example.com')).toBeVisible();
     });
 
+    test('offers the moved destination first and keeps source reuse behind a destructive warning', async ({ page }) => {
+        const movedFixture = createRemoteDriveFixture({});
+        const bindingId = 'playwright-moved-binding';
+
+        movedFixture.files.push({
+            id: bindingId,
+            name: 'tasktime-cloud-binding.json',
+            modifiedTime: movedFixture.modifiedTime,
+        });
+        movedFixture.fileBodies.set(bindingId, JSON.stringify({
+            version: 1,
+            workspaceId: '42de9b18-445c-4d28-b5c9-88bc476fc7f1',
+            generation: 1,
+            activeProvider: 'dropbox',
+            state: 'moved',
+            operationId: 'f85f92e3-1584-4d77-8292-3a9977adcf44',
+            updatedAt: movedFixture.modifiedTime,
+        }));
+
+        const driveFixture = createStatefulDriveFixture(movedFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
+
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+        await seedStoredGoogleSession(page, {
+            sessionId: `playwright-moved-session-${Date.now()}`,
+            userId: 'playwright-moved-user',
+            email: 'playwright-moved@example.com',
+        });
+
+        await page.reload();
+        await page.goto('/account?section=sync');
+
+        await expect(page.getByRole('main').getByText('Moved to Dropbox', { exact: true })).toBeVisible();
+        await expect(page.getByText('TaskTime data in this Google Drive was moved to Dropbox.')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect Dropbox' })).toBeVisible();
+
+        await page.getByRole('button', { name: 'Use Google Drive' }).click();
+
+        await expect(page.getByRole('dialog', { name: 'Use Google Drive for a new workspace?' })).toBeVisible();
+        await expect(page.getByText(/permanently deletes all TaskTime sync files and backups in Google Drive/i)).toBeVisible();
+        await expect(page.getByText(/Dropbox stays unchanged/i)).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Clear & use Google Drive' })).toBeVisible();
+    });
+
     test('falls back to reconnect state when an existing Drive session expires during a later Drive request', async ({ page }) => {
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
         let expireDriveRequests = false;

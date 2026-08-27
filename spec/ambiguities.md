@@ -40,7 +40,9 @@ Before enforcement, every approved answer must be reflected in product requireme
 
 ## Cloud storage provider expansion
 
-The Dropbox direction below was approved on August 19, 2026. These are implementation constraints, not claims that Dropbox is already available. Current Google-only requirements, contracts, and public copy remain authoritative until the corresponding implementation and rollout slices ship.
+The Dropbox direction below was approved on August 19, 2026 and now governs
+the deployed Google Drive/Dropbox connection lifecycle. Provider transfer stays
+fail-closed until its remaining production canary and rollout gates pass.
 
 ### Approved August 19, 2026
 

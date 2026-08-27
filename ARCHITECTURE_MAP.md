@@ -19,8 +19,8 @@ Browser / PWA
         ├── IndexedDB (local, authoritative working copy)
         ├── sync.tasktime.pro OAuth/token control plane (optional)
         ├── Google Drive appDataFolder direct data path (production optional)
-        ├── Dropbox App Folder direct data path (implemented locally, disabled)
-        ├── provider-neutral hosted identity (implemented privately; production migration/deployment pending)
+        ├── Dropbox App Folder direct data path (production optional)
+        ├── provider-neutral hosted identity (production control plane)
         ├── DebugBundle endpoint (optional diagnostics)
         └── exchange-rate / email / push integrations as configured
 
@@ -52,7 +52,7 @@ Public web build
 - Sync providers operate on Yjs document updates and manifests; they do not redefine entity business rules. Operational recovery keys are scoped by durable provider ID and connection generation, while generation-zero Google mirrors the legacy keys for rolling compatibility.
 - The provider owns manifest-write serialization across normal passes and on-demand documents: external lazy loads wait behind an active pass, while callback-owned lazy loads join that pass and leave the final manifest commit to its owner.
 - Drive transport is direct per connection: the module-owned token provider keeps its short-lived token in memory and routine file requests go straight to Google Drive.
-- Dropbox transport is also direct in the disabled implementation: its module-owned token provider keeps short-lived access in memory and its App Folder adapter targets only Dropbox API/content origins. The Worker has no provider-data route.
+- Dropbox transport is also direct: its module-owned token provider keeps short-lived access in memory and its App Folder adapter targets only Dropbox API/content origins. The Worker has no provider-data route.
 - The lifecycle-selected provider session is also the hosted-service session.
   Private Worker code derives provider-separated subjects, resolves an opaque
   hosted principal, and links source/target identities only inside verified

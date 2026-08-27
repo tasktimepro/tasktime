@@ -20,6 +20,15 @@ These invariants summarize critical production contracts. They supplement the de
   Identity-link failure leaves the source active; success preserves one opaque
   hosted principal and locally disconnects the former provider without revoking
   its grant or deleting retained source files.
+- A verified moved-source marker is a terminal reconnect fence, not a generic
+  provider failure. The recorded destination is the primary recovery path and
+  must not delete or mutate the retained source.
+- Reusing a moved source is an explicit destructive replacement, never a merge.
+  It verifies the expected target, deletes and verifies source backups and sync
+  objects with the marker last, leaves the target provider untouched, and seeds
+  the complete local IndexedDB workspace with one push-only full-state pass.
+  Marker-free resume is allowed only after the source sync namespace is empty;
+  durable dirty-document evidence owns recovery until the seed succeeds.
 - Page hide or exit while a sync is active must not enqueue a duplicate forced pass. The active pass owns updates produced during that pass, while durable per-document recovery owns genuinely interrupted local work.
 - Genuine pending local work blocked by an active sync or occupied cross-tab lock must retry after the current pass can release the lock, using bounded backoff. Clean checks and failed network/conflict passes must not create background retry loops.
 - An externally requested lazy-document load must wait for an active provider sync to finish before it performs provider or manifest work. A lazy load initiated by that sync's own completion callback joins the owning pass and defers its manifest commit to the owner, so two revision-sensitive manifest writes cannot overlap or deadlock.

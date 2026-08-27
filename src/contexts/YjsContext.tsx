@@ -20,6 +20,7 @@ import {
     AuthorizationError,
     CloudFileStoreError,
     CloudManifestManager,
+    CloudProviderMovedError,
     DropboxFileStore,
     DriveTransportDisabledError,
 } from '@/stores/yjs';
@@ -67,6 +68,8 @@ export interface YjsContextValue {
     driveSessionId: string | null;
     /** Provider allowed to perform cloud storage work in this browser profile */
     activeStorageProvider: CloudProviderId | null;
+    /** Target provider recorded by a verified moved-source safety marker */
+    movedToStorageProvider: CloudProviderId | null;
     /** Provider-bound Worker session reference for active storage only */
     activeStorageSessionId: string | null;
     /** Generation fence for the active storage connection */
@@ -103,6 +106,8 @@ export interface YjsContextValue {
     wipeDriveData: () => Promise<void>;
     /** Wipe validated TaskTime Pro sync files from the active provider */
     wipeCloudData: () => Promise<void>;
+    /** Clear a verified moved source and seed it as a new independent workspace */
+    replaceMovedCloudWorkspace: (expectedTargetProvider: CloudProviderId) => Promise<void>;
     /** Load time entries for a specific year */
     loadEntriesForYear: (year: number) => Promise<Y.Map<string, TimeEntry>>;
     /** Load archived tasks */
@@ -177,6 +182,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
     const [autoSyncMode, setAutoSyncMode] = useState<AutoSyncMode>('sync');
     const [pendingSyncChanges, setPendingSyncChanges] = useState(false);
+    const [movedToStorageProvider, setMovedToStorageProvider] = useState<CloudProviderId | null>(null);
     const [driveBindingVersion, setDriveBindingVersion] = useState(0);
     const [showReconnectDialog, setShowReconnectDialog] = useState(false);
     const [reconnectDialogMessage, setReconnectDialogMessage] = useState('Google authorization expired. Reconnect Google Drive to continue syncing.');
@@ -184,6 +190,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const hasCheckedPersistedState = useRef(false);
     const consecutiveSyncErrors = useRef(0);
     const cloudConnectionAttempt = useRef<CloudConnectionAttempt | null>(null);
+    const blockedCloudConnectionKey = useRef<string | null>(null);
     
     // Auth hook for Google Drive connection
     const {
@@ -359,6 +366,29 @@ export function YjsProvider({ children }: YjsProviderProps) {
         return true;
     }, [activeStorageProvider, handleDriveBoundaryFailure, store]);
 
+    const handleMovedWorkspaceFailure = useCallback((
+        error: unknown,
+        attemptKey: string,
+    ): boolean => {
+        if (!(error instanceof CloudProviderMovedError)) {
+            return false;
+        }
+
+        // The provider marker is an intentional terminal fence. Remember the
+        // exact failed connection identity so React rerenders cannot retry it
+        // until the user chooses the target provider or explicitly replaces
+        // the retained source data.
+        blockedCloudConnectionKey.current = attemptKey;
+        setMovedToStorageProvider(error.targetProvider);
+        setIsCloudConnected(false);
+        setIsConnecting(false);
+        setSyncState('idle');
+        setSyncPhase('idle');
+        setHasSynced(false);
+        setManualSyncInProgress(false);
+        return true;
+    }, []);
+
     const runSyncWithAuthHandling = useCallback<RunSyncWithAuthHandling>(async (options) => {
         try {
             await store.syncCloud(options);
@@ -469,6 +499,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
         if (store.isCloudConnected()
             && runtimeScope.provider === activeStorageProvider
             && runtimeScope.generation === activeStorageGeneration) {
+            blockedCloudConnectionKey.current = null;
+            setMovedToStorageProvider(null);
             setIsCloudConnected(true);
             setSyncState(store.getSyncState());
             setSyncPhase(store.getSyncPhase());
@@ -484,6 +516,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 sessionId,
                 driveTransport,
             ]);
+            if (blockedCloudConnectionKey.current === attemptKey) return;
             if (cloudConnectionAttempt.current?.key === attemptKey) return;
             const attempt = { key: attemptKey };
             cloudConnectionAttempt.current = attempt;
@@ -498,6 +531,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
             })
                 .then(async () => {
                     if (cloudConnectionAttempt.current !== attempt) return;
+                    blockedCloudConnectionKey.current = null;
+                    setMovedToStorageProvider(null);
                     setIsCloudConnected(true);
                     setSyncState(store.getSyncState());
                     setSyncPhase(store.getSyncPhase());
@@ -509,6 +544,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 })
                 .catch(async (error) => {
                     if (cloudConnectionAttempt.current !== attempt) return;
+                    if (handleMovedWorkspaceFailure(error, attemptKey)) return;
                     if (await handleDriveBoundaryFailure(error)) {
                         return;
                     }
@@ -534,6 +570,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 activeStorageGeneration,
                 dropboxSessionId,
             ]);
+            if (blockedCloudConnectionKey.current === attemptKey) return;
             if (cloudConnectionAttempt.current?.key === attemptKey) return;
             const attempt = { key: attemptKey };
             cloudConnectionAttempt.current = attempt;
@@ -553,6 +590,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
             })
                 .then(() => {
                     if (cloudConnectionAttempt.current !== attempt) return;
+                    blockedCloudConnectionKey.current = null;
+                    setMovedToStorageProvider(null);
                     setIsCloudConnected(true);
                     setSyncState(store.getSyncState());
                     setSyncPhase(store.getSyncPhase());
@@ -561,6 +600,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 })
                 .catch(async (error) => {
                     if (cloudConnectionAttempt.current !== attempt) return;
+                    if (handleMovedWorkspaceFailure(error, attemptKey)) return;
                     if (await handleCloudBoundaryFailure(error)) return;
                     setIsCloudConnected(false);
                     setSyncState('error');
@@ -576,6 +616,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
         }
 
         cloudConnectionAttempt.current = null;
+        blockedCloudConnectionKey.current = null;
+        setMovedToStorageProvider(null);
         store.disconnectCloud();
         if (activeStorageProvider !== 'dropbox') {
             dropboxAccessTokenProvider.clearToken();
@@ -604,6 +646,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         store,
         handleDriveBoundaryFailure,
         handleCloudBoundaryFailure,
+        handleMovedWorkspaceFailure,
     ]);
 
     // Update session ID when it changes (Worker mode)
@@ -864,6 +907,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     const disconnectDrive = useCallback(() => {
         if (activeStorageProvider !== 'google-drive') return;
+        blockedCloudConnectionKey.current = null;
+        setMovedToStorageProvider(null);
         store.disconnectDrive();
         setIsCloudConnected(false);
         setIsConnecting(false);
@@ -876,6 +921,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
     }, [activeStorageProvider, store]);
 
     const disconnectCloud = useCallback(() => {
+        blockedCloudConnectionKey.current = null;
+        setMovedToStorageProvider(null);
         store.disconnectCloud();
         dropboxAccessTokenProvider.clearToken();
         setIsCloudConnected(false);
@@ -937,6 +984,42 @@ export function YjsProvider({ children }: YjsProviderProps) {
 
     const wipeCloudData = useCallback(async () => {
         await store.wipeCloudData();
+    }, [store]);
+
+    const replaceMovedCloudWorkspace = useCallback<YjsContextValue['replaceMovedCloudWorkspace']>(async (
+        expectedTargetProvider,
+    ) => {
+        setIsConnecting(true);
+        try {
+            await store.replaceMovedCloudWorkspace(expectedTargetProvider);
+            blockedCloudConnectionKey.current = null;
+            setMovedToStorageProvider(null);
+            setIsCloudConnected(store.isCloudConnected());
+            setSyncState(store.getSyncState());
+            setSyncPhase(store.getSyncPhase());
+            setLastSyncedAt(store.getLastSyncedAt());
+            setHasSynced(store.isCloudConnected());
+            setDriveBindingVersion(previous => previous + 1);
+            hasCheckedPersistedState.current = false;
+        } catch (error) {
+            // Once the old source is cleared and its new manual connection is
+            // established, a failed first upload is an ordinary retryable sync
+            // error rather than a moved-source fence. Expose Sync Now instead
+            // of leaving the user trapped in the destructive confirmation.
+            if (store.isCloudConnected()) {
+                blockedCloudConnectionKey.current = null;
+                setMovedToStorageProvider(null);
+                setIsCloudConnected(true);
+                setSyncState(store.getSyncState());
+                setSyncPhase(store.getSyncPhase());
+                setLastSyncedAt(store.getLastSyncedAt());
+                setHasSynced(false);
+                setDriveBindingVersion(previous => previous + 1);
+            }
+            throw error;
+        } finally {
+            setIsConnecting(false);
+        }
     }, [store]);
 
     const loadEntriesForYear = useCallback<YjsContextValue['loadEntriesForYear']>(async (year) => {
@@ -1025,6 +1108,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         isDriveConnected,
         isCloudConnected,
         activeStorageProvider,
+        movedToStorageProvider,
         activeStorageSessionId,
         activeStorageGeneration,
         hostedServiceSessionId,
@@ -1044,6 +1128,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         disconnectActiveCloudSession,
         wipeDriveData,
         wipeCloudData,
+        replaceMovedCloudWorkspace,
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,
@@ -1063,6 +1148,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         isDriveConnected,
         isCloudConnected,
         activeStorageProvider,
+        movedToStorageProvider,
         activeStorageSessionId,
         activeStorageGeneration,
         hostedServiceSessionId,
@@ -1082,6 +1168,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         disconnectActiveCloudSession,
         wipeDriveData,
         wipeCloudData,
+        replaceMovedCloudWorkspace,
         loadEntriesForYear,
         loadArchivedTasks,
         loadArchivedInvoices,

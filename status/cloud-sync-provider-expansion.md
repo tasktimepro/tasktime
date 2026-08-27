@@ -26,13 +26,23 @@ The planned behavior contract is `spec/features/provider-neutral-cloud-sync-and-
 - [x] Restore the owner Edge profile from the local Dropbox canary to the deployed Google control plane without wiping either provider. Google OAuth completed, the recommended Sync-between-devices transition ran one forced reconciliation pass, the following reload ran one connection pass, and the shared synthetic project note written during the Dropbox canary remained intact. The final Edge state is Google Drive, In sync, with no current console errors; the local Dropbox Worker is stopped.
 - [x] Complete the owner Edge Dropbox parity and cleanup canary. Backup mode pushed one debounced project-note delta without pulling; Sync mode performed one unchanged-manifest check and one delta upload; a live backup was created, listed, downloaded, and structurally validated; a second same-profile tab received the canary note while both tabs stayed green; an offline edit remained local and automatically recovered on the later online event; and routine file operations made zero Worker requests. Wipe data & disconnect deleted all managed files, revoked the Dropbox session, left both App Folder namespaces at zero items, and retained all eight local projects. The final deployed-control-plane Google reconnect completed one reconciliation pass and retained the complete canary note in an In sync state.
 - [x] Serialize externally requested lazy-document sync behind an active provider pass, while allowing callback-owned lazy loads to join that pass and defer their manifest commit to its owner. This prevents revision-sensitive manifest writes from racing during navigation/archive loading without changing Google or Dropbox file contracts; focused regression coverage proves both paths.
-- [x] Pass the reconciled local gates: app lint, typecheck, production app/blog build, 239 test files / 2,215 tests with coverage (93.12% statements / 82.67% branches / 94.27% functions / 94.19% lines overall), 38/38 Chromium smoke tests, 2/2 PWA smoke tests, direct Google transport in Chromium/Firefox/WebKit, private Worker typecheck and 13 files / 105 tests, plus bridge/OpenClaw package dry-runs and packaged bridge, managed-bundle, and live MCP smoke tests.
+- [x] Pass the reconciled local gates: app lint, typecheck, production app/blog build, 239 test files / 2,232 tests with coverage (93.12% statements / 82.67% branches / 94.27% functions / 94.19% lines overall), 39/39 Chromium smoke tests, 2/2 PWA smoke tests, direct Google transport in Chromium/Firefox/WebKit, private Worker typecheck and 13 files / 105 tests, plus bridge/OpenClaw package dry-runs and packaged bridge, managed-bundle, and live MCP smoke tests.
 - [x] Refine the disabled transfer UI with a lifecycle-selected provider mark and title, an above-settings transient transfer panel, and accessible determinate progress driven by durable journal stages.
 - [x] Keep transfer progress at zero until the first durable stage, animate a reduced-motion-safe traveling highlight inside the filled line while work is ongoing, and remove the transient panel after successful completion.
 - [x] Clarify cross-device transfer guidance with provider-specific plain language: other devices remain authorized, TaskTime stays closed there during transfer, and those devices connect to the new provider before editing.
-- [ ] Deploy or enable any Dropbox runtime behavior.
+- [x] Deploy the compatible Worker and app, apply the production hosted-identity migration, and enable Dropbox endpoints plus new connections.
+- [x] Reconcile the production moved-source canary locally: the expected marker is a non-incident terminal fence; the recorded destination is primary; global status routes the user to those Cloud Sync choices instead of reconnecting the retained source; explicit source reuse deletes/verifies only source backups and sync files with the marker last, then performs one complete push-only local seed. Both provider directions, interruption guards, the 2,232-test release gate, 39 Chromium smokes, and 2 PWA smokes are green locally. The owner Edge production-preview recovery smoke also cleared the retained Drive source, seeded all six local documents without pulling, survived reload and Sync Now with no errors, preserved the local synthetic task, and left the Dropbox destination unchanged at nine sync items and one backup.
+- [x] Use the shared disabled loading-button state, including its left-side spinner and action-specific progress label, for Sync & disconnect, Wipe & disconnect, and moved-source replacement.
+- [x] Prepare a human-readable, search-friendly Dropbox sync announcement for the public blog. It is included in the verified merged production build and will publish with the app promotion.
+- [ ] Promote the moved-source recovery fix and complete the production canary. Provider transfers remain disabled until that evidence is green.
 
-The current production contract remains Google Drive only. Do not mark Dropbox available in requirements, contracts, architecture summaries, privacy/terms, README, or public copy before the implementation and rollout state makes that claim true.
+Production now supports Google Drive and Dropbox connections. Provider transfers
+remain disabled. The first production Google canary correctly honored a source
+move marker created during the local transfer test, but exposed a recovery UX
+dead end. The locally validated fix treats that marker as an expected terminal fence,
+offers the recorded destination as the primary action, and permits explicit
+source reuse only after verified source-only deletion and a complete local
+push-only seed. It has not yet been promoted.
 
 The owner-only Dropbox development app and local Worker configuration have now
 completed the initial real-credential Manual-mode canary. OAuth, direct App
@@ -58,14 +68,10 @@ and verified wipe/revoke cleanup. Routine Dropbox file operations remained
 browser-to-Dropbox, the local Worker observed only control-plane calls, both
 App Folder namespaces ended empty after wipe, and the local workspace remained
 intact before the profile returned to a green Google Drive connection. The
-production hosted-identity
-D1 resource exists and its binding is prepared in source, but the remote
-migration, production Worker secrets/deployment, supported-browser canaries,
-and public enablement remain open. All tracked production Dropbox controls
-remain off. A live two-provider transfer is also setup-blocked rather than
-code-blocked: the local Worker still has the placeholder Google OAuth client,
-while the deployed Worker correctly keeps Dropbox connection and transfer
-controls disabled.
+production hosted-identity D1 resource, migration, secrets, Worker, and
+Dropbox connection controls are deployed. Provider transfers remain disabled
+until the moved-source recovery hotfix is promoted and its production canary is
+green.
 
 ## Fixed outcomes
 
@@ -115,7 +121,7 @@ controls disabled.
 - [x] Replace KV-backed auth/token/push abuse counters with Workers Rate Limiting bindings in the private Worker source.
 - [x] Add provider-discriminated sessions with missing provider treated as legacy Google.
 - [x] Prove doubled projected peak headroom against the captured baseline; no D1 session branch is currently required.
-- [ ] Deploy the compatible foundation with Dropbox disabled.
+- [x] Deploy the compatible foundation with Dropbox disabled.
 
 ### Slice 5 — Dropbox OAuth and direct file-store vertical
 
@@ -161,21 +167,22 @@ controls disabled.
 
 - [x] Reconcile the approved planned contract, internal implementation docs,
   architecture/rules, sync docs, environment setup, and status while retaining
-  truthful Google-only current-production claims.
+  the truthful pre-deployment production claims required at that stage.
 - [x] Create the hosted-identity D1 resource, prepare its source binding and
   dedicated ignored local salt, and apply the migration to local Wrangler D1.
-- [ ] Apply the hosted-identity migration remotely, configure its production
-  salt, then deploy the compatible Worker with all Dropbox controls false.
+- [x] Apply the hosted-identity migration remotely, configure its production
+  salt, and deploy the compatible Worker before client enablement.
 - [x] Prepare next-release public contracts, privacy/terms, README, onboarding,
   agent guidance, and evergreen public copy for Google Drive/Dropbox parity.
   These changes remain unshipped and must not be described as deployed until
   the compatible Worker/app production canary is green.
-- [ ] Complete Dropbox production approval and supported-browser credential canaries with synthetic data.
+- [ ] Complete the remaining supported-browser production credential canaries with synthetic data. The initial Edge canary reached the expected moved-source safety fence and now requires the recovery fix before completion.
 - [x] Prove in the owner-only Edge canary that no Worker request carries routine Dropbox provider data.
 - [ ] Repeat the direct-data-path proof in the production supported-browser canaries.
 - [x] Pass the local private Worker gates, full public app release gate,
   packaged-agent smokes, and cross-browser direct-Google regression.
-- [ ] Enable bounded new connections before transfers, compare capacity/errors to budgets, and retain tested rollback controls.
+- [x] Enable Dropbox endpoints and new connections while retaining fail-closed transfer and rollback controls.
+- [ ] Complete canary comparison and enable transfers only after the moved-source recovery path and capacity/error evidence are green.
 
 ## Required release evidence
 

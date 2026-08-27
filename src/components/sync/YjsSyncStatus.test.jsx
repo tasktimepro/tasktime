@@ -26,6 +26,7 @@ const yjsState = vi.hoisted(() => ({
     isDriveConnected: false,
     isCloudConnected: undefined,
     activeStorageProvider: undefined,
+    movedToStorageProvider: null,
     isConnecting: false,
     hasSynced: false,
     manualSyncInProgress: false,
@@ -85,6 +86,7 @@ describe('YjsSyncStatus', () => {
         yjsState.isDriveConnected = false
         yjsState.isCloudConnected = undefined
         yjsState.activeStorageProvider = undefined
+        yjsState.movedToStorageProvider = null
         yjsState.isConnecting = false
         yjsState.hasSynced = false
         yjsState.manualSyncInProgress = false
@@ -179,6 +181,20 @@ describe('YjsSyncStatus', () => {
         render(<YjsSyncStatus />)
 
         await userEvent.click(screen.getByRole('button', { name: /(?:connect|reconnect) to cloud storage/i }))
+
+        expect(navigateToAccountMock).toHaveBeenCalledWith({ section: 'sync' })
+        expect(signInMock).not.toHaveBeenCalled()
+        expect(signInDropboxMock).not.toHaveBeenCalled()
+    })
+
+    it('opens Cloud Sync choices from a moved source instead of reconnecting it', async () => {
+        dropboxFeatureState.enabled = true
+        yjsState.activeStorageProvider = 'google-drive'
+        yjsState.movedToStorageProvider = 'dropbox'
+
+        render(<YjsSyncStatus />)
+
+        await userEvent.click(screen.getByRole('button', { name: /moved to dropbox/i }))
 
         expect(navigateToAccountMock).toHaveBeenCalledWith({ section: 'sync' })
         expect(signInMock).not.toHaveBeenCalled()

@@ -15,6 +15,7 @@ const { docs, providerInstances, storage, providerMockState, deletedDatabaseCall
     providerMockState: {
         hasLocalChangesToPush: false,
         pendingDocNames: [],
+        isConnected: true,
     },
     restoreJournalState: {
         record: null,
@@ -84,13 +85,16 @@ vi.mock('./providers/GoogleDriveProvider', () => {
             this.onSyncComplete = vi.fn()
             this.connect = vi.fn(async () => {})
             this.disconnect = vi.fn()
-            this.isConnected = vi.fn(() => true)
+            this.isConnected = vi.fn(() => providerMockState.isConnected)
             this.getState = vi.fn(() => 'idle')
             this.hasLocalChangesToPush = vi.fn(() => providerMockState.hasLocalChangesToPush)
             this.getPendingDocNames = vi.fn(() => providerMockState.pendingDocNames)
             this.sync = vi.fn(async () => {})
             this.syncAndSubscribeDoc = vi.fn(async () => {})
             this.wipeCloudData = vi.fn(async () => {})
+            this.replaceMovedCloudWorkspace = vi.fn(async (_expectedTarget, deleteBackups) => {
+                await deleteBackups()
+            })
             this.getEntryYears = vi.fn(() => [])
             providerInstances.push(this)
         }
@@ -99,12 +103,17 @@ vi.mock('./providers/GoogleDriveProvider', () => {
     return {
         YjsCloudSyncProvider: ProviderMock,
         YjsDriveProvider: ProviderMock,
+        withCloudSyncExclusiveLock: vi.fn(async (operation) => ({
+            acquired: true,
+            value: await operation({}),
+        })),
     }
 })
 
 vi.mock('./providers/BackupManager', () => {
     class BackupManagerMock {
         async maybeCreateBackup() {}
+        deleteAllBackups = vi.fn(async () => {})
     }
 
     return {
@@ -162,6 +171,7 @@ describe('YjsStore reconnect sync tracking', () => {
         deletedDatabaseCalls.length = 0
         providerMockState.hasLocalChangesToPush = false
         providerMockState.pendingDocNames = []
+        providerMockState.isConnected = true
         restoreJournalState.record = null
     })
 
@@ -1290,6 +1300,72 @@ describe('YjsStore reconnect sync tracking', () => {
         store.disconnectCloud('dropbox')
         expect(provider.disconnect).toHaveBeenCalledOnce()
         expect(store.getActiveCloudProviderId()).toBeNull()
+        store.destroy()
+    })
+
+    it('clears a verified moved source and seeds one complete push-only workspace', async () => {
+        providerMockState.isConnected = false
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive({
+            transport: 'direct',
+            sessionId: 'moved-google-session',
+            generation: 0,
+            tokenProvider: { getToken: vi.fn(), clearToken: vi.fn() },
+        })
+        const provider = providerInstances[0]
+
+        await store.replaceMovedCloudWorkspace('dropbox')
+
+        expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(
+            expect.arrayContaining(['core', 'entries-active']),
+        )
+        expect(provider.replaceMovedCloudWorkspace).toHaveBeenCalledWith(
+            'dropbox',
+            expect.any(Function),
+        )
+        expect(provider.connect).toHaveBeenLastCalledWith(
+            'manual',
+            { bootstrapPullIfPristine: false },
+            expect.any(Object),
+        )
+        expect(provider.sync).toHaveBeenCalledWith(true, {
+            allowPull: false,
+            forceFullState: true,
+        }, expect.any(Object))
+        expect(provider.setSyncMode).toHaveBeenLastCalledWith('manual')
+
+        store.destroy()
+    })
+
+    it('uses the same moved-source replacement path when Dropbox is the source', async () => {
+        providerMockState.isConnected = false
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectCloud({
+            provider: 'dropbox',
+            generation: 3,
+            manifest: {},
+        })
+        const provider = providerInstances[0]
+
+        await store.replaceMovedCloudWorkspace('google-drive')
+
+        expect(store.getActiveCloudProviderId()).toBe('dropbox')
+        expect(provider.replaceMovedCloudWorkspace).toHaveBeenCalledWith(
+            'google-drive',
+            expect.any(Function),
+        )
+        expect(provider.connect).toHaveBeenLastCalledWith(
+            'manual',
+            { bootstrapPullIfPristine: false },
+            expect.any(Object),
+        )
+        expect(provider.sync).toHaveBeenCalledWith(true, {
+            allowPull: false,
+            forceFullState: true,
+        }, expect.any(Object))
+
         store.destroy()
     })
 

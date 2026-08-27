@@ -116,6 +116,183 @@ describe('YjsDriveProvider', () => {
 
         await expect(provider.connect('manual')).rejects.toBeInstanceOf(CloudProviderMovedError)
         expect(provider.isConnected()).toBe(false)
+        expect(captureDebugBundleIncidentSpy).not.toHaveBeenCalled()
+    })
+
+    it('replaces moved-source sync data only after deleting backups and keeps the binding marker until last', async () => {
+        const marker = {
+            version: 1,
+            workspaceId: '42de9b18-445c-4d28-b5c9-88bc476fc7f1',
+            generation: 3,
+            activeProvider: 'dropbox',
+            state: 'moved',
+            operationId: 'f85f92e3-1584-4d77-8292-3a9977adcf44',
+            updatedAt: '2026-08-19T10:00:00.000Z',
+        }
+        const files = [
+            { id: 'state-file', name: 'tasktime-yjs-core.bin' },
+            { id: 'binding-file', name: 'tasktime-cloud-binding.json' },
+        ]
+        const deletionOrder = []
+        const manifest = {
+            getProviderId: () => 'google-drive',
+            load: vi.fn(async () => {}),
+            readCloudBindingMarker: vi.fn(async () => (
+                files.some(file => file.name === 'tasktime-cloud-binding.json') ? marker : null
+            )),
+            listSyncFiles: vi.fn(async () => files.slice()),
+            deleteFileById: vi.fn(async (id) => {
+                deletionOrder.push(id)
+                const index = files.findIndex(file => file.id === id)
+                if (index >= 0) files.splice(index, 1)
+            }),
+            reset: vi.fn(),
+        }
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => ['core'],
+            getDocSync: () => new Y.Doc(),
+        }, {
+            provider: 'google-drive',
+            generation: 0,
+            manifest,
+        })
+        provider.isOnline = () => true
+        const deleteBackups = vi.fn(async () => {
+            deletionOrder.push('backups')
+        })
+
+        await provider.replaceMovedCloudWorkspace('dropbox', deleteBackups)
+
+        expect(deletionOrder).toEqual(['backups', 'state-file', 'binding-file'])
+        expect(manifest.listSyncFiles).toHaveBeenCalled()
+        expect(manifest.reset).toHaveBeenCalledOnce()
+        expect(provider.getPendingDocNames()).toContain('core')
+    })
+
+    it('keeps the moved-source binding marker when deleting a sync file is interrupted', async () => {
+        const marker = {
+            version: 1,
+            workspaceId: '42de9b18-445c-4d28-b5c9-88bc476fc7f1',
+            generation: 3,
+            activeProvider: 'dropbox',
+            state: 'moved',
+            operationId: 'f85f92e3-1584-4d77-8292-3a9977adcf44',
+            updatedAt: '2026-08-19T10:00:00.000Z',
+        }
+        const files = [
+            { id: 'state-file', name: 'tasktime-yjs-core.bin' },
+            { id: 'binding-file', name: 'tasktime-cloud-binding.json' },
+        ]
+        const manifest = {
+            getProviderId: () => 'google-drive',
+            load: vi.fn(async () => {}),
+            readCloudBindingMarker: vi.fn(async () => marker),
+            listSyncFiles: vi.fn(async () => files.slice()),
+            deleteFileById: vi.fn(async (id) => {
+                if (id === 'state-file') {
+                    throw new Error('provider delete interrupted')
+                }
+            }),
+            reset: vi.fn(),
+        }
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => ['core'],
+            getDocSync: () => new Y.Doc(),
+        }, {
+            provider: 'google-drive',
+            generation: 0,
+            manifest,
+        })
+        provider.isOnline = () => true
+        const deleteBackups = vi.fn(async () => {})
+
+        await expect(provider.replaceMovedCloudWorkspace('dropbox', deleteBackups))
+            .rejects.toThrow('provider delete interrupted')
+
+        expect(manifest.deleteFileById).toHaveBeenCalledTimes(1)
+        expect(manifest.deleteFileById).toHaveBeenCalledWith('state-file')
+        expect(files).toContainEqual({
+            id: 'binding-file',
+            name: 'tasktime-cloud-binding.json',
+        })
+        expect(manifest.reset).not.toHaveBeenCalled()
+    })
+
+    it('does not clear active or unrelated provider data through moved-source replacement', async () => {
+        const deleteBackups = vi.fn()
+        const manifest = {
+            getProviderId: () => 'google-drive',
+            load: vi.fn(async () => {}),
+            readCloudBindingMarker: vi.fn(async () => ({
+                version: 1,
+                workspaceId: '42de9b18-445c-4d28-b5c9-88bc476fc7f1',
+                generation: 3,
+                activeProvider: 'google-drive',
+                state: 'active',
+                updatedAt: '2026-08-19T10:00:00.000Z',
+            })),
+            listSyncFiles: vi.fn(async () => []),
+        }
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => [],
+            getDocSync: () => null,
+        }, {
+            provider: 'google-drive',
+            generation: 0,
+            manifest,
+        })
+        provider.isOnline = () => true
+
+        await expect(provider.replaceMovedCloudWorkspace('dropbox', deleteBackups))
+            .rejects.toThrow('no longer marked as moved to Dropbox')
+        expect(deleteBackups).not.toHaveBeenCalled()
+    })
+
+    it('resumes moved-source replacement only when the marker and sync namespace are already empty', async () => {
+        const manifest = {
+            getProviderId: () => 'google-drive',
+            readCloudBindingMarker: vi.fn(async () => null),
+            listSyncFiles: vi.fn(async () => []),
+            reset: vi.fn(),
+        }
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => ['core', 'entries-active'],
+            getDocSync: () => new Y.Doc(),
+        }, {
+            provider: 'google-drive',
+            generation: 0,
+            manifest,
+        })
+        provider.isOnline = () => true
+        const deleteBackups = vi.fn(async () => {})
+
+        await provider.replaceMovedCloudWorkspace('dropbox', deleteBackups)
+
+        expect(deleteBackups).toHaveBeenCalledOnce()
+        expect(manifest.reset).toHaveBeenCalledOnce()
+        expect(provider.getPendingDocNames()).toEqual(expect.arrayContaining(['core', 'entries-active']))
+    })
+
+    it('refuses marker-free replacement when any source sync file remains', async () => {
+        const manifest = {
+            getProviderId: () => 'google-drive',
+            readCloudBindingMarker: vi.fn(async () => null),
+            listSyncFiles: vi.fn(async () => [{ id: 'state-file', name: 'tasktime-yjs-core.bin' }]),
+        }
+        const provider = new YjsCloudSyncProvider({
+            getLoadedDocs: () => ['core'],
+            getDocSync: () => new Y.Doc(),
+        }, {
+            provider: 'google-drive',
+            generation: 0,
+            manifest,
+        })
+        provider.isOnline = () => true
+        const deleteBackups = vi.fn(async () => {})
+
+        await expect(provider.replaceMovedCloudWorkspace('dropbox', deleteBackups))
+            .rejects.toThrow('no longer marked as moved to Dropbox')
+        expect(deleteBackups).not.toHaveBeenCalled()
     })
 
     it('uses Dropbox-scoped diagnostics in the reusable sync core', async () => {

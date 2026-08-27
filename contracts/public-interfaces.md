@@ -97,6 +97,13 @@ The `/auth/dropbox/*` family is provider-bound and accepts no Dropbox file path 
 
 Provider-grant revocation and local disconnect are separate auth primitives. The connected-provider UI composes them into two choices: Disconnect retains authorization and provider data, while Wipe data & disconnect removes verified TaskTime sync files and backups before revocation. The browser clears its stored Worker session after confirmed revocation or an already-invalid grant, but preserves it and surfaces an error when revocation fails transiently so the operation can be retried truthfully.
 
+A verified moved-source marker is exposed as a recovery choice rather than a
+generic connection error. Connecting the recorded destination is the primary,
+non-destructive action. Reusing the source is a secondary destructive action
+that clears only that source's TaskTime backups and sync objects, leaves the
+destination unchanged, and seeds the local workspace without pulling or
+merging retained source data.
+
 ## Browser-to-bridge command protocol
 
 Agent command results are discriminated responses:

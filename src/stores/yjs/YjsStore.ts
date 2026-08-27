@@ -19,6 +19,7 @@ import {
     type CloudSyncConnectionOptions,
     type CloudSyncLockPermit,
     type DriveConnectionOptions,
+    withCloudSyncExclusiveLock,
 } from './providers/GoogleDriveProvider';
 import { BackupManager, CloudBackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
@@ -1646,6 +1647,84 @@ export class YjsStore {
         }
 
         await this.driveProvider.wipeCloudData();
+    }
+
+    /**
+     * Replace a provider workspace only after its binding proves that this
+     * exact source was moved to the expected target. The old source is fully
+     * cleared, then seeded from local IndexedDB without pulling or changing the
+     * target provider.
+     */
+    async replaceMovedCloudWorkspace(expectedTargetProvider: SyncPersistenceScope['provider']): Promise<void> {
+        const provider = this.driveProvider;
+        const backupManager = this.backupManager;
+        const sourceProvider = this.activeCloudProviderId;
+
+        if (!provider || !backupManager || !sourceProvider) {
+            throw new Error('Reconnect the moved cloud provider before replacing its workspace.');
+        }
+        if (provider.isConnected()) {
+            throw new Error('The moved source must remain disconnected before it can be replaced.');
+        }
+        if (sourceProvider === expectedTargetProvider) {
+            throw new Error('The moved workspace target must be a different cloud provider.');
+        }
+
+        // Load every locally persisted Yjs document before any remote deletion.
+        // No provider refresh is allowed here: the retained source is fenced,
+        // while the target provider must remain completely untouched.
+        await this.exportBackupData({
+            backupType: 'manual',
+            refreshLazyDocsFromCloud: false,
+        });
+        const persistedDocs = await this.docManager.listPersistedDocs();
+        for (const docName of persistedDocs) {
+            await this.docManager.getDoc(docName);
+        }
+        await this.docManager.flushPersistence();
+
+        const loadedDocs = this.docManager.getLoadedDocs().sort();
+        provider.markDocsForFullStateUpload(loadedDocs);
+
+        const lockResult = await withCloudSyncExclusiveLock(async (permit) => {
+            if (this.driveProvider !== provider
+                || this.backupManager !== backupManager
+                || this.activeCloudProviderId !== sourceProvider) {
+                throw new Error('The active cloud provider changed before replacement started.');
+            }
+
+            await provider.replaceMovedCloudWorkspace(
+                expectedTargetProvider,
+                () => backupManager.deleteAllBackups(),
+            );
+
+            // Manual connect performs only the access/empty-namespace check.
+            // One push-only full-state pass then seeds the independent source
+            // workspace without ever downloading the retired source data.
+            await provider.connect('manual', { bootstrapPullIfPristine: false }, permit);
+            try {
+                await provider.sync(true, {
+                    allowPull: false,
+                    forceFullState: true,
+                }, permit);
+            } finally {
+                provider.setSyncMode(this.driveSyncMode);
+            }
+
+            if (provider.getState() === 'error') {
+                throw new Error(
+                    `The old ${sourceProvider === 'dropbox' ? 'Dropbox' : 'Google Drive'} data was cleared, but the new workspace could not be uploaded. Your local data remains safe and will retry.`,
+                );
+            }
+        });
+
+        if (!lockResult.acquired) {
+            throw new Error('Another TaskTime tab is using cloud sync. Close it and try again.');
+        }
+
+        if (this.canClearDisconnectedDirtyDocsAfterSync()) {
+            this.clearDisconnectedDirtyDocs();
+        }
     }
 
     /**
