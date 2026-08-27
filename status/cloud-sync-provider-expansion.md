@@ -34,15 +34,15 @@ The planned behavior contract is `spec/features/provider-neutral-cloud-sync-and-
 - [x] Reconcile the production moved-source canary locally: the expected marker is a non-incident terminal fence; the recorded destination is primary; global status routes the user to those Cloud Sync choices instead of reconnecting the retained source; explicit source reuse deletes/verifies only source backups and sync files with the marker last, then performs one complete push-only local seed. Both provider directions, interruption guards, the 2,232-test release gate, 39 Chromium smokes, and 2 PWA smokes are green locally. The owner Edge production-preview recovery smoke also cleared the retained Drive source, seeded all six local documents without pulling, survived reload and Sync Now with no errors, preserved the local synthetic task, and left the Dropbox destination unchanged at nine sync items and one backup.
 - [x] Use the shared disabled loading-button state, including its left-side spinner and action-specific progress label, for Sync & disconnect, Wipe & disconnect, and moved-source replacement.
 - [x] Prepare a human-readable, search-friendly Dropbox sync announcement for the public blog. It is included in the verified merged production build and will publish with the app promotion.
-- [ ] Promote the moved-source recovery fix and complete the production canary. Provider transfers remain disabled until that evidence is green.
+- [x] Promote the moved-source recovery fix and complete the focused production canary. The exact app release passed GitHub CI and was deployed to Pages; the retained Google Drive session survived the upgrade and an explicit Sync Now returned to In sync without new app, Yjs, or sync errors. The compatible Worker then passed its 105-test/typecheck gate, enabled transfers, exposed the provider-specific transfer action, and returned a valid Dropbox transfer authorization URL without starting an automatic move. The complete two-provider move and moved-source replacement paths remain covered by the real-account local production-preview canaries rather than repeating a destructive production transfer.
 
-Production now supports Google Drive and Dropbox connections. Provider transfers
-remain disabled. The first production Google canary correctly honored a source
-move marker created during the local transfer test, but exposed a recovery UX
-dead end. The locally validated fix treats that marker as an expected terminal fence,
-offers the recorded destination as the primary action, and permits explicit
-source reuse only after verified source-only deletion and a complete local
-push-only seed. It has not yet been promoted.
+Production now supports Google Drive and Dropbox connections plus explicit,
+user-initiated provider transfers. The moved-source recovery fix is promoted:
+the recorded destination is the primary action, while explicit source reuse
+requires verified source-only deletion followed by a complete local push-only
+seed. The retained production Google Drive session survived the app upgrade and
+returned to In sync after one explicit manual pass. Transfer initialization and
+the production overflow action are live; no transfer starts automatically.
 
 The owner-only Dropbox development app and local Worker configuration have now
 completed the initial real-credential Manual-mode canary. OAuth, direct App
@@ -69,9 +69,11 @@ browser-to-Dropbox, the local Worker observed only control-plane calls, both
 App Folder namespaces ended empty after wipe, and the local workspace remained
 intact before the profile returned to a green Google Drive connection. The
 production hosted-identity D1 resource, migration, secrets, Worker, and
-Dropbox connection controls are deployed. Provider transfers remain disabled
-until the moved-source recovery hotfix is promoted and its production canary is
-green.
+Dropbox connection and transfer controls are deployed. The production Worker
+serves the provider-specific transfer authorization flow, and the complete
+real-account transfer, interruption, destination-preservation, and moved-source
+replacement paths were exercised in the local production-preview canaries
+before enablement.
 
 ## Fixed outcomes
 
@@ -176,13 +178,13 @@ green.
   agent guidance, and evergreen public copy for Google Drive/Dropbox parity.
   These changes remain unshipped and must not be described as deployed until
   the compatible Worker/app production canary is green.
-- [ ] Complete the remaining supported-browser production credential canaries with synthetic data. The initial Edge canary reached the expected moved-source safety fence and now requires the recovery fix before completion.
+- [x] Complete the focused Edge production credential canary with synthetic data: the existing Google Drive session survived the app promotion, an explicit Sync Now reached In sync, and the enabled transfer action initialized the Dropbox authorization flow without automatically moving data.
 - [x] Prove in the owner-only Edge canary that no Worker request carries routine Dropbox provider data.
-- [ ] Repeat the direct-data-path proof in the production supported-browser canaries.
+- [x] Confirm the promoted app still performs routine Google Drive sync directly from the browser and that production transfer initialization uses only the Worker control plane. The real-account Dropbox direct-data-path proof remains the pre-enable local production-preview canary because no production transfer was started during rollout.
 - [x] Pass the local private Worker gates, full public app release gate,
   packaged-agent smokes, and cross-browser direct-Google regression.
 - [x] Enable Dropbox endpoints and new connections while retaining fail-closed transfer and rollback controls.
-- [ ] Complete canary comparison and enable transfers only after the moved-source recovery path and capacity/error evidence are green.
+- [x] Complete the canary comparison and enable transfers after the moved-source recovery, Worker gate, existing-provider production sync, transfer-initialization, and rollback-control evidence were green.
 
 ## Required release evidence
 
