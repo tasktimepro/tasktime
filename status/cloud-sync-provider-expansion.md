@@ -35,6 +35,8 @@ The planned behavior contract is `spec/features/provider-neutral-cloud-sync-and-
 - [x] Use the shared disabled loading-button state, including its left-side spinner and action-specific progress label, for Sync & disconnect, Wipe & disconnect, and moved-source replacement.
 - [x] Prepare a human-readable, search-friendly Dropbox sync announcement for the public blog. It is included in the verified merged production build and will publish with the app promotion.
 - [x] Promote the moved-source recovery fix and complete the focused production canary. The exact app release passed GitHub CI and was deployed to Pages; the retained Google Drive session survived the upgrade and an explicit Sync Now returned to In sync without new app, Yjs, or sync errors. The compatible Worker then passed its 105-test/typecheck gate, enabled transfers, exposed the provider-specific transfer action, and returned a valid Dropbox transfer authorization URL without starting an automatic move. The complete two-provider move and moved-source replacement paths remain covered by the real-account local production-preview canaries rather than repeating a destructive production transfer.
+- [x] Publish core app `v1.5.0`, agent bridge/MCP Registry `1.1.0`, OpenClaw npm/ClawHub `1.1.0`, and repository-backed Claude `1.1.0` / marketplace `1.3.0`; leave the unchanged ClawHub skill at `1.2.1`.
+- [ ] Apply for Dropbox App Console production access. This is the remaining external availability/capacity step; the production code, Worker, transfer flag, privacy boundary, canary, and package releases are complete.
 
 Production now supports Google Drive and Dropbox connections plus explicit,
 user-initiated provider transfers. The moved-source recovery fix is promoted:
@@ -192,7 +194,7 @@ before enablement.
 - Both providers pass the shared adapter, mode, request-budget, backup, destructive-action, and privacy matrices.
 - Both transfer directions reconstruct the same complete Yjs workspace and recover safely from every injected interruption.
 - Worker tests/typecheck, app coverage/lint/typecheck/build/browser/PWA/release gates, and generated agent checks are green as applicable.
-- Dropbox App Folder scopes, redirect URIs, production approval, and privacy disclosures are verified.
+- Dropbox App Folder scopes, redirect URIs, current development access, and privacy disclosures are verified; App Console production access remains the external follow-up recorded above.
 - Total Cloudflare usage retains at least two-times headroom under the selected plan after a doubled peak projection and canary comparison.
 - Existing Dropbox support survives acquisition/transfer rollback; no automatic Google fallback exists.
 - Exact releases/deployments and public enablement receive separate explicit approval.
