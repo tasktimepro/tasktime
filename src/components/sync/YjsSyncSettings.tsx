@@ -3,16 +3,19 @@
  *
  * Sync contract source of truth: ./README.md
  * 
- * Shows connection status and allows managing Google Drive sync
+ * Shows connection status and manages the active cloud provider.
  */
 
 import type { ChangeEvent, ComponentType, MouseEvent } from 'react';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
+import { isDropboxCloudUiEnabled } from '@/config/cloudProviders';
+import { useCloudProviderTransfer } from '@/hooks/useCloudProviderTransfer';
+import { useDropboxAuth } from '@/hooks/useDropboxAuth';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { usePreferences } from '@/hooks/usePreferences';
 import { useToast } from '@/hooks/useToast';
-import { ArrowPathIcon, CheckIcon, CloudBackupIcon, CloudIcon, CloudOffIcon, ExclamationTriangleIcon, MoreHorizontalIcon, TrashIcon } from '@/components/ui/icons';
+import { ArrowPathIcon, CheckIcon, CloudBackupIcon, CloudIcon, CloudOffIcon, DropboxBrandIcon, ExclamationTriangleIcon, GoogleDriveBrandIcon, MoreHorizontalIcon, TrashIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card as CardPrimitive, CardContent as CardContentPrimitive, CardHeader as CardHeaderPrimitive, CardTitle as CardTitlePrimitive } from '@/components/ui/card';
 import { Checkbox as CheckboxPrimitive } from '@/components/ui/checkbox';
@@ -21,14 +24,16 @@ import { Label as LabelPrimitive } from '@/components/ui/label';
 import { Select as SelectPrimitive, SelectContent as SelectContentPrimitive, SelectItem as SelectItemPrimitive, SelectTrigger as SelectTriggerPrimitive, SelectValue as SelectValuePrimitive } from '@/components/ui/select';
 import { DropdownMenu as DropdownMenuPrimitive, DropdownMenuContent as DropdownMenuContentPrimitive, DropdownMenuItem as DropdownMenuItemPrimitive, DropdownMenuTrigger as DropdownMenuTriggerPrimitive } from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
+import { Notice as NoticePrimitive } from '@/components/ui/notice';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { BackupInfo } from '@/stores/yjs';
+import type { CloudProviderId } from '@/stores/yjs';
 import type { AutoSyncMode } from '@/stores/yjs/types';
 import { parseIntegerInputWithFallback } from '@/utils/numberInputUtils';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 
-type ConfirmDialogType = 'disconnect' | 'wipe' | null;
+type ConfirmDialogType = 'disconnect' | 'transfer' | 'wipe' | 'replace-moved' | null;
 type PendingBackupModeChange = {
     autoSyncEnabled: boolean;
     autoSyncMode: 'backup';
@@ -51,6 +56,7 @@ const DropdownMenu = DropdownMenuPrimitive as unknown as UntypedUiComponent;
 const DropdownMenuContent = DropdownMenuContentPrimitive as unknown as UntypedUiComponent;
 const DropdownMenuItem = DropdownMenuItemPrimitive as unknown as UntypedUiComponent;
 const DropdownMenuTrigger = DropdownMenuTriggerPrimitive as unknown as UntypedUiComponent;
+const Notice = NoticePrimitive as unknown as UntypedUiComponent;
 
 export default function YjsSyncSettings() {
     const isMobileLayout = useIsMobileLayout();
@@ -60,22 +66,92 @@ export default function YjsSyncSettings() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [wipeConfirmText, setWipeConfirmText] = useState('');
-    const [wipeIncludesBackups, setWipeIncludesBackups] = useState(false);
     const [backups, setBackups] = useState<BackupInfo[]>([]);
     const [backupsLoading, setBackupsLoading] = useState(false);
     const [backupCreating, setBackupCreating] = useState(false);
     const [restoreConfirmBackup, setRestoreConfirmBackup] = useState<BackupInfo | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
     const [pendingBackupModeChange, setPendingBackupModeChange] = useState<PendingBackupModeChange>(null);
+    const [transferTarget, setTransferTarget] = useState<CloudProviderId | null>(null);
 
-    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, lastSyncedAt, pendingSyncChanges, forceSyncDrive, disconnectDrive, wipeDriveData, deleteAllBackups, listBackups, createBackup, downloadBackup } = useYjs();
-    const { isSignedIn, isLoading: authLoading, user, signIn, signOut, hadPreviousSession } = useGoogleAuth();
+    const {
+        store,
+        isReady,
+        isSyncing,
+        syncState,
+        syncPhase,
+        isDriveConnected,
+        isCloudConnected,
+        activeStorageProvider,
+        movedToStorageProvider,
+        isConnecting,
+        hasSynced,
+        manualSyncInProgress,
+        lastSyncedAt,
+        pendingSyncChanges,
+        forceSyncCloud,
+        disconnectActiveCloudSession,
+        wipeCloudData,
+        replaceMovedCloudWorkspace,
+        deleteAllBackups,
+        listBackups,
+        createBackup,
+        downloadBackup,
+    } = useYjs();
+    const {
+        isSignedIn,
+        isLoading: authLoading,
+        user,
+        signIn,
+        hadPreviousSession,
+    } = useGoogleAuth();
+    const {
+        isSignedIn: isDropboxSignedIn,
+        isLoading: dropboxAuthLoading,
+        sessionId: dropboxSessionId,
+        error: dropboxAuthError,
+        signIn: signInDropbox,
+        refresh: refreshDropboxAuth,
+    } = useDropboxAuth();
+    const transfer = useCloudProviderTransfer();
     const { preferences, updatePreferences } = usePreferences();
     const { showSuccess, showError } = useToast();
 
-    const showAuthActions = isReady && !authLoading;
-    const showConnectButton = showAuthActions && !isOffline && !isSignedIn && !isDriveConnected && !isConnecting;
-    const showConnectedActions = showAuthActions && !isOffline && isSignedIn && isDriveConnected;
+    const dropboxUiEnabled = isDropboxCloudUiEnabled();
+    const cloudConnected = isCloudConnected ?? isDriveConnected;
+    const provider = activeStorageProvider ?? (isDriveConnected ? 'google-drive' : null);
+    const providerName = provider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const providerShortName = provider === 'dropbox' ? 'Dropbox' : 'Drive';
+    const transferTargetProvider: CloudProviderId = provider === 'dropbox' ? 'google-drive' : 'dropbox';
+    const transferTargetName = transferTargetProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const TransferTargetIcon = transferTargetProvider === 'dropbox' ? DropboxBrandIcon : GoogleDriveBrandIcon;
+    const ProviderIcon = provider === 'dropbox' ? DropboxBrandIcon : GoogleDriveBrandIcon;
+    const movedTargetName = movedToStorageProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const MovedTargetIcon = movedToStorageProvider === 'dropbox' ? DropboxBrandIcon : GoogleDriveBrandIcon;
+    const providerIsSignedIn = provider === 'dropbox' ? isDropboxSignedIn : isSignedIn;
+    const showAuthActions = isReady && !authLoading && !dropboxAuthLoading;
+    const showConnectButton = showAuthActions
+        && !isOffline
+        && !provider
+        && !isSignedIn
+        && !isDropboxSignedIn
+        && !cloudConnected
+        && !isConnecting;
+    const showConnectedActions = showAuthActions
+        && !isOffline
+        && providerIsSignedIn
+        && cloudConnected;
+    const showMovedRecoveryActions = showAuthActions
+        && !isOffline
+        && Boolean(provider)
+        && Boolean(movedToStorageProvider)
+        && !cloudConnected
+        && !isConnecting;
+    const showProviderRecoveryActions = showAuthActions
+        && provider === 'dropbox'
+        && Boolean(dropboxSessionId)
+        && !providerIsSignedIn
+        && !cloudConnected;
 
     const autoSyncEnabled = preferences.autoSyncEnabled ?? false;
     const autoSyncMode = preferences.autoSyncMode ?? 'sync';
@@ -85,7 +161,7 @@ export default function YjsSyncSettings() {
 
     // Update "time ago" display
     useEffect(() => {
-        if (!isDriveConnected || !lastSyncedAt) {
+        if (!cloudConnected || !lastSyncedAt) {
             return undefined;
         }
 
@@ -94,7 +170,7 @@ export default function YjsSyncSettings() {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [isDriveConnected, lastSyncedAt]);
+    }, [cloudConnected, lastSyncedAt]);
 
     useEffect(() => {
         const handleOnline = () => setIsOffline(false);
@@ -110,7 +186,7 @@ export default function YjsSyncSettings() {
     }, []);
 
     const status = useMemo(() => {
-        if (!isReady || authLoading) {
+        if (!isReady || authLoading || dropboxAuthLoading) {
             return {
                 text: 'Loading...',
                 tone: 'text-muted-foreground',
@@ -127,7 +203,23 @@ export default function YjsSyncSettings() {
             };
         }
 
-        if (!isDriveConnected && !isConnecting) {
+        if (movedToStorageProvider) {
+            return {
+                text: `Moved to ${movedTargetName}`,
+                tone: 'status-warning-text-strong',
+                icon: ExclamationTriangleIcon,
+            };
+        }
+
+        if (provider === 'dropbox' && dropboxSessionId && dropboxAuthError) {
+            return {
+                text: 'Connection unavailable',
+                tone: 'status-warning-text-strong',
+                icon: ExclamationTriangleIcon,
+            };
+        }
+
+        if (!cloudConnected && !isConnecting) {
             return {
                 text: 'Not connected',
                 tone: 'text-muted-foreground',
@@ -135,7 +227,7 @@ export default function YjsSyncSettings() {
             };
         }
 
-        if (isConnecting || !isDriveConnected) {
+        if (isConnecting || !cloudConnected) {
             return {
                 text: 'Syncing...',
                 tone: 'status-warning-text-strong',
@@ -224,7 +316,7 @@ export default function YjsSyncSettings() {
             icon: CheckIcon
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is a tick dependency that forces recomputation of relative-time strings
-    }, [isReady, authLoading, isDriveConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges, autoSyncEnabled, autoSyncMode]);
+    }, [isReady, authLoading, dropboxAuthLoading, cloudConnected, isConnecting, isOffline, syncState, syncPhase, isSyncing, hasSynced, manualSyncInProgress, lastSyncedAt, now, isManualMode, pendingSyncChanges, autoSyncEnabled, autoSyncMode, provider, dropboxSessionId, dropboxAuthError, movedToStorageProvider, movedTargetName]);
 
     const handleConnect = async () => {
         try {
@@ -239,6 +331,55 @@ export default function YjsSyncSettings() {
         }
     };
 
+    const handleConnectDropbox = async () => {
+        try {
+            await signInDropbox();
+        } catch (error) {
+            if (store.isCloudConnected()) return;
+            console.error('[YjsSyncSettings] Dropbox connect failed:', error);
+            showError(error instanceof Error ? error.message : 'Dropbox action failed.');
+        }
+    };
+
+    const handleRetryDropbox = async () => {
+        try {
+            await refreshDropboxAuth();
+        } catch (error) {
+            console.error('[YjsSyncSettings] Dropbox reconnect check failed:', error);
+            showError(error instanceof Error ? error.message : 'Dropbox connection could not be checked.');
+        }
+    };
+
+    const handleConnectMovedTarget = async () => {
+        if (!movedToStorageProvider) return;
+        try {
+            await disconnectActiveCloudSession({ revoke: false });
+            if (movedToStorageProvider === 'dropbox') {
+                await signInDropbox();
+            } else {
+                await signIn();
+            }
+        } catch (error) {
+            console.error('[YjsSyncSettings] Moved provider recovery failed:', error);
+            showError(error instanceof Error ? error.message : `Could not connect ${movedTargetName}.`);
+        }
+    };
+
+    const confirmReplaceMovedWorkspace = async () => {
+        if (!movedToStorageProvider) return;
+        setIsProcessing(true);
+        try {
+            await replaceMovedCloudWorkspace(movedToStorageProvider);
+            showSuccess(`${providerName} is ready as a new workspace`);
+            setConfirmDialog(null);
+        } catch (error) {
+            console.error('[YjsSyncSettings] Moved source replacement failed:', error);
+            showError(error instanceof Error ? error.message : `${providerName} could not be cleared.`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     /**
      * Simple disconnect - syncs first, then disconnects.
      * Does NOT delete local data (user can reconnect later).
@@ -249,24 +390,25 @@ export default function YjsSyncSettings() {
 
     const handleWipeAndDisconnect = () => {
         setWipeConfirmText('');
-        setWipeIncludesBackups(false);
         setConfirmDialog('wipe');
     };
 
     const confirmDisconnect = async () => {
+        const canSyncBeforeDisconnect = cloudConnected && providerIsSignedIn;
         setIsProcessing(true);
         try {
-            // Sync before disconnecting to ensure Drive has latest data
-            await forceSyncDrive();
-            showSuccess('Synced successfully');
-            
-            // Now safe to disconnect
-            disconnectDrive();
-            await signOut();
-            showSuccess('Disconnected from Google Drive');
+            if (canSyncBeforeDisconnect) {
+                // Sync before disconnecting so the active provider has the latest data.
+                await forceSyncCloud();
+                showSuccess('Synced successfully');
+            }
+            await disconnectActiveCloudSession({ revoke: false });
+            showSuccess(`Disconnected from ${providerName}`);
         } catch (error) {
-            console.error('[YjsSyncSettings] Sync failed before disconnect:', error);
-            showError('Sync failed. Please try again before disconnecting.');
+            console.error('[YjsSyncSettings] Disconnect failed:', error);
+            showError(canSyncBeforeDisconnect
+                ? 'Sync or disconnect failed. Please try again.'
+                : 'Disconnect failed. Please try again.');
             // DO NOT disconnect if sync failed - data could be lost
             return;
         } finally {
@@ -276,24 +418,18 @@ export default function YjsSyncSettings() {
     };
 
     const confirmWipeAndDisconnect = async () => {
-        if (wipeConfirmText.trim().toLowerCase() !== 'wipe drive') {
-            showError('Please type "wipe drive" to confirm.');
+        const confirmation = 'wipe data';
+        if (wipeConfirmText.trim().toLowerCase() !== confirmation) {
+            showError(`Please type "${confirmation}" to confirm.`);
             return;
         }
 
         setIsProcessing(true);
         try {
-            await wipeDriveData();
-
-            if (wipeIncludesBackups) {
-                await deleteAllBackups();
-            }
-
-            disconnectDrive();
-            await signOut();
-            showSuccess(wipeIncludesBackups
-                ? 'Google Drive data and backups wiped and disconnected'
-                : 'Google Drive sync data wiped and disconnected');
+            await wipeCloudData();
+            await deleteAllBackups();
+            await disconnectActiveCloudSession({ revoke: true });
+            showSuccess(`${providerName} data wiped and disconnected`);
         } catch (error) {
             console.error('[YjsSyncSettings] Wipe & disconnect failed:', error);
             showError('Wipe failed. Please try again.');
@@ -306,7 +442,7 @@ export default function YjsSyncSettings() {
 
     const handleForceSync = async () => {
         try {
-            await forceSyncDrive();
+            await forceSyncCloud();
             showSuccess('Synced successfully');
         } catch (error) {
             console.error('[YjsSyncSettings] Manual sync failed:', error);
@@ -319,17 +455,22 @@ export default function YjsSyncSettings() {
             autoSyncEnabled: nextEnabled,
             autoSyncMode: nextMode,
         });
-        store.setDriveSyncPreferences(nextEnabled, nextMode);
+        if (typeof store.setCloudSyncPreferences === 'function') {
+            store.setCloudSyncPreferences(nextEnabled, nextMode);
+        } else {
+            // Compatibility for older embedded/test store facades.
+            store.setDriveSyncPreferences(nextEnabled, nextMode);
+        }
 
-        if (isDriveConnected) {
+        if (cloudConnected) {
             try {
-                await forceSyncDrive();
+                await forceSyncCloud();
             } catch (error) {
                 console.error('[YjsSyncSettings] Sync failed after auto-sync preference change:', error);
                 showError('Sync failed. Please try again.');
             }
         }
-    }, [forceSyncDrive, isDriveConnected, showError, store, updatePreferences]);
+    }, [cloudConnected, forceSyncCloud, showError, store, updatePreferences]);
 
     const handleAutoSyncToggle = async (checked: boolean | 'indeterminate') => {
         const nextEnabled = checked === true;
@@ -363,7 +504,7 @@ export default function YjsSyncSettings() {
     };
 
     const loadBackups = useCallback(async () => {
-        if (!isDriveConnected) return;
+        if (!cloudConnected) return;
         setBackupsLoading(true);
         try {
             const result = await listBackups();
@@ -373,16 +514,16 @@ export default function YjsSyncSettings() {
         } finally {
             setBackupsLoading(false);
         }
-    }, [isDriveConnected, listBackups]);
+    }, [cloudConnected, listBackups]);
 
     // Load backups when connected
     useEffect(() => {
-        if (isDriveConnected && hasSynced) {
+        if (cloudConnected && hasSynced) {
             loadBackups();
         } else {
             setBackups([]);
         }
-    }, [isDriveConnected, hasSynced, loadBackups]);
+    }, [cloudConnected, hasSynced, loadBackups]);
 
     const handleCreateBackup = async () => {
         setBackupCreating(true);
@@ -432,20 +573,153 @@ export default function YjsSyncSettings() {
         }
     };
 
+    const requestTransfer = (targetProvider: CloudProviderId) => {
+        setTransferTarget(targetProvider);
+        setConfirmDialog('transfer');
+    };
+
+    const confirmTransfer = async () => {
+        if (!transferTarget) return;
+        setConfirmDialog(null);
+        try {
+            await transfer.startTransfer(transferTarget);
+            showSuccess(`Workspace transferred to ${transferTarget === 'dropbox' ? 'Dropbox' : 'Google Drive'}`);
+        } catch (error) {
+            console.error('[YjsSyncSettings] Provider transfer stopped:', error);
+            showError(error instanceof Error
+                ? error.message
+                : 'The provider transfer stopped safely. Your source remains active.');
+        }
+    };
+
+    const handleResumeTransfer = async () => {
+        try {
+            await transfer.resumeTransfer();
+            showSuccess(`Workspace transfer to ${transfer.targetProvider === 'dropbox' ? 'Dropbox' : 'Google Drive'} completed`);
+        } catch (error) {
+            console.error('[YjsSyncSettings] Provider transfer resume stopped:', error);
+            showError(error instanceof Error
+                ? error.message
+                : 'The provider transfer could not resume. Your source remains active.');
+        }
+    };
+
+    const transferTargetLabel = transfer.targetProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const transferStageDetails: Record<string, { text: string; progress: number }> = {
+        'preparing-source': { text: 'Preparing your data', progress: 10 },
+        'target-inspected': { text: `Checking ${transferTargetLabel}`, progress: 25 },
+        'uploading-target': { text: `Copying your data to ${transferTargetLabel}`, progress: 40 },
+        'target-prepared': { text: `Verifying your data in ${transferTargetLabel}`, progress: 55 },
+        'target-verified': { text: 'Checking for recent changes', progress: 70 },
+        'source-marked': { text: `Switching to ${transferTargetLabel}`, progress: 80 },
+        activated: { text: `Connecting ${transferTargetLabel}`, progress: 90 },
+        finalizing: { text: 'Finishing setup', progress: 95 },
+    };
+    const transferStageDetail = transfer.stage ? transferStageDetails[transfer.stage] : null;
+    const transferProgress = transferStageDetail?.progress ?? 0;
+    const transferStatusText = transferStageDetail?.text ?? 'Waiting for provider authorization';
+    const showTransferPanel = dropboxUiEnabled
+        && (transfer.isTransferInProgress
+            || transfer.canResume
+            || transfer.status === 'error');
+
     const StatusIcon = status.icon;
+    const renderProviderOverflowActions = () => (
+        <>
+            {dropboxUiEnabled && (
+                <DropdownMenuItem
+                    onClick={() => requestTransfer(transferTargetProvider)}
+                    disabled={transfer.isTransferInProgress || isSyncing}
+                    className="flex items-center space-x-2"
+                >
+                    <TransferTargetIcon className="h-4 w-4" />
+                    <span>Transfer to {transferTargetName}</span>
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+                onClick={handleWipeAndDisconnect}
+                disabled={transfer.isTransferInProgress}
+                className="status-danger-action flex items-center space-x-2"
+            >
+                <TrashIcon className="h-4 w-4" />
+                <span>Wipe data & disconnect</span>
+            </DropdownMenuItem>
+        </>
+    );
 
     return (
         <div>
             <div className="mb-6">
                 <h2 className="text-2xl font-bold text-foreground">Cloud Sync</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Connect Google Drive to back up your data. Auto-sync between devices is optional.
+                    {dropboxUiEnabled
+                        ? 'Choose one cloud provider for private, direct browser-to-provider sync. Auto-sync between devices is optional.'
+                        : 'Connect Google Drive to back up your data. Auto-sync between devices is optional.'}
                 </p>
             </div>
 
+            {showTransferPanel && (
+                <Card className="mb-4" aria-live="polite">
+                    <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
+                        <CardTitle>
+                            Moving to {transferTargetLabel}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className={cn('space-y-3', isMobileLayout && 'px-3 pb-3 pt-0')}>
+                        <div className="space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                                <p className="text-sm text-foreground">{transferStatusText}</p>
+                                <span className="flex-shrink-0 text-xs font-medium text-muted-foreground">
+                                    {transferProgress}%
+                                </span>
+                            </div>
+                            <div
+                                role="progressbar"
+                                aria-label={`Transfer to ${transferTargetLabel} progress`}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={transferProgress}
+                                aria-valuetext={transferStatusText}
+                                className="relative h-2 overflow-hidden rounded-full bg-muted"
+                            >
+                                <div
+                                    data-transfer-progress-fill
+                                    className="relative h-full overflow-hidden rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+                                    style={{ width: `${transferProgress}%` }}
+                                >
+                                    {transfer.isTransferInProgress && (
+                                        <div
+                                            data-transfer-progress-activity
+                                            aria-hidden="true"
+                                            className="transfer-progress-activity"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {transfer.error && (
+                            <p className="text-sm status-danger-text-strong">{transfer.error}</p>
+                        )}
+                        <Notice
+                            variant="warning"
+                            compact
+                            description={`Do not use TaskTime on other devices during this transfer. Then connect them to ${transferTargetLabel} before making changes.`}
+                        />
+                        {transfer.canResume && !transfer.isTransferInProgress && (
+                            <Button variant="outline" onClick={handleResumeTransfer}>
+                                Resume transfer
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
             <Card>
                 <CardHeader className={cn(isMobileLayout && 'px-3 pb-2 pt-3')}>
-                    <CardTitle>Google Drive</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                        {provider && <ProviderIcon className="h-5 w-5 flex-shrink-0" />}
+                        <span>{provider ? providerName : (dropboxUiEnabled ? 'Choose a provider' : 'Google Drive')}</span>
+                    </CardTitle>
                 </CardHeader>
                 <CardContent className={cn('space-y-4', isMobileLayout && 'px-3 pb-3 pt-0')}>
                     <div className={cn('flex gap-4', isMobileLayout ? 'flex-col' : 'items-center justify-between')}>
@@ -454,8 +728,18 @@ export default function YjsSyncSettings() {
                                 <StatusIcon className={`h-5 w-5 flex-shrink-0 ${status.tone} ${status.spinning ? 'animate-spin' : ''}`} />
                                 <div className="min-w-0">
                                     <div className={`text-sm font-medium ${status.tone}`}>{status.text}</div>
-                                    {isSignedIn && user?.email && (
+                                    {provider !== 'dropbox' && isSignedIn && user?.email && (
                                         <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+                                    )}
+                                    {provider === 'dropbox' && (
+                                        <div className="truncate text-xs text-muted-foreground">
+                                            {dropboxAuthError ?? 'App Folder access · storage identity only'}
+                                        </div>
+                                    )}
+                                    {provider && movedToStorageProvider && (
+                                        <div className="mt-1 text-xs status-warning-text-strong">
+                                            TaskTime data in this {providerName} was moved to {movedTargetName}.
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -473,13 +757,7 @@ export default function YjsSyncSettings() {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
-                                        <DropdownMenuItem
-                                            onClick={handleWipeAndDisconnect}
-                                            className="status-danger-action flex items-center space-x-2"
-                                        >
-                                            <TrashIcon className="h-4 w-4" />
-                                            <span>Wipe & Disconnect</span>
-                                        </DropdownMenuItem>
+                                        {renderProviderOverflowActions()}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             )}
@@ -490,6 +768,7 @@ export default function YjsSyncSettings() {
                                         <Button
                                             variant="ghost"
                                             onClick={handleDisconnect}
+                                            disabled={transfer.isTransferInProgress}
                                             className={cn(isMobileLayout && 'flex-1')}
                                         >
                                             Disconnect
@@ -497,7 +776,7 @@ export default function YjsSyncSettings() {
                                         <Button
                                             variant="outline"
                                             onClick={handleForceSync}
-                                            disabled={!isDriveConnected || isSyncing}
+                                            disabled={!cloudConnected || isSyncing || transfer.isTransferInProgress}
                                             leadingIcon={ArrowPathIcon}
                                             className={cn(isMobileLayout && 'flex-1')}
                                         >
@@ -517,26 +796,71 @@ export default function YjsSyncSettings() {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
-                                                    <DropdownMenuItem
-                                                        onClick={handleWipeAndDisconnect}
-                                                        className="status-danger-action flex items-center space-x-2"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                        <span>Wipe & Disconnect</span>
-                                                    </DropdownMenuItem>
+                                                    {renderProviderOverflowActions()}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         )}
                                     </>
+                            ) : showMovedRecoveryActions ? (
+                                <div className={cn('flex gap-2', isMobileLayout && 'w-full flex-col')}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setConfirmDialog('replace-moved')}
+                                        disabled={isProcessing}
+                                        leadingIcon={ProviderIcon}
+                                        className={cn(isMobileLayout && 'w-full')}
+                                    >
+                                        Use {providerName}
+                                    </Button>
+                                    <Button
+                                        onClick={handleConnectMovedTarget}
+                                        disabled={isProcessing}
+                                        leadingIcon={MovedTargetIcon}
+                                        className={cn(isMobileLayout && 'w-full')}
+                                    >
+                                        Connect {movedTargetName}
+                                    </Button>
+                                </div>
+                            ) : showProviderRecoveryActions ? (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={handleDisconnect}
+                                        className={cn(isMobileLayout && 'flex-1')}
+                                    >
+                                        Disconnect
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleRetryDropbox}
+                                        disabled={dropboxAuthLoading || isOffline}
+                                        leadingIcon={ArrowPathIcon}
+                                        className={cn(isMobileLayout && 'flex-1')}
+                                    >
+                                        Retry
+                                    </Button>
+                                </>
                             ) : showConnectButton ? (
-                                <Button
-                                    onClick={handleConnect}
-                                    leadingIcon={CloudIcon}
-                                    title={hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive'}
-                                    className={cn(isMobileLayout && 'w-full')}
-                                >
-                                    Connect Google Drive
-                                </Button>
+                                <div className={cn('flex gap-2', isMobileLayout && 'w-full flex-col')}>
+                                    <Button
+                                        onClick={handleConnect}
+                                        leadingIcon={GoogleDriveBrandIcon}
+                                        title={hadPreviousSession ? 'Reconnect Google Drive' : 'Connect Google Drive'}
+                                        className={cn(isMobileLayout && 'w-full')}
+                                    >
+                                        Connect Google Drive
+                                    </Button>
+                                    {dropboxUiEnabled && (
+                                        <Button
+                                            onClick={handleConnectDropbox}
+                                            leadingIcon={DropboxBrandIcon}
+                                            title="Connect Dropbox"
+                                            className={cn(isMobileLayout && 'w-full')}
+                                        >
+                                            Connect Dropbox
+                                        </Button>
+                                    )}
+                                </div>
                             ) : null}
                         </div>
                     </div>
@@ -553,7 +877,7 @@ export default function YjsSyncSettings() {
                                         Enable auto-sync
                                     </Label>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        When disabled, you control when changes are synced with Drive.
+                                        When disabled, you control when changes are synced with {providerShortName}.
                                     </p>
                                 </div>
                             </div>
@@ -598,7 +922,7 @@ export default function YjsSyncSettings() {
                                         Enable automatic backups
                                     </Label>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Creates snapshots of your data on Google Drive after each sync.
+                                        Creates snapshots of your data on {providerName} after each sync.
                                     </p>
                                 </div>
                             </div>
@@ -714,7 +1038,7 @@ export default function YjsSyncSettings() {
             <Modal
                 isOpen={confirmDialog === 'disconnect'}
                 onClose={() => !isProcessing && setConfirmDialog(null)}
-                title="Disconnect from Google Drive?"
+                title={`Disconnect from ${providerName}?`}
                 size="md"
                 footer={
                     <div className="flex justify-end gap-3">
@@ -728,16 +1052,92 @@ export default function YjsSyncSettings() {
                         <Button
                             onClick={confirmDisconnect}
                             disabled={isProcessing}
+                            loading={isProcessing}
+                            loadingText="Disconnecting..."
                         >
-                            {isProcessing ? 'Syncing...' : 'Sync & Disconnect'}
+                            {cloudConnected && providerIsSignedIn ? 'Sync & disconnect' : 'Disconnect'}
                         </Button>
                     </div>
                 }
             >
                 <p className="text-sm text-muted-foreground">
-                    Your data will be synced to Google Drive before disconnecting.
-                    Your local data will remain on this device.
+                    {cloudConnected && providerIsSignedIn
+                        ? `Your data will be synced to ${providerName} before this browser disconnects.`
+                        : `This browser will disconnect without syncing because ${providerName} is currently unavailable. Any local changes stay on this device.`}
+                    {' '}Provider authorization and cloud files remain in place, and your local data stays on this device.
                 </p>
+            </Modal>
+
+            <Modal
+                isOpen={confirmDialog === 'transfer'}
+                onClose={() => !transfer.isTransferInProgress && setConfirmDialog(null)}
+                title={`Transfer to ${transferTarget === 'dropbox' ? 'Dropbox' : 'Google Drive'}?`}
+                size="md"
+                footer={
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmDialog(null)}
+                            disabled={transfer.isTransferInProgress}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={confirmTransfer}
+                            disabled={transfer.isTransferInProgress}
+                            leadingIcon={TransferTargetIcon}
+                        >
+                            Connect & transfer
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-3 text-sm text-muted-foreground">
+                    <p>
+                        TaskTime will sync your latest changes, copy your data to {transferTarget === 'dropbox' ? 'Dropbox' : 'Google Drive'}, and verify it before switching this browser.
+                    </p>
+                    <p>
+                        Your {providerName} data and backups will stay there.
+                    </p>
+                    <Notice
+                        variant="warning"
+                        compact
+                        description={`Do not use TaskTime on other devices during this transfer. Then connect them to ${transferTarget === 'dropbox' ? 'Dropbox' : 'Google Drive'} before making changes.`}
+                    />
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={confirmDialog === 'replace-moved'}
+                onClose={() => !isProcessing && setConfirmDialog(null)}
+                title={`Use ${providerName} for a new workspace?`}
+                size="md"
+                footer={
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmDialog(null)}
+                            disabled={isProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmReplaceMovedWorkspace}
+                            disabled={isProcessing}
+                            loading={isProcessing}
+                            loadingText={`Resetting ${providerName}...`}
+                        >
+                            Clear & use {providerName}
+                        </Button>
+                    </div>
+                }
+            >
+                <Notice
+                    variant="warning"
+                    icon={ExclamationTriangleIcon}
+                    description={`This permanently deletes all TaskTime sync files and backups in ${providerName}. ${movedTargetName} stays unchanged. This device will then start a new ${providerName} workspace.`}
+                />
             </Modal>
 
             {/* Backup Mode Confirmation Modal */}
@@ -762,7 +1162,7 @@ export default function YjsSyncSettings() {
             >
                 <div className="space-y-3 text-sm text-muted-foreground">
                     <p>
-                        Device backup is intended for using TaskTime Pro on one device. It uploads this device's changes to Drive, but it does not automatically keep other devices up to date.
+                        Device backup is intended for using TaskTime Pro on one device. It uploads this device's changes to {providerShortName}, but it does not automatically keep other devices up to date.
                     </p>
                     <p>
                         Use Sync between devices if you use TaskTime Pro on both your phone and computer.
@@ -774,7 +1174,7 @@ export default function YjsSyncSettings() {
             <Modal
                 isOpen={confirmDialog === 'wipe'}
                 onClose={() => !isProcessing && setConfirmDialog(null)}
-                title="Wipe synced Drive data and disconnect?"
+                title="Wipe cloud data & disconnect?"
                 size="md"
                 footer={
                     <div className="flex justify-end gap-3">
@@ -788,39 +1188,39 @@ export default function YjsSyncSettings() {
                         <Button
                             variant="destructive"
                             onClick={confirmWipeAndDisconnect}
-                            disabled={isProcessing || wipeConfirmText.trim().toLowerCase() !== 'wipe drive'}
+                            disabled={isProcessing || wipeConfirmText.trim().toLowerCase() !== 'wipe data'}
+                            loading={isProcessing}
+                            loadingText="Wiping..."
                         >
-                            {isProcessing ? 'Wiping...' : 'Wipe & Disconnect'}
+                            Wipe & disconnect
                         </Button>
                     </div>
                 }
             >
                 <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                        This will permanently delete TaskTime Pro sync files from Google Drive and disconnect this device.
-                        Your local data will remain on this device, but we recommend that you <strong>export your data before this action</strong>.
-                    </p>
-                    <label className="flex items-start gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
-                        <Checkbox
-                            checked={wipeIncludesBackups}
-                            onCheckedChange={(checked: boolean | 'indeterminate') => setWipeIncludesBackups(checked === true)}
-                        />
-                        <span className="space-y-1">
-                            <span className="block font-medium text-foreground">Also delete backup snapshots</span>
-                            <span className="block text-muted-foreground">
-                                Leave this unchecked if you want to keep Drive backups available for recovery.
-                            </span>
-                        </span>
-                    </label>
+                    <Notice
+                        title="Cloud data will be wiped"
+                        icon={ExclamationTriangleIcon}
+                        variant="warning"
+                    >
+                        <p>
+                            Deletes all TaskTime sync files and backups from {providerName}, revokes access, and disconnects this browser. Local data remains on this device.
+                        </p>
+                        {provider === 'dropbox' && (
+                            <p className="mt-2">
+                                Dropbox may retain deleted files temporarily for recovery.
+                            </p>
+                        )}
+                    </Notice>
                     <div>
-                        <Label htmlFor="wipe-drive-confirm" className="text-sm font-medium">
-                            Type <span className="font-semibold">wipe drive</span> to confirm
+                        <Label htmlFor="wipe-cloud-confirm" className="text-sm font-medium">
+                            Type <span className="font-semibold">wipe data</span> to confirm
                         </Label>
                         <Input
-                            id="wipe-drive-confirm"
+                            id="wipe-cloud-confirm"
                             value={wipeConfirmText}
                             onChange={(event: ChangeEvent<HTMLInputElement>) => setWipeConfirmText(event.target.value)}
-                            placeholder="wipe drive"
+                            placeholder="wipe data"
                             className="mt-2"
                         />
                     </div>

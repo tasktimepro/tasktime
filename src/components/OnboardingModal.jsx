@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
+import { isDropboxCloudUiEnabled } from '@/config/cloudProviders';
 import {
     ArrowUpTrayIcon,
     CheckIcon,
@@ -147,6 +148,7 @@ const OnboardingModal = ({
     const isFirstStep = currentStep === 0;
     const isLastStep = currentStep === STEPS.length - 1;
     const currentStepMeta = STEPS[currentStep];
+    const dropboxUiEnabled = isDropboxCloudUiEnabled();
 
     const goToStep = (nextStep) => {
         setCurrentStep(Math.min(Math.max(nextStep, 0), STEPS.length - 1));
@@ -238,10 +240,12 @@ const OnboardingModal = ({
                             <CloudUploadIcon className="h-6 w-6 text-foreground" />
                         </div>
                         <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                            Sync with Google Drive
+                            {dropboxUiEnabled ? 'Sync with your cloud provider' : 'Sync with Google Drive'}
                         </h3>
                         <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                            Connect your Google Drive to privately sync TaskTime Pro across devices.
+                            {dropboxUiEnabled
+                                ? 'Connect Google Drive or Dropbox to privately sync TaskTime Pro across devices.'
+                                : 'Connect your Google Drive to privately sync TaskTime Pro across devices.'}
                         </p>
                     </div>
 
@@ -259,18 +263,22 @@ const OnboardingModal = ({
                         <DetailRow
                             icon={CheckIcon}
                             title="Status stays visible"
-                            description="Use the sync badge and Account > Sync to see whether you are idle, syncing, offline, or need to reconnect."
+                            description="Use the sync badge and Account > Cloud Sync to see whether you are idle, syncing, offline, or need to reconnect."
                         />
                         <DetailRow
                             icon={DocumentTextIcon}
                             title="Automatic backups"
-                            description="Separate Drive backups keep up to 7 recent daily snapshots and 4 weekly Sunday backups."
+                            description={dropboxUiEnabled
+                                ? 'TaskTime keeps up to 7 recent daily snapshots and 4 weekly Sunday backups in your connected cloud storage.'
+                                : 'Separate Drive backups keep up to 7 recent daily snapshots and 4 weekly Sunday backups.'}
                         />
                     </div>
 
                     <Notice
                         title="Optional by design"
-                        description="Connect Drive when you want backup and multi-device continuity. Skip it if you prefer to stay fully local."
+                        description={dropboxUiEnabled
+                            ? 'Connect a cloud provider when you want backups and multi-device continuity. Skip it if you prefer to stay fully local.'
+                            : 'Connect Drive when you want backup and multi-device continuity. Skip it if you prefer to stay fully local.'}
                     />
                 </div>
             );

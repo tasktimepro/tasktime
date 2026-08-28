@@ -9,7 +9,7 @@ test.describe('Onboarding smoke', () => {
         await expect(onboardingDialog).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
-        await expect(onboardingDialog.getByRole('heading', { name: 'Sync with Google Drive' })).toBeVisible();
+        await expect(onboardingDialog.getByRole('heading', { name: 'Sync with your cloud provider' })).toBeVisible();
 
         await page.reload();
 
@@ -28,7 +28,7 @@ test.describe('Onboarding smoke', () => {
         await expect(onboardingDialog.getByText('1 of 3')).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
-        await expect(onboardingDialog.getByRole('heading', { name: 'Sync with Google Drive' })).toBeVisible();
+        await expect(onboardingDialog.getByRole('heading', { name: 'Sync with your cloud provider' })).toBeVisible();
         await expect(onboardingDialog.getByText('2 of 3')).toBeVisible();
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();

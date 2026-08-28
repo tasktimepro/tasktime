@@ -297,17 +297,22 @@ describe('MCP bridge tool definitions', () => {
             }),
         }));
         expect(exportTools.map((tool) => tool.name)).toContain('create_drive_backup');
+        expect(exportTools.map((tool) => tool.name)).toContain('create_cloud_backup');
         expect(exportTools.map((tool) => tool.name)).toContain('download_drive_backup_json');
+        expect(exportTools.map((tool) => tool.name)).toContain('download_cloud_backup_json');
         expect(exportTools.map((tool) => tool.name)).toContain('export_accountant_pack');
         expect(exportTools.map((tool) => tool.name)).toContain('export_backup_json');
         expect(exportTools.map((tool) => tool.name)).toContain('export_invoice_pdf');
         expect(exportTools.map((tool) => tool.name)).toContain('export_report_csv');
         expect(exportTools.map((tool) => tool.name)).toContain('export_report_pdf');
         expect(exportTools.map((tool) => tool.name)).toContain('list_drive_backups');
+        expect(exportTools.map((tool) => tool.name)).toContain('list_cloud_backups');
         expect(exportTools.map((tool) => tool.name)).not.toContain('restore_backup_json');
         expect(exportTools.map((tool) => tool.name)).not.toContain('restore_drive_backup');
+        expect(exportTools.map((tool) => tool.name)).not.toContain('restore_cloud_backup');
         expect(accountTools.map((tool) => tool.name)).toContain('restore_backup_json');
         expect(accountTools.map((tool) => tool.name)).toContain('restore_drive_backup');
+        expect(accountTools.map((tool) => tool.name)).toContain('restore_cloud_backup');
         expect(accountTools.map((tool) => tool.name)).toContain('update_sync_settings');
         expect(accountTools.map((tool) => tool.name)).toContain('delete_all_account_data');
         expect(exportTools.map((tool) => tool.name)).toContain('export_project_quote_pdf');
@@ -339,7 +344,7 @@ describe('McpBridgeJsonRpcServer', () => {
                 },
                 serverInfo: {
                     name: 'tasktime-local-bridge',
-                    version: '1.0.0',
+                    version: '1.1.0',
                 },
             },
         });

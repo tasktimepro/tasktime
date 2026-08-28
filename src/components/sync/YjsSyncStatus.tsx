@@ -3,12 +3,14 @@
  *
  * Sync contract source of truth: ./README.md
  * 
- * Shows connection status to Google Drive and sync state
+ * Shows the active cloud provider connection and sync state
  */
 
 import type { ComponentType, MouseEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
+import { isDropboxCloudUiEnabled } from '@/config/cloudProviders';
+import { useDropboxAuth } from '@/hooks/useDropboxAuth';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useToast } from '@/hooks/useToast';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -29,12 +31,47 @@ const TooltipContentComponent = TooltipContent as unknown as ComponentType<{
 
 export default function YjsSyncStatus({ className = '', isCompact = false, onActionComplete }: YjsSyncStatusProps) {
 
-    const { store, isReady, isSyncing, syncState, syncPhase, isDriveConnected, isConnecting, hasSynced, manualSyncInProgress, pendingSyncChanges, forceSyncDrive, autoSyncEnabled, autoSyncMode, lastSyncedAt } = useYjs();
+    const {
+        store,
+        isReady,
+        isSyncing,
+        syncState,
+        syncPhase,
+        isDriveConnected,
+        isCloudConnected,
+        activeStorageProvider,
+        movedToStorageProvider,
+        isConnecting,
+        hasSynced,
+        manualSyncInProgress,
+        pendingSyncChanges,
+        forceSyncCloud,
+        autoSyncEnabled,
+        autoSyncMode,
+        lastSyncedAt,
+    } = useYjs();
     const { signIn, isLoading: authLoading, hadPreviousSession } = useGoogleAuth();
+    const {
+        signIn: signInDropbox,
+        isLoading: dropboxAuthLoading,
+        sessionId: dropboxSessionId,
+    } = useDropboxAuth();
     const { showError } = useToast();
     const { navigateToAccount } = useUrlState();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [isHovered, setIsHovered] = useState(false);
+    const cloudConnected = isCloudConnected ?? isDriveConnected;
+    const provider = activeStorageProvider ?? (isDriveConnected ? 'google-drive' : null);
+    const providerName = provider === 'dropbox'
+        ? 'Dropbox'
+        : (provider === 'google-drive' || !isDropboxCloudUiEnabled()
+            ? 'Google Drive'
+            : 'cloud storage');
+    const movedTargetName = movedToStorageProvider === 'dropbox'
+        ? 'Dropbox'
+        : movedToStorageProvider === 'google-drive'
+            ? 'Google Drive'
+            : null;
 
     useEffect(() => {
         const updateOfflineState = () => {
@@ -65,26 +102,35 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         };
     }, []);
 
-    const handleConnect = useCallback(async () => {
-        await signIn();
-    }, [signIn]);
-
     const handleCloudOptions = useCallback(() => {
         navigateToAccount({ section: 'sync' });
     }, [navigateToAccount]);
 
+    const handleConnect = useCallback(async () => {
+        if (!provider && isDropboxCloudUiEnabled()) {
+            handleCloudOptions();
+            return;
+        }
+        if (provider === 'dropbox') await signInDropbox();
+        else await signIn();
+    }, [handleCloudOptions, provider, signIn, signInDropbox]);
+
     const handleManualSync = useCallback(async () => {
-        await forceSyncDrive();
-    }, [forceSyncDrive]);
+        await forceSyncCloud();
+    }, [forceSyncCloud]);
 
     const status = useMemo(() => {
         return getYjsSyncStatusDescriptor({
             isReady,
-            authLoading,
+            authLoading: authLoading || dropboxAuthLoading,
             isOffline,
-            isDriveConnected,
+            isDriveConnected: cloudConnected,
             isConnecting,
-            hadPreviousSession,
+            hadPreviousSession: provider === 'dropbox'
+                ? Boolean(dropboxSessionId)
+                : hadPreviousSession,
+            providerName,
+            movedToProviderName: movedTargetName,
             syncState,
             syncPhase,
             lastSyncedAt,
@@ -100,6 +146,7 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         });
     }, [
         authLoading,
+        dropboxAuthLoading,
         autoSyncEnabled,
         autoSyncMode,
         hadPreviousSession,
@@ -108,13 +155,17 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
         handleManualSync,
         hasSynced,
         isConnecting,
-        isDriveConnected,
+        cloudConnected,
         isOffline,
         isReady,
         isSyncing,
         lastSyncedAt,
         manualSyncInProgress,
+        movedTargetName,
         pendingSyncChanges,
+        provider,
+        providerName,
+        dropboxSessionId,
         syncPhase,
         syncState,
     ]);
@@ -138,13 +189,13 @@ export default function YjsSyncStatus({ className = '', isCompact = false, onAct
             await status.onClick();
             onActionComplete?.();
         } catch (error) {
-            if (store.isDriveConnected()) {
+            if (store.isCloudConnected()) {
                 onActionComplete?.();
                 return;
             }
 
             console.error('[YjsSyncStatus] Status action failed:', error);
-            showError(error instanceof Error ? error.message : 'Google Drive action failed.');
+            showError(error instanceof Error ? error.message : `${providerName} action failed.`);
         }
     };
 

@@ -100,7 +100,7 @@ The agent does not need to infer the work context from vague notes. It can use t
 
 TaskTime Pro's bridge exists so agents do not need to poke at browser internals.
 
-Codex should not edit IndexedDB, Yjs documents, Google Drive sync files, invoice records, billing state, or local storage directly. It should use TaskTime Pro tools and let the app validate changes.
+Codex should not edit IndexedDB, Yjs documents, cloud sync files, invoice records, billing state, or local storage directly. It should use TaskTime Pro tools and let the app validate changes.
 
 That matters because TaskTime Pro is production local-first software. The app has rules for recurring expenses, invoice finalization, billed entries, tax-claimed expenses, sync behavior, backups, restores, and deletion impact. The MCP command layer keeps those rules in one place.
 

@@ -8,9 +8,11 @@
 | Backup mode | Auto-sync mode that automatically pushes local changes but does not automatically pull remote changes except the documented connect/reload behavior. |
 | Business command | A validated agent operation that invokes product behavior rather than raw storage access. |
 | Core document | Always-loaded Yjs document for projects, active tasks, clients, settings/templates, and other core collections. |
+| Cloud provider session | Worker-managed OAuth session for the selected Google Drive or Dropbox provider; in the provider-neutral contract it authenticates both cloud storage and TaskTime-hosted services. |
 | Drive session | Worker-managed authenticated connection used for optional Google Drive access. |
 | Finalized invoice | Invoice whose billing effects have been applied to source work/expenses; distinguish it from a draft or quote. |
 | Local-first | The browser's local Yjs/IndexedDB state remains usable without cloud connectivity; cloud sync is optional. |
+| Hosted principal | Opaque Worker-side identity that links hashed provider subjects during an explicit transfer so hosted-service quotas and future Pro entitlements follow the selected provider without exposing raw provider identity. |
 | Manual mode | Drive mode in which only explicit “Sync Now” performs normal pull/push, except documented pristine-device bootstrap behavior. |
 | Pairing code | Short-lived, single-use code that authorizes initial browser-to-bridge pairing. |
 | Planner attachment | A dated planner reference to a client, project, task, or expense; it does not duplicate the referenced entity. |

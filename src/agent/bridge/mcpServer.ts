@@ -135,7 +135,7 @@ export class McpBridgeJsonRpcServer {
                     },
                     serverInfo: {
                         name: 'tasktime-local-bridge',
-                        version: '1.0.0',
+                        version: '1.1.0',
                     },
                 });
 

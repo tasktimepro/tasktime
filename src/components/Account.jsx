@@ -21,7 +21,6 @@ import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { useToast } from '../hooks/useToast.ts';
 import { useYjs } from '../contexts/YjsContext';
-import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { resetOnboardingCompleted } from '../utils/onboardingUtils.ts';
 import { queuePostReloadToast } from '../utils/postReloadToast.ts';
@@ -48,14 +47,23 @@ const Account = ({
     const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
-    const { clearAllData, isDriveConnected, forceSyncDrive, disconnectDrive, wipeDriveData, deleteAllBackups } = useYjs();
-    const { signOut, revokeAccess } = useGoogleAuth();
+    const {
+        clearAllData,
+        isCloudConnected,
+        activeStorageProvider,
+        forceSyncCloud,
+        disconnectActiveCloudSession,
+        wipeCloudData,
+        deleteAllBackups,
+    } = useYjs();
     const { preferences, updatePreferences } = usePreferences();
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [showSignOutModal, setShowSignOutModal] = useState(false);
+    const activeProviderName = activeStorageProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const providerNeedsReconnect = Boolean(activeStorageProvider && !isCloudConnected);
     
     // Define sections in order (first will be default)
     const sideNavItems = useMemo(() => [
@@ -75,7 +83,7 @@ const Account = ({
             id: 'sync',
             name: 'Cloud Sync',
             icon: CloudIcon,
-            description: 'Connect Google Drive sync'
+            description: 'Manage cloud sync and backups'
         },
         {
             id: 'agent',
@@ -111,8 +119,8 @@ const Account = ({
         updateUrl({ section: sectionId, create: null });
     };
 
-    // Delete all account data function
-    // Note: When connected, this also wipes Drive to avoid reintroducing old data
+    // Delete all account data function. A selected provider must be reachable
+    // so retained cloud state cannot reintroduce records after local deletion.
     const handleDeleteAllData = async () => {
         if (deleteConfirmationText.trim().toLowerCase() !== 'delete all data') {
             showError('Please type "delete all data" to confirm');
@@ -121,13 +129,19 @@ const Account = ({
 
         setIsDeleting(true);
         try {
-            if (isDriveConnected) {
-                await wipeDriveData();
-                await deleteAllBackups();
-                await revokeAccess();
+            if (providerNeedsReconnect) {
+                showError(`Reconnect ${activeProviderName} before deleting all account data.`);
+                return;
             }
 
-            // Clear all data via Yjs store after removing any active Drive session.
+            if (isCloudConnected) {
+                await wipeCloudData();
+                await deleteAllBackups();
+                await disconnectActiveCloudSession({ revoke: true });
+            }
+
+            // Clear local data only after every active cloud copy is gone and
+            // the corresponding provider authorization has been revoked.
             await clearAllData();
             resetOnboardingCompleted();
             
@@ -137,8 +151,8 @@ const Account = ({
 
             queuePostReloadToast({
                 level: 'success',
-                message: isDriveConnected
-                    ? 'All data was deleted and Google Drive was disconnected'
+                message: isCloudConnected
+                    ? `All data was deleted and ${activeProviderName} was disconnected`
                     : 'All data has been successfully deleted',
             });
             
@@ -157,12 +171,11 @@ const Account = ({
 
         try {
             // MUST sync before deleting local data to prevent data loss
-            await forceSyncDrive();
-            showSuccess('Synced to Google Drive');
+            await forceSyncCloud();
+            showSuccess(`Synced to ${activeProviderName}`);
             
             // Now safe to disconnect and clear local data
-            disconnectDrive();
-            await signOut();
+            await disconnectActiveCloudSession({ revoke: false });
             await clearAllData();
             resetOnboardingCompleted();
             queuePostReloadToast({
@@ -263,7 +276,7 @@ const Account = ({
                         <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
                     )}
                 </div>
-                {isDriveConnected && (
+                {isCloudConnected && (
                     <Button
                         variant="ghost"
                         onClick={() => setShowSignOutModal(true)}
@@ -336,7 +349,7 @@ const Account = ({
                             variant="destructive"
                             onClick={handleDeleteAllData}
                             leadingIcon={TrashIcon}
-                            disabled={deleteConfirmationText.trim().toLowerCase() !== 'delete all data' || isDeleting}
+                            disabled={deleteConfirmationText.trim().toLowerCase() !== 'delete all data' || isDeleting || providerNeedsReconnect}
                         >
                             {isDeleting ? 'Deleting...' : 'Delete All Data'}
                         </Button>
@@ -344,14 +357,25 @@ const Account = ({
                 }
             >
                 <div className="space-y-4">
-                    {isDriveConnected && (
+                    {isCloudConnected && (
                         <Notice
                             title="You have an active Cloud Sync connection"
                             icon={CloudIcon}
                             variant="warning"
                         >
                             <p>
-                                Deleting data without disconnecting will remove your data from the cloud backup as well.
+                                This also removes all TaskTime sync files and backups from {activeProviderName}, revokes access, and disconnects this browser.
+                            </p>
+                        </Notice>
+                    )}
+                    {providerNeedsReconnect && (
+                        <Notice
+                            title={`${activeProviderName} needs to be reconnected`}
+                            icon={CloudIcon}
+                            variant="warning"
+                        >
+                            <p>
+                                Reconnect {activeProviderName} before deleting all account data so its retained cloud files can be removed safely.
                             </p>
                         </Notice>
                     )}
@@ -414,7 +438,7 @@ const Account = ({
             >
                 <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                        We will sync your latest changes to Google Drive before signing you out.
+                        We will sync your latest changes to {activeProviderName} before signing you out.
                         After the sync completes, all local data on this device will be removed.
                     </p>
                 </div>

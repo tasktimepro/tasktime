@@ -14,8 +14,8 @@ help:
 	@echo "=============================="
 	@echo ""
 	@echo "  make dev      - Start development server (docker compose up)"
-	@echo "  make dev-push-local - Start app dev server using local Worker at http://localhost:8787"
-	@echo "  make preview-push-local - Build production preview using local Worker at http://localhost:8787"
+	@echo "  make dev-push-local - Start app dev server with Dropbox UI using local Worker at http://localhost:8787"
+	@echo "  make preview-push-local - Build production preview with Dropbox UI using local Worker at http://localhost:8787"
 	@echo "  make preview-push-cloud - Build production preview using deployed Worker at https://sync.tasktime.pro"
 	@echo "  make preview-cloud - Build production preview using the deployed production Worker"
 	@echo "  make stop     - Stop development server"
@@ -48,18 +48,20 @@ dev:
 	@echo "Development server running at http://localhost:3101"
 	@echo "Blog dev server is available through the same origin at http://localhost:3101/blog"
 
-# Start local app dev server wired to local Wrangler Worker
+# Start local app dev server wired to local Wrangler Worker with Dropbox UI.
 dev-push-local:
 	docker compose run --rm -p 3101:3101 \
 		-e VITE_SYNC_WORKER_URL=http://localhost:8787 \
+		-e VITE_DROPBOX_CLOUD_UI_ENABLED=true \
 		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
 		app sh -lc 'sh ./scripts/start-dev-servers.sh'
 
-# Build and preview production app wired to local Wrangler Worker.
+# Build and preview production app wired to local Wrangler Worker with Dropbox UI.
 # Use this for service-worker/Web Push testing; Vite dev mode unregisters service workers.
 preview-push-local:
 	docker compose run --rm -p 3101:3101 \
 		-e VITE_SYNC_WORKER_URL=http://localhost:8787 \
+		-e VITE_DROPBOX_CLOUD_UI_ENABLED=true \
 		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
 		app sh -lc 'npm run build && npm run preview -- --host 0.0.0.0 --port 3101'
 
@@ -71,6 +73,7 @@ preview-push-cloud:
 	if [ -n "$$leftovers" ]; then docker rm -f $$leftovers; fi
 	docker compose run --rm -p $(PREVIEW_PORT):$(PREVIEW_PORT) \
 		-e VITE_SYNC_WORKER_URL=https://sync.tasktime.pro \
+		-e VITE_DROPBOX_CLOUD_UI_ENABLED=true \
 		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
 		app sh -lc 'npm run build && npm run preview -- --host 0.0.0.0 --port $(PREVIEW_PORT)'
 

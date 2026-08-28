@@ -30,7 +30,7 @@ Forget the AI-powered receipt scanning and the 47 integrations. For most freelan
 
 In TaskTime Pro, expenses live right alongside your projects, tasks, and invoices. You log an expense, tag it to a project, mark it as billable or not, and move on. Recurring expenses get created automatically.
 
-The key difference: your expense records stay in your browser by default. There is no product account required or TaskTime-hosted workspace database. If you enable Google Drive sync, sync documents are stored in the app-data area of your own Drive rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to Google Drive.
+The key difference: your expense records stay in your browser by default. There is no product account required or TaskTime-hosted workspace database. If you enable Google Drive or Dropbox sync, sync documents are stored in TaskTime's application area in your own provider account rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to that provider.
 
 ## A quick tip for staying organized
 

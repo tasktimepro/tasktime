@@ -12,7 +12,7 @@ class j extends Error {
 }
 const Ir = 500;
 function wr(e) {
-  return e.startsWith("export_") || e === "create_drive_backup" || e === "download_drive_backup_json" ? "export" : e.startsWith("open_") || e.startsWith("focus_") ? "navigation" : e.includes("invoice") || e.includes("billed") || e.includes("billing") ? e.includes("email") ? "email" : "billing" : e.startsWith("list_") || e.startsWith("get_") || e.startsWith("find_") || e.startsWith("preview_") ? "read" : e.startsWith("create_") || e.startsWith("update_") || e.startsWith("complete_") || e.startsWith("archive_") || e.startsWith("unarchive_") || e.startsWith("start_") || e.startsWith("pause_") || e.startsWith("stop_") || e.startsWith("add_") || e.startsWith("mark_") || e.startsWith("finalize_") || e.startsWith("restore_") || e.startsWith("delete_") ? "write" : "unknown";
+  return e.startsWith("export_") || e === "create_cloud_backup" || e === "create_drive_backup" || e === "download_cloud_backup_json" || e === "download_drive_backup_json" ? "export" : e.startsWith("open_") || e.startsWith("focus_") ? "navigation" : e.includes("invoice") || e.includes("billed") || e.includes("billing") ? e.includes("email") ? "email" : "billing" : e.startsWith("list_") || e.startsWith("get_") || e.startsWith("find_") || e.startsWith("preview_") ? "read" : e.startsWith("create_") || e.startsWith("update_") || e.startsWith("complete_") || e.startsWith("archive_") || e.startsWith("unarchive_") || e.startsWith("start_") || e.startsWith("pause_") || e.startsWith("stop_") || e.startsWith("add_") || e.startsWith("mark_") || e.startsWith("finalize_") || e.startsWith("restore_") || e.startsWith("delete_") ? "write" : "unknown";
 }
 class mn {
   constructor(t = {}) {
@@ -133,18 +133,18 @@ class Nr {
     this.challenges.delete(t);
   }
 }
-const Cr = 1440 * 60 * 1e3, Rr = 32;
+const Rr = 1440 * 60 * 1e3, Cr = 32;
 function $r() {
   if (!globalThis.crypto?.getRandomValues)
     throw new Error("Secure random token generation is unavailable.");
   return globalThis.crypto;
 }
-function Lr(e = Rr) {
+function Lr(e = Cr) {
   const t = new Uint8Array(e);
   return $r().getRandomValues(t), Array.from(t).map((n) => n.toString(16).padStart(2, "0")).join("");
 }
 function bt(e) {
-  const t = e.now ? e.now() : Date.now(), n = e.ttlMs ?? Cr;
+  const t = e.now ? e.now() : Date.now(), n = e.ttlMs ?? Rr;
   return {
     sessionToken: e.tokenFactory ? e.tokenFactory(e.tokenBytes) : Lr(e.tokenBytes),
     scopes: new Set(e.scopes),
@@ -608,7 +608,7 @@ function jo(e) {
 const zo = (e) => {
   const t = e ? `[\\s\\S]{${e?.minimum ?? 0},${e?.maximum ?? ""}}` : "[\\s\\S]*";
   return new RegExp(`^${t}$`);
-}, Do = /^-?\d+$/, Sn = /^-?\d+(?:\.\d+)?$/, Oo = /^(?:true|false)$/i, No = /^null$/i, Co = /^[^A-Z]*$/, Ro = /^[^a-z]*$/, F = /* @__PURE__ */ u("$ZodCheck", (e, t) => {
+}, Do = /^-?\d+$/, Sn = /^-?\d+(?:\.\d+)?$/, Oo = /^(?:true|false)$/i, No = /^null$/i, Ro = /^[^A-Z]*$/, Co = /^[^a-z]*$/, F = /* @__PURE__ */ u("$ZodCheck", (e, t) => {
   var n;
   e._zod ?? (e._zod = {}), e._zod.def = t, (n = e._zod).onattach ?? (n.onattach = []);
 }), An = {
@@ -795,7 +795,7 @@ const zo = (e) => {
       continue: !t.abort
     });
   };
-}), Ce = /* @__PURE__ */ u("$ZodCheckStringFormat", (e, t) => {
+}), Re = /* @__PURE__ */ u("$ZodCheckStringFormat", (e, t) => {
   var n, r;
   F.init(e, t), e._zod.onattach.push((o) => {
     const a = o._zod.bag;
@@ -813,7 +813,7 @@ const zo = (e) => {
   }) : (r = e._zod).check ?? (r.check = () => {
   });
 }), Bo = /* @__PURE__ */ u("$ZodCheckRegex", (e, t) => {
-  Ce.init(e, t), e._zod.check = (n) => {
+  Re.init(e, t), e._zod.check = (n) => {
     t.pattern.lastIndex = 0, !t.pattern.test(n.value) && n.issues.push({
       origin: "string",
       code: "invalid_format",
@@ -825,9 +825,9 @@ const zo = (e) => {
     });
   };
 }), qo = /* @__PURE__ */ u("$ZodCheckLowerCase", (e, t) => {
-  t.pattern ?? (t.pattern = Co), Ce.init(e, t);
+  t.pattern ?? (t.pattern = Ro), Re.init(e, t);
 }), Fo = /* @__PURE__ */ u("$ZodCheckUpperCase", (e, t) => {
-  t.pattern ?? (t.pattern = Ro), Ce.init(e, t);
+  t.pattern ?? (t.pattern = Co), Re.init(e, t);
 }), Go = /* @__PURE__ */ u("$ZodCheckIncludes", (e, t) => {
   F.init(e, t);
   const n = he(t.includes), r = new RegExp(typeof t.position == "number" ? `^.{${t.position}}${n}` : n);
@@ -1000,7 +1000,7 @@ const Ho = {
     }), n;
   };
 }), E = /* @__PURE__ */ u("$ZodStringFormat", (e, t) => {
-  Ce.init(e, t), ut.init(e, t);
+  Re.init(e, t), ut.init(e, t);
 }), Xo = /* @__PURE__ */ u("$ZodGUID", (e, t) => {
   t.pattern ?? (t.pattern = bo), E.init(e, t);
 }), Yo = /* @__PURE__ */ u("$ZodUUID", (e, t) => {
@@ -1348,15 +1348,15 @@ const xi = /* @__PURE__ */ u("$ZodObject", (e, t) => {
     c.value = {};
     const d = [], y = i.shape;
     for (const v of i.keys) {
-      const w = y[v], M = w._zod.optout === "optional", C = w._zod.run({ value: p[v], issues: [] }, l);
-      C instanceof Promise ? d.push(C.then(($) => Te($, c, v, p, M))) : Te(C, c, v, p, M);
+      const w = y[v], M = w._zod.optout === "optional", R = w._zod.run({ value: p[v], issues: [] }, l);
+      R instanceof Promise ? d.push(R.then(($) => Te($, c, v, p, M))) : Te(R, c, v, p, M);
     }
     return a ? Dn(d, p, c, l, r.value, e) : d.length ? Promise.all(d).then(() => c) : c;
   };
 }), Ei = /* @__PURE__ */ u("$ZodObjectJIT", (e, t) => {
   xi.init(e, t);
   const n = e._zod.parse, r = it(() => zn(t)), o = (v) => {
-    const w = new Wo(["shape", "payload", "ctx"]), M = r.value, C = (X) => {
+    const w = new Wo(["shape", "payload", "ctx"]), M = r.value, R = (X) => {
       const q = It(X);
       return `shape[${q}]._zod.run({ value: input[${q}], issues: [] }, ctx)`;
     };
@@ -1368,7 +1368,7 @@ const xi = /* @__PURE__ */ u("$ZodObject", (e, t) => {
     w.write("const newResult = {};");
     for (const X of M.keys) {
       const q = $[X], W = It(X), lr = v[X]?._zod?.optout === "optional";
-      w.write(`const ${q} = ${C(X)};`), lr ? w.write(`
+      w.write(`const ${q} = ${R(X)};`), lr ? w.write(`
         if (${q}.issues.length) {
           if (${W} in input) {
             payload.issues = payload.issues.concat(${q}.issues.map(iss => ({
@@ -1619,7 +1619,7 @@ const Di = /* @__PURE__ */ u("$ZodRecord", (e, t) => {
       inst: e
     }), r;
   };
-}), Ci = /* @__PURE__ */ u("$ZodTransform", (e, t) => {
+}), Ri = /* @__PURE__ */ u("$ZodTransform", (e, t) => {
   P.init(e, t), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
       throw new hn(e.constructor.name);
@@ -1645,7 +1645,7 @@ const On = /* @__PURE__ */ u("$ZodOptional", (e, t) => {
     }
     return n.value === void 0 ? n : t.innerType._zod.run(n, r);
   };
-}), Ri = /* @__PURE__ */ u("$ZodExactOptional", (e, t) => {
+}), Ci = /* @__PURE__ */ u("$ZodExactOptional", (e, t) => {
   On.init(e, t), S(e._zod, "values", () => t.innerType._zod.values), S(e._zod, "pattern", () => t.innerType._zod.pattern), e._zod.parse = (n, r) => t.innerType._zod.run(n, r);
 }), $i = /* @__PURE__ */ u("$ZodNullable", (e, t) => {
   P.init(e, t), S(e._zod, "optin", () => t.innerType._zod.optin), S(e._zod, "optout", () => t.innerType._zod.optout), S(e._zod, "pattern", () => {
@@ -2139,7 +2139,7 @@ function Le(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Ct(e, t) {
+function Rt(e, t) {
   return new $o({
     check: "multiple_of",
     ..._(t),
@@ -2163,7 +2163,7 @@ function Se(e, t) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function Cn(e, t) {
+function Rn(e, t) {
   return new Uo({
     check: "length_equals",
     ..._(t),
@@ -2242,11 +2242,11 @@ function Na() {
   return /* @__PURE__ */ ge((e) => e.toLowerCase());
 }
 // @__NO_SIDE_EFFECTS__
-function Ca() {
+function Ra() {
   return /* @__PURE__ */ ge((e) => e.toUpperCase());
 }
 // @__NO_SIDE_EFFECTS__
-function Ra() {
+function Ca() {
   return /* @__PURE__ */ ge((e) => Zr(e));
 }
 // @__NO_SIDE_EFFECTS__
@@ -2289,7 +2289,7 @@ function Za(e, t) {
   });
   return n._zod.check = e, n;
 }
-function Rn(e) {
+function Cn(e) {
   let t = e?.target ?? "draft-2020-12";
   return t === "draft-4" && (t = "draft-04"), t === "draft-7" && (t = "draft-07"), {
     processors: e.processors ?? {},
@@ -2334,7 +2334,7 @@ function O(e, t, n = { path: [], schemaPath: [] }) {
     y && (i.ref || (i.ref = y), O(y, t, d), t.seen.get(y).isParent = !0);
   }
   const l = t.metadataRegistry.get(e);
-  return l && Object.assign(i.schema, l), t.io === "input" && U(e) && (delete i.schema.examples, delete i.schema.default), t.io === "input" && i.schema._prefault && ((r = i.schema).default ?? (r.default = i.schema._prefault)), delete i.schema._prefault, t.seen.get(e).schema;
+  return l && Object.assign(i.schema, l), t.io === "input" && B(e) && (delete i.schema.examples, delete i.schema.default), t.io === "input" && i.schema._prefault && ((r = i.schema).default ?? (r.default = i.schema._prefault)), delete i.schema._prefault, t.seen.get(e).schema;
 }
 function $n(e, t) {
   const n = e.seen.get(t);
@@ -2421,11 +2421,11 @@ function Ln(e, t) {
       r(d);
       const v = e.seen.get(d), w = v.schema;
       if (w.$ref && (e.target === "draft-07" || e.target === "draft-04" || e.target === "openapi-3.0") ? (l.allOf = l.allOf ?? [], l.allOf.push(w)) : Object.assign(l, w), Object.assign(l, p), i._zod.parent === d)
-        for (const C in l)
-          C === "$ref" || C === "allOf" || C in p || delete l[C];
+        for (const R in l)
+          R === "$ref" || R === "allOf" || R in p || delete l[R];
       if (w.$ref && v.def)
-        for (const C in l)
-          C === "$ref" || C === "allOf" || C in v.def && JSON.stringify(l[C]) === JSON.stringify(v.def[C]) && delete l[C];
+        for (const R in l)
+          R === "$ref" || R === "allOf" || R in v.def && JSON.stringify(l[R]) === JSON.stringify(v.def[R]) && delete l[R];
     }
     const y = i._zod.parent;
     if (y && y !== d) {
@@ -2474,7 +2474,7 @@ function Ln(e, t) {
     throw new Error("Error converting schema to JSON.");
   }
 }
-function U(e, t) {
+function B(e, t) {
   const n = t ?? { seen: /* @__PURE__ */ new Set() };
   if (n.seen.has(e))
     return !1;
@@ -2483,44 +2483,44 @@ function U(e, t) {
   if (r.type === "transform")
     return !0;
   if (r.type === "array")
-    return U(r.element, n);
+    return B(r.element, n);
   if (r.type === "set")
-    return U(r.valueType, n);
+    return B(r.valueType, n);
   if (r.type === "lazy")
-    return U(r.getter(), n);
+    return B(r.getter(), n);
   if (r.type === "promise" || r.type === "optional" || r.type === "nonoptional" || r.type === "nullable" || r.type === "readonly" || r.type === "default" || r.type === "prefault")
-    return U(r.innerType, n);
+    return B(r.innerType, n);
   if (r.type === "intersection")
-    return U(r.left, n) || U(r.right, n);
+    return B(r.left, n) || B(r.right, n);
   if (r.type === "record" || r.type === "map")
-    return U(r.keyType, n) || U(r.valueType, n);
+    return B(r.keyType, n) || B(r.valueType, n);
   if (r.type === "pipe")
-    return U(r.in, n) || U(r.out, n);
+    return B(r.in, n) || B(r.out, n);
   if (r.type === "object") {
     for (const o in r.shape)
-      if (U(r.shape[o], n))
+      if (B(r.shape[o], n))
         return !0;
     return !1;
   }
   if (r.type === "union") {
     for (const o of r.options)
-      if (U(o, n))
+      if (B(o, n))
         return !0;
     return !1;
   }
   if (r.type === "tuple") {
     for (const o of r.items)
-      if (U(o, n))
+      if (B(o, n))
         return !0;
-    return !!(r.rest && U(r.rest, n));
+    return !!(r.rest && B(r.rest, n));
   }
   return !1;
 }
 const Ua = (e, t = {}) => (n) => {
-  const r = Rn({ ...n, processors: t });
+  const r = Cn({ ...n, processors: t });
   return O(e, r), $n(r, e), Ln(r, e);
 }, Ae = (e, t, n = {}) => (r) => {
-  const { libraryOptions: o, target: a } = r ?? {}, i = Rn({ ...o ?? {}, target: a, io: t, processors: n });
+  const { libraryOptions: o, target: a } = r ?? {}, i = Cn({ ...o ?? {}, target: a, io: t, processors: n });
   return O(e, i), $n(i, e), Ln(i, e);
 }, Ba = {
   guid: "uuid",
@@ -2774,9 +2774,9 @@ const vs = (e, t) => {
 }, e.isOptional = () => e.safeParse(void 0).success, e.isNullable = () => e.safeParse(null).success, e.apply = (n) => n(e), e)), Zn = /* @__PURE__ */ u("_ZodString", (e, t) => {
   ut.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => qa(e, r, o);
   const n = e._zod.bag;
-  e.format = n.format ?? null, e.minLength = n.minimum ?? null, e.maxLength = n.maximum ?? null, e.regex = (...r) => e.check(/* @__PURE__ */ Aa(...r)), e.includes = (...r) => e.check(/* @__PURE__ */ Ea(...r)), e.startsWith = (...r) => e.check(/* @__PURE__ */ ja(...r)), e.endsWith = (...r) => e.check(/* @__PURE__ */ za(...r)), e.min = (...r) => e.check(/* @__PURE__ */ Se(...r)), e.max = (...r) => e.check(/* @__PURE__ */ Nn(...r)), e.length = (...r) => e.check(/* @__PURE__ */ Cn(...r)), e.nonempty = (...r) => e.check(/* @__PURE__ */ Se(1, ...r)), e.lowercase = (r) => e.check(/* @__PURE__ */ Pa(r)), e.uppercase = (r) => e.check(/* @__PURE__ */ xa(r)), e.trim = () => e.check(/* @__PURE__ */ Oa()), e.normalize = (...r) => e.check(/* @__PURE__ */ Da(...r)), e.toLowerCase = () => e.check(/* @__PURE__ */ Na()), e.toUpperCase = () => e.check(/* @__PURE__ */ Ca()), e.slugify = () => e.check(/* @__PURE__ */ Ra());
+  e.format = n.format ?? null, e.minLength = n.minimum ?? null, e.maxLength = n.maximum ?? null, e.regex = (...r) => e.check(/* @__PURE__ */ Aa(...r)), e.includes = (...r) => e.check(/* @__PURE__ */ Ea(...r)), e.startsWith = (...r) => e.check(/* @__PURE__ */ ja(...r)), e.endsWith = (...r) => e.check(/* @__PURE__ */ za(...r)), e.min = (...r) => e.check(/* @__PURE__ */ Se(...r)), e.max = (...r) => e.check(/* @__PURE__ */ Nn(...r)), e.length = (...r) => e.check(/* @__PURE__ */ Rn(...r)), e.nonempty = (...r) => e.check(/* @__PURE__ */ Se(1, ...r)), e.lowercase = (r) => e.check(/* @__PURE__ */ Pa(r)), e.uppercase = (r) => e.check(/* @__PURE__ */ xa(r)), e.trim = () => e.check(/* @__PURE__ */ Oa()), e.normalize = (...r) => e.check(/* @__PURE__ */ Da(...r)), e.toLowerCase = () => e.check(/* @__PURE__ */ Na()), e.toUpperCase = () => e.check(/* @__PURE__ */ Ra()), e.slugify = () => e.check(/* @__PURE__ */ Ca());
 }), Os = /* @__PURE__ */ u("ZodString", (e, t) => {
-  ut.init(e, t), Zn.init(e, t), e.email = (n) => e.check(/* @__PURE__ */ Wi(Ns, n)), e.url = (n) => e.check(/* @__PURE__ */ ea(Cs, n)), e.jwt = (n) => e.check(/* @__PURE__ */ ha(Hs, n)), e.emoji = (n) => e.check(/* @__PURE__ */ ta(Rs, n)), e.guid = (n) => e.check(/* @__PURE__ */ Dt(Rt, n)), e.uuid = (n) => e.check(/* @__PURE__ */ Hi(we, n)), e.uuidv4 = (n) => e.check(/* @__PURE__ */ Xi(we, n)), e.uuidv6 = (n) => e.check(/* @__PURE__ */ Yi(we, n)), e.uuidv7 = (n) => e.check(/* @__PURE__ */ Qi(we, n)), e.nanoid = (n) => e.check(/* @__PURE__ */ na($s, n)), e.guid = (n) => e.check(/* @__PURE__ */ Dt(Rt, n)), e.cuid = (n) => e.check(/* @__PURE__ */ ra(Ls, n)), e.cuid2 = (n) => e.check(/* @__PURE__ */ oa(Ms, n)), e.ulid = (n) => e.check(/* @__PURE__ */ ia(Zs, n)), e.base64 = (n) => e.check(/* @__PURE__ */ da(Ks, n)), e.base64url = (n) => e.check(/* @__PURE__ */ ma(Js, n)), e.xid = (n) => e.check(/* @__PURE__ */ aa(Us, n)), e.ksuid = (n) => e.check(/* @__PURE__ */ sa(Bs, n)), e.ipv4 = (n) => e.check(/* @__PURE__ */ ca(qs, n)), e.ipv6 = (n) => e.check(/* @__PURE__ */ la(Fs, n)), e.cidrv4 = (n) => e.check(/* @__PURE__ */ pa(Gs, n)), e.cidrv6 = (n) => e.check(/* @__PURE__ */ ua(Vs, n)), e.e164 = (n) => e.check(/* @__PURE__ */ fa(Ws, n)), e.datetime = (n) => e.check(ms(n)), e.date = (n) => e.check(hs(n)), e.time = (n) => e.check(ys(n)), e.duration = (n) => e.check(_s(n));
+  ut.init(e, t), Zn.init(e, t), e.email = (n) => e.check(/* @__PURE__ */ Wi(Ns, n)), e.url = (n) => e.check(/* @__PURE__ */ ea(Rs, n)), e.jwt = (n) => e.check(/* @__PURE__ */ ha(Hs, n)), e.emoji = (n) => e.check(/* @__PURE__ */ ta(Cs, n)), e.guid = (n) => e.check(/* @__PURE__ */ Dt(Ct, n)), e.uuid = (n) => e.check(/* @__PURE__ */ Hi(we, n)), e.uuidv4 = (n) => e.check(/* @__PURE__ */ Xi(we, n)), e.uuidv6 = (n) => e.check(/* @__PURE__ */ Yi(we, n)), e.uuidv7 = (n) => e.check(/* @__PURE__ */ Qi(we, n)), e.nanoid = (n) => e.check(/* @__PURE__ */ na($s, n)), e.guid = (n) => e.check(/* @__PURE__ */ Dt(Ct, n)), e.cuid = (n) => e.check(/* @__PURE__ */ ra(Ls, n)), e.cuid2 = (n) => e.check(/* @__PURE__ */ oa(Ms, n)), e.ulid = (n) => e.check(/* @__PURE__ */ ia(Zs, n)), e.base64 = (n) => e.check(/* @__PURE__ */ da(Ks, n)), e.base64url = (n) => e.check(/* @__PURE__ */ ma(Js, n)), e.xid = (n) => e.check(/* @__PURE__ */ aa(Us, n)), e.ksuid = (n) => e.check(/* @__PURE__ */ sa(Bs, n)), e.ipv4 = (n) => e.check(/* @__PURE__ */ ca(qs, n)), e.ipv6 = (n) => e.check(/* @__PURE__ */ la(Fs, n)), e.cidrv4 = (n) => e.check(/* @__PURE__ */ pa(Gs, n)), e.cidrv6 = (n) => e.check(/* @__PURE__ */ ua(Vs, n)), e.e164 = (n) => e.check(/* @__PURE__ */ fa(Ws, n)), e.datetime = (n) => e.check(ms(n)), e.date = (n) => e.check(hs(n)), e.time = (n) => e.check(ys(n)), e.duration = (n) => e.check(_s(n));
 });
 function m(e) {
   return /* @__PURE__ */ Ji(Os, e);
@@ -2785,13 +2785,13 @@ const z = /* @__PURE__ */ u("ZodStringFormat", (e, t) => {
   E.init(e, t), Zn.init(e, t);
 }), Ns = /* @__PURE__ */ u("ZodEmail", (e, t) => {
   Qo.init(e, t), z.init(e, t);
-}), Rt = /* @__PURE__ */ u("ZodGUID", (e, t) => {
+}), Ct = /* @__PURE__ */ u("ZodGUID", (e, t) => {
   Xo.init(e, t), z.init(e, t);
 }), we = /* @__PURE__ */ u("ZodUUID", (e, t) => {
   Yo.init(e, t), z.init(e, t);
-}), Cs = /* @__PURE__ */ u("ZodURL", (e, t) => {
+}), Rs = /* @__PURE__ */ u("ZodURL", (e, t) => {
   ei.init(e, t), z.init(e, t);
-}), Rs = /* @__PURE__ */ u("ZodEmoji", (e, t) => {
+}), Cs = /* @__PURE__ */ u("ZodEmoji", (e, t) => {
   ti.init(e, t), z.init(e, t);
 }), $s = /* @__PURE__ */ u("ZodNanoID", (e, t) => {
   ni.init(e, t), z.init(e, t);
@@ -2822,7 +2822,7 @@ const z = /* @__PURE__ */ u("ZodStringFormat", (e, t) => {
 }), Hs = /* @__PURE__ */ u("ZodJWT", (e, t) => {
   Ii.init(e, t), z.init(e, t);
 }), Un = /* @__PURE__ */ u("ZodNumber", (e, t) => {
-  jn.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => Fa(e, r, o), e.gt = (r, o) => e.check(/* @__PURE__ */ Nt(r, o)), e.gte = (r, o) => e.check(/* @__PURE__ */ Le(r, o)), e.min = (r, o) => e.check(/* @__PURE__ */ Le(r, o)), e.lt = (r, o) => e.check(/* @__PURE__ */ Ot(r, o)), e.lte = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.max = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.int = (r) => e.check($t(r)), e.safe = (r) => e.check($t(r)), e.positive = (r) => e.check(/* @__PURE__ */ Nt(0, r)), e.nonnegative = (r) => e.check(/* @__PURE__ */ Le(0, r)), e.negative = (r) => e.check(/* @__PURE__ */ Ot(0, r)), e.nonpositive = (r) => e.check(/* @__PURE__ */ $e(0, r)), e.multipleOf = (r, o) => e.check(/* @__PURE__ */ Ct(r, o)), e.step = (r, o) => e.check(/* @__PURE__ */ Ct(r, o)), e.finite = () => e;
+  jn.init(e, t), x.init(e, t), e._zod.processJSONSchema = (r, o, a) => Fa(e, r, o), e.gt = (r, o) => e.check(/* @__PURE__ */ Nt(r, o)), e.gte = (r, o) => e.check(/* @__PURE__ */ Le(r, o)), e.min = (r, o) => e.check(/* @__PURE__ */ Le(r, o)), e.lt = (r, o) => e.check(/* @__PURE__ */ Ot(r, o)), e.lte = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.max = (r, o) => e.check(/* @__PURE__ */ $e(r, o)), e.int = (r) => e.check($t(r)), e.safe = (r) => e.check($t(r)), e.positive = (r) => e.check(/* @__PURE__ */ Nt(0, r)), e.nonnegative = (r) => e.check(/* @__PURE__ */ Le(0, r)), e.negative = (r) => e.check(/* @__PURE__ */ Ot(0, r)), e.nonpositive = (r) => e.check(/* @__PURE__ */ $e(0, r)), e.multipleOf = (r, o) => e.check(/* @__PURE__ */ Rt(r, o)), e.step = (r, o) => e.check(/* @__PURE__ */ Rt(r, o)), e.finite = () => e;
   const n = e._zod.bag;
   e.minValue = Math.max(n.minimum ?? Number.NEGATIVE_INFINITY, n.exclusiveMinimum ?? Number.NEGATIVE_INFINITY) ?? null, e.maxValue = Math.min(n.maximum ?? Number.POSITIVE_INFINITY, n.exclusiveMaximum ?? Number.POSITIVE_INFINITY) ?? null, e.isInt = (n.format ?? "").includes("int") || Number.isSafeInteger(n.multipleOf ?? 0.5), e.isFinite = !0, e.format = n.format ?? null;
 });
@@ -2860,7 +2860,7 @@ function rc(e) {
   return /* @__PURE__ */ Sa(nc, e);
 }
 const oc = /* @__PURE__ */ u("ZodArray", (e, t) => {
-  Pi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Qa(e, n, r, o), e.element = t.element, e.min = (n, r) => e.check(/* @__PURE__ */ Se(n, r)), e.nonempty = (n) => e.check(/* @__PURE__ */ Se(1, n)), e.max = (n, r) => e.check(/* @__PURE__ */ Nn(n, r)), e.length = (n, r) => e.check(/* @__PURE__ */ Cn(n, r)), e.unwrap = () => e.element;
+  Pi.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Qa(e, n, r, o), e.element = t.element, e.min = (n, r) => e.check(/* @__PURE__ */ Se(n, r)), e.nonempty = (n) => e.check(/* @__PURE__ */ Se(1, n)), e.max = (n, r) => e.check(/* @__PURE__ */ Nn(n, r)), e.length = (n, r) => e.check(/* @__PURE__ */ Rn(n, r)), e.unwrap = () => e.element;
 });
 function L(e, t) {
   return /* @__PURE__ */ $a(oc, e, t);
@@ -2963,7 +2963,7 @@ function G(e, t) {
   });
 }
 const uc = /* @__PURE__ */ u("ZodTransform", (e, t) => {
-  Ci.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ya(e, n), e._zod.parse = (n, r) => {
+  Ri.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Ya(e, n), e._zod.parse = (n, r) => {
     if (r.direction === "backward")
       throw new hn(e.constructor.name);
     n.addIssue = (a) => {
@@ -2994,7 +2994,7 @@ function Lt(e) {
   });
 }
 const dc = /* @__PURE__ */ u("ZodExactOptional", (e, t) => {
-  Ri.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Mn(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
+  Ci.init(e, t), x.init(e, t), e._zod.processJSONSchema = (n, r, o) => Mn(e, n, r, o), e.unwrap = () => e._zod.def.innerType;
 });
 function mc(e) {
   return new dc({
@@ -3106,7 +3106,7 @@ const Ec = /^\d{4}-\d{2}-\d{2}$/, jc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, z
 ), h = te().finite(), K = te().int(), de = te().finite().min(0), b = m().trim().min(1), Oc = m().trim().min(1).nullable(), D = m().trim().min(1).nullable().optional(), Nc = mt(
   (e) => e === void 0 ? null : e,
   Oc
-), Vn = m().regex(jc), Cc = m().regex(zc), Kn = A(["image/svg+xml", "image/png", "image/jpeg", "image/webp"]), Jn = A([
+), Vn = m().regex(jc), Rc = m().regex(zc), Kn = A(["image/svg+xml", "image/png", "image/jpeg", "image/webp"]), Jn = A([
   "classic",
   "neutral"
 ]), Wn = A([
@@ -3135,7 +3135,7 @@ const Ec = /^\d{4}-\d{2}-\d{2}$/, jc = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, z
   content: Hn,
   plainTextPreview: m().optional(),
   updatedAt: h
-}).passthrough(), Rc = mt((e) => {
+}).passthrough(), Cc = mt((e) => {
   if (e == null)
     return e;
   const t = Zt.safeParse(e);
@@ -3154,7 +3154,7 @@ T({
   createdAt: h.optional(),
   updatedAt: h.optional(),
   description: m().optional(),
-  notes: Rc,
+  notes: Cc,
   hourlyRate: h.nullable().optional(),
   flatRate: k().optional(),
   preferredClientId: D,
@@ -3295,7 +3295,7 @@ T({
   id: b,
   businessInfoId: b,
   kind: G("logo"),
-  dataUrl: Cc,
+  dataUrl: Rc,
   mimeType: Kn,
   fileName: m().nullable().optional(),
   width: K.positive(),
@@ -3675,7 +3675,7 @@ function Fc() {
     IDBCursor.prototype.continuePrimaryKey
   ]);
 }
-const We = /* @__PURE__ */ new WeakMap(), Me = /* @__PURE__ */ new WeakMap(), Re = /* @__PURE__ */ new WeakMap();
+const We = /* @__PURE__ */ new WeakMap(), Me = /* @__PURE__ */ new WeakMap(), Ce = /* @__PURE__ */ new WeakMap();
 function Gc(e) {
   const t = new Promise((n, r) => {
     const o = () => {
@@ -3687,7 +3687,7 @@ function Gc(e) {
     };
     e.addEventListener("success", a), e.addEventListener("error", i);
   });
-  return Re.set(t, e), t;
+  return Ce.set(t, e), t;
 }
 function Vc(e) {
   if (We.has(e))
@@ -3740,9 +3740,9 @@ function Ee(e) {
   if (Me.has(e))
     return Me.get(e);
   const t = Jc(e);
-  return t !== e && (Me.set(e, t), Re.set(t, e)), t;
+  return t !== e && (Me.set(e, t), Ce.set(t, e)), t;
 }
-const Xe = (e) => Re.get(e), Wc = ["get", "getKey", "getAll", "getAllKeys", "count"], Hc = ["put", "add", "delete", "clear"], Ze = /* @__PURE__ */ new Map();
+const Xe = (e) => Ce.get(e), Wc = ["get", "getKey", "getAll", "getAllKeys", "count"], Hc = ["put", "add", "delete", "clear"], Ze = /* @__PURE__ */ new Map();
 function qt(e, t) {
   if (!(e instanceof IDBDatabase && !(t in e) && typeof t == "string"))
     return;
@@ -3785,7 +3785,7 @@ async function* Qc(...e) {
     return;
   t = t;
   const n = new Proxy(t, Yc);
-  for (Qn.set(n, t), Re.set(n, Xe(t)); t; )
+  for (Qn.set(n, t), Ce.set(n, Xe(t)); t; )
     yield n, t = await (Ye.get(n) || t.continue()), Ye.delete(n);
 }
 function Gt(e, t) {
@@ -4583,7 +4583,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
   body: f,
   attachmentTitle: f,
   forwardToSelf: g
-}, B = {
+}, Z = {
   type: "object",
   properties: {},
   additionalProperties: !1
@@ -4592,14 +4592,14 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "get_pairing_status",
     description: "Return the active local TaskTime Pro bridge endpoint, launch URL, pairing expiry, stable agent identity, and app-session status. This tool works before the browser app is paired.",
     scopes: [],
-    inputSchema: B,
+    inputSchema: Z,
     bridgeLocal: !0
   },
   {
     name: "refresh_pairing",
     description: "Create a fresh local TaskTime Pro pairing challenge and launch URL for the same bridge process when the previous pairing code expired or was consumed. This tool works before the browser app is paired.",
     scopes: [],
-    inputSchema: B,
+    inputSchema: Z,
     bridgeLocal: !0
   }
 ], tr = [
@@ -4607,7 +4607,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "list_projects",
     description: "List active TaskTime Pro projects visible to the paired app session.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "create_project",
@@ -4918,7 +4918,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "list_business_infos",
     description: "List business profiles used for invoices, expenses, and tax/reporting context.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "create_business_info",
@@ -5090,7 +5090,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "list_payment_methods",
     description: "List payment methods used on invoices and expenses.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "create_payment_method",
@@ -5162,7 +5162,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "list_invoice_templates",
     description: "List invoice templates, including sequence and branding defaults.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "create_invoice_template",
@@ -5399,7 +5399,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "get_preferences",
     description: "Return validated TaskTime Pro user preferences. Sync/backup control state is readable but not mutable through update_preferences.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "update_preferences",
@@ -5597,7 +5597,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "get_active_timers",
     description: "List active timers with resolved timer keys and elapsed time.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "start_timer",
@@ -6084,7 +6084,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "list_tax_return_periods",
     description: "List tax return periods used by Reports tax-claim workflows.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "create_tax_return_period",
@@ -6468,7 +6468,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "get_dashboard_summary",
     description: "Get a bounded summary of current work and canonical invoice-eligible time across complete local history.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "get_project_overview",
@@ -6613,20 +6613,46 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     }
   },
   {
-    name: "list_drive_backups",
-    description: "List TaskTime Pro backup snapshots available in Google Drive without returning backup contents.",
+    name: "list_cloud_backups",
+    description: "List TaskTime Pro backup snapshots in the active cloud provider without returning backup contents.",
     scopes: ["read", "export"],
-    inputSchema: B
+    inputSchema: Z
+  },
+  {
+    name: "create_cloud_backup",
+    description: "Create a TaskTime Pro backup snapshot in the active cloud provider using the existing backup manager.",
+    scopes: ["read", "export"],
+    inputSchema: Z
+  },
+  {
+    name: "download_cloud_backup_json",
+    description: "Download a selected backup from the active cloud provider as a browser JSON file without returning backup contents through the bridge.",
+    scopes: ["read", "export"],
+    inputSchema: {
+      type: "object",
+      properties: {
+        backupId: s,
+        filename: s
+      },
+      required: ["backupId"],
+      additionalProperties: !1
+    }
+  },
+  {
+    name: "list_drive_backups",
+    description: "Deprecated Google Drive compatibility alias for list_cloud_backups. List TaskTime Pro backup snapshots in Google Drive without returning backup contents.",
+    scopes: ["read", "export"],
+    inputSchema: Z
   },
   {
     name: "create_drive_backup",
-    description: "Create a TaskTime Pro backup snapshot in Google Drive using the existing backup manager.",
+    description: "Deprecated Google Drive compatibility alias for create_cloud_backup. Create a TaskTime Pro backup snapshot in Google Drive.",
     scopes: ["read", "export"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "download_drive_backup_json",
-    description: "Download a selected Google Drive backup as a browser JSON file without returning backup contents through the bridge.",
+    description: "Deprecated Google Drive compatibility alias for download_cloud_backup_json. Download a selected Google Drive backup as a browser JSON file without returning backup contents through the bridge.",
     scopes: ["read", "export"],
     inputSchema: {
       type: "object",
@@ -6667,8 +6693,23 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     }
   },
   {
+    name: "restore_cloud_backup",
+    description: "Replace current local TaskTime Pro data from a selected backup in the active cloud provider after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.",
+    scopes: ["read", "write", "export"],
+    inputSchema: {
+      type: "object",
+      properties: {
+        backupId: s,
+        confirmRestore: g,
+        confirmationText: s
+      },
+      required: ["backupId", "confirmRestore", "confirmationText"],
+      additionalProperties: !1
+    }
+  },
+  {
     name: "restore_drive_backup",
-    description: "Replace current local TaskTime Pro data from a selected Google Drive backup after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.",
+    description: "Deprecated Google Drive compatibility alias for restore_cloud_backup. Replace current local TaskTime Pro data from a selected Google Drive backup after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal RESTORE.",
     scopes: ["read", "write", "export"],
     inputSchema: {
       type: "object",
@@ -6683,13 +6724,13 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
   },
   {
     name: "get_sync_status",
-    description: "Read current Google Drive sync status, auto-sync mode, pending changes, and backup preference metadata.",
+    description: "Read the active cloud provider, sync status, auto-sync mode, pending changes, and backup preference metadata.",
     scopes: ["read"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "update_sync_settings",
-    description: "Update explicit Google Drive sync and backup preferences. Backup mode requires confirmBackupMode: true. Optional runSync triggers Sync Now after saving.",
+    description: "Update explicit cloud sync and backup preferences for the active provider. Backup mode requires confirmBackupMode: true. Optional runSync triggers Sync Now after saving.",
     scopes: ["read", "write", "export"],
     inputSchema: {
       type: "object",
@@ -6706,13 +6747,14 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
   },
   {
     name: "delete_all_account_data",
-    description: "Delete all local TaskTime Pro data and, when Drive is connected, wipe Drive sync data and backups after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal DELETE ALL DATA.",
+    description: "Delete all local TaskTime Pro data and, when cloud storage is connected, wipe all TaskTime sync data and backups and revoke the active provider after explicit confirmation and TaskTime Pro approval. Requires confirmationText to equal DELETE ALL DATA.",
     scopes: ["read", "write", "export"],
     inputSchema: {
       type: "object",
       properties: {
         confirmDelete: g,
         confirmationText: s,
+        includeCloudData: g,
         includeDriveData: g
       },
       required: ["confirmDelete", "confirmationText"],
@@ -6751,7 +6793,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "open_dashboard_view",
     description: "Open the TaskTime Pro dashboard route in the paired app session.",
     scopes: ["navigation"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "open_planner_view",
@@ -6836,7 +6878,7 @@ const s = { type: "string" }, I = { type: "number" }, g = { type: "boolean" }, f
     name: "open_reports_view",
     description: "Open the TaskTime Pro reports route in the paired app session.",
     scopes: ["navigation"],
-    inputSchema: B
+    inputSchema: Z
   },
   {
     name: "focus_running_timer",
@@ -6894,10 +6936,10 @@ function et(e, t, n, r) {
     typeof e.minItems == "number" && i.length < e.minItems && r.push(`${n} must contain at least ${e.minItems} item(s)`), e.items && i.forEach((c, l) => et(e.items, c, `${n}[${l}]`, r));
   }
 }
-const Ol = "2025-11-25", je = "2.0", Nl = 120, Cl = 6e4, Rl = 5 * 6e4;
+const Ol = "2025-11-25", je = "2.0", Nl = 120, Rl = 6e4, Cl = 5 * 6e4;
 class $l {
   constructor(t) {
-    if (this.toolCallCount = 0, this.nextRequestId = 0, this.bridge = t.bridge, this.scopes = new Set(t.scopes), this.commandTimeoutMs = t.commandTimeoutMs, this.requestIdFactory = t.requestIdFactory ?? (() => `mcp-request-${this.nextRequestId++}`), this.toolCallRateLimit = t.toolCallRateLimit ?? Nl, this.toolCallRateWindowMs = t.toolCallRateWindowMs ?? Cl, this.now = t.now ?? (() => Date.now()), !Number.isInteger(this.toolCallRateLimit) || this.toolCallRateLimit < 0)
+    if (this.toolCallCount = 0, this.nextRequestId = 0, this.bridge = t.bridge, this.scopes = new Set(t.scopes), this.commandTimeoutMs = t.commandTimeoutMs, this.requestIdFactory = t.requestIdFactory ?? (() => `mcp-request-${this.nextRequestId++}`), this.toolCallRateLimit = t.toolCallRateLimit ?? Nl, this.toolCallRateWindowMs = t.toolCallRateWindowMs ?? Rl, this.now = t.now ?? (() => Date.now()), !Number.isInteger(this.toolCallRateLimit) || this.toolCallRateLimit < 0)
       throw new Error("toolCallRateLimit must be a non-negative integer.");
     if (!Number.isInteger(this.toolCallRateWindowMs) || this.toolCallRateWindowMs <= 0)
       throw new Error("toolCallRateWindowMs must be a positive integer.");
@@ -6917,7 +6959,7 @@ class $l {
           },
           serverInfo: {
             name: "tasktime-local-bridge",
-            version: "1.0.0"
+            version: "1.1.0"
           }
         });
       case "ping":
@@ -6941,20 +6983,20 @@ class $l {
   async callTool(t) {
     const n = t;
     if (!n || typeof n != "object" || typeof n.name != "string")
-      return R("INVALID_INPUT", "tools/call requires a string tool name.");
+      return C("INVALID_INPUT", "tools/call requires a string tool name.");
     const r = Ht(n.name);
     if (!r)
-      return R("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.name}`);
+      return C("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.name}`);
     const o = n.arguments ?? {}, a = Yt(r.inputSchema, o);
     if (!a.valid)
-      return R("INVALID_INPUT", `Invalid input for ${r.name}.`, {
+      return C("INVALID_INPUT", `Invalid input for ${r.name}.`, {
         validationErrors: a.errors
       });
     if (Xt(r.name))
       return this.callBridgeSetupTool(r.name);
     const i = r.scopes.find((p) => !this.scopes.has(p));
     if (i)
-      return R("PERMISSION_DENIED", `Missing ${i} permission.`, {
+      return C("PERMISSION_DENIED", `Missing ${i} permission.`, {
         scope: i
       });
     const c = this.consumeToolCallBudget(r.name);
@@ -6970,7 +7012,7 @@ class $l {
         Ll(n.approval)
       );
     } catch (p) {
-      return p instanceof j ? R(p.code, p.message, Qt(p)) : R(
+      return p instanceof j ? C(p.code, p.message, Qt(p)) : C(
         "UNAVAILABLE",
         p instanceof Error ? p.message : "TaskTime Pro app session is unavailable.",
         nr()
@@ -6988,35 +7030,35 @@ class $l {
     };
   }
   callBridgeSetupTool(t) {
-    return t === "get_pairing_status" ? this.bridge.getPairingStatus ? en(t, this.bridge.getPairingStatus()) : R("UNAVAILABLE", "TaskTime Pro bridge pairing status is unavailable.") : this.bridge.refreshPairing ? en(t, this.bridge.refreshPairing()) : R("UNAVAILABLE", "TaskTime Pro bridge pairing refresh is unavailable.");
+    return t === "get_pairing_status" ? this.bridge.getPairingStatus ? en(t, this.bridge.getPairingStatus()) : C("UNAVAILABLE", "TaskTime Pro bridge pairing status is unavailable.") : this.bridge.refreshPairing ? en(t, this.bridge.refreshPairing()) : C("UNAVAILABLE", "TaskTime Pro bridge pairing refresh is unavailable.");
   }
   async createApprovalToken(t) {
     if (!this.bridge.createApprovalToken)
-      return R("UNAVAILABLE", "TaskTime Pro approval-token signing is unavailable.");
+      return C("UNAVAILABLE", "TaskTime Pro approval-token signing is unavailable.");
     const n = t;
     if (!n || typeof n != "object" || typeof n.command != "string")
-      return R("INVALID_INPUT", "tasktime/create_approval_token requires a string command.");
+      return C("INVALID_INPUT", "tasktime/create_approval_token requires a string command.");
     const r = Ht(n.command);
     if (!r)
-      return R("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.command}`);
+      return C("INVALID_INPUT", `Unsupported TaskTime Pro tool: ${n.command}`);
     if (Xt(r.name))
-      return R("INVALID_INPUT", `TaskTime Pro setup tool does not require approval tokens: ${n.command}`);
+      return C("INVALID_INPUT", `TaskTime Pro setup tool does not require approval tokens: ${n.command}`);
     const o = n.arguments ?? {}, a = Yt(r.inputSchema, o);
     if (!a.valid)
-      return R("INVALID_INPUT", `Invalid input for ${r.name}.`, {
+      return C("INVALID_INPUT", `Invalid input for ${r.name}.`, {
         validationErrors: a.errors
       });
     const i = Ml(n.scopes, r.scopes);
     if (!i)
-      return R("INVALID_INPUT", "Approval token scopes must be an array of strings.");
+      return C("INVALID_INPUT", "Approval token scopes must be an array of strings.");
     const c = i.find((p) => !this.scopes.has(p));
     if (c)
-      return R("PERMISSION_DENIED", `Missing ${c} permission.`, {
+      return C("PERMISSION_DENIED", `Missing ${c} permission.`, {
         scope: c
       });
     const l = Ul(n.ttlMs);
     if (l === null)
-      return R("INVALID_INPUT", "Approval token ttlMs must be a positive integer no greater than 300000.");
+      return C("INVALID_INPUT", "Approval token ttlMs must be a positive integer no greater than 300000.");
     try {
       const p = typeof n.inputHash == "string" ? n.inputHash : Zl(o);
       return {
@@ -7031,7 +7073,7 @@ class $l {
         })
       };
     } catch (p) {
-      return p instanceof j ? R(p.code, p.message, Qt(p)) : R("UNAVAILABLE", p instanceof Error ? p.message : "TaskTime Pro approval-token signing failed.");
+      return p instanceof j ? C(p.code, p.message, Qt(p)) : C("UNAVAILABLE", p instanceof Error ? p.message : "TaskTime Pro approval-token signing failed.");
     }
   }
   consumeToolCallBudget(t) {
@@ -7040,7 +7082,7 @@ class $l {
     const n = this.now();
     if (n - this.toolCallWindowStartedAt >= this.toolCallRateWindowMs && (this.toolCallWindowStartedAt = n, this.toolCallCount = 0), this.toolCallCount >= this.toolCallRateLimit) {
       const r = Math.max(0, this.toolCallRateWindowMs - (n - this.toolCallWindowStartedAt));
-      return R("RATE_LIMITED", "TaskTime Pro MCP tool call rate limit exceeded.", {
+      return C("RATE_LIMITED", "TaskTime Pro MCP tool call rate limit exceeded.", {
         tool: t,
         limit: this.toolCallRateLimit,
         windowMs: this.toolCallRateWindowMs,
@@ -7089,7 +7131,7 @@ function Zl(e) {
 }
 function Ul(e) {
   if (e !== void 0)
-    return !Number.isInteger(e) || e <= 0 || e > Rl ? null : e;
+    return !Number.isInteger(e) || e <= 0 || e > Cl ? null : e;
 }
 function Qt(e) {
   return e.code !== "UNAVAILABLE" ? e.details : {
@@ -7125,7 +7167,7 @@ function en(e, t) {
     isError: !1
   };
 }
-function R(e, t, n) {
+function C(e, t, n) {
   const r = {
     ok: !1,
     command: "tools/call",
@@ -7215,49 +7257,49 @@ function Vl(e, t = process.env) {
         n.manifest = !0;
         break;
       case "--host":
-        n.host = Z(e, ++a, i);
+        n.host = U(e, ++a, i);
         break;
       case "--port":
-        n.port = H(Z(e, ++a, i), tn, i);
+        n.port = H(U(e, ++a, i), tn, i);
         break;
       case "--path":
-        n.path = ln(Z(e, ++a, i));
+        n.path = ln(U(e, ++a, i));
         break;
       case "--scopes":
-        n.scopes = Ql(Z(e, ++a, i), i);
+        n.scopes = Ql(U(e, ++a, i), i);
         break;
       case "--scope":
-        r.push(sr(Z(e, ++a, i), i));
+        r.push(sr(U(e, ++a, i), i));
         break;
       case "--origin":
-        o.push(Z(e, ++a, i));
+        o.push(U(e, ++a, i));
         break;
       case "--agent-id":
-        n.agentId = se(Z(e, ++a, i), ze, i);
+        n.agentId = se(U(e, ++a, i), ze, i);
         break;
       case "--agent-label":
-        n.agentLabel = se(Z(e, ++a, i), rt, i);
+        n.agentLabel = se(U(e, ++a, i), rt, i);
         break;
       case "--pairing-ttl-ms":
-        n.pairingTtlMs = H(Z(e, ++a, i), Ue, i);
+        n.pairingTtlMs = H(U(e, ++a, i), Ue, i);
         break;
       case "--session-ttl-ms":
-        n.sessionTtlMs = H(Z(e, ++a, i), Ue, i);
+        n.sessionTtlMs = H(U(e, ++a, i), Ue, i);
         break;
       case "--command-timeout-ms":
-        n.commandTimeoutMs = H(Z(e, ++a, i), nn, i);
+        n.commandTimeoutMs = H(U(e, ++a, i), nn, i);
         break;
       case "--tool-rate-limit":
-        n.toolCallRateLimit = H(Z(e, ++a, i), rn, i);
+        n.toolCallRateLimit = H(U(e, ++a, i), rn, i);
         break;
       case "--tool-rate-window-ms":
-        n.toolCallRateWindowMs = pn(Z(e, ++a, i), on, i);
+        n.toolCallRateWindowMs = pn(U(e, ++a, i), on, i);
         break;
       case "--app-url":
-        n.appUrl = ht(Z(e, ++a, i), i);
+        n.appUrl = ht(U(e, ++a, i), i);
         break;
       case "--status-file":
-        n.statusFile = se(Z(e, ++a, i), "", i);
+        n.statusFile = se(U(e, ++a, i), "", i);
         break;
       default:
         throw new Error(`Unsupported option: ${i}`);
@@ -7482,7 +7524,7 @@ async function Hl(e, t) {
     commandTimeoutMs: e.commandTimeoutMs,
     toolCallRateLimit: e.toolCallRateLimit,
     toolCallRateWindowMs: e.toolCallRateWindowMs
-  }), C = Bl({
+  }), R = Bl({
     input: t.stdin,
     output: t.stdout,
     server: M,
@@ -7498,7 +7540,7 @@ async function Hl(e, t) {
     getStatus: y,
     refreshPairing: v,
     stop: async () => {
-      C(), await p.stop(), cn(i), i && cn(sn(i, p.getBridgeInstanceId()));
+      R(), await p.stop(), cn(i), i && cn(sn(i, p.getBridgeInstanceId()));
     }
   };
 }
@@ -7610,7 +7652,7 @@ function ot(e) {
 function ln(e) {
   return e.startsWith("/") ? e : `/${e}`;
 }
-function Z(e, t, n) {
+function U(e, t, n) {
   const r = e[t];
   if (!r || r.startsWith("--"))
     throw new Error(`${n} requires a value.`);

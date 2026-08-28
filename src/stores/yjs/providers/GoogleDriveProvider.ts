@@ -15,18 +15,21 @@ import * as Y from 'yjs';
 import { encodeStateAsUpdate, applyUpdate, mergeUpdates } from 'yjs';
 import { YjsDocManager } from '../YjsDocManager';
 import {
+    CloudManifestManager,
+    CLOUD_BINDING_FILE_NAME,
     ManifestManager,
     AuthorizationError,
     DriveTransportDisabledError,
-    isDriveFileNotFoundError,
+    isCloudFileNotFoundError,
     type DriveTokenProvider,
     type DriveTransport,
 } from './ManifestManager';
-import { BackupManager } from './BackupManager';
-import type { DocName, SyncState, DriveSyncMode, SyncPhase } from '../types';
+import { CloudFileStoreError, type CloudProviderId } from './CloudFileStore';
+import type { CloudSyncMode, DocName, SyncState, SyncPhase } from '../types';
 import { validateDocManagerState } from '../validation';
 import {
     markPendingChanges,
+    markPendingDocsSynced,
     markSyncStarted,
     markSyncCompleted,
     markSyncFailed,
@@ -35,6 +38,7 @@ import {
     getSyncPersistenceState,
     getPersistedPendingDocNames,
     shouldSyncOnLoad,
+    type SyncPersistenceScope,
 } from '@/utils/syncPersistence';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { PROJECT_NOTES_LOCAL_SAVE_ORIGIN } from '@/constants/syncOrigins';
@@ -55,35 +59,63 @@ const WIPE_VERIFY_ATTEMPTS = 3;
 const DRIVE_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
 const DRIVE_VALIDATION_INCIDENT_THROTTLE_MS = 30 * 60 * 1000;
 
-class BackupModeRemoteChangedError extends Error {
-
-    constructor() {
-        super('Remote Drive data changed. Run Sync Now before backup mode can upload local changes.');
-        this.name = 'BackupModeRemoteChangedError';
-    }
+interface CloudProviderDetails {
+    provider: CloudProviderId;
+    displayName: string;
+    shortName: string;
+    logPrefix: string;
+    incidentPrefix: string;
+    incidentName: string;
 }
 
-function captureDriveIncident({
-    incidentKey,
-    message,
-    error,
-    context,
-    throttleMs = DRIVE_INCIDENT_THROTTLE_MS,
-}: {
-    incidentKey: string;
-    message: string;
-    error?: unknown;
-    context?: Record<string, unknown>;
-    throttleMs?: number;
-}): void {
-    captureDebugBundleIncident({
-        incidentKey,
-        name: 'TaskTimeDriveSyncError',
-        message,
-        error,
-        context,
-        throttleMs,
-    });
+function getCloudProviderDetails(provider: CloudProviderId): CloudProviderDetails {
+    if (provider === 'google-drive') {
+        return {
+            provider,
+            displayName: 'Google Drive',
+            shortName: 'Drive',
+            logPrefix: 'DriveSync',
+            incidentPrefix: 'drive',
+            incidentName: 'TaskTimeDriveSyncError',
+        };
+    }
+
+    return {
+        provider,
+        displayName: 'Dropbox',
+        shortName: 'Dropbox',
+        logPrefix: 'CloudSync:dropbox',
+        incidentPrefix: 'dropbox',
+        incidentName: 'TaskTimeCloudSyncError',
+    };
+}
+
+function isCloudAuthorizationError(error: unknown): boolean {
+    return error instanceof AuthorizationError
+        || (error instanceof CloudFileStoreError
+            && (error.code === 'unauthenticated' || error.code === 'missing-scope'));
+}
+
+function isCloudTransportDisabledError(error: unknown): boolean {
+    return error instanceof DriveTransportDisabledError
+        || (error instanceof CloudFileStoreError && error.code === 'policy-disabled');
+}
+
+function isKnownSyncDocName(docName: string): docName is DocName {
+    return docName === 'core'
+        || docName === 'entries-active'
+        || docName === 'tasks-archived'
+        || docName === 'invoices-archived'
+        || docName === 'expenses-archived'
+        || /^entries-\d+$/.test(docName);
+}
+
+class BackupModeRemoteChangedError extends Error {
+
+    constructor(providerShortName: string) {
+        super(`Remote ${providerShortName} data changed. Run Sync Now before backup mode can upload local changes.`);
+        this.name = 'BackupModeRemoteChangedError';
+    }
 }
 
 /**
@@ -92,11 +124,24 @@ function captureDriveIncident({
  * - ifAvailable=false: wait for lock (for force/manual syncs)
  * Falls back to no-op on browsers without Web Locks API.
  */
-type SyncLockResult<T> =
+export type CloudSyncLockResult<T> =
     | { acquired: true; value: T }
     | { acquired: false };
 
-async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Promise<SyncLockResult<T>> {
+declare const CLOUD_SYNC_LOCK_PERMIT_BRAND: unique symbol;
+
+/**
+ * Capability passed only while this tab owns the cross-tab sync Web Lock.
+ * It lets the transfer coordinator call the normal sync implementation without
+ * attempting to acquire the same non-reentrant browser lock a second time.
+ */
+export type CloudSyncLockPermit = {
+    readonly [CLOUD_SYNC_LOCK_PERMIT_BRAND]: true;
+};
+
+const CLOUD_SYNC_LOCK_PERMIT = Object.freeze({}) as CloudSyncLockPermit;
+
+async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Promise<CloudSyncLockResult<T>> {
     if (typeof navigator === 'undefined' || !navigator.locks) {
         return { acquired: true, value: await fn() };
     }
@@ -114,6 +159,17 @@ async function withSyncLock<T>(fn: () => Promise<T>, wait: boolean = false): Pro
     );
 }
 
+/** Acquire the established compatibility lock for a multi-step cloud operation. */
+export function withCloudSyncExclusiveLock<T>(
+    operation: (permit: CloudSyncLockPermit) => Promise<T>,
+): Promise<CloudSyncLockResult<T>> {
+    return withSyncLock(() => operation(CLOUD_SYNC_LOCK_PERMIT), false);
+}
+
+function hasCloudSyncLockPermit(permit: CloudSyncLockPermit | undefined): boolean {
+    return permit === CLOUD_SYNC_LOCK_PERMIT;
+}
+
 type DocUpdateHandler = (...args: unknown[]) => void;
 
 type ConnectOptions = {
@@ -128,25 +184,47 @@ type SyncOptions = {
 export interface DriveConnectionOptions {
     transport: DriveTransport;
     sessionId: string | null;
+    /** Provider lifecycle generation; omitted legacy Google sessions remain generation zero. */
+    generation?: number;
     tokenProvider?: DriveTokenProvider | null;
     /** Legacy direct-auth compatibility for non-Worker consumers. */
     accessToken?: string | null;
 }
 
-export class YjsDriveProvider {
+export interface CloudSyncConnectionOptions {
+    provider: CloudProviderId;
+    generation: number;
+    manifest: CloudManifestManager;
+}
+
+export class CloudProviderMovedError extends Error {
+    readonly targetProvider: CloudProviderId;
+    readonly generation: number;
+
+    constructor(targetProvider: CloudProviderId, generation: number) {
+        super('This workspace moved to another cloud provider. Reconnect it before editing on this device.');
+        this.name = 'CloudProviderMovedError';
+        this.targetProvider = targetProvider;
+        this.generation = generation;
+    }
+}
+
+export class YjsCloudSyncProvider {
 
     private docManager: YjsDocManager;
-    private manifest: ManifestManager;
+    private manifest: CloudManifestManager;
     private accessToken: string;
     private sessionId: string | null;
     private readonly transport: DriveTransport;
+    private readonly persistenceScope: SyncPersistenceScope;
+    private readonly providerDetails: CloudProviderDetails;
 
     private connected: boolean = false;
     private syncState: SyncState = 'idle';
     private stateListeners: Set<(state: SyncState) => void> = new Set();
     private syncPhase: SyncPhase = 'idle';
     private phaseListeners: Set<(phase: SyncPhase) => void> = new Set();
-    private syncMode: DriveSyncMode = 'sync';
+    private syncMode: CloudSyncMode = 'sync';
     private pendingChanges: boolean = false;
     private pendingChangeListeners: Set<(hasPending: boolean) => void> = new Set();
     private onSyncCompleteCallback: (() => void | Promise<void>) | null = null;
@@ -158,6 +236,8 @@ export class YjsDriveProvider {
     private syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
     private syncRetryAttempt: number = 0;
     private isSyncing: boolean = false;
+    private activeSyncCompletion: Promise<void> | null = null;
+    private syncCompleteCallbackActive: boolean = false;
     private forceFullStateDocs: Set<DocName> = new Set();
     private verifyFullStateDocs: Set<DocName> = new Set();
     private lifecycleListenersAttached: boolean = false;
@@ -175,6 +255,12 @@ export class YjsDriveProvider {
         let added = false;
 
         for (const docName of docNames) {
+            // Keep exact recovery identity durable before connection work starts.
+            // This lets the common sync core reload lazy IndexedDB documents
+            // instead of repeatedly promoting only the documents that happened
+            // to be mounted when the page refreshed.
+            markPendingChanges(docName, this.persistenceScope);
+
             if (!this.forceFullStateDocs.has(docName)) {
                 this.forceFullStateDocs.add(docName);
                 added = true;
@@ -207,20 +293,30 @@ export class YjsDriveProvider {
     }
 
     private markDocsForFullStateVerification(docNames: DocName[]): void {
-        let added = false;
+        const queuedDocNames: DocName[] = [];
+
+        // Persist the forced verification boundary for every document before
+        // provider work begins. An existing recovery upload is already the
+        // stronger full-state operation, so it must not also occupy the
+        // verification queue and cause a second provider write in this pass.
+        docNames.forEach((docName) => markPendingChanges(docName, this.persistenceScope));
 
         for (const docName of docNames) {
+            if (this.forceFullStateDocs.has(docName)) {
+                continue;
+            }
+
             if (!this.verifyFullStateDocs.has(docName)) {
                 this.verifyFullStateDocs.add(docName);
-                added = true;
+                queuedDocNames.push(docName);
             }
         }
 
-        if (added) {
-            this.log('sync: queued full-state verification upload', { docs: docNames });
-            docNames.forEach((docName) => markPendingChanges(docName));
-            this.updatePendingState();
+        if (queuedDocNames.length > 0) {
+            this.log('sync: queued full-state verification upload', { docs: queuedDocNames });
         }
+
+        this.updatePendingState();
     }
 
     private isOnline(): boolean {
@@ -253,10 +349,33 @@ export class YjsDriveProvider {
     private log(message: string, extra?: unknown): void {
         const ts = new Date().toISOString();
         if (extra !== undefined) {
-            console.log(`[DriveSync] ${ts} ${message}`, extra);
+            console.log(`[${this.providerDetails.logPrefix}] ${ts} ${message}`, extra);
         } else {
-            console.log(`[DriveSync] ${ts} ${message}`);
+            console.log(`[${this.providerDetails.logPrefix}] ${ts} ${message}`);
         }
+    }
+
+    private captureIncident({
+        incidentKey,
+        message,
+        error,
+        context,
+        throttleMs = DRIVE_INCIDENT_THROTTLE_MS,
+    }: {
+        incidentKey: string;
+        message: string;
+        error?: unknown;
+        context?: Record<string, unknown>;
+        throttleMs?: number;
+    }): void {
+        captureDebugBundleIncident({
+            incidentKey: `${this.providerDetails.incidentPrefix}.${incidentKey}`,
+            name: this.providerDetails.incidentName,
+            message,
+            error,
+            context,
+            throttleMs,
+        });
     }
 
     private handleDocumentVisibilityChange = (): void => {
@@ -310,10 +429,10 @@ export class YjsDriveProvider {
 
         this.log('page exit: flushing pending local changes', { trigger, mode: this.syncMode });
         this.sync(true, { allowPull: false }).catch((error) => {
-            console.error('[YjsDriveProvider] Page-exit sync failed:', error);
-            captureDriveIncident({
-                incidentKey: 'drive.page_exit_sync_failed',
-                message: 'TaskTime Pro could not flush pending Drive sync changes during page exit',
+            console.error(`[${this.providerDetails.logPrefix}] Page-exit sync failed:`, error);
+            this.captureIncident({
+                incidentKey: 'page_exit_sync_failed',
+                message: `TaskTime Pro could not flush pending ${this.providerDetails.shortName} sync changes during page exit`,
                 error,
                 context: { trigger, mode: this.syncMode },
                 throttleMs: 10 * 60 * 1000,
@@ -337,7 +456,7 @@ export class YjsDriveProvider {
         try {
             return await this.manifest.downloadFileAsArrayBuffer(fileId);
         } catch (error) {
-            if (!isDriveFileNotFoundError(error)) {
+            if (!isCloudFileNotFoundError(error)) {
                 throw error;
             }
 
@@ -347,9 +466,9 @@ export class YjsDriveProvider {
 
             const recoveredFileId = await this.manifest.getFileIdWithFallback(fileName);
             if (!recoveredFileId) {
-                captureDriveIncident({
-                    incidentKey: 'drive.remote_file_missing_after_recovery',
-                    message: 'TaskTime Pro could not recover a Drive sync file after refreshing the file cache',
+                this.captureIncident({
+                    incidentKey: 'remote_file_missing_after_recovery',
+                    message: `TaskTime Pro could not recover a ${this.providerDetails.shortName} sync file after refreshing the file cache`,
                     error,
                     context: { fileName, fileId },
                     throttleMs: 30 * 60 * 1000,
@@ -360,10 +479,10 @@ export class YjsDriveProvider {
             try {
                 return await this.manifest.downloadFileAsArrayBuffer(recoveredFileId);
             } catch (retryError) {
-                if (isDriveFileNotFoundError(retryError)) {
-                    captureDriveIncident({
-                        incidentKey: 'drive.remote_file_missing_after_recovery',
-                        message: 'TaskTime Pro could not recover a Drive sync file after refreshing the file cache',
+                if (isCloudFileNotFoundError(retryError)) {
+                    this.captureIncident({
+                        incidentKey: 'remote_file_missing_after_recovery',
+                        message: `TaskTime Pro could not recover a ${this.providerDetails.shortName} sync file after refreshing the file cache`,
                         error: retryError,
                         context: { fileName, fileId: recoveredFileId, originalFileId: fileId },
                         throttleMs: 30 * 60 * 1000,
@@ -389,7 +508,7 @@ export class YjsDriveProvider {
             await this.manifest.updateFile(existingFileId, fileName, blob);
             return;
         } catch (error) {
-            if (!isDriveFileNotFoundError(error)) {
+            if (!isCloudFileNotFoundError(error)) {
                 throw error;
             }
 
@@ -404,7 +523,7 @@ export class YjsDriveProvider {
                     this.manifest.setFileId(fileName, recoveredFileId);
                     return;
                 } catch (retryError) {
-                    if (!isDriveFileNotFoundError(retryError)) {
+                    if (!isCloudFileNotFoundError(retryError)) {
                         throw retryError;
                     }
 
@@ -422,7 +541,7 @@ export class YjsDriveProvider {
         const hasPendingInMemory = this.hasLocalChangesToPush();
         // Pull/consistency retries remain visible without pretending they are
         // unsynced local documents.
-        const hasPersisted = shouldSyncOnLoad();
+        const hasPersisted = shouldSyncOnLoad(this.persistenceScope);
         const hasPending = hasPendingInMemory || hasPersisted;
         
         if (hasPending === this.pendingChanges) {
@@ -464,12 +583,12 @@ export class YjsDriveProvider {
     }
 
     private getPersistedLocalChangeDocNames(loadedDocs: DocName[]): DocName[] {
-        if (!hasPersistedPendingChanges()) {
+        if (!hasPersistedPendingChanges(this.persistenceScope)) {
             return [];
         }
 
         const loadedDocSet = new Set(loadedDocs);
-        const persistedDocNames = getPersistedPendingDocNames();
+        const persistedDocNames = getPersistedPendingDocNames(this.persistenceScope);
         const loadedPersistedDocNames = persistedDocNames
             .filter((docName): docName is DocName => loadedDocSet.has(docName as DocName));
 
@@ -483,6 +602,29 @@ export class YjsDriveProvider {
         // record. Upgrade it conservatively once, then future writes retain
         // exact document identity.
         return [...loadedDocs];
+    }
+
+    /**
+     * Rehydrate exact recovery documents that were unloaded by a page refresh.
+     * Their IndexedDB state must join the same provider sync before durable
+     * pending evidence can be cleared.
+     */
+    private async loadPersistedPendingDocs(): Promise<DocName[]> {
+        const loadedDocNames = new Set(this.docManager.getLoadedDocs());
+        const unloadedDocNames = getPersistedPendingDocNames(this.persistenceScope)
+            .filter(isKnownSyncDocName)
+            .filter((docName) => !loadedDocNames.has(docName));
+
+        for (const docName of unloadedDocNames) {
+            await this.docManager.getDoc(docName);
+            this.subscribeToDoc(docName);
+        }
+
+        if (unloadedDocNames.length > 0) {
+            this.log('sync: loaded persisted recovery documents', { docs: unloadedDocNames });
+        }
+
+        return this.docManager.getLoadedDocs();
     }
 
     /**
@@ -502,7 +644,7 @@ export class YjsDriveProvider {
             applyUpdate(projectedDoc, update, 'remote');
         } catch (error) {
             // Corrupt CRDT binary — this is the only case we truly reject
-            console.warn(`[YjsDriveProvider] Rejected corrupt remote ${source} for ${docName}:`, error);
+            console.warn(`[${this.providerDetails.logPrefix}] Rejected corrupt remote ${source} for ${docName}:`, error);
             projectedDoc.destroy();
             return false;
         }
@@ -514,10 +656,10 @@ export class YjsDriveProvider {
             // Cross-document references (e.g. entries → tasks) can be
             // temporarily broken during concurrent multi-device edits;
             // blocking the update would prevent CRDT convergence.
-            console.warn(`[YjsDriveProvider] Validation warning after ${source} for ${docName} (update applied anyway):`, error);
-            captureDriveIncident({
-                incidentKey: 'drive.remote_validation_warning',
-                message: 'TaskTime Pro applied a remote Drive update that failed validation',
+            console.warn(`[${this.providerDetails.logPrefix}] Validation warning after ${source} for ${docName} (update applied anyway):`, error);
+            this.captureIncident({
+                incidentKey: 'remote_validation_warning',
+                message: `TaskTime Pro applied a remote ${this.providerDetails.shortName} update that failed validation`,
                 error,
                 context: { docName, source },
                 throttleMs: DRIVE_VALIDATION_INCIDENT_THROTTLE_MS,
@@ -533,21 +675,56 @@ export class YjsDriveProvider {
 
     constructor(
         docManager: YjsDocManager,
-        connection: DriveConnectionOptions | string,
+        connection: CloudSyncConnectionOptions | DriveConnectionOptions | string,
         legacySessionId?: string | null,
     ) {
         this.docManager = docManager;
+        if (typeof connection !== 'string' && 'manifest' in connection) {
+            if (!Number.isSafeInteger(connection.generation) || connection.generation < 0) {
+                throw new Error('Cloud provider generation must be a non-negative safe integer.');
+            }
+
+            const manifestProvider = connection.manifest.getProviderId();
+            if (manifestProvider !== connection.provider) {
+                throw new Error(
+                    `Cloud provider scope ${connection.provider} does not match manifest store ${manifestProvider}.`,
+                );
+            }
+        }
+
+        const provider = typeof connection === 'string' || !('manifest' in connection)
+            ? 'google-drive'
+            : connection.provider;
+        this.providerDetails = getCloudProviderDetails(provider);
         if (typeof connection === 'string') {
             this.accessToken = connection;
             this.sessionId = legacySessionId ?? null;
             this.transport = legacySessionId ? 'proxy' : 'direct';
+            this.persistenceScope = { provider: 'google-drive', generation: 0 };
             this.manifest = new ManifestManager(connection, legacySessionId);
+            return;
+        }
+
+        if ('manifest' in connection) {
+            this.accessToken = '';
+            this.sessionId = null;
+            this.transport = 'direct';
+            this.persistenceScope = {
+                provider: connection.provider,
+                generation: connection.generation,
+            };
+            this.manifest = connection.manifest;
             return;
         }
 
         this.accessToken = connection.accessToken ?? '';
         this.sessionId = connection.sessionId;
         this.transport = connection.transport;
+        const generation = connection.generation ?? 0;
+        if (!Number.isSafeInteger(generation) || generation < 0) {
+            throw new Error('Google storage generation must be a non-negative safe integer.');
+        }
+        this.persistenceScope = { provider: 'google-drive', generation };
         this.manifest = new ManifestManager({
             transport: connection.transport,
             sessionId: connection.sessionId,
@@ -566,8 +743,18 @@ export class YjsDriveProvider {
     /**
      * Get the manifest manager (for BackupManager access)
      */
-    getManifest(): ManifestManager {
+    getManifest(): CloudManifestManager {
         return this.manifest;
+    }
+
+    private async assertWorkspaceBindingAllowsSync(): Promise<void> {
+        if (typeof this.manifest.readCachedCloudBindingMarker !== 'function') return;
+        const marker = await this.manifest.readCachedCloudBindingMarker();
+        if (marker?.state === 'moved'
+            && marker.activeProvider !== this.persistenceScope.provider
+            && marker.generation >= this.persistenceScope.generation) {
+            throw new CloudProviderMovedError(marker.activeProvider, marker.generation);
+        }
     }
 
     // =========================================================================
@@ -579,24 +766,31 @@ export class YjsDriveProvider {
      * @param syncMode - Optional sync mode to determine connect behavior.
      *   'sync' = pull + push (default), 'backup' = push only, 'manual' = subscribe only
      */
-    async connect(syncMode?: DriveSyncMode, options: ConnectOptions = {}): Promise<void> {
+    async connect(
+        syncMode?: CloudSyncMode,
+        options: ConnectOptions = {},
+        lockPermit?: CloudSyncLockPermit,
+    ): Promise<void> {
         if (this.connected) return;
 
-        const lockResult = await withSyncLock(
-            () => this.connectInner(syncMode, options),
-            true,
-        );
+        const lockResult = hasCloudSyncLockPermit(lockPermit)
+            ? { acquired: true as const, value: await this.connectInner(syncMode, options) }
+            : await withSyncLock(
+                () => this.connectInner(syncMode, options),
+                true,
+            );
 
         if (!lockResult.acquired) {
-            throw new Error('Unable to acquire the Google Drive connection lock.');
+            throw new Error(`Unable to acquire the ${this.providerDetails.displayName} connection lock.`);
         }
     }
 
-    private async connectInner(syncMode?: DriveSyncMode, options: ConnectOptions = {}): Promise<void> {
+    private async connectInner(syncMode?: CloudSyncMode, options: ConnectOptions = {}): Promise<void> {
         if (this.connected) return;
 
         const mode = syncMode ?? this.syncMode;
         const bootstrapPullIfPristine = options.bootstrapPullIfPristine === true;
+        let connectRecoveryDocNames: DocName[] = [];
         this.syncMode = mode;
 
         try {
@@ -616,12 +810,15 @@ export class YjsDriveProvider {
                 this.setPhase('checking');
 
                 await this.manifest.load();
+                await this.assertWorkspaceBindingAllowsSync();
                 this.lastPullAt = Date.now();
                 this.log('connect: manifest loaded');
 
-                this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
+                const loadedDocs = await this.loadPersistedPendingDocs();
+                connectRecoveryDocNames = this.getPersistedLocalChangeDocNames(loadedDocs);
+                this.promotePersistedLocalChangesToFullState(loadedDocs);
 
-                for (const docName of this.docManager.getLoadedDocs()) {
+                for (const docName of loadedDocs) {
                     await this.syncDoc(docName);
                     this.subscribeToDoc(docName);
                 }
@@ -639,12 +836,15 @@ export class YjsDriveProvider {
                 this.setPhase('checking');
 
                 await this.manifest.load();
+                await this.assertWorkspaceBindingAllowsSync();
                 this.lastPullAt = Date.now();
 
                 const remoteManifest = this.manifest.getManifest();
                 const hasRemoteData = remoteManifest && Object.keys(remoteManifest.documents).length > 0;
 
-                this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
+                const loadedDocs = await this.loadPersistedPendingDocs();
+                connectRecoveryDocNames = this.getPersistedLocalChangeDocNames(loadedDocs);
+                this.promotePersistedLocalChangesToFullState(loadedDocs);
 
                 const shouldPushLocalChanges = this.hasLocalChangesToPush();
 
@@ -653,7 +853,7 @@ export class YjsDriveProvider {
                     this.log('connect: first-sync pull for backup/manual mode');
                     this.setPhase('downloading');
 
-                    for (const docName of this.docManager.getLoadedDocs()) {
+                    for (const docName of loadedDocs) {
                         await this.syncDoc(docName, true);
                         this.subscribeToDoc(docName);
                     }
@@ -664,7 +864,7 @@ export class YjsDriveProvider {
                 } else if (shouldPushLocalChanges) {
                     this.log('connect: first-sync push for local reconnect changes', { mode });
 
-                    for (const docName of this.docManager.getLoadedDocs()) {
+                    for (const docName of loadedDocs) {
                         await this.syncDoc(docName, false);
                         this.subscribeToDoc(docName);
                     }
@@ -674,7 +874,7 @@ export class YjsDriveProvider {
                     }
                 } else {
                     // No remote data — just subscribe to doc updates
-                    for (const docName of this.docManager.getLoadedDocs()) {
+                    for (const docName of loadedDocs) {
                         this.subscribeToDoc(docName);
                     }
                 }
@@ -687,6 +887,7 @@ export class YjsDriveProvider {
                 this.setPhase('checking');
 
                 await this.manifest.load();
+                await this.assertWorkspaceBindingAllowsSync();
 
                 this.promotePersistedLocalChangesToFullState(this.docManager.getLoadedDocs());
 
@@ -717,6 +918,21 @@ export class YjsDriveProvider {
                 }
             }
 
+            // A successful non-manual connect is also a completed recovery pass
+            // for the exact loaded documents it uploaded. Clear those durable
+            // identities only after every document and manifest write above has
+            // succeeded, while preserving any document that gained new pending
+            // work during the pass. Manual mode intentionally keeps recovery
+            // evidence until the user explicitly chooses Sync Now.
+            if (mode !== 'manual' && connectRecoveryDocNames.length > 0) {
+                const remainingPendingDocNames = new Set(this.getInMemoryPendingDocNames());
+                const completedRecoveryDocNames = connectRecoveryDocNames.filter(
+                    (docName) => !remainingPendingDocNames.has(docName),
+                );
+
+                markPendingDocsSynced(completedRecoveryDocNames, this.persistenceScope);
+            }
+
             this.connected = true;
             this.attachLifecycleListeners();
             this.updateSyncInterval();
@@ -731,11 +947,21 @@ export class YjsDriveProvider {
                 return;
             }
 
-            console.error('[YjsDriveProvider] Connection failed:', error);
-            if (!(error instanceof AuthorizationError) && !(error instanceof DriveTransportDisabledError)) {
-                captureDriveIncident({
-                    incidentKey: 'drive.connect_failed',
-                    message: 'TaskTime Pro could not connect to Google Drive sync',
+            if (error instanceof CloudProviderMovedError) {
+                // A verified transfer fence is an expected recovery state, not
+                // an operational sync failure. Keep the source disconnected and
+                // let the account UI offer the target provider or an explicit
+                // destructive fresh start on this source.
+                this.setState('idle');
+                this.setPhase('idle');
+                throw error;
+            }
+
+            console.error(`[${this.providerDetails.logPrefix}] Connection failed:`, error);
+            if (!isCloudAuthorizationError(error) && !isCloudTransportDisabledError(error)) {
+                this.captureIncident({
+                    incidentKey: 'connect_failed',
+                    message: `TaskTime Pro could not connect to ${this.providerDetails.displayName} sync`,
                     error,
                     context: { mode },
                 });
@@ -744,6 +970,132 @@ export class YjsDriveProvider {
             this.setPhase('error');
             throw error;
         }
+    }
+
+    /**
+     * Permanently retire the retained data in a source provider that has a
+     * verified moved marker. Backups are deleted and verified first, sync
+     * objects next, and the binding marker last so an interrupted operation
+     * stays fenced until every earlier destructive step has completed.
+     */
+    async replaceMovedCloudWorkspace(
+        expectedTargetProvider: CloudProviderId,
+        deleteBackups: () => Promise<void>,
+    ): Promise<void> {
+        if (this.connected) {
+            throw new Error(`Disconnect ${this.providerDetails.displayName} before replacing its moved workspace.`);
+        }
+        if (!this.isOnline()) {
+            throw new Error(`Cannot replace ${this.providerDetails.displayName} data while offline.`);
+        }
+        if (expectedTargetProvider === this.persistenceScope.provider) {
+            throw new Error('The moved workspace target must be a different cloud provider.');
+        }
+
+        const targetName = getCloudProviderDetails(expectedTargetProvider).displayName;
+        const validateMovedMarker = async (): Promise<void> => {
+            const marker = await this.manifest.readCloudBindingMarker();
+            if (marker?.state !== 'moved'
+                || marker.activeProvider !== expectedTargetProvider
+                || marker.generation < this.persistenceScope.generation) {
+                throw new Error(
+                    `${this.providerDetails.displayName} is no longer marked as moved to ${targetName}. Nothing was deleted.`,
+                );
+            }
+        };
+
+        const initialMarker = await this.manifest.readCloudBindingMarker();
+        if (!initialMarker) {
+            const existingSyncFiles = await this.manifest.listSyncFiles();
+            if (existingSyncFiles.length > 0) {
+                throw new Error(
+                    `${this.providerDetails.displayName} is no longer marked as moved to ${targetName}. Nothing was deleted.`,
+                );
+            }
+
+            // Recovery after the previous attempt deleted the marker but the
+            // browser stopped before reconnecting. An empty sync namespace is
+            // the only marker-free state that is safe to continue from.
+            await deleteBackups();
+            this.manifest.reset();
+            this.pendingDeltas.clear();
+            this.verifyFullStateDocs.clear();
+            this.appliedStateVersions.clear();
+            this.appliedDeltaIds.clear();
+            this.markDocsForFullStateUpload(this.docManager.getLoadedDocs());
+            this.setState('idle');
+            this.setPhase('idle');
+            this.log('resuming cleared moved workspace replacement');
+            return;
+        }
+
+        if (initialMarker.state !== 'moved'
+            || initialMarker.activeProvider !== expectedTargetProvider
+            || initialMarker.generation < this.persistenceScope.generation) {
+            throw new Error(
+                `${this.providerDetails.displayName} is no longer marked as moved to ${targetName}. Nothing was deleted.`,
+            );
+        }
+
+        await deleteBackups();
+        await validateMovedMarker();
+
+        let syncFiles = await this.manifest.listSyncFiles();
+        const bindingFile = syncFiles.find((file) => file.name === CLOUD_BINDING_FILE_NAME);
+        if (!bindingFile) {
+            throw new Error(
+                `${this.providerDetails.displayName} no longer contains the expected moved-workspace marker. Nothing was deleted.`,
+            );
+        }
+
+        for (const file of syncFiles) {
+            if (file.name === CLOUD_BINDING_FILE_NAME) continue;
+            await this.manifest.deleteFileById(file.id);
+        }
+
+        for (let attempt = 1; attempt <= WIPE_VERIFY_ATTEMPTS; attempt++) {
+            syncFiles = await this.manifest.listSyncFiles();
+            const remainingDataFiles = syncFiles.filter((file) => file.name !== CLOUD_BINDING_FILE_NAME);
+            if (remainingDataFiles.length === 0) break;
+            if (attempt === WIPE_VERIFY_ATTEMPTS) {
+                throw new Error(
+                    `${this.providerDetails.displayName} replacement stopped safely because ${remainingDataFiles.length} TaskTime sync file(s) remain.`,
+                );
+            }
+        }
+
+        // Revalidate immediately before removing the final safety fence. A
+        // concurrent transfer or provider change must never be mistaken for
+        // the marker the user explicitly approved replacing.
+        await validateMovedMarker();
+        const verifiedBinding = (await this.manifest.listSyncFiles())
+            .find((file) => file.name === CLOUD_BINDING_FILE_NAME);
+        if (!verifiedBinding) {
+            throw new Error(
+                `${this.providerDetails.displayName} no longer contains the expected moved-workspace marker.`,
+            );
+        }
+        await this.manifest.deleteFileById(verifiedBinding.id);
+
+        for (let attempt = 1; attempt <= WIPE_VERIFY_ATTEMPTS; attempt++) {
+            const remainingSyncFiles = await this.manifest.listSyncFiles();
+            if (remainingSyncFiles.length === 0) break;
+            if (attempt === WIPE_VERIFY_ATTEMPTS) {
+                throw new Error(
+                    `${this.providerDetails.displayName} replacement is incomplete. ${remainingSyncFiles.length} TaskTime sync file(s) remain.`,
+                );
+            }
+        }
+
+        this.manifest.reset();
+        this.pendingDeltas.clear();
+        this.verifyFullStateDocs.clear();
+        this.appliedStateVersions.clear();
+        this.appliedDeltaIds.clear();
+        this.markDocsForFullStateUpload(this.docManager.getLoadedDocs());
+        this.setState('idle');
+        this.setPhase('idle');
+        this.log('moved workspace cleared for a new local workspace');
     }
 
     /**
@@ -786,21 +1138,21 @@ export class YjsDriveProvider {
         this.setPhase('idle');
         this.updatePendingState();
         // Clear persisted sync state on disconnect
-        clearSyncPersistence();
-        console.log('[YjsDriveProvider] Disconnected from Google Drive');
+        clearSyncPersistence(this.persistenceScope);
+        console.log(`[${this.providerDetails.logPrefix}] Disconnected from ${this.providerDetails.displayName}`);
     }
 
     /**
      * Wipe all TaskTime Pro files from Drive appDataFolder
      * This deletes the manifest and all document/delta files.
      */
-    async wipeDriveData(): Promise<void> {
+    async wipeCloudData(): Promise<void> {
         if (!this.connected) {
-            throw new Error('Drive not connected');
+            throw new Error(`${this.providerDetails.shortName} not connected`);
         }
 
         if (!this.isOnline()) {
-            throw new Error('Cannot wipe Drive while offline');
+            throw new Error(`Cannot wipe ${this.providerDetails.shortName} while offline`);
         }
 
         this.setState('syncing');
@@ -808,8 +1160,7 @@ export class YjsDriveProvider {
         this.log('wipe: started');
 
         for (let attempt = 1; attempt <= WIPE_VERIFY_ATTEMPTS; attempt++) {
-            const files = await this.manifest.listAppDataFiles();
-            const syncFiles = files.filter((file) => !BackupManager.isBackupFile(file.name));
+            const syncFiles = await this.manifest.listSyncFiles();
 
             if (syncFiles.length === 0) {
                 break;
@@ -820,11 +1171,10 @@ export class YjsDriveProvider {
             }
 
             if (attempt === WIPE_VERIFY_ATTEMPTS) {
-                const remainingFiles = await this.manifest.listAppDataFiles();
-                const remainingSyncFiles = remainingFiles.filter((file) => !BackupManager.isBackupFile(file.name));
+                const remainingSyncFiles = await this.manifest.listSyncFiles();
 
                 if (remainingSyncFiles.length > 0) {
-                    throw new Error(`Drive wipe incomplete. ${remainingSyncFiles.length} sync file(s) remain.`);
+                    throw new Error(`${this.providerDetails.shortName} wipe incomplete. ${remainingSyncFiles.length} sync file(s) remain.`);
                 }
             }
         }
@@ -840,11 +1190,16 @@ export class YjsDriveProvider {
         this.appliedDeltaIds.clear();
         this.updatePendingState();
         // Clear persisted sync state on wipe
-        clearSyncPersistence();
+        clearSyncPersistence(this.persistenceScope);
 
         this.setState('idle');
         this.setPhase('idle');
         this.log('wipe: complete');
+    }
+
+    /** Google-compatible destructive-action facade retained for existing consumers. */
+    async wipeDriveData(): Promise<void> {
+        await this.wipeCloudData();
     }
 
     /**
@@ -857,7 +1212,7 @@ export class YjsDriveProvider {
     /**
      * Update sync mode (manual, backup, or sync)
      */
-    setSyncMode(mode: DriveSyncMode): void {
+    setSyncMode(mode: CloudSyncMode): void {
         this.syncMode = mode;
 
         if (mode === 'manual') {
@@ -930,7 +1285,7 @@ export class YjsDriveProvider {
         const lastSync = this.manifest.getLastSync();
         const parsedManifestTime = lastSync ? Date.parse(lastSync) : Number.NaN;
         const manifestTime = Number.isNaN(parsedManifestTime) ? null : parsedManifestTime;
-        const localCompletedAt = getSyncPersistenceState().lastSyncCompletedAt;
+        const localCompletedAt = getSyncPersistenceState(this.persistenceScope).lastSyncCompletedAt;
 
         if (manifestTime == null) return localCompletedAt;
         if (localCompletedAt == null) return manifestTime;
@@ -945,7 +1300,11 @@ export class YjsDriveProvider {
      * Perform a full sync of all loaded documents
      * @param force - If true, bypasses the isSyncing guard and throttle (for manual Sync Now / visibility change)
      */
-    async sync(force: boolean = false, options: SyncOptions = {}): Promise<void> {
+    async sync(
+        force: boolean = false,
+        options: SyncOptions = {},
+        lockPermit?: CloudSyncLockPermit,
+    ): Promise<void> {
         // Force sync supersedes any pending debounced sync
         if (force && this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
@@ -957,7 +1316,7 @@ export class YjsDriveProvider {
         }
 
         if (!this.connected) {
-            console.warn('[YjsDriveProvider] Cannot sync: not connected');
+            console.warn(`[${this.providerDetails.logPrefix}] Cannot sync: not connected`);
             return;
         }
 
@@ -981,7 +1340,7 @@ export class YjsDriveProvider {
 
         // Cross-tab recency check: if another tab completed a sync recently, skip periodic syncs
         if (!force) {
-            const { lastSyncCompletedAt } = getSyncPersistenceState();
+            const { lastSyncCompletedAt } = getSyncPersistenceState(this.persistenceScope);
 
             if (lastSyncCompletedAt && (Date.now() - lastSyncCompletedAt) < CROSS_TAB_SYNC_RECENCY_MS) {
                 const hasPendingLocal = this.hasLocalChangesToPush();
@@ -994,7 +1353,9 @@ export class YjsDriveProvider {
         }
 
         // Acquire cross-tab lock (skip if another tab is syncing, unless force)
-        const lockResult = await withSyncLock(() => this.syncInner(force, options), force);
+        const lockResult = hasCloudSyncLockPermit(lockPermit)
+            ? { acquired: true as const, value: await this.syncInner(force, options) }
+            : await withSyncLock(() => this.syncInner(force, options), force);
 
         if (!lockResult.acquired && !force) {
             this.log('sync: skipped, sync lock is currently held');
@@ -1014,7 +1375,7 @@ export class YjsDriveProvider {
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
             if (this.isSyncing) {
-                console.warn('[YjsDriveProvider] Timeout waiting for sync, proceeding anyway');
+                console.warn(`[${this.providerDetails.logPrefix}] Timeout waiting for sync, proceeding anyway`);
             }
         }
 
@@ -1043,17 +1404,24 @@ export class YjsDriveProvider {
         }
 
         this.isSyncing = true;
+        let resolveActiveSync: (() => void) | null = null;
+        const activeSyncCompletion = new Promise<void>((resolve) => {
+            resolveActiveSync = resolve;
+        });
+        this.activeSyncCompletion = activeSyncCompletion;
         this.setState('syncing');
-        // Capture persisted state BEFORE markSyncStarted() overwrites it.
-        // markSyncStarted sets syncInterrupted=true for crash detection, but
-        // promotePersistedLocalChangesToFullState must only act on stale flags
-        // left over from a genuinely interrupted previous sync, not the current one.
-        const loadedDocs = this.docManager.getLoadedDocs();
-        this.promotePersistedLocalChangesToFullState(loadedDocs);
-        markSyncStarted();
-        this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal, allowPull });
+        let loadedDocs = this.docManager.getLoadedDocs();
+        markSyncStarted(this.persistenceScope);
 
         try {
+            // A refresh unloads lazy Yjs documents but intentionally preserves
+            // their exact recovery names. Bring only those documents back from
+            // local IndexedDB so the common Google/Dropbox sync core can upload
+            // and verify them instead of leaving the UI permanently pending.
+            loadedDocs = await this.loadPersistedPendingDocs();
+            this.promotePersistedLocalChangesToFullState(loadedDocs);
+            this.log('sync: started', { docs: loadedDocs, force, hasPendingLocal, allowPull });
+
             // An offline first connection has not inspected Drive yet. Complete
             // the same one-time reconciliation an online connect would perform
             // before honoring Backup mode's normal push-only trigger behavior.
@@ -1065,6 +1433,7 @@ export class YjsDriveProvider {
             if (completingInitialRemoteReconciliation) {
                 this.setPhase('checking');
                 await this.manifest.load();
+                await this.assertWorkspaceBindingAllowsSync();
                 this.lastPullAt = Date.now();
                 const remoteManifest = this.manifest.getManifest();
                 initialRemoteDataAvailable = Boolean(remoteManifest && Object.keys(remoteManifest.documents).length > 0);
@@ -1079,6 +1448,7 @@ export class YjsDriveProvider {
                     // any sync files that were uploaded but lost from the manifest.
                     this.setPhase('downloading');
                     await this.manifest.reload();
+                    await this.assertWorkspaceBindingAllowsSync();
                     this.lastPullAt = Date.now();
                     this.log('sync: manifest reloaded (changed or forced)');
                 } else {
@@ -1088,6 +1458,7 @@ export class YjsDriveProvider {
 
             if (!completingInitialRemoteReconciliation && !allowPull && !this.manifest.getManifest()) {
                 await this.manifest.load();
+                await this.assertWorkspaceBindingAllowsSync();
                 this.log('sync: manifest loaded (push-only)');
             }
 
@@ -1096,7 +1467,7 @@ export class YjsDriveProvider {
                 const remoteManifestChanged = await this.manifest.hasManifestChanged();
 
                 if (remoteManifestChanged) {
-                    throw new BackupModeRemoteChangedError();
+                    throw new BackupModeRemoteChangedError(this.providerDetails.shortName);
                 }
             }
 
@@ -1129,7 +1500,12 @@ export class YjsDriveProvider {
             // backup creation may load lazy documents. Await both so a forced
             // Sync Now never reports completion while that work is still
             // generating local deltas.
-            await this.onSyncCompleteCallback?.();
+            this.syncCompleteCallbackActive = true;
+            try {
+                await this.onSyncCompleteCallback?.();
+            } finally {
+                this.syncCompleteCallbackActive = false;
+            }
 
             // A pulled operation journal can require deterministic writes to
             // already-synced documents. Flush those callback-generated deltas
@@ -1149,19 +1525,22 @@ export class YjsDriveProvider {
             this.setState('idle');
             const remainingInMemoryDocs = this.getInMemoryPendingDocNames();
             const loadedDocSet = new Set(loadedDocs);
-            const unloadedPersistedDocs = getPersistedPendingDocNames()
+            const unloadedPersistedDocs = getPersistedPendingDocNames(this.persistenceScope)
                 .filter((docName) => !loadedDocSet.has(docName as DocName));
-            markSyncCompleted([...remainingInMemoryDocs, ...unloadedPersistedDocs]);
+            markSyncCompleted(
+                [...remainingInMemoryDocs, ...unloadedPersistedDocs],
+                this.persistenceScope,
+            );
 
         } catch (error) {
-            console.error('[YjsDriveProvider] Sync failed:', error);
-            markSyncFailed(); // Persist that sync failed (pending changes remain)
-            if (!(error instanceof AuthorizationError)
-                && !(error instanceof DriveTransportDisabledError)
+            console.error(`[${this.providerDetails.logPrefix}] Sync failed:`, error);
+            markSyncFailed(this.persistenceScope); // Persist that sync failed (pending changes remain)
+            if (!isCloudAuthorizationError(error)
+                && !isCloudTransportDisabledError(error)
                 && !(error instanceof BackupModeRemoteChangedError)) {
-                captureDriveIncident({
-                    incidentKey: 'drive.sync_failed',
-                    message: 'TaskTime Pro Drive sync failed',
+                this.captureIncident({
+                    incidentKey: 'sync_failed',
+                    message: `TaskTime Pro ${this.providerDetails.shortName} sync failed`,
                     error,
                     context: {
                         allowPull,
@@ -1170,7 +1549,7 @@ export class YjsDriveProvider {
                     },
                 });
             }
-            if (error instanceof AuthorizationError || error instanceof DriveTransportDisabledError) {
+            if (isCloudAuthorizationError(error) || isCloudTransportDisabledError(error)) {
                 this.setState('error');
                 this.setPhase('error');
                 throw error; // Auth errors should propagate
@@ -1183,6 +1562,10 @@ export class YjsDriveProvider {
             }
         } finally {
             this.isSyncing = false;
+            resolveActiveSync?.();
+            if (this.activeSyncCompletion === activeSyncCompletion) {
+                this.activeSyncCompletion = null;
+            }
             const hasPending = this.hasPendingDeltas();
             this.log('sync: finished', { pending: hasPending });
 
@@ -1233,7 +1616,7 @@ export class YjsDriveProvider {
             return true;
         }
 
-        return hasPersistedPendingChanges();
+        return hasPersistedPendingChanges(this.persistenceScope);
     }
 
     /**
@@ -1283,7 +1666,7 @@ export class YjsDriveProvider {
 
             if (!uploaded) {
                 this.forceFullStateDocs.add(docName);
-                throw new Error(`Failed to upload full Drive state for ${docName}`);
+                throw new Error(`Failed to upload full ${this.providerDetails.shortName} state for ${docName}`);
             }
 
             // Success - clear only the updates already included in the uploaded full state.
@@ -1295,7 +1678,7 @@ export class YjsDriveProvider {
 
             if (!uploaded) {
                 this.verifyFullStateDocs.add(docName);
-                throw new Error(`Failed to verify full Drive state for ${docName}`);
+                throw new Error(`Failed to verify full ${this.providerDetails.shortName} state for ${docName}`);
             }
 
             this.clearUploadedPendingPrefix(docName, uploadedBatch);
@@ -1303,7 +1686,7 @@ export class YjsDriveProvider {
             const uploaded = await this.pushDeltas(docName, doc);
 
             if (!uploaded) {
-                throw new Error(`Failed to upload Drive delta for ${docName}`);
+                throw new Error(`Failed to upload ${this.providerDetails.shortName} delta for ${docName}`);
             }
         }
 
@@ -1361,7 +1744,7 @@ export class YjsDriveProvider {
                     appliedDeltas.clear();
                     this.appliedDeltaIds.set(docName, appliedDeltas);
                 } catch (error) {
-                    console.warn(`[YjsDriveProvider] Could not pull base state for ${docName}:`, error);
+                    console.warn(`[${this.providerDetails.logPrefix}] Could not pull base state for ${docName}:`, error);
                     throw error;
                 }
             } else {
@@ -1405,7 +1788,7 @@ export class YjsDriveProvider {
                     appliedDeltas.add(delta.id);
                     this.appliedDeltaIds.set(docName, appliedDeltas);
                 } catch (error) {
-                    console.warn(`[YjsDriveProvider] Could not pull delta ${delta.id}:`, error);
+                    console.warn(`[${this.providerDetails.logPrefix}] Could not pull delta ${delta.id}:`, error);
                     throw error;
                 }
             } else {
@@ -1465,10 +1848,10 @@ export class YjsDriveProvider {
             return true;
         } catch (error) {
             // Preserve pending deltas so they retry on next sync
-            console.error(`[DriveSync] Failed to push delta for ${docName}, will retry on next sync`, error);
-            captureDriveIncident({
-                incidentKey: 'drive.delta_upload_failed',
-                message: 'TaskTime Pro could not upload a Drive delta update',
+            console.error(`[${this.providerDetails.logPrefix}] Failed to push delta for ${docName}, will retry on next sync`, error);
+            this.captureIncident({
+                incidentKey: 'delta_upload_failed',
+                message: `TaskTime Pro could not upload a ${this.providerDetails.shortName} delta update`,
                 error,
                 context: {
                     docName,
@@ -1520,7 +1903,7 @@ export class YjsDriveProvider {
                 try {
                     await this.manifest.deleteFileByName(deltaFileName);
                 } catch (deleteError) {
-                    console.warn(`[YjsDriveProvider] Could not delete compacted delta ${deltaFileName}:`, deleteError);
+                    console.warn(`[${this.providerDetails.logPrefix}] Could not delete compacted delta ${deltaFileName}:`, deleteError);
                 }
             }
 
@@ -1531,10 +1914,10 @@ export class YjsDriveProvider {
             this.updatePendingState();
             return true;
         } catch (error) {
-            console.error(`[DriveSync] Failed to push full state for ${docName}, will retry`, error);
-            captureDriveIncident({
-                incidentKey: 'drive.full_state_upload_failed',
-                message: 'TaskTime Pro could not upload a full Drive document state',
+            console.error(`[${this.providerDetails.logPrefix}] Failed to push full state for ${docName}, will retry`, error);
+            this.captureIncident({
+                incidentKey: 'full_state_upload_failed',
+                message: `TaskTime Pro could not upload a full ${this.providerDetails.shortName} document state`,
                 error,
                 context: {
                     clearDeltas,
@@ -1554,7 +1937,7 @@ export class YjsDriveProvider {
      * Compact deltas into base state
      */
     private async compactDoc(docName: DocName, doc: Y.Doc): Promise<void> {
-        console.log(`[YjsDriveProvider] Compacting ${docName}...`);
+        console.log(`[${this.providerDetails.logPrefix}] Compacting ${docName}...`);
 
         const docManifest = this.manifest.getDocManifest(docName);
         if (!docManifest) return;
@@ -1579,7 +1962,7 @@ export class YjsDriveProvider {
             try {
                 await this.manifest.deleteFileByName(deltaFileName);
             } catch (deleteError) {
-                console.warn(`[YjsDriveProvider] Could not delete compacted delta ${deltaFileName}:`, deleteError);
+                console.warn(`[${this.providerDetails.logPrefix}] Could not delete compacted delta ${deltaFileName}:`, deleteError);
             }
         }
 
@@ -1619,7 +2002,7 @@ export class YjsDriveProvider {
             this.log('doc update queued', { docName, pending: this.pendingDeltas.get(docName)?.length });
 
             // Persist that we have pending changes (survives page refresh)
-            markPendingChanges(docName);
+            markPendingChanges(docName, this.persistenceScope);
 
             this.updatePendingState();
 
@@ -1786,6 +2169,29 @@ export class YjsDriveProvider {
             return;
         }
 
+        // Navigation can mount a lazy document while a full sync is already
+        // updating the shared manifest. Keep that independent load behind the
+        // active pass so revision-sensitive providers such as Dropbox never
+        // receive overlapping manifest writes. Lazy documents loaded by the
+        // owning post-sync callback are safe to process inline; their manifest
+        // update is committed by the outer pass below.
+        if (this.isSyncing && !this.syncCompleteCallbackActive) {
+            const activeSyncCompletion = this.activeSyncCompletion;
+            if (activeSyncCompletion) {
+                await activeSyncCompletion;
+            }
+
+            if (!this.connected) return;
+            if (!this.isOnline()) {
+                this.subscribeToDoc(docName);
+                return;
+            }
+            if (this.syncMode === 'manual' && options.allowPull !== true) {
+                this.subscribeToDoc(docName);
+                return;
+            }
+        }
+
         if (!this.manifest.getManifest()) {
             if (!this.isOnline()) {
                 this.subscribeToDoc(docName);
@@ -1793,20 +2199,33 @@ export class YjsDriveProvider {
             }
 
             await this.manifest.load();
+            await this.assertWorkspaceBindingAllowsSync();
             this.log('syncAndSubscribeDoc: manifest loaded');
         }
 
         // Sync the document silently (don't show global "Fetching updates" for on-demand loads)
         const shouldPull = options.allowPull ?? (this.syncMode === 'sync');
+        // Exact recovery evidence for a document loaded after the main pass
+        // began still requires a full-state upload. Do not let the initial
+        // loaded-document snapshot strand that local work.
+        this.promotePersistedLocalChangesToFullState([docName]);
         await this.syncDoc(docName, shouldPull, true);
 
         // Subscribe to future updates
         this.subscribeToDoc(docName);
 
         // Save manifest only if it was modified
-        if (this.manifest.isDirty()) {
+        if (this.manifest.isDirty() && !this.syncCompleteCallbackActive) {
             await this.manifest.save();
         }
+
+        // Remove only this document's durable recovery marker after both its
+        // data and any manifest update succeeded. A newly queued in-memory
+        // update keeps the marker intact for the next pass.
+        if (!this.getInMemoryPendingDocNames().includes(docName)) {
+            markPendingDocsSynced([docName], this.persistenceScope);
+        }
+        this.updatePendingState();
     }
 
     /**
@@ -1816,3 +2235,6 @@ export class YjsDriveProvider {
         return this.manifest.getEntryYears();
     }
 }
+
+/** Google-compatible facade retained for existing imports and consumers. */
+export class YjsDriveProvider extends YjsCloudSyncProvider {}

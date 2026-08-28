@@ -8,7 +8,7 @@ test.describe('Offline smoke', () => {
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toBeVisible();
 
         await page.context().setOffline(true);
         await page.evaluate(() => {
@@ -16,7 +16,7 @@ test.describe('Offline smoke', () => {
         });
 
         await expect(page.getByText("You're offline")).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toHaveCount(0);
 
         await page.getByRole('button', { name: 'Create First Project' }).click();
 
@@ -34,7 +34,7 @@ test.describe('Offline smoke', () => {
         });
 
         await expect(page.getByText("You're offline")).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toBeVisible();
 
         await page.reload();
 

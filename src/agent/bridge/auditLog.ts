@@ -55,7 +55,9 @@ const DEFAULT_MAX_AUDIT_EVENTS = 500;
 export function getBridgeAuditCommandCategory(command: string): BridgeAuditCommandCategory {
     if (
         command.startsWith('export_')
+        || command === 'create_cloud_backup'
         || command === 'create_drive_backup'
+        || command === 'download_cloud_backup_json'
         || command === 'download_drive_backup_json'
     ) {
         return 'export';

@@ -6,11 +6,16 @@ import Account from './Account';
 const accountLayoutMocks = vi.hoisted(() => ({
     isMobileLayout: false,
     isDriveConnected: false,
+    isCloudConnected: false,
+    activeStorageProvider: null,
     activeSection: 'preferences',
     clearAllData: vi.fn(),
     forceSyncDrive: vi.fn(),
+    forceSyncCloud: vi.fn(),
     disconnectDrive: vi.fn(),
+    disconnectActiveCloudSession: vi.fn(),
     wipeDriveData: vi.fn(),
+    wipeCloudData: vi.fn(),
     deleteAllBackups: vi.fn(),
     signOut: vi.fn(),
     revokeAccess: vi.fn(),
@@ -43,9 +48,14 @@ vi.mock('../contexts/YjsContext', () => ({
     useYjs: () => ({
         clearAllData: accountLayoutMocks.clearAllData,
         isDriveConnected: accountLayoutMocks.isDriveConnected,
+        isCloudConnected: accountLayoutMocks.isCloudConnected,
+        activeStorageProvider: accountLayoutMocks.activeStorageProvider,
         forceSyncDrive: accountLayoutMocks.forceSyncDrive,
+        forceSyncCloud: accountLayoutMocks.forceSyncCloud,
         disconnectDrive: accountLayoutMocks.disconnectDrive,
+        disconnectActiveCloudSession: accountLayoutMocks.disconnectActiveCloudSession,
         wipeDriveData: accountLayoutMocks.wipeDriveData,
+        wipeCloudData: accountLayoutMocks.wipeCloudData,
         deleteAllBackups: accountLayoutMocks.deleteAllBackups,
     }),
 }));
@@ -113,12 +123,17 @@ const renderAccount = () => render(
 beforeEach(() => {
     accountLayoutMocks.isMobileLayout = false;
     accountLayoutMocks.isDriveConnected = false;
+    accountLayoutMocks.isCloudConnected = false;
+    accountLayoutMocks.activeStorageProvider = null;
     accountLayoutMocks.activeSection = 'preferences';
 
     accountLayoutMocks.clearAllData.mockReset();
     accountLayoutMocks.forceSyncDrive.mockReset();
+    accountLayoutMocks.forceSyncCloud.mockReset();
     accountLayoutMocks.disconnectDrive.mockReset();
+    accountLayoutMocks.disconnectActiveCloudSession.mockReset();
     accountLayoutMocks.wipeDriveData.mockReset();
+    accountLayoutMocks.wipeCloudData.mockReset();
     accountLayoutMocks.deleteAllBackups.mockReset();
     accountLayoutMocks.signOut.mockReset();
     accountLayoutMocks.revokeAccess.mockReset();
@@ -157,7 +172,8 @@ describe('Account', () => {
     });
 
     it('keeps the desktop subtitle visible', () => {
-        accountLayoutMocks.isDriveConnected = true;
+        accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
 
         renderAccount();
 
@@ -166,7 +182,8 @@ describe('Account', () => {
 
     it('hides the subtitle and keeps sign out inline on mobile', () => {
         accountLayoutMocks.isMobileLayout = true;
-        accountLayoutMocks.isDriveConnected = true;
+        accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
 
         renderAccount();
 
@@ -210,13 +227,17 @@ describe('Account', () => {
         expect(screen.getByTestId('backup-content')).toBeInTheDocument();
     });
 
-    it('revokes the Drive session before clearing data when connected', async () => {
-        accountLayoutMocks.isDriveConnected = true;
+    it.each([
+        ['google-drive', 'Google Drive'],
+        ['dropbox', 'Dropbox'],
+    ])('wipes and revokes the active %s provider before clearing account data', async (provider, providerName) => {
+        accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.activeStorageProvider = provider;
         accountLayoutMocks.activeSection = 'data';
 
-        accountLayoutMocks.wipeDriveData.mockResolvedValue(undefined);
+        accountLayoutMocks.wipeCloudData.mockResolvedValue(undefined);
         accountLayoutMocks.deleteAllBackups.mockResolvedValue(undefined);
-        accountLayoutMocks.revokeAccess.mockResolvedValue(undefined);
+        accountLayoutMocks.disconnectActiveCloudSession.mockResolvedValue(undefined);
         accountLayoutMocks.clearAllData.mockResolvedValue(undefined);
 
         renderAccount();
@@ -228,20 +249,54 @@ describe('Account', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Delete All Data' }));
 
         await waitFor(() => {
-            expect(accountLayoutMocks.wipeDriveData).toHaveBeenCalledTimes(1);
+            expect(accountLayoutMocks.wipeCloudData).toHaveBeenCalledTimes(1);
             expect(accountLayoutMocks.deleteAllBackups).toHaveBeenCalledTimes(1);
-            expect(accountLayoutMocks.revokeAccess).toHaveBeenCalledTimes(1);
+            expect(accountLayoutMocks.disconnectActiveCloudSession).toHaveBeenCalledWith({ revoke: true });
             expect(accountLayoutMocks.clearAllData).toHaveBeenCalledTimes(1);
         });
 
-        expect(accountLayoutMocks.wipeDriveData.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.deleteAllBackups.mock.invocationCallOrder[0]);
-        expect(accountLayoutMocks.deleteAllBackups.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.revokeAccess.mock.invocationCallOrder[0]);
-        expect(accountLayoutMocks.revokeAccess.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.clearAllData.mock.invocationCallOrder[0]);
+        expect(accountLayoutMocks.wipeCloudData.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.deleteAllBackups.mock.invocationCallOrder[0]);
+        expect(accountLayoutMocks.deleteAllBackups.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.disconnectActiveCloudSession.mock.invocationCallOrder[0]);
+        expect(accountLayoutMocks.disconnectActiveCloudSession.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.clearAllData.mock.invocationCallOrder[0]);
         expect(accountLayoutMocks.resetOnboardingCompleted).toHaveBeenCalledTimes(1);
         expect(accountLayoutMocks.queuePostReloadToast).toHaveBeenCalledWith({
             level: 'success',
-            message: 'All data was deleted and Google Drive was disconnected',
+            message: `All data was deleted and ${providerName} was disconnected`,
         });
         expect(accountLayoutMocks.showSuccess).not.toHaveBeenCalled();
+    });
+
+    it('syncs Dropbox before signing out and clearing local data', async () => {
+        accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
+        accountLayoutMocks.forceSyncCloud.mockResolvedValue(undefined);
+        accountLayoutMocks.disconnectActiveCloudSession.mockResolvedValue(undefined);
+        accountLayoutMocks.clearAllData.mockResolvedValue(undefined);
+
+        renderAccount();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Sync & Sign out' }));
+
+        await waitFor(() => {
+            expect(accountLayoutMocks.forceSyncCloud).toHaveBeenCalledTimes(1);
+            expect(accountLayoutMocks.disconnectActiveCloudSession).toHaveBeenCalledWith({ revoke: false });
+            expect(accountLayoutMocks.clearAllData).toHaveBeenCalledTimes(1);
+        });
+        expect(accountLayoutMocks.forceSyncCloud.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.disconnectActiveCloudSession.mock.invocationCallOrder[0]);
+        expect(accountLayoutMocks.disconnectActiveCloudSession.mock.invocationCallOrder[0]).toBeLessThan(accountLayoutMocks.clearAllData.mock.invocationCallOrder[0]);
+    });
+
+    it('does not clear local data while a selected provider needs reconnection', async () => {
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
+        accountLayoutMocks.activeSection = 'data';
+
+        renderAccount();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete All Account Data' }));
+
+        expect(screen.getByText(/reconnect Dropbox before deleting all account data/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete All Data' })).toBeDisabled();
+        expect(accountLayoutMocks.clearAllData).not.toHaveBeenCalled();
     });
 });

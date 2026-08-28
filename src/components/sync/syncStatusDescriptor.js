@@ -26,6 +26,7 @@ export const SYNC_STATUS_KIND = {
     SYNCING: 'syncing',
     PENDING: 'pending',
     SYNCED: 'synced',
+    MOVED: 'moved',
 };
 
 export function getYjsSyncStatusDescriptor({
@@ -35,6 +36,8 @@ export function getYjsSyncStatusDescriptor({
     isDriveConnected,
     isConnecting,
     hadPreviousSession,
+    providerName = 'Google Drive',
+    movedToProviderName = null,
     syncState,
     syncPhase,
     lastSyncedAt,
@@ -69,10 +72,26 @@ export function getYjsSyncStatusDescriptor({
         };
     }
 
+    if (movedToProviderName) {
+        return {
+            kind: SYNC_STATUS_KIND.MOVED,
+            text: `Moved to ${movedToProviderName}`,
+            icon: ExclamationTriangleIcon,
+            tone: 'status-warning-text-strong',
+            onClick: onCloudOptions,
+        };
+    }
+
     if (!isDriveConnected && !isConnecting) {
+        const reconnectText = providerName === 'Google Drive'
+            ? 'Reconnect to Drive'
+            : `Reconnect to ${providerName}`;
+        const connectText = providerName === 'Google Drive'
+            ? 'Connect Google Drive'
+            : `Connect ${providerName}`;
         return {
             kind: SYNC_STATUS_KIND.DISCONNECTED,
-            text: hadPreviousSession ? 'Reconnect to Drive' : 'Connect Google Drive',
+            text: hadPreviousSession ? reconnectText : connectText,
             icon: CloudIcon,
             tone: 'text-muted-foreground',
             onClick: onConnect,

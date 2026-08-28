@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "deviceId": "legacy-google-device-fixture",
+  "lastSync": "2025-11-08T14:30:00.000Z",
+  "documents": {
+    "core": {
+      "stateFile": "tasktime-yjs-core.bin",
+      "stateVersion": 3,
+      "lastCompaction": "2025-11-08T14:00:00.000Z",
+      "deltas": [
+        {
+          "id": "legacy-core-delta",
+          "timestamp": "2025-11-08T14:20:00.000Z"
+        }
+      ],
+      "stateModifiedTime": "2025-11-08T14:00:00.000Z"
+    },
+    "entries-active": {
+      "stateFile": "tasktime-yjs-entries-active.bin",
+      "stateVersion": 2,
+      "lastCompaction": "2025-11-08T14:05:00.000Z",
+      "deltas": [],
+      "stateModifiedTime": "2025-11-08T14:05:00.000Z"
+    },
+    "entries-2024": {
+      "stateFile": "tasktime-yjs-entries-2024.bin",
+      "stateVersion": 1,
+      "lastCompaction": "2025-01-02T08:00:00.000Z",
+      "deltas": [],
+      "stateModifiedTime": "2025-01-02T08:00:00.000Z"
+    }
+  }
+}

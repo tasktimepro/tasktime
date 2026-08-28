@@ -1,14 +1,18 @@
 import type { AgentCommandContext, AgentCommandHandler, AgentCommandResponse, AgentPermissionScope } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
 import {
+    createCloudBackupCommand,
     createDriveBackupCommand,
     deleteAllAccountDataCommand,
+    downloadCloudBackupJsonCommand,
     downloadDriveBackupJsonCommand,
     exportBackupJsonCommand,
     getSyncStatusCommand,
+    listCloudBackupsCommand,
     listDriveBackupsCommand,
     previewBackupImportJsonCommand,
     restoreBackupJsonCommand,
+    restoreCloudBackupCommand,
     restoreDriveBackupCommand,
     updateSyncSettingsCommand,
 } from './account';
@@ -281,11 +285,15 @@ export type AgentCommandName =
     | 'export_report_pdf'
     | 'export_accountant_pack'
     | 'export_backup_json'
+    | 'list_cloud_backups'
+    | 'create_cloud_backup'
+    | 'download_cloud_backup_json'
     | 'list_drive_backups'
     | 'create_drive_backup'
     | 'download_drive_backup_json'
     | 'preview_backup_import_json'
     | 'restore_backup_json'
+    | 'restore_cloud_backup'
     | 'restore_drive_backup'
     | 'get_sync_status'
     | 'update_sync_settings'
@@ -1060,21 +1068,39 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         scopes: ['read', 'export'],
         handler: exportBackupJsonCommand,
     },
+    list_cloud_backups: {
+        name: 'list_cloud_backups',
+        description: 'List TaskTime Pro backup snapshots in the active cloud provider without returning backup contents.',
+        scopes: ['read', 'export'],
+        handler: (context) => listCloudBackupsCommand(context),
+    },
+    create_cloud_backup: {
+        name: 'create_cloud_backup',
+        description: 'Create a TaskTime Pro backup snapshot in the active cloud provider using the existing backup manager.',
+        scopes: ['read', 'export'],
+        handler: (context) => createCloudBackupCommand(context),
+    },
+    download_cloud_backup_json: {
+        name: 'download_cloud_backup_json',
+        description: 'Download a selected backup from the active cloud provider as a browser JSON file without returning backup contents through the bridge.',
+        scopes: ['read', 'export'],
+        handler: downloadCloudBackupJsonCommand,
+    },
     list_drive_backups: {
         name: 'list_drive_backups',
-        description: 'List TaskTime Pro JSON backup snapshots currently available in Google Drive without returning backup contents.',
+        description: 'Deprecated Google Drive compatibility alias for list_cloud_backups. List TaskTime Pro backup snapshots in Google Drive without returning backup contents.',
         scopes: ['read', 'export'],
         handler: (context) => listDriveBackupsCommand(context),
     },
     create_drive_backup: {
         name: 'create_drive_backup',
-        description: 'Create a TaskTime Pro JSON backup snapshot in Google Drive using the existing backup manager.',
+        description: 'Deprecated Google Drive compatibility alias for create_cloud_backup. Create a TaskTime Pro backup snapshot in Google Drive.',
         scopes: ['read', 'export'],
         handler: (context) => createDriveBackupCommand(context),
     },
     download_drive_backup_json: {
         name: 'download_drive_backup_json',
-        description: 'Download a selected Google Drive backup as a browser JSON file without returning backup contents through the bridge.',
+        description: 'Deprecated Google Drive compatibility alias for download_cloud_backup_json. Download a selected Google Drive backup as a browser JSON file without returning backup contents through the bridge.',
         scopes: ['read', 'export'],
         handler: downloadDriveBackupJsonCommand,
     },
@@ -1091,22 +1117,29 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         requiresApproval: true,
         handler: restoreBackupJsonCommand,
     },
+    restore_cloud_backup: {
+        name: 'restore_cloud_backup',
+        description: 'Replace current local TaskTime Pro data from a selected backup in the active cloud provider after explicit confirmation and TaskTime Pro approval.',
+        scopes: ['read', 'write', 'export'],
+        requiresApproval: true,
+        handler: restoreCloudBackupCommand,
+    },
     restore_drive_backup: {
         name: 'restore_drive_backup',
-        description: 'Replace current local TaskTime Pro data from a selected Google Drive backup after explicit confirmation and TaskTime Pro approval.',
+        description: 'Deprecated Google Drive compatibility alias for restore_cloud_backup. Replace current local TaskTime Pro data from a selected Google Drive backup after explicit confirmation and TaskTime Pro approval.',
         scopes: ['read', 'write', 'export'],
         requiresApproval: true,
         handler: restoreDriveBackupCommand,
     },
     get_sync_status: {
         name: 'get_sync_status',
-        description: 'Read current Google Drive sync status, auto-sync mode, pending changes, and backup preference metadata.',
+        description: 'Read the active cloud provider, sync status, auto-sync mode, pending changes, and backup preference metadata.',
         scopes: ['read'],
         handler: (context) => getSyncStatusCommand(context),
     },
     update_sync_settings: {
         name: 'update_sync_settings',
-        description: 'Update explicit Google Drive sync and backup preferences, optionally triggering Sync Now after saving.',
+        description: 'Update explicit cloud sync and backup preferences for the active provider, optionally triggering Sync Now after saving.',
         scopes: ['read', 'write', 'export'],
         handler: updateSyncSettingsCommand,
     },

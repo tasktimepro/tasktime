@@ -1468,10 +1468,12 @@ export function sendProjectQuoteEmailCommand(
             throw new AgentCommandError('INVALID_INPUT', 'Sending a project quote email requires confirmSend: true.');
         }
 
-        const sessionId = typeof context.driveSessionId === 'string' ? context.driveSessionId.trim() : '';
+        const sessionId = typeof context.hostedServiceSessionId === 'string'
+            ? context.hostedServiceSessionId.trim()
+            : (typeof context.driveSessionId === 'string' ? context.driveSessionId.trim() : '');
 
         if (!sessionId) {
-            throw new AgentCommandError('UNAVAILABLE', 'Cloud sync must be connected before sending quote email.');
+            throw new AgentCommandError('UNAVAILABLE', 'A cloud provider must be connected before sending quote email.');
         }
 
         const quote = buildProjectQuoteDocument(context, input);
@@ -1557,10 +1559,12 @@ export function sendInvoiceEmailCommand(
             throw new AgentCommandError('INVALID_INPUT', 'Sending an invoice email requires confirmSend: true.');
         }
 
-        const sessionId = typeof context.driveSessionId === 'string' ? context.driveSessionId.trim() : '';
+        const sessionId = typeof context.hostedServiceSessionId === 'string'
+            ? context.hostedServiceSessionId.trim()
+            : (typeof context.driveSessionId === 'string' ? context.driveSessionId.trim() : '');
 
         if (!sessionId) {
-            throw new AgentCommandError('UNAVAILABLE', 'Cloud sync must be connected before sending invoice email.');
+            throw new AgentCommandError('UNAVAILABLE', 'A cloud provider must be connected before sending invoice email.');
         }
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');

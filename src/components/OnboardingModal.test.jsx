@@ -1,8 +1,14 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OnboardingModal from './OnboardingModal'
+
+const dropboxFeatureState = vi.hoisted(() => ({ enabled: false }))
+
+vi.mock('@/config/cloudProviders', () => ({
+    isDropboxCloudUiEnabled: () => dropboxFeatureState.enabled,
+}))
 
 vi.mock('./Modal', () => ({
 
@@ -19,6 +25,10 @@ vi.mock('./Modal', () => ({
 }))
 
 describe('OnboardingModal', () => {
+
+    beforeEach(() => {
+        dropboxFeatureState.enabled = false
+    })
 
     it('renders the welcome step without a top progress section', () => {
 
@@ -46,12 +56,18 @@ describe('OnboardingModal', () => {
 
         const user = userEvent.setup()
         const onComplete = vi.fn()
+        dropboxFeatureState.enabled = true
 
         render(<OnboardingModal isOpen onComplete={onComplete} />)
 
         await user.click(screen.getByRole('button', { name: 'Next' }))
 
-        expect(screen.getByText(/Sync with Google Drive/i)).toBeInTheDocument()
+        expect(screen.getByText('Sync with your cloud provider')).toBeInTheDocument()
+        expect(screen.getByText('Connect Google Drive or Dropbox to privately sync TaskTime Pro across devices.')).toBeInTheDocument()
+        expect(screen.getByText(/Account > Cloud Sync/i)).toBeInTheDocument()
+        expect(screen.getByText(/backups in your connected cloud storage/i)).toBeInTheDocument()
+        expect(screen.getByText(/Connect a cloud provider when you want backups/i)).toBeInTheDocument()
+        expect(screen.queryByText('Sync with Google Drive')).toBeNull()
         expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Skip Onboarding' })).not.toBeInTheDocument()
 
@@ -72,6 +88,18 @@ describe('OnboardingModal', () => {
         await user.click(screen.getByRole('button', { name: 'Get Started' }))
 
         expect(onComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps Drive-only onboarding copy while Dropbox entry points are disabled', async () => {
+
+        const user = userEvent.setup()
+
+        render(<OnboardingModal isOpen onComplete={vi.fn()} />)
+
+        await user.click(screen.getByRole('button', { name: 'Next' }))
+
+        expect(screen.getByText('Sync with Google Drive')).toBeInTheDocument()
+        expect(screen.queryByText(/Google Drive or Dropbox/i)).toBeNull()
     })
 
     it('lets the user skip onboarding at any time', async () => {

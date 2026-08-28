@@ -3,6 +3,7 @@ import {
     getSyncPersistenceState,
     markPendingChanges,
     clearPendingChanges,
+    markPendingDocsSynced,
     markSyncStarted,
     markSyncCompleted,
     markSyncFailed,
@@ -12,6 +13,10 @@ import {
     hasPersistedRetryNeeded,
     wasSyncInterrupted,
     clearSyncPersistence,
+    getSyncPersistenceStorageKey,
+    getDisconnectedDirtyDocNames,
+    getDisconnectedDirtyDocsStorageKey,
+    setDisconnectedDirtyDocNames,
 } from './syncPersistence';
 
 describe('syncPersistence', () => {
@@ -72,6 +77,140 @@ describe('syncPersistence', () => {
         });
     });
 
+    it('copies legacy recovery evidence into the Google provider namespace', () => {
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        }));
+
+        expect(getSyncPersistenceState({ provider: 'google-drive', generation: 0 })).toEqual({
+            ...defaultState,
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        });
+        expect(JSON.parse(localStorage.getItem(getSyncPersistenceStorageKey({
+            provider: 'google-drive',
+            generation: 0,
+        })))).toEqual({
+            ...defaultState,
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        });
+        expect(localStorage.getItem('tasktime-sync-state')).not.toBeNull();
+    });
+
+    it('keeps legacy sync recovery readable when its scoped shadow cannot be written', () => {
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        }));
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+            throw new Error('quota exceeded');
+        });
+
+        expect(getSyncPersistenceState()).toEqual({
+            ...defaultState,
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        });
+        expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('isolates recovery evidence by provider and connection generation', () => {
+        const googleScope = { provider: 'google-drive', generation: 4 };
+        const dropboxScope = { provider: 'dropbox', generation: 7 };
+
+        markPendingChanges('core', googleScope);
+        markPendingChanges('entries-active', dropboxScope);
+        markSyncFailed(dropboxScope);
+
+        expect(getSyncPersistenceState(googleScope)).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+            needsRetry: false,
+        }));
+        expect(getSyncPersistenceState(dropboxScope)).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            pendingDocNames: ['entries-active'],
+            needsRetry: true,
+        }));
+
+        clearSyncPersistence(dropboxScope);
+
+        expect(getSyncPersistenceState(dropboxScope)).toEqual(defaultState);
+        expect(getSyncPersistenceState(googleScope)).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        }));
+    });
+
+    it('never treats legacy Google evidence as Dropbox state', () => {
+        localStorage.setItem('tasktime-sync-state', JSON.stringify({
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+        }));
+
+        expect(getSyncPersistenceState({ provider: 'dropbox', generation: 0 })).toEqual(defaultState);
+        expect(localStorage.getItem(getSyncPersistenceStorageKey({
+            provider: 'dropbox',
+            generation: 0,
+        }))).toBeNull();
+    });
+
+    it('copies legacy disconnected dirty docs into generation-zero Google state', () => {
+        localStorage.setItem(
+            'tasktime-disconnected-dirty-docs',
+            JSON.stringify(['core', 'core', 'entries-active']),
+        );
+
+        expect(getDisconnectedDirtyDocNames()).toEqual(['core', 'entries-active']);
+        expect(JSON.parse(localStorage.getItem(getDisconnectedDirtyDocsStorageKey({
+            provider: 'google-drive',
+            generation: 0,
+        })))).toEqual(['core', 'entries-active']);
+        expect(localStorage.getItem('tasktime-disconnected-dirty-docs')).not.toBeNull();
+    });
+
+    it('keeps legacy disconnected dirty docs readable when its scoped shadow cannot be written', () => {
+        localStorage.setItem(
+            'tasktime-disconnected-dirty-docs',
+            JSON.stringify(['core']),
+        );
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+            throw new Error('quota exceeded');
+        });
+
+        expect(getDisconnectedDirtyDocNames()).toEqual(['core']);
+        expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('isolates disconnected dirty docs by provider and generation', () => {
+        const googleScope = { provider: 'google-drive', generation: 4 };
+        const dropboxScope = { provider: 'dropbox', generation: 7 };
+
+        setDisconnectedDirtyDocNames(['core'], googleScope);
+        setDisconnectedDirtyDocNames(['entries-active'], dropboxScope);
+
+        expect(getDisconnectedDirtyDocNames(googleScope)).toEqual(['core']);
+        expect(getDisconnectedDirtyDocNames(dropboxScope)).toEqual(['entries-active']);
+
+        setDisconnectedDirtyDocNames([], dropboxScope);
+
+        expect(getDisconnectedDirtyDocNames(dropboxScope)).toEqual([]);
+        expect(getDisconnectedDirtyDocNames(googleScope)).toEqual(['core']);
+    });
+
+    it('never treats legacy Google disconnected dirty docs as Dropbox state', () => {
+        localStorage.setItem(
+            'tasktime-disconnected-dirty-docs',
+            JSON.stringify(['core']),
+        );
+
+        expect(getDisconnectedDirtyDocNames({ provider: 'dropbox', generation: 0 })).toEqual([]);
+    });
+
     it('marks and clears pending changes', () => {
         markPendingChanges('core');
         markPendingChanges('entries-active');
@@ -82,6 +221,39 @@ describe('syncPersistence', () => {
         clearPendingChanges();
         expect(getSyncPersistenceState().hasPendingChanges).toBe(false);
         expect(getPersistedPendingDocNames()).toEqual([]);
+    });
+
+    it('clears only successfully synced document identities without ending an active pass', () => {
+        markPendingChanges('core');
+        markPendingChanges('tasks-archived');
+        markSyncStarted();
+
+        markPendingDocsSynced(['tasks-archived']);
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            pendingDocNames: ['core'],
+            syncInterrupted: true,
+        }));
+
+        markPendingDocsSynced(['core']);
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: false,
+            pendingDocNames: [],
+            syncInterrupted: true,
+        }));
+    });
+
+    it('preserves boolean-only legacy recovery evidence when document identity is unknown', () => {
+        markPendingChanges();
+
+        markPendingDocsSynced(['core']);
+
+        expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
+            hasPendingChanges: true,
+            pendingDocNames: [],
+        }));
     });
 
     it('marks sync started and completed', () => {

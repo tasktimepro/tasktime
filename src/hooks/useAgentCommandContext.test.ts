@@ -6,8 +6,10 @@ const yjsMocks = vi.hoisted(() => ({
     store: { marker: 'store' },
     isReady: true,
     driveSessionId: 'drive-session-1',
+    hostedServiceSessionId: 'hosted-session-1',
     clearAllData: vi.fn(async () => undefined),
     restoreBackupData: vi.fn(async () => undefined),
+    disconnectActiveCloudSession: vi.fn(async () => undefined),
 }));
 
 const googleAuthMocks = vi.hoisted(() => ({
@@ -26,8 +28,10 @@ describe('useAgentCommandContext', () => {
     beforeEach(() => {
         yjsMocks.isReady = true;
         yjsMocks.driveSessionId = 'drive-session-1';
+        yjsMocks.hostedServiceSessionId = 'hosted-session-1';
         yjsMocks.clearAllData.mockClear();
         yjsMocks.restoreBackupData.mockClear();
+        yjsMocks.disconnectActiveCloudSession.mockClear();
         googleAuthMocks.revokeAccess.mockClear();
         window.history.pushState({}, '', '/account?section=agent');
     });
@@ -41,8 +45,10 @@ describe('useAgentCommandContext', () => {
             isReady: true,
             clearAllData: yjsMocks.clearAllData,
             restoreBackupData: yjsMocks.restoreBackupData,
+            disconnectActiveCloudSession: yjsMocks.disconnectActiveCloudSession,
             revokeDriveAccess: googleAuthMocks.revokeAccess,
             driveSessionId: 'drive-session-1',
+            hostedServiceSessionId: 'hosted-session-1',
         }));
         expect(firstIdempotency).toBeInstanceOf(Map);
 

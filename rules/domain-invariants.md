@@ -4,17 +4,42 @@ These invariants summarize critical production contracts. They supplement the de
 
 ## Persistence and sync
 
-- Existing IndexedDB, Yjs documents, backups, and Google Drive state are live customer data.
+- Existing IndexedDB, Yjs documents, backups, Google Drive state, and Dropbox state are live customer data.
 - Persisted schema changes are additive or migrated; readers tolerate supported historical shapes.
 - Old remote or backup state can return after a local upgrade, so compatibility belongs in validation, import, migration, and sync paths.
 - Manual, backup, and sync modes retain the trigger behavior documented in `AGENTS.md`.
-- Normal unchanged sync must remain Worker-efficient. A foreground event inside the cooldown makes zero Worker/Drive requests. Once the cooldown expires, a clean unchanged check makes at most one lightweight manifest-metadata request, advances the local successful-check timestamp, and performs no document download, upload, manifest save, backup listing, or full app-data-folder listing. Any additional normal-path request requires a correctness or measured reliability justification plus request-count regression coverage.
-- Persist unsynced local identity per document. An interrupted pull or consistency retry is not evidence that every loaded document changed, and recovery must never promote unrelated documents to full-state upload. Boolean-only legacy recovery markers remain conservatively readable.
+- Normal unchanged sync must remain request-efficient. A foreground event inside the cooldown makes zero Worker/provider requests. Once the cooldown expires, a clean unchanged check makes at most one lightweight manifest-metadata request, advances the local successful-check timestamp, and performs no document download, upload, manifest save, backup listing, or full provider-namespace listing. Any additional normal-path request requires a correctness or measured reliability justification plus request-count regression coverage.
+- Tab-visible and browser-online signals within one second are one foreground wake window: they perform one eligibility check and at most one sync pass. A later online event remains eligible to recover from a genuine network transition or failed pass.
+- Persist unsynced local identity per document and scope operational recovery by provider plus connection generation. An interrupted pull or consistency retry is not evidence that every loaded document changed, and recovery must never promote unrelated documents to full-state upload. Boolean-only and disconnected-doc legacy records remain conservatively readable as generation-zero Google only; another provider/generation must neither consume nor clear them.
+- A forced verification pass performs at most one required full-state write per document. When exact dirty-document recovery already requires that write, verification reuses it rather than issuing a duplicate provider request.
+- In the provider-neutral implementation, the lifecycle-selected cloud session is
+  also the hosted-service authentication session. An inactive provider must not
+  remain required for email, metrics, agent email, or future Pro access.
+- Provider transfer links the two authenticated provider subjects only after
+  target readback/source recheck and before publishing the source move marker.
+  Identity-link failure leaves the source active; success preserves one opaque
+  hosted principal and locally disconnects the former provider without revoking
+  its grant or deleting retained source files.
+- A verified moved-source marker is a terminal reconnect fence, not a generic
+  provider failure. The recorded destination is the primary recovery path and
+  must not delete or mutate the retained source.
+- Reusing a moved source is an explicit destructive replacement, never a merge.
+  It verifies the expected target, deletes and verifies source backups and sync
+  objects with the marker last, leaves the target provider untouched, and seeds
+  the complete local IndexedDB workspace with one push-only full-state pass.
+  Marker-free resume is allowed only after the source sync namespace is empty;
+  durable dirty-document evidence owns recovery until the seed succeeds.
 - Page hide or exit while a sync is active must not enqueue a duplicate forced pass. The active pass owns updates produced during that pass, while durable per-document recovery owns genuinely interrupted local work.
 - Genuine pending local work blocked by an active sync or occupied cross-tab lock must retry after the current pass can release the lock, using bounded backoff. Clean checks and failed network/conflict passes must not create background retry loops.
+- An externally requested lazy-document load must wait for an active provider sync to finish before it performs provider or manifest work. A lazy load initiated by that sync's own completion callback joins the owning pass and defers its manifest commit to the owner, so two revision-sensitive manifest writes cannot overlap or deadlock.
 - A sync cannot report success until required cross-document reconciliation has completed and any deltas it creates have been flushed; failures retain durable retry evidence.
 - Reconciliation and persisted-data normalization are idempotent: once records are settled, another pass emits no Yjs changes and therefore schedules no upload.
 - Destructive resets, claims, archive moves, and conflict recovery must not auto-propagate in ways that undo valid work on another device.
+- Connected-provider cleanup is provider-neutral and strictly ordered: verified
+  sync-file deletion, verified backup deletion, confirmed grant revocation, then
+  browser disconnect. Account-wide deletion may clear local data only after that
+  sequence succeeds; a selected but unreachable provider blocks local-only
+  deletion until reconnection.
 - Every persisted user-data collection must be represented in complete backup/export paths and in equivalent UI/agent reads where that capability is advertised.
 
 ## Time and tasks
@@ -43,6 +68,6 @@ These invariants summarize critical production contracts. They supplement the de
 - The bridge stays loopback-only and requires explicit pairing, scopes, approvals, and revocation.
 - Pairing codes remain single-use and short-lived. App-session bearer tokens remain bounded and may exist only in active memory, current-tab `sessionStorage`, and the live bridge session map; they must never enter logs, status files, IndexedDB, Yjs, Drive, backups, exports, docs, diagnostics, or recovery payloads.
 - Same-browser agent reconnect uses proof of possession, never stable identity or a persisted bearer token. Its private key is non-exportable, origin-local, sign-only, isolated from product/synced storage, and paired with an in-memory bridge authorization that is scope-, origin-, instance-, expiry-, and revocation-bound.
-- Private Worker source, deployment state, provider identifiers, secrets, and internal operational runbooks remain outside the public repository.
+- Private Worker source, deployment state, raw provider identifiers, secrets, and internal operational runbooks remain outside the public repository.
 
 Changes touching these areas require focused regression coverage and the relevant broader release checks.

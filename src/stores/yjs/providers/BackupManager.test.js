@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BackupManager } from './BackupManager.ts'
+import { BackupManager, CloudBackupManager } from './BackupManager.ts'
 
 function createManifest(backups) {
     return {
-        listAppDataFiles: vi.fn()
+        listBackupFiles: vi.fn()
             .mockResolvedValueOnce(backups)
             .mockResolvedValueOnce([]),
         deleteFileById: vi.fn(async () => undefined),
@@ -11,6 +11,25 @@ function createManifest(backups) {
 }
 
 describe('BackupManager', () => {
+    it('keeps provider wording out of the reusable backup core', async () => {
+        const backup = {
+            id: 'backup-1',
+            name: 'tasktime-backup-2026-07-10-0900.json',
+            modifiedTime: '2026-07-10T09:00:00.000Z',
+        }
+        const manifest = {
+            listBackupFiles: vi.fn()
+                .mockResolvedValueOnce([backup])
+                .mockResolvedValueOnce([backup]),
+            deleteFileById: vi.fn(async () => undefined),
+        }
+        const manager = new CloudBackupManager(manifest, {}, { providerLabel: 'Dropbox' })
+
+        await expect(manager.deleteAllBackups()).rejects.toThrow(
+            'Could not delete 1 Dropbox backup'
+        )
+    })
+
     it('refreshes every lazy Drive document before creating a backup', async () => {
         const manifest = {
             createFile: vi.fn(async () => 'backup-file-id'),
@@ -28,6 +47,27 @@ describe('BackupManager', () => {
         })
     })
 
+    it('uses collision-safe Dropbox names while retaining legacy backup readers', async () => {
+        const manifest = {
+            createFile: vi.fn(async () => 'dropbox-backup-id'),
+        }
+        const store = {
+            exportBackupData: vi.fn(async () => ({ version: '1.4', projects: [] })),
+        }
+        const manager = new CloudBackupManager(manifest, store, {
+            providerLabel: 'Dropbox',
+            collisionSafeFileNames: true,
+        })
+
+        await manager.createBackup()
+
+        expect(manifest.createFile).toHaveBeenCalledWith(
+            expect.stringMatching(/^tasktime-backup-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-[a-f0-9]{8}\.json$/),
+            expect.any(Blob),
+        )
+        expect(CloudBackupManager.isBackupFile('tasktime-backup-2025-01-02-0900.json')).toBe(true)
+    })
+
     it('deletes every Drive backup and verifies that none remain', async () => {
         const backups = [
             { id: 'backup-1', name: 'tasktime-backup-2026-07-10-0900.json', modifiedTime: '2026-07-10T09:00:00.000Z' },
@@ -39,7 +79,7 @@ describe('BackupManager', () => {
         await expect(manager.deleteAllBackups()).resolves.toBeUndefined()
 
         expect(manifest.deleteFileById).toHaveBeenCalledTimes(2)
-        expect(manifest.listAppDataFiles).toHaveBeenCalledTimes(2)
+        expect(manifest.listBackupFiles).toHaveBeenCalledTimes(2)
     })
 
     it('fails the account deletion flow when any Drive backup deletion fails', async () => {
@@ -48,7 +88,7 @@ describe('BackupManager', () => {
             { id: 'backup-2', name: 'tasktime-backup-2026-07-09-0900.json', modifiedTime: '2026-07-09T09:00:00.000Z' },
         ]
         const manifest = {
-            listAppDataFiles: vi.fn()
+            listBackupFiles: vi.fn()
                 .mockResolvedValueOnce(backups)
                 .mockResolvedValueOnce([backups[1]]),
             deleteFileById: vi.fn()
@@ -71,7 +111,7 @@ describe('BackupManager', () => {
             modifiedTime: '2026-07-10T09:00:00.000Z',
         }
         const manifest = {
-            listAppDataFiles: vi.fn()
+            listBackupFiles: vi.fn()
                 .mockResolvedValueOnce([backup])
                 .mockResolvedValueOnce([backup]),
             deleteFileById: vi.fn(async () => undefined),

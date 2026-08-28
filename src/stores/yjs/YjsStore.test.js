@@ -2,6 +2,9 @@ import * as Y from 'yjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const STORAGE_KEY = 'tasktime-disconnected-dirty-docs'
+const SCOPED_STORAGE_KEY = 'tasktime-disconnected-dirty-docs-v2:google-drive:0'
+const NEXT_GOOGLE_SCOPED_STORAGE_KEY = 'tasktime-disconnected-dirty-docs-v2:google-drive:1'
+const DROPBOX_SCOPED_STORAGE_KEY = 'tasktime-disconnected-dirty-docs-v2:dropbox:3'
 const SYNC_STATE_STORAGE_KEY = 'tasktime-sync-state'
 
 const { docs, providerInstances, storage, providerMockState, deletedDatabaseCalls, restoreJournalState } = vi.hoisted(() => ({
@@ -12,6 +15,7 @@ const { docs, providerInstances, storage, providerMockState, deletedDatabaseCall
     providerMockState: {
         hasLocalChangesToPush: false,
         pendingDocNames: [],
+        isConnected: true,
     },
     restoreJournalState: {
         record: null,
@@ -71,8 +75,8 @@ vi.mock('./YjsDocManager', async () => {
     }
 })
 
-vi.mock('./providers/GoogleDriveProvider', () => ({
-    YjsDriveProvider: class {
+vi.mock('./providers/GoogleDriveProvider', () => {
+    class ProviderMock {
         constructor(...args) {
             this.constructorArgs = args
             this.markDocsForFullStateUpload = vi.fn()
@@ -81,23 +85,42 @@ vi.mock('./providers/GoogleDriveProvider', () => ({
             this.onSyncComplete = vi.fn()
             this.connect = vi.fn(async () => {})
             this.disconnect = vi.fn()
-            this.isConnected = vi.fn(() => true)
+            this.isConnected = vi.fn(() => providerMockState.isConnected)
             this.getState = vi.fn(() => 'idle')
             this.hasLocalChangesToPush = vi.fn(() => providerMockState.hasLocalChangesToPush)
             this.getPendingDocNames = vi.fn(() => providerMockState.pendingDocNames)
             this.sync = vi.fn(async () => {})
             this.syncAndSubscribeDoc = vi.fn(async () => {})
+            this.wipeCloudData = vi.fn(async () => {})
+            this.replaceMovedCloudWorkspace = vi.fn(async (_expectedTarget, deleteBackups) => {
+                await deleteBackups()
+            })
             this.getEntryYears = vi.fn(() => [])
             providerInstances.push(this)
         }
     }
-}))
 
-vi.mock('./providers/BackupManager', () => ({
-    BackupManager: class {
-        async maybeCreateBackup() {}
+    return {
+        YjsCloudSyncProvider: ProviderMock,
+        YjsDriveProvider: ProviderMock,
+        withCloudSyncExclusiveLock: vi.fn(async (operation) => ({
+            acquired: true,
+            value: await operation({}),
+        })),
     }
-}))
+})
+
+vi.mock('./providers/BackupManager', () => {
+    class BackupManagerMock {
+        async maybeCreateBackup() {}
+        deleteAllBackups = vi.fn(async () => {})
+    }
+
+    return {
+        BackupManager: BackupManagerMock,
+        CloudBackupManager: BackupManagerMock,
+    }
+})
 
 import { YjsStore } from './YjsStore.ts'
 
@@ -148,7 +171,25 @@ describe('YjsStore reconnect sync tracking', () => {
         deletedDatabaseCalls.length = 0
         providerMockState.hasLocalChangesToPush = false
         providerMockState.pendingDocNames = []
+        providerMockState.isConnected = true
         restoreJournalState.record = null
+    })
+
+    it('copies legacy disconnected dirty documents into the Google provider namespace', () => {
+        storage.set(STORAGE_KEY, JSON.stringify(['core', 'entries-2024']))
+
+        const store = new YjsStore()
+
+        expect(JSON.parse(localStorage.getItem(SCOPED_STORAGE_KEY))).toEqual([
+            'core',
+            'entries-2024',
+        ])
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual([
+            'core',
+            'entries-2024',
+        ])
+
+        store.destroy()
     })
 
     it.each(BILLING_OPERATION_PHASES)(
@@ -1164,6 +1205,7 @@ describe('YjsStore reconnect sync tracking', () => {
         docs.get('core').getMap('projects').set('project-1', project)
 
         expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
+        expect(JSON.parse(localStorage.getItem(SCOPED_STORAGE_KEY))).toEqual(['core'])
 
         await store.connectDrive('worker-placeholder', 'session-1')
 
@@ -1171,6 +1213,26 @@ describe('YjsStore reconnect sync tracking', () => {
 
         expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(['core'])
         expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+        expect(localStorage.getItem(SCOPED_STORAGE_KEY)).toBeUndefined()
+
+        store.destroy()
+    })
+
+    it('never clears dormant Dropbox dirty evidence after Google reconnect succeeds', async () => {
+        storage.set(DROPBOX_SCOPED_STORAGE_KEY, JSON.stringify(['entries-active']))
+        const store = new YjsStore()
+        await store.initialize()
+        store.setDriveSyncPreferences(true, 'sync')
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Google-only change',
+        }))
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        expect(localStorage.getItem(DROPBOX_SCOPED_STORAGE_KEY)).toBe(
+            JSON.stringify(['entries-active']),
+        )
 
         store.destroy()
     })
@@ -1188,6 +1250,211 @@ describe('YjsStore reconnect sync tracking', () => {
         await store.connectDrive(connection)
 
         expect(providerInstances[0].constructorArgs[1]).toBe(connection)
+        store.destroy()
+    })
+
+    it('connects the shared core to a generation-fenced Dropbox manifest', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        const manifest = { getProviderId: () => 'dropbox' }
+        const connection = { provider: 'dropbox', generation: 3, manifest }
+
+        await store.connectCloud(connection)
+
+        expect(providerInstances[0].constructorArgs[1]).toBe(connection)
+        expect(store.getActiveCloudProviderId()).toBe('dropbox')
+        expect(store.isCloudConnected()).toBe(true)
+        expect(store.isDriveConnected()).toBe(false)
+
+        await store.forceCloudSync({ allowPull: true })
+        expect(providerInstances[0].sync).toHaveBeenCalledWith(true, {
+            allowPull: true,
+            forceFullState: true,
+        })
+
+        store.destroy()
+    })
+
+    it('keeps Drive-named compatibility methods from touching active Dropbox', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectCloud({
+            provider: 'dropbox',
+            generation: 3,
+            manifest: { getProviderId: () => 'dropbox' },
+        })
+        const provider = providerInstances[0]
+
+        await store.forceDriveSync({ allowPull: true })
+        store.updateDriveAccessToken('google-token-fixture')
+        store.updateDriveSessionId('google-session-fixture')
+        store.disconnectDrive()
+
+        expect(provider.sync).not.toHaveBeenCalled()
+        expect(provider.disconnect).not.toHaveBeenCalled()
+        expect(store.getActiveCloudProviderId()).toBe('dropbox')
+        await expect(store.wipeDriveData()).rejects.toThrow('Drive not connected')
+        await store.wipeCloudData()
+        expect(provider.wipeCloudData).toHaveBeenCalledOnce()
+
+        store.disconnectCloud('dropbox')
+        expect(provider.disconnect).toHaveBeenCalledOnce()
+        expect(store.getActiveCloudProviderId()).toBeNull()
+        store.destroy()
+    })
+
+    it('clears a verified moved source and seeds one complete push-only workspace', async () => {
+        providerMockState.isConnected = false
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive({
+            transport: 'direct',
+            sessionId: 'moved-google-session',
+            generation: 0,
+            tokenProvider: { getToken: vi.fn(), clearToken: vi.fn() },
+        })
+        const provider = providerInstances[0]
+
+        await store.replaceMovedCloudWorkspace('dropbox')
+
+        expect(provider.markDocsForFullStateUpload).toHaveBeenCalledWith(
+            expect.arrayContaining(['core', 'entries-active']),
+        )
+        expect(provider.replaceMovedCloudWorkspace).toHaveBeenCalledWith(
+            'dropbox',
+            expect.any(Function),
+        )
+        expect(provider.connect).toHaveBeenLastCalledWith(
+            'manual',
+            { bootstrapPullIfPristine: false },
+            expect.any(Object),
+        )
+        expect(provider.sync).toHaveBeenCalledWith(true, {
+            allowPull: false,
+            forceFullState: true,
+        }, expect.any(Object))
+        expect(provider.setSyncMode).toHaveBeenLastCalledWith('manual')
+
+        store.destroy()
+    })
+
+    it('uses the same moved-source replacement path when Dropbox is the source', async () => {
+        providerMockState.isConnected = false
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectCloud({
+            provider: 'dropbox',
+            generation: 3,
+            manifest: {},
+        })
+        const provider = providerInstances[0]
+
+        await store.replaceMovedCloudWorkspace('google-drive')
+
+        expect(store.getActiveCloudProviderId()).toBe('dropbox')
+        expect(provider.replaceMovedCloudWorkspace).toHaveBeenCalledWith(
+            'google-drive',
+            expect.any(Function),
+        )
+        expect(provider.connect).toHaveBeenLastCalledWith(
+            'manual',
+            { bootstrapPullIfPristine: false },
+            expect.any(Object),
+        )
+        expect(provider.sync).toHaveBeenCalledWith(true, {
+            allowPull: false,
+            forceFullState: true,
+        }, expect.any(Object))
+
+        store.destroy()
+    })
+
+    it('attributes disconnected edits only to the selected provider generation', async () => {
+        const store = new YjsStore()
+        store.setActiveCloudStorageScope({ provider: 'dropbox', generation: 3 })
+        await store.initialize()
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Dropbox-scoped local change',
+        }))
+
+        expect(localStorage.getItem(DROPBOX_SCOPED_STORAGE_KEY)).toBe(JSON.stringify(['core']))
+        expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+        expect(localStorage.getItem(SCOPED_STORAGE_KEY)).toBeUndefined()
+        store.destroy()
+    })
+
+    it('moves unsynced local docs into a replacement generation of the same provider', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Unsynced Google change',
+        }))
+
+        store.setActiveCloudStorageScope({ provider: 'google-drive', generation: 1 })
+
+        expect(localStorage.getItem(STORAGE_KEY)).toBeUndefined()
+        expect(localStorage.getItem(SCOPED_STORAGE_KEY)).toBeUndefined()
+        expect(JSON.parse(localStorage.getItem(NEXT_GOOGLE_SCOPED_STORAGE_KEY))).toEqual(['core'])
+        store.destroy()
+    })
+
+    it('keeps the old generation dirty marker when persisting the replacement marker fails', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+
+        docs.get('core').getMap('projects').set('project-1', objectToYMap({
+            id: 'project-1',
+            title: 'Unsynced Google change',
+        }))
+        localStorage.setItem.mockImplementation((key, value) => {
+            if (key === NEXT_GOOGLE_SCOPED_STORAGE_KEY) {
+                throw new Error('storage full')
+            }
+            storage.set(key, String(value))
+        })
+
+        store.setActiveCloudStorageScope({ provider: 'google-drive', generation: 1 })
+
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(['core'])
+        expect(JSON.parse(localStorage.getItem(SCOPED_STORAGE_KEY))).toEqual(['core'])
+        expect(localStorage.getItem(NEXT_GOOGLE_SCOPED_STORAGE_KEY)).toBeUndefined()
+        store.destroy()
+    })
+
+    it('captures, compares, and merges complete CRDT transfer snapshots', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        store.projects.set('local-project', objectToYMap({
+            id: 'local-project',
+            title: 'Local project',
+        }))
+
+        const snapshot = await store.createCloudTransferSnapshot()
+        expect(snapshot.documents.map(({ docName }) => docName)).toEqual(expect.arrayContaining([
+            'core',
+            'entries-active',
+        ]))
+        expect(store.isCloudTransferSnapshotCurrent(snapshot)).toBe(true)
+
+        const remote = new Y.Doc()
+        remote.getMap('projects').set('remote-project', objectToYMap({
+            id: 'remote-project',
+            title: 'Same-lineage target project',
+        }))
+        await store.mergeCloudTransferUpdates([{
+            docName: 'core',
+            update: Y.encodeStateAsUpdate(remote),
+        }])
+
+        expect(readStored(store.projects, 'remote-project')).toMatchObject({
+            title: 'Same-lineage target project',
+        })
+        expect(store.isCloudTransferSnapshotCurrent(snapshot)).toBe(false)
+        remote.destroy()
         store.destroy()
     })
 
@@ -2213,6 +2480,34 @@ describe('YjsStore timer reconciliation', () => {
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('invoices-archived', { allowPull: true })
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('expenses-archived', { allowPull: true })
         expect(provider.syncAndSubscribeDoc).toHaveBeenCalledWith('entries-2024', { allowPull: true })
+
+        store.destroy()
+    })
+
+    it('serializes lazy cloud refreshes while building a complete backup', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        await store.connectDrive('worker-placeholder', 'session-1')
+
+        const provider = providerInstances[0]
+        provider.getEntryYears.mockReturnValue([2024])
+
+        let activeRefreshes = 0
+        let maximumConcurrentRefreshes = 0
+        provider.syncAndSubscribeDoc.mockImplementation(async () => {
+            activeRefreshes += 1
+            maximumConcurrentRefreshes = Math.max(maximumConcurrentRefreshes, activeRefreshes)
+            await new Promise((resolve) => setTimeout(resolve, 0))
+            activeRefreshes -= 1
+        })
+
+        await store.exportBackupData({
+            backupType: 'automatic',
+            refreshLazyDocsFromCloud: true,
+        })
+
+        expect(provider.syncAndSubscribeDoc).toHaveBeenCalledTimes(4)
+        expect(maximumConcurrentRefreshes).toBe(1)
 
         store.destroy()
     })

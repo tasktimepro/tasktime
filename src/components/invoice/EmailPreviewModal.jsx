@@ -54,7 +54,7 @@ const EmailPreviewModal = ({
 
     const NO_TEMPLATE_ID = '__no_email_template__';
 
-    const { driveSessionId } = useYjs();
+    const { hostedServiceSessionId } = useYjs();
     const { businessBrandAssets } = useBusinessBrandAssets();
     const { updateInvoice } = useInvoices();
     const { getByType, getDefaultForType } = useEmailTemplates();
@@ -198,8 +198,8 @@ const EmailPreviewModal = ({
 
     const handleSend = useCallback(async () => {
 
-        if (!driveSessionId) {
-            setError(`Connect cloud sync to enable ${documentLabel} emailing.`);
+        if (!hostedServiceSessionId) {
+            setError(`Connect a cloud provider to enable ${documentLabel} emailing.`);
             return;
         }
 
@@ -241,7 +241,7 @@ const EmailPreviewModal = ({
 
             failureStage = 'send';
             const result = await sendInvoiceEmail({
-                sessionId: driveSessionId,
+                sessionId: hostedServiceSessionId,
                 invoiceId: documentId,
                 invoiceNumber: invoice.invoiceNumber,
                 to,
@@ -329,7 +329,7 @@ const EmailPreviewModal = ({
         } finally {
             setSending(false);
         }
-    }, [attachmentTitle, body, businessBrandAssets, clients, documentLabel, driveSessionId, forwardToSelf, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, senderForwardAddress, showSuccess, subject, to, updateInvoice]);
+    }, [attachmentTitle, body, businessBrandAssets, clients, documentLabel, hostedServiceSessionId, forwardToSelf, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, senderForwardAddress, showSuccess, subject, to, updateInvoice]);
 
     const handleClose = useCallback(() => {
         setError(null);
@@ -386,9 +386,9 @@ const EmailPreviewModal = ({
             >
                 <div className="space-y-4">
                 {/* Precondition warnings */}
-                {!driveSessionId && (
-                    <Notice variant="warning" title="Cloud sync required">
-                        Connect cloud sync in Account settings to enable {documentLabel} emailing.
+                {!hostedServiceSessionId && (
+                    <Notice variant="warning" title="Cloud provider required">
+                        Connect Google Drive or Dropbox in Account settings to enable {documentLabel} emailing.
                     </Notice>
                 )}
 

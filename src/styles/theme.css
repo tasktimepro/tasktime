@@ -61,6 +61,36 @@
   }
 }
 
+@keyframes transfer-progress-activity {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(350%);
+  }
+}
+
+.transfer-progress-activity {
+  position: absolute;
+  inset-block: 0;
+  left: -40%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--primary-foreground) / 0.3),
+    transparent
+  );
+  animation: transfer-progress-activity 1.25s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transfer-progress-activity {
+    left: 30%;
+    animation: none;
+  }
+}
+
 /* App-specific colors for scrollbar and legacy components */
 :root {
   --app-primary: #2563eb;

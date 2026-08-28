@@ -1,16 +1,29 @@
 # TaskTime Pro Sync Source Of Truth
 
-This file is the source of truth for TaskTime Pro cloud sync behavior. Read it before changing Yjs storage, Google Drive sync, import/export, backups, account deletion, or sync UI.
+This file is the source of truth for TaskTime Pro cloud sync behavior. Read it before changing Yjs storage, the shared cloud-sync core, Google Drive sync, import/export, backups, account deletion, or sync UI.
 
 Handled production incident captures are documented in the private operations runbook. Update that runbook when adding or removing sync/auth/persistence incidents.
 
-TaskTime Pro is in production. Existing IndexedDB and Google Drive appDataFolder state is live customer data. Changes must be backwards compatible and must not require users to clear local storage or Drive files.
+TaskTime Pro is in production. Existing IndexedDB, Google Drive appDataFolder,
+and Dropbox App Folder state is live customer data. Changes must be backwards
+compatible and must not require users to clear local or provider data.
 
 ## Architecture
 
 - Storage is local-first Yjs CRDT data persisted in IndexedDB.
+- `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own shared behavior. `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google-only compatibility facades. Dropbox entry points are enabled, with an explicit false emergency UI opt-out; compatible Worker controls remain the fail-closed runtime boundary, and provider transfers remain disabled pending the final canary.
 - Drive sync stores Yjs base-state files, delta files, and one manifest in Google Drive appDataFolder.
-- The Worker retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, and revocation. Routine Google Drive requests go directly from the browser to Google.
+- The Worker retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, and revocation. Routine Google Drive and Dropbox requests go directly from the browser to the selected provider.
+- In the provider-neutral implementation, the lifecycle-selected
+  Google Drive or Dropbox session also authenticates hosted email, privacy-safe
+  synced metrics, agent email, and future Pro state. The private Worker derives
+  provider-separated hashes and resolves one opaque hosted principal; Dropbox
+  does not require a parallel Google session.
+- Verified provider transfer links hosted identity after target readback/source
+  recheck and before the source move marker. Link failure keeps the source
+  active. Successful activation locally disconnects the former session while
+  retaining its provider files; later source-provider cleanup remains an
+  explicit action outside transfer.
 - JSON backups are separate snapshot files. They are not Yjs sync files and must not be deleted by ordinary sync cleanup.
 - Import/export uses the Yjs store, not separate localStorage state.
 
@@ -56,9 +69,10 @@ Sync must stay fast and Worker-friendly.
 - If the manifest is unchanged, do not download document files.
 - An unchanged check must not upload documents, save the manifest, list backups, or list the full appDataFolder.
 - Do not call full appDataFolder listing on unchanged/no-op syncs. A manifest write may list files once to merge concurrent writer evidence safely.
-- `listAppDataFiles()` is for connect/load, backup listing, wipe, and stale-file recovery.
+- Shared sync paths list only the sync namespace; backup listing lists only the backup namespace. The Google compatibility adapter keeps its existing one-request mixed `appDataFolder` listing behavior.
 - Keep periodic checks visible-only. Sync mode checks every 5 minutes; hidden tabs, Manual mode, and Backup mode do not poll.
 - Keep foreground sync cooldowns so focus/online events do not spam the Worker.
+- Coalesce tab-visible and browser-online signals that arrive within one second into one eligibility check and at most one sync pass. Do not suppress a genuinely later online recovery event.
 - Use Web Locks to avoid duplicate cross-tab sync.
 - Retry genuine pending local work with bounded backoff when an active sync or Web Lock contention blocks an automatic upload. Do not retry clean checks or failed network/conflict passes in a loop.
 - Use one merged delta per queued doc batch instead of uploading every Yjs update separately.
@@ -79,6 +93,7 @@ The visible sync-status control remains navigable to Account > Cloud Sync during
 - Invalid entities should be filtered or normalized at read/import boundaries.
 - Persisted-data normalization and cross-document reconciliation must be idempotent and emit no Yjs update once data is settled.
 - Cross-document references can be temporarily incomplete while lazy docs load.
+- A lazy document requested outside a sync waits for the active provider pass before doing provider or manifest work. A lazy document loaded from that pass's completion callback joins the pass and lets the owner commit the combined manifest, avoiding overlapping revision-sensitive writes.
 - Do not add non-CRDT overwrite behavior for normal sync.
 
 ## Manifest And File Rules
@@ -96,10 +111,11 @@ The visible sync-status control remains navigable to Account > Cloud Sync during
 ## Pending Local Changes
 
 - Local Yjs updates are queued as pending deltas while connected.
-- Local edits made while Drive is disconnected are tracked by document name as disconnected dirty docs in localStorage.
+- Local dirty/retry and disconnected-dirty evidence is scoped by durable provider ID plus connection generation. Existing generation-zero Google reads and mirrors `tasktime-sync-state` and `tasktime-disconnected-dirty-docs` so old tabs/builds retain recovery evidence; another provider or generation must never inherit or clear those legacy Google records.
 - Dirty docs must be marked for full-state upload on reconnect.
+- During a forced Sync Now pass, a full-state upload already required for exact dirty-document recovery also satisfies that document's verification requirement. Do not queue a second full-state write for the same document in the same pass.
 - Failed pull/consistency work uses retry evidence separate from dirty-document evidence.
-- Dirty markers may clear only after Drive is not `offline` or `error` and the provider reports no local changes left to push.
+- Dirty markers may clear only after the active provider is not `offline` or `error` and reports no local changes left to push.
 - Failed sync must not make UI flows behave as if sync succeeded.
 
 ## Import And Export
@@ -115,18 +131,62 @@ Import:
 
 - Import replaces this device's local Yjs data only.
 - It does not replace existing Drive data while connected.
-- The safe cloud-reset path is: export, Wipe Drive & Disconnect, import while disconnected, reconnect, then verify sync completes.
+- The safe cloud-reset path is: export, Wipe data & disconnect, import while disconnected, reconnect, then verify sync completes.
 - Import must route archived/historical entities to their correct docs.
 - Imported disconnected docs must remain queued for full-state upload until Drive confirms no pending work remains.
 
 ## Wipe, Disconnect, And Delete-All
 
 - Never auto-sync destructive resets across devices.
-- Wipe Drive & Disconnect deletes sync files only by default and preserves backup snapshots.
-- Wipe Drive & Disconnect may delete backup snapshots only when the user explicitly selects that option.
-- Delete All Account Data while connected should delete sync files and backup snapshots before revoking Google access and clearing local data.
-- Drive wipe must verify non-backup sync files are gone and fail visibly if files remain.
-- A Drive wipe is not a global tombstone. A stale already-authorized device can recreate cloud state if it later reconnects with old local data. Do not claim wipe makes old devices impossible to reintroduce without adding a reset-generation/tombstone protocol.
+- Every connected provider presents exactly two session-lifecycle choices:
+  **Disconnect** and **Wipe data & disconnect**. Provider-specific auth details
+  are implementation concerns, not additional compact-menu choices.
+- Provider transfer is an exceptional setup action in the overflow menu, named
+  and marked for the destination provider rather than shown as a persistent
+  settings card.
+- The active-provider card pairs its title with the selected provider's official
+  mark. Verified activation updates both through the durable lifecycle state.
+  While transfer state is visible, its transient panel comes first. Progress
+  stays at zero until the first durable journal stage, then advances by stage
+  with a reduced-motion-safe traveling highlight inside the filled line.
+  Successful completion removes the panel after the toast and active-provider
+  switch take over.
+- Transfer copy names the providers directly and avoids storage terminology.
+  Its compact title-free warning says not to use TaskTime on other devices
+  during transfer and to connect them to the new provider before editing.
+- Reopening a retained transfer source stops at its verified move marker. The
+  primary action connects the recorded destination without deleting source
+  data. Sidebar and mobile sync status name the destination and open Cloud Sync
+  choices rather than reconnecting the retained source directly. A secondary
+  provider-marked action may reuse the source only after a
+  destructive warning; it deletes and verifies all TaskTime source backups and
+  sync files, removes the move marker last, leaves the destination untouched,
+  and pushes the complete local workspace into the now-empty source.
+- Sync & disconnect, Wipe & disconnect, and moved-source replacement use the
+  shared disabled loading-button state with its spinner before the progress
+  label for the full duration of each operation.
+- Disconnect first completes a forced provider-neutral sync, then detaches this
+  browser session without revoking the provider authorization. Provider sync
+  files, backup snapshots, and local data remain in place.
+- Wipe data & disconnect deletes and verifies all validated TaskTime sync files,
+  deletes and verifies every TaskTime backup snapshot, confirms provider
+  authorization revocation, and only then disconnects this browser. Local data
+  remains on this device.
+- Delete All Account Data while connected uses the same cloud ordering and then
+  clears local data. If a lifecycle-selected provider cannot be reached, local
+  deletion is blocked until that provider is reconnected so retained cloud data
+  cannot silently reappear.
+- A failure at any cloud deletion, backup deletion, or revocation step must stay
+  visible and must not be reported as a completed wipe. Transient revocation
+  failure preserves a retryable provider session and connected runtime.
+- The low-level sync-file wipe primitive intentionally excludes backups so
+  compaction and internal recovery cannot delete them accidentally; the
+  user-facing wipe operation composes that primitive with verified backup
+  deletion.
+- Wipe is not a global tombstone. Another stale device can recreate cloud state
+  after later authorization with old local data. Do not claim wipe makes old
+  devices impossible to reintroduce without adding a reset-generation/tombstone
+  protocol.
 
 ## Backup Snapshots
 
@@ -144,7 +204,7 @@ Check these before committing:
 - Does failed sync preserve pending local work?
 - Does UI show failure instead of continuing destructive flows?
 - Does import/export include all active, archived, and historical docs?
-- Does Drive wipe avoid deleting backups unless explicitly requested?
+- Does the user-facing wipe delete and verify both sync files and backups before revocation, while ordinary sync cleanup still excludes backups?
 - Does backup mode avoid pulling except on connect or Sync Now?
 - Does manual mode remain user-controlled?
 - Are stale Drive file IDs and trashed files handled?

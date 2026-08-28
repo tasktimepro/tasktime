@@ -154,18 +154,36 @@ function AppContent() {
         syncState,
         syncPhase,
         isDriveConnected,
+        isCloudConnected,
+        activeStorageProvider,
+        activeStorageSessionId,
+        movedToStorageProvider,
         isConnecting,
         hasSynced,
         manualSyncInProgress,
         hasPendingSyncChanges,
         pendingSyncChanges,
         forceSyncDrive,
+        forceSyncCloud,
         autoSyncEnabled,
         lastSyncedAt,
         restoreBackupData,
-        driveSessionId,
+        hostedServiceSessionId,
     } = useYjs();
     const { hadPreviousSession, isLoading: authLoading, isSignedIn } = useGoogleAuth();
+    const cloudConnected = isCloudConnected ?? isDriveConnected;
+    const cloudProvider = activeStorageProvider ?? (isDriveConnected ? 'google-drive' : null);
+    const cloudProviderName = cloudProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const movedTargetName = movedToStorageProvider === 'dropbox'
+        ? 'Dropbox'
+        : movedToStorageProvider === 'google-drive'
+            ? 'Google Drive'
+            : null;
+    const cloudAuthLoading = cloudProvider === 'dropbox' ? false : authLoading;
+    const cloudHadPreviousSession = cloudProvider === 'dropbox'
+        ? Boolean(activeStorageSessionId)
+        : hadPreviousSession;
+    const cloudProviderSignedIn = cloudProvider === 'dropbox' ? cloudConnected : isSignedIn;
     const toast = useContext(ToastContext);
     const [isSyncIndicatorOffline, setIsSyncIndicatorOffline] = useState(() => {
         if (typeof navigator === 'undefined') {
@@ -219,8 +237,8 @@ function AppContent() {
     }, []);
 
     useEffect(() => {
-        setUsageMetricsSessionId(driveSessionId);
-    }, [driveSessionId]);
+        setUsageMetricsSessionId(hostedServiceSessionId);
+    }, [hostedServiceSessionId]);
 
     // === Yjs Data Hooks ===
     const { 
@@ -891,17 +909,19 @@ function AppContent() {
     }, [navigateToAccount]);
 
     const handleMobileManualSync = useCallback(async () => {
-        await forceSyncDrive();
-    }, [forceSyncDrive]);
+        await (forceSyncCloud ?? forceSyncDrive)();
+    }, [forceSyncCloud, forceSyncDrive]);
 
     const mobileSyncStatus = useMemo(() => {
         return getYjsSyncStatusDescriptor({
             isReady,
-            authLoading,
+            authLoading: cloudAuthLoading,
             isOffline: isSyncIndicatorOffline,
-            isDriveConnected,
+            isDriveConnected: cloudConnected,
             isConnecting,
-            hadPreviousSession,
+            hadPreviousSession: cloudHadPreviousSession,
+            providerName: cloudProviderName,
+            movedToProviderName: movedTargetName,
             syncState,
             syncPhase,
             lastSyncedAt,
@@ -916,18 +936,20 @@ function AppContent() {
         });
     }, [
         autoSyncEnabled,
-        authLoading,
+        cloudAuthLoading,
+        cloudConnected,
+        cloudHadPreviousSession,
+        cloudProviderName,
         handleMobileManualSync,
         handleOpenMobileSyncSettings,
-        hadPreviousSession,
         hasSynced,
         isConnecting,
-        isDriveConnected,
         isReady,
         isSyncIndicatorOffline,
         isSyncing,
         lastSyncedAt,
         manualSyncInProgress,
+        movedTargetName,
         pendingSyncChanges,
         syncPhase,
         syncState,
@@ -1032,9 +1054,16 @@ function AppContent() {
             };
         }
 
-        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.DISCONNECTED && hadPreviousSession && !authLoading && !isSignedIn) {
+        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.MOVED) {
             return {
-                description: 'Drive disconnected. Open More to reconnect sync.',
+                description: `Cloud sync moved to ${movedTargetName}. Open More to choose how to continue.`,
+                toneClassName: 'status-warning-fill',
+            };
+        }
+
+        if (mobileSyncStatus.kind === SYNC_STATUS_KIND.DISCONNECTED && cloudHadPreviousSession && !cloudAuthLoading && !cloudProviderSignedIn) {
+            return {
+                description: `${cloudProviderName} disconnected. Open More to reconnect sync.`,
                 toneClassName: 'status-danger-fill',
             };
         }
@@ -1049,7 +1078,7 @@ function AppContent() {
 
 
         return null;
-    }, [authLoading, hadPreviousSession, isSignedIn, mobileSyncStatus.kind, showMobileSyncButton]);
+    }, [cloudAuthLoading, cloudHadPreviousSession, cloudProviderName, cloudProviderSignedIn, mobileSyncStatus.kind, movedTargetName, showMobileSyncButton]);
     
     const activeView = urlParams.view;
 

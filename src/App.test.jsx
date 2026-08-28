@@ -113,6 +113,7 @@ const yjsHookState = vi.hoisted(() => ({
     clearAllData: vi.fn(),
     restoreBackupData: vi.fn(),
     driveSessionId: null,
+    hostedServiceSessionId: null,
 }))
 
 // Mock all Yjs-based hooks
@@ -423,6 +424,7 @@ describe('App component', () => {
         yjsHookState.clearAllData.mockReset()
         yjsHookState.restoreBackupData.mockReset()
         yjsHookState.driveSessionId = null
+        yjsHookState.hostedServiceSessionId = null
         localStorage.getItem.mockImplementation((key) => {
             if (key === 'tasktime-onboarding-completed') {
                 return 'true'

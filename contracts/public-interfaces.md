@@ -58,7 +58,7 @@ plannerAttachments: PlannerAttachment[]
 preferences: Preferences
 ```
 
-Imports validate version, container types, unique identifiers, time ranges, task hierarchy/project references, time-entry task references, and project invoice references before mutation. Missing collections supported by historical versions normalize to empty arrays/default objects. Credentials and Drive/agent sessions are never exported.
+Imports validate version, container types, unique identifiers, time ranges, task hierarchy/project references, time-entry task references, and project invoice references before mutation. Missing collections supported by historical versions normalize to empty arrays/default objects. Credentials and cloud/agent sessions are never exported.
 
 Replacement restore is journaled outside the managed Yjs databases before any
 destructive mutation. The journal includes the prior workspace and active
@@ -71,7 +71,9 @@ Configured by `VITE_SYNC_WORKER_URL`. Public client endpoint families are:
 
 - `/auth/init`, `/auth/callback`, `/auth/revoke`, `/auth/status`
 - `/auth/access-token`
-- `/drive`
+- `/auth/dropbox/init`, `/auth/dropbox/callback`, `/auth/dropbox/revoke`, `/auth/dropbox/status`
+- `/auth/dropbox/access-token`
+- `/auth/hosted-identity/transfer`
 - `/metrics/batch`
 - `/email/invoice`
 - `/push/vapid-public-key`, `/push/subscription`, `/push/schedules`, `/push/test`
@@ -83,13 +85,24 @@ values fail closed instead of weakening the browser policy. An alternate
 configured build therefore does not require the production app to permanently
 trust another Worker hostname.
 
-The Worker owns OAuth code exchange, encrypted refresh-token persistence, session validation, token issuance, and revocation. The browser owns product data semantics. A successful status response selects direct Google Drive for the next connection. The browser sends its non-secret build identifier in `X-TaskTime-App-Version` and matching `appVersion` query parameter on status and token requests. Direct connections request a short-lived Google access token from `POST /auth/access-token`, retain it only in active-tab memory, and send routine Drive file requests directly to Google Drive. The Worker must never return a refresh token and may cache its short-lived Google access token only in encrypted private session storage. Errors exposed to the browser must be sanitized; private deployment/KV/D1 details are not part of this public contract.
+The Worker owns provider OAuth code exchange, encrypted refresh-token persistence, session validation, token issuance, revocation, and opaque hosted-identity linking. The browser owns product data semantics. A successful provider-bound status response selects direct Google Drive or Dropbox for the next connection. The browser sends its non-secret build identifier in `X-TaskTime-App-Version` and matching `appVersion` query parameter on status and token requests. Direct connections request a short-lived provider access token, retain it only in active-tab memory, and send routine sync file requests directly to the selected provider. The Worker must never return a refresh token or receive routine provider file bodies. Errors exposed to the browser must be sanitized; private deployment/KV/D1 details are not part of this public contract.
 
 `POST /email/invoice` accepts the existing opaque `X-Session-Id` and an invoice, reminder, or quote email payload containing a base64 PDF attachment. The browser and Worker both require the decoded attachment to start with the PDF signature and contain a final PDF end-of-file marker before the provider call. TaskTime Pro does not persist the attachment bytes.
 
 `POST /auth/access-token` accepts the existing opaque `X-Session-Id`, optional non-secret `X-TaskTime-App-Version`, and no credential in its URL. It accepts only an optional boolean `forceRefresh` body field, returns a short-lived bearer token, its absolute expiry, Worker time, and known grant scope. Every success and failure response is `no-store`.
 
-Google-grant revocation and local disconnect are separate auth behaviors. The browser clears its stored Worker session after confirmed revocation or an already-invalid grant, but preserves it and surfaces an error when revocation fails transiently so the operation can be retried truthfully.
+The `/auth/dropbox/*` family is provider-bound and accepts no Dropbox file path or file body. Dropbox authorization uses App Folder access and only the approved content/metadata read/write scopes. `POST /auth/dropbox/access-token` returns a short-lived memory-only token for direct browser-to-Dropbox requests.
+
+`POST /auth/hosted-identity/transfer` accepts two authenticated provider sessions and no payload after target readback verification. It links their domain-separated provider subjects to one opaque TaskTime principal before transfer activation and never returns either raw provider subject. Identity-store unavailability fails the transfer closed.
+
+Provider-grant revocation and local disconnect are separate auth primitives. The connected-provider UI composes them into two choices: Disconnect retains authorization and provider data, while Wipe data & disconnect removes verified TaskTime sync files and backups before revocation. The browser clears its stored Worker session after confirmed revocation or an already-invalid grant, but preserves it and surfaces an error when revocation fails transiently so the operation can be retried truthfully.
+
+A verified moved-source marker is exposed as a recovery choice rather than a
+generic connection error. Connecting the recorded destination is the primary,
+non-destructive action. Reusing the source is a secondary destructive action
+that clears only that source's TaskTime backups and sync objects, leaves the
+destination unchanged, and seeds the local workspace without pulling or
+merging retained source data.
 
 ## Browser-to-bridge command protocol
 
@@ -128,10 +141,12 @@ Command groups include:
 - invoice/quote preview, drafts, finalization, payments, cancellation, undo, PDF, and email
 - business information/assets, payment methods, invoice/email templates, preferences
 - reports, accountant/export outputs, dashboards, and unbilled queries
-- Drive sync/backup/import/account data operations
+- cloud sync/backup/import/account data operations
 - application navigation
 
 The authoritative command-name/metadata catalog is generated from `src/agent/commands/registry.ts`. A command may additionally require explicit TaskTime approval and idempotency/confirmation data. Changes require synchronized tool schemas, bridge package, bundles, public docs, and tests.
+
+Provider-neutral cloud commands are canonical. The shipped Drive-named backup commands remain deprecated, Google-only compatibility aliases so existing MCP and OpenClaw automations continue to work; new integrations must use the corresponding `*_cloud_*` commands. Removing those aliases requires an explicit major-version migration.
 
 `stop_timer` accepts an optional `idempotencyKey` and also converges concurrent stops through deterministic timer-instance entry identity. Manual time-entry commands validate complete local history and source/target billing rules before mutation. Generic `update_task` requests are normalized through task-state invariants; recurring completion still requires the occurrence-aware `complete_task` command. Create commands return `CONFLICT` for an existing persisted ID and must not replace the prior record.
 

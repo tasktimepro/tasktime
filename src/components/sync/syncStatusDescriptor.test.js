@@ -197,4 +197,18 @@ describe('getYjsSyncStatusDescriptor', () => {
 
         expect(result.kind).toBe(SYNC_STATUS_KIND.DISCONNECTED)
     })
+
+    it('routes a moved source to cloud options instead of reconnecting it', () => {
+        const result = getYjsSyncStatusDescriptor({
+            ...baseArgs,
+            isDriveConnected: false,
+            isConnecting: false,
+            movedToProviderName: 'Dropbox',
+        })
+
+        expect(result.kind).toBe(SYNC_STATUS_KIND.MOVED)
+        expect(result.text).toBe('Moved to Dropbox')
+        expect(result.onClick).toBe(baseArgs.onCloudOptions)
+        expect(result.onClick).not.toBe(baseArgs.onConnect)
+    })
 })

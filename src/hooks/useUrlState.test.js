@@ -218,6 +218,10 @@ describe('useUrlState', () => {
         window.history.pushState({}, '', '/auth/callback')
         const { result: authResult } = renderHook(() => useUrlState())
         expect(authResult.current.urlParams.view).toBe('auth-callback')
+
+        window.history.pushState({}, '', '/auth/dropbox/callback')
+        const { result: dropboxAuthResult } = renderHook(() => useUrlState())
+        expect(dropboxAuthResult.current.urlParams.view).toBe('auth-callback')
     })
 
     it('falls back to dashboard path for unknown view', () => {

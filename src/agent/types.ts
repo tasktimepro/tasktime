@@ -41,13 +41,17 @@ export interface AgentCommandContext {
     isReady?: boolean;
     clearAllData?: () => Promise<void>;
     restoreBackupData?: (data: BackupImportPayload) => Promise<void>;
+    disconnectActiveCloudSession?: (options?: { revoke?: boolean }) => Promise<void>;
+    /** @deprecated Google-only compatibility callback. */
     revokeDriveAccess?: () => Promise<void>;
     now?: () => number;
     generateId?: () => string;
     navigation?: AgentNavigationAdapter;
     permissions?: Set<AgentPermissionScope>;
     idempotency?: Map<string, unknown>;
+    /** @deprecated Google Drive compatibility field; hosted services use hostedServiceSessionId. */
     driveSessionId?: string | null;
+    hostedServiceSessionId?: string | null;
 }
 
 export interface AgentCommandResult<T> {

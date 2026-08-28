@@ -38,7 +38,7 @@ const TOOL_GROUPS = [
     {
         id: 'reports-exports-backups',
         title: 'Reports, Exports, and Backups',
-        description: 'Read reports, export files through the browser app, and manage local or Drive backups.',
+        description: 'Read reports, export files through the browser app, and manage local or cloud backups.',
     },
     {
         id: 'sync-account',

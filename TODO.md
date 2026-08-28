@@ -4,6 +4,8 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
+[ ] I think time entries widget is filtering with last 30 days? Because I would leave it that it always shows the most recent time entries no matter when they were last added
+
 [x] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management

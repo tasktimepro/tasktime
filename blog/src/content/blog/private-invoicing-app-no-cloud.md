@@ -45,7 +45,7 @@ TaskTime Pro is a PWA — a progressive web app — that runs entirely in your b
 
 When you generate an invoice, the PDF is created right in your browser. No server round-trip, no upload. The file goes from your device to wherever you choose to save it.
 
-If you want your invoicing data available on another device, you can connect Google Drive for sync. Sync documents are stored in the app-data area of your own Drive rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to Google Drive.
+If you want your invoicing data available on another device, you can connect Google Drive or Dropbox for sync. Sync documents are stored in TaskTime's application area in your own provider account rather than a TaskTime-hosted workspace, and routine file requests travel directly from your browser to that provider.
 
 There is no product account to create and no monthly fee. TaskTime Pro does not keep a hosted workspace copy of your billing history. You control your financial records and can export everything at any time.
 

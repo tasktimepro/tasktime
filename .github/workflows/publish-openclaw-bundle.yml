@@ -55,11 +55,19 @@ jobs:
         run: npm pack --dry-run
 
       - name: Dry-run publish
-        if: ${{ inputs.dry_run == true }}
+        if: ${{ inputs.dry_run == true && steps.package_version.outputs.exists == 'false' }}
         working-directory: integrations/openclaw/tasktime
         run: npm publish --access public --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify existing public package
+        if: ${{ inputs.dry_run == true && steps.package_version.outputs.exists == 'true' }}
+        env:
+          EXPECTED_VERSION: ${{ steps.package_version.outputs.version }}
+        run: |
+          PUBLISHED_VERSION="$(npm view "@tasktimepro/openclaw@${EXPECTED_VERSION}" version)"
+          test "$PUBLISHED_VERSION" = "$EXPECTED_VERSION"
 
       - name: Publish package
         if: ${{ inputs.dry_run == false && steps.package_version.outputs.exists == 'false' }}
@@ -68,8 +76,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Ensure public package access
+      - name: Verify public package release
         if: ${{ inputs.dry_run == false }}
-        run: npm access set status=public @tasktimepro/openclaw
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          EXPECTED_VERSION: ${{ steps.package_version.outputs.version }}
+        run: |
+          PUBLISHED_VERSION="$(npm view "@tasktimepro/openclaw@${EXPECTED_VERSION}" version)"
+          test "$PUBLISHED_VERSION" = "$EXPECTED_VERSION"

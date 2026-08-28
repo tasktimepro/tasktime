@@ -65,7 +65,7 @@ People often search for open-source task management software because they want c
 
 TaskTime Pro is local-first. The production app stores work records in the browser through IndexedDB and remains usable offline after the PWA is loaded or installed. You do not need to operate a task-management server for core use.
 
-Optional Google Drive sync is available in manual, backup, and bidirectional modes. Routine sync files move directly between the browser and Google Drive; the TaskTime Pro sync service handles OAuth and short-lived token issuance rather than becoming the storage location for ordinary Drive file contents.
+Optional Google Drive or Dropbox sync is available in manual, backup, and bidirectional modes. Routine sync files move directly between the browser and the selected provider; the TaskTime Pro sync service handles OAuth and short-lived token issuance rather than becoming the storage location for ordinary sync file contents.
 
 TaskTime Pro does send limited aggregate usage metrics on the production origin, but not project, task, client, invoice, expense, note, or time-entry content.
 
@@ -122,7 +122,7 @@ A free task tracker often becomes less free when you need another project, more 
 
 TaskTime Pro's core workflow does not require a TaskTime login. You can open the app, create projects and tasks, track time, add expenses, and work with invoices without first creating a vendor account.
 
-That does not remove the need for your own backup habits. Browser-local data is still data you should protect. TaskTime Pro provides portable backup and optional Drive modes so you can choose an appropriate recovery path.
+That does not remove the need for your own backup habits. Browser-local data is still data you should protect. TaskTime Pro provides portable backup and optional cloud-sync modes so you can choose an appropriate recovery path.
 
 For a shorter introduction, see [a free task tracker that does not require sign-up](/blog/free-task-tracker-no-signup/) and the guide to [local-first software for freelancers](/blog/local-first-invoicing-software-for-freelancers/).
 
@@ -141,7 +141,7 @@ No. Core use runs as a local-first browser PWA. Developers can also inspect and 
 Yes, after the PWA is loaded or installed. Core work data is stored in the browser.
 
 **Does it require an account?**
-No TaskTime account is required for core use. Optional integrations such as Google Drive have their own connection steps.
+No TaskTime account is required for core use. Optional integrations such as Google Drive or Dropbox have their own connection steps.
 
 **Can an AI agent manage TaskTime Pro?**
 Yes, through the optional local MCP bridge after explicit same-device pairing. You choose the agent host, scopes, and approvals.

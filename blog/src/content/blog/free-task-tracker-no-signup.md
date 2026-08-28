@@ -45,7 +45,7 @@ Your tasks support subtasks, so you can break bigger deliverables into manageabl
 
 Everything is stored locally on your device by default. There is no TaskTime-hosted workspace database for your task list, and no monthly fee keeping it alive. It's just *there*, in your browser, whenever you need it.
 
-If you want to access your tasks across devices, you can optionally sync through your own Google Drive. Routine sync file requests travel directly from your browser to Google Drive, but the app works perfectly fine without sync — most people don't need it at all.
+If you want to access your tasks across devices, you can optionally sync through your own Google Drive or Dropbox. Routine sync file requests travel directly from your browser to your selected provider, but the app works perfectly fine without sync — most people don't need it at all.
 
 ## The simplest test
 

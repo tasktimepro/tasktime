@@ -669,7 +669,9 @@ export interface MultiTimerState {
 
 export type SyncState = 'idle' | 'syncing' | 'error' | 'offline';
 export type AutoSyncMode = 'backup' | 'sync';
-export type DriveSyncMode = 'manual' | AutoSyncMode;
+export type CloudSyncMode = 'manual' | AutoSyncMode;
+/** Google compatibility alias retained for existing consumers. */
+export type DriveSyncMode = CloudSyncMode;
 export type SyncPhase = 'idle' | 'checking' | 'downloading' | 'uploading' | 'error';
 
 /**

@@ -6,7 +6,7 @@ import { InformationCircleIcon } from "@/components/ui/icons"
  * Notice component for displaying informational messages, warnings, or tips
  * 
  * @param {Object} props
- * @param {string} props.title - Required title text
+ * @param {string} [props.title] - Optional title text
  * @param {string} [props.description] - Optional description text
  * @param {React.ReactNode} [props.children] - Optional custom content (alternative to description)
  * @param {React.ComponentType} [props.icon] - Optional icon component (defaults to InformationCircleIcon)
@@ -65,16 +65,18 @@ const Notice = React.forwardRef(({
                     </div>
                 )}
                 <div className={cn(showIcon && Icon ? "ml-3" : "")}>
-                    <p className="text-sm font-medium">
-                        {title}
-                    </p>
+                    {title && (
+                        <p className="text-sm font-medium">
+                            {title}
+                        </p>
+                    )}
                     {description && (
-                        <p className={cn(compact ? "text-sm" : "mt-1 text-sm", descriptionStyles[variant])}>
+                        <p className={cn(compact || !title ? "text-sm" : "mt-1 text-sm", descriptionStyles[variant])}>
                             {description}
                         </p>
                     )}
                     {children && (
-                        <div className={cn(compact ? "mt-1 text-sm" : "mt-1 text-sm", descriptionStyles[variant])}>
+                        <div className={cn(title ? "mt-1 text-sm" : "text-sm", descriptionStyles[variant])}>
                             {children}
                         </div>
                     )}

@@ -18,15 +18,57 @@
 
 // Store
 export { YjsStore, getYjsStore, resetYjsStore } from './YjsStore';
+export type {
+    CloudTransferDocumentSnapshot,
+    CloudTransferWorkspaceSnapshot,
+} from './YjsStore';
+export {
+    CloudProviderTransferCoordinator,
+    CloudTransferError,
+    isRecoverableCloudTransferError,
+} from './CloudProviderTransferCoordinator';
+export type {
+    CloudProviderTransferOptions,
+    CloudTransferErrorCode,
+} from './CloudProviderTransferCoordinator';
 
 // Document manager
 export { YjsDocManager } from './YjsDocManager';
 
 // Providers
-export { YjsDriveProvider, AuthorizationError, DriveTransportDisabledError } from './providers';
-export { ManifestManager } from './providers';
-export { BackupManager } from './providers';
-export type { Manifest, DocManifest, DeltaInfo, BackupInfo, DriveConnectionOptions, DriveTransport } from './providers';
+export {
+    YjsCloudSyncProvider,
+    YjsDriveProvider,
+    CloudProviderMovedError,
+    withCloudSyncExclusiveLock,
+    AuthorizationError,
+    DriveTransportDisabledError,
+    isCloudFileNotFoundError,
+} from './providers';
+export { CloudManifestManager, ManifestManager } from './providers';
+export { BackupManager, CloudBackupManager } from './providers';
+export { CloudFileStoreError, DropboxFileStore, GoogleDriveFileStore } from './providers';
+export type {
+    CloudBindingMarkerV1,
+    CloudManifestFingerprint,
+    Manifest,
+    DocManifest,
+    DeltaInfo,
+    BackupInfo,
+    CloudBackupManagerOptions,
+    CloudManifestManagerOptions,
+    CloudSyncConnectionOptions,
+    CloudSyncLockPermit,
+    CloudSyncLockResult,
+    DriveConnectionOptions,
+    DriveTransport,
+    CloudFileStore,
+    CloudFileStoreErrorCode,
+    CloudNamespace,
+    CloudObjectMetadata,
+    CloudProviderId,
+    GoogleDriveFileStoreOptions,
+} from './providers';
 
 // Types
 export type {
@@ -34,6 +76,7 @@ export type {
     SyncState,
     SyncPhase,
     AutoSyncMode,
+    CloudSyncMode,
     DriveSyncMode,
     Project,
     Task,

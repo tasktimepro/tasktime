@@ -36,9 +36,11 @@ test.describe('Invoice email smoke', () => {
         const emailModal = page.getByRole('dialog', { name: /Send Invoice/ });
         await expect(emailModal).toBeVisible();
 
-        // Email sending is gated behind a connected cloud sync session.
-        await expect(emailModal.getByText(/Cloud sync required/i)).toBeVisible();
-        await expect(emailModal.getByText(/Connect cloud sync in Account settings/i)).toBeVisible();
+        // Hosted sending uses whichever supported cloud provider is active.
+        await expect(emailModal.getByText(/Cloud provider required/i)).toBeVisible();
+        await expect(emailModal.getByText(
+            /Connect Google Drive or Dropbox in Account settings/i,
+        )).toBeVisible();
 
         // The Send Invoice button in the modal should be disabled until cloud sync is connected.
         const modalSendButton = emailModal.getByRole('button', { name: /Send Invoice/i });

@@ -6,7 +6,7 @@ const highlights = [
     'Use get_pairing_status and refresh_pairing before manual bridge commands.',
     'Run bridge smoke tests after changing the agent surface.',
     'Use DebugBundle for production/runtime incidents, not deterministic local code checks.',
-    'Do not ask users to reset local data or Drive state as a first response.',
+    'Do not ask users to reset local data or cloud sync state as a first response.',
 ];
 ---
 
@@ -106,9 +106,9 @@ make npm CMD="run test:run -- src/agent/bridge/mcpServer.test.ts src/agent/bridg
     <section>
         <h2>Production Data Rules</h2>
         <ul class="agent-check-list">
-            <li>Do not tell users to clear browser data or Drive sync state as a normal fix.</li>
+            <li>Do not tell users to clear browser data or cloud sync state as a normal fix.</li>
             <li>Do not auto-sync destructive resets across devices.</li>
-            <li>Preserve existing IndexedDB, Yjs, Google Drive sync, invoice, billing, and backup contracts.</li>
+            <li>Preserve existing IndexedDB, Yjs, cloud sync, invoice, billing, and backup contracts.</li>
             <li>Use preview commands before destructive delete, restore, billing, or account-data operations.</li>
         </ul>
     </section>
