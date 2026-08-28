@@ -100,7 +100,9 @@ jobs:
           set -euo pipefail
           PUBLISH_ARGS=(--family code-plugin)
           if [[ "${{ inputs.use_token }}" == "true" ]]; then
-            PUBLISH_ARGS+=(--owner tasktimepro)
+            PUBLISH_ARGS+=(--owner tasktimepro --source-ref "$GITHUB_REF")
+          else
+            PUBLISH_ARGS+=(--source-ref "$GITHUB_SHA")
           fi
 
           npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
@@ -108,7 +110,6 @@ jobs:
             --version "${{ steps.release.outputs.version }}" \
             --source-repo "$GITHUB_REPOSITORY" \
             --source-commit "$GITHUB_SHA" \
-            --source-ref "$GITHUB_REF" \
             --source-path "$PACKAGE_PATH" \
             --dry-run \
             --json
@@ -120,7 +121,9 @@ jobs:
           set -euo pipefail
           PUBLISH_ARGS=(--family code-plugin)
           if [[ "${{ inputs.use_token }}" == "true" ]]; then
-            PUBLISH_ARGS+=(--owner tasktimepro)
+            PUBLISH_ARGS+=(--owner tasktimepro --source-ref "$GITHUB_REF")
+          else
+            PUBLISH_ARGS+=(--source-ref "$GITHUB_SHA")
           fi
 
           npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
@@ -128,7 +131,6 @@ jobs:
             --version "${{ steps.release.outputs.version }}" \
             --source-repo "$GITHUB_REPOSITORY" \
             --source-commit "$GITHUB_SHA" \
-            --source-ref "$GITHUB_REF" \
             --source-path "$PACKAGE_PATH" \
             --json
 
