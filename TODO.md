@@ -4,6 +4,10 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
+[ ] When I import data I should see a success toast notification
+
+[ ] Homepage and migration of product from / to app.
+
 [ ] I think time entries widget is filtering with last 30 days? Because I would leave it that it always shows the most recent time entries no matter when they were last added
 
 [x] Actually validate the skill/MCP with our own OpenClaw - RE-TEST

@@ -2,30 +2,7 @@
 import ProductLayout from '../../layouts/ProductLayout.astro';
 
 const title = 'TaskTime Pro — Local-first work and invoicing for freelancers';
-const description = 'Plan projects, track time and expenses, create invoices, review reports, and optionally work with AI agents in one free, open-source, local-first app.';
-
-const benefits = [
-    {
-        label: 'Start immediately',
-        title: 'No account required',
-        description: 'Open TaskTime Pro and begin organizing work. Core use does not require a TaskTime account or cloud setup.',
-    },
-    {
-        label: 'Keep ownership',
-        title: 'Local-first by design',
-        description: 'Your work records live in your browser. Optional Google Drive sync is there when you want backup or another device.',
-    },
-    {
-        label: 'Stay in one flow',
-        title: 'From planning to payment',
-        description: 'Connect projects, tasks, time, expenses, invoices, payments, and reports without rebuilding the same context in separate tools.',
-    },
-    {
-        label: 'Use it your way',
-        title: 'Free and open source',
-        description: 'Inspect the source, run it yourself, and follow how TaskTime Pro handles the workflows that matter to your business.',
-    },
-];
+const description = 'Plan client work, track billable time and expenses, create invoices, and stay on top of what is outstanding in one free, local-first workspace for freelancers.';
 
 const capabilities = [
     {
@@ -35,6 +12,10 @@ const capabilities = [
     {
         title: 'Time that stays connected',
         description: 'Run multiple project timers, record manual entries, and keep every tracked interval attached to the task and project it belongs to.',
+    },
+    {
+        title: 'Clients and business details',
+        description: 'Keep client contacts, business identities, payment methods, templates, and project history ready when work turns into billing.',
     },
     {
         title: 'Expenses and tax periods',
@@ -48,35 +29,25 @@ const capabilities = [
         title: 'Reports you can act on',
         description: 'Review time, revenue, expenses, outstanding invoices, and client activity, then export useful records when you need them.',
     },
-    {
-        title: 'Optional local agent access',
-        description: 'Pair a same-device AI agent through scoped MCP tools while the browser remains the owner of your data and business actions.',
-    },
 ];
 ---
 
 <ProductLayout title={title} description={description}>
     <section class="product-hero" aria-labelledby="product-title">
         <div class="product-hero-copy">
-            <p class="eyebrow">Free · Open source · No account required</p>
-            <h1 id="product-title">Your work. Your time. Your data.</h1>
+            <p class="eyebrow">Built for independent professionals</p>
+            <h1 id="product-title">
+                <span>From task to paid.</span>
+                <span>Without an account.</span>
+            </h1>
             <p class="product-hero-lede">
-                TaskTime Pro brings projects, tasks, timers, expenses, invoices, and reports into one local-first
-                workspace for freelancers and solo professionals.
+                Plan client work, track billable time and expenses, create invoices, and stay on top of what is
+                outstanding—all in one workspace built for freelancers.
             </p>
             <div class="product-actions">
-                <a class="product-button product-button--primary" href="/">Open App</a>
-                <a
-                    class="product-button product-button--secondary"
-                    href="https://github.com/tasktimepro/tasktime"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    aria-label="View TaskTime Pro on GitHub (opens in a new tab)"
-                >
-                    View on GitHub
-                </a>
+                <a class="product-button product-button--primary" href="/">Open TaskTime</a>
             </div>
-            <p class="product-action-note">Runs in your browser. Works offline after it is loaded or installed.</p>
+            <p class="product-action-note">Free. No signup. Your work stays in your browser.</p>
         </div>
 
         <!-- Replace this figure with a 16:10 product screenshot while retaining the figure and caption. -->
@@ -96,15 +67,12 @@ const capabilities = [
         </figure>
     </section>
 
-    <section class="product-benefit-grid" aria-label="Why TaskTime Pro">
-        {benefits.map((benefit) => (
-            <article class="product-benefit-card">
-                <p>{benefit.label}</p>
-                <h2>{benefit.title}</h2>
-                <span>{benefit.description}</span>
-            </article>
-        ))}
-    </section>
+    <ul class="product-trust-strip" aria-label="TaskTime Pro essentials">
+        <li>Free to use</li>
+        <li>No signup</li>
+        <li>Works offline</li>
+        <li>Open source</li>
+    </ul>
 
     <section class="product-section product-section--centered" aria-labelledby="capabilities-title">
         <div class="product-section-heading">
@@ -123,6 +91,24 @@ const capabilities = [
                     <p>{capability.description}</p>
                 </article>
             ))}
+        </div>
+    </section>
+
+    <section class="product-solo" aria-labelledby="solo-title">
+        <div>
+            <p class="eyebrow">Made for independent work</p>
+            <h2 id="solo-title">Built for one professional, not a team.</h2>
+        </div>
+        <div class="product-solo-copy">
+            <p>
+                No seats. No workspace setup. No employee monitoring. No admin overhead. Just your clients,
+                projects, time, expenses, and invoices in one connected workspace.
+            </p>
+            <ul>
+                <li>Start with the work already in front of you</li>
+                <li>Keep client context without managing a team system</li>
+                <li>Move from planning to billing without duplicate entry</li>
+            </ul>
         </div>
     </section>
 
@@ -194,21 +180,21 @@ const capabilities = [
     <section class="product-principles" aria-labelledby="ownership-title">
         <div class="product-section-heading">
             <p class="eyebrow">Local-first by design</p>
-            <h2 id="ownership-title">Useful before you create an account—because there is no required account</h2>
+            <h2 id="ownership-title">Your work. Your time. Your data.</h2>
             <p>
-                Core work records stay in browser-local storage and remain usable offline after TaskTime Pro is loaded
-                or installed. Google Drive sync is optional, and routine Drive data moves directly between your browser
-                and Google when you connect it.
+                Core work records stay in your browser and remain usable offline after TaskTime Pro is loaded or
+                installed. Cloud sync is optional and keeps routine file transfers directly between your browser and
+                the provider you choose.
             </p>
         </div>
         <div class="product-principle-list">
             <article>
-                <h3>Your browser owns the work</h3>
+                <h3>Start in your browser</h3>
                 <p>Projects, clients, tasks, time entries, expenses, and invoices are not placed behind a hosted TaskTime account.</p>
             </article>
             <article>
                 <h3>Cloud features stay optional</h3>
-                <p>Connect Drive for backup and multi-device continuity, or keep the core workflow fully local.</p>
+                <p>Connect Google Drive or Dropbox for backup and multi-device continuity, or keep the core workflow fully local.</p>
             </article>
             <article>
                 <h3>Privacy boundaries stay explicit</h3>
@@ -218,43 +204,45 @@ const capabilities = [
         <a class="product-text-link" href="/privacy/">Read the privacy policy <span aria-hidden="true">→</span></a>
     </section>
 
-    <section class="product-agent-callout" aria-labelledby="agent-title">
-        <div>
-            <p class="eyebrow">Optional AI-agent access</p>
-            <h2 id="agent-title">Let an agent help without handing over raw app storage</h2>
-            <p>
-                The first-party local MCP bridge gives same-device agents scoped tools for tasks, timers, expenses,
-                reports, invoicing, and navigation. You pair the browser, control access, and keep sensitive actions
-                behind TaskTime Pro’s approval rules.
-            </p>
-        </div>
-        <a class="product-button product-button--secondary" href="/agents/">Explore Agent Docs</a>
-    </section>
+    <div class="product-secondary-list">
+        <section class="product-agent-callout" aria-labelledby="agent-title">
+            <div>
+                <p class="eyebrow">Optional AI-agent access</p>
+                <h2 id="agent-title">Let an agent help without handing over raw app storage</h2>
+                <p>
+                    The first-party local MCP bridge gives same-device agents scoped tools for tasks, timers, expenses,
+                    reports, invoicing, and navigation. You pair the browser, control access, and keep sensitive actions
+                    behind TaskTime Pro’s approval rules.
+                </p>
+            </div>
+            <a class="product-button product-button--secondary" href="/agents/">Explore Agent Docs</a>
+        </section>
 
-    <section class="product-open-source" aria-labelledby="open-source-title">
-        <div>
-            <p class="eyebrow">Open source</p>
-            <h2 id="open-source-title">A work tool you can inspect</h2>
-            <p>
-                TaskTime Pro’s app, public site, tests, agent bridge, and public integrations are available on GitHub.
-                Review the implementation, report an issue, or run the project yourself.
-            </p>
-        </div>
-        <a
-            class="product-button product-button--secondary"
-            href="https://github.com/tasktimepro/tasktime"
-            target="_blank"
-            rel="noreferrer noopener"
-            aria-label="Visit TaskTime Pro on GitHub (opens in a new tab)"
-        >
-            Visit GitHub
-        </a>
-    </section>
+        <section class="product-open-source" aria-labelledby="open-source-title">
+            <div>
+                <p class="eyebrow">Open source</p>
+                <h2 id="open-source-title">A work tool you can inspect</h2>
+                <p>
+                    TaskTime Pro’s app, public site, tests, agent bridge, and public integrations are available on GitHub.
+                    Review the implementation, report an issue, or run the project yourself.
+                </p>
+            </div>
+            <a
+                class="product-button product-button--secondary"
+                href="https://github.com/tasktimepro/tasktime"
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="Visit TaskTime Pro on GitHub (opens in a new tab)"
+            >
+                Visit GitHub
+            </a>
+        </section>
+    </div>
 
     <section class="product-final-cta" aria-labelledby="final-cta-title">
         <p class="eyebrow">No signup. No setup wall.</p>
         <h2 id="final-cta-title">Open TaskTime Pro and start with the work in front of you.</h2>
         <p>Your first project, task, and timer can stay entirely in your browser.</p>
-        <a class="product-button product-button--primary" href="/">Open App</a>
+        <a class="product-button product-button--primary" href="/">Open TaskTime</a>
     </section>
 </ProductLayout>

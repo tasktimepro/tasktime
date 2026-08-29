@@ -5,7 +5,7 @@ const publicRouteExpectations = [
     {
         path: '/product/',
         title: 'TaskTime Pro — Local-first work and invoicing for freelancers',
-        heading: 'Your work. Your time. Your data.',
+        heading: 'From task to paid. Without an account.',
     },
     {
         path: '/blog/',
@@ -57,8 +57,18 @@ test.describe('PWA smoke', () => {
         await page.setViewportSize({ width: 320, height: 800 });
         await page.goto('/product/');
 
-        await expect(page.getByRole('heading', { name: 'Your work. Your time. Your data.', level: 1 })).toBeVisible();
-        await expect(page.getByRole('link', { name: 'Open App' }).first()).toBeVisible();
+        const hero = page.locator('.product-hero');
+
+        await expect(page.getByRole('heading', { name: 'From task to paid. Without an account.', level: 1 })).toBeVisible();
+        await expect(hero.getByRole('link', { name: 'Open TaskTime' })).toBeVisible();
+        await expect(hero.getByRole('link', { name: /GitHub/i })).toHaveCount(0);
+        await expect(page.getByLabel('TaskTime Pro essentials')).toContainText('Free to use');
+        await expect(page.getByLabel('TaskTime Pro essentials')).toContainText('No signup');
+        await expect(page.getByLabel('TaskTime Pro essentials')).toContainText('Works offline');
+        await expect(page.getByLabel('TaskTime Pro essentials')).toContainText('Open source');
+        await expect(page.getByRole('heading', { name: 'Built for one professional, not a team.', level: 2 })).toBeVisible();
+        await expect(page.locator('.product-capability-card')).toHaveCount(6);
+        await expect(page.locator('.product-capability-card', { hasText: 'Optional local agent access' })).toHaveCount(0);
         await expect(page.locator('[data-screenshot-slot]')).toHaveCount(3);
 
         const horizontalLayout = await page.evaluate(() => {
@@ -97,6 +107,51 @@ test.describe('PWA smoke', () => {
         await expect(footer.getByRole('link', { name: 'Contact' })).toBeVisible();
         await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
         await expect(footer.getByRole('link', { name: 'Privacy' })).toBeVisible();
+    });
+
+    test('keeps the product hero and secondary callouts balanced on desktop', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto('/product/');
+
+        const heroLineMetrics = await page.locator('.product-hero h1 span').evaluateAll((lines) => {
+            return lines.map((line) => {
+                const styles = window.getComputedStyle(line);
+
+                return {
+                    height: Math.round(line.getBoundingClientRect().height),
+                    lineHeight: Math.round(Number.parseFloat(styles.lineHeight)),
+                };
+            });
+        });
+
+        expect(heroLineMetrics).toHaveLength(2);
+        expect(heroLineMetrics.every(({ height, lineHeight }) => height <= lineHeight + 1)).toBe(true);
+
+        const secondaryList = page.locator('.product-secondary-list');
+
+        await expect(secondaryList.locator(':scope > section')).toHaveCount(2);
+
+        const secondarySpacing = await secondaryList.evaluate((list) => {
+            const [agentSection, openSourceSection] = Array.from(list.children);
+            const agentBounds = agentSection.getBoundingClientRect();
+            const openSourceBounds = openSourceSection.getBoundingClientRect();
+
+            return {
+                gap: Math.round(openSourceBounds.top - agentBounds.bottom),
+                agentBottomBorder: window.getComputedStyle(agentSection).borderBottomWidth,
+                openSourceTopBorder: window.getComputedStyle(openSourceSection).borderTopWidth,
+            };
+        });
+
+        expect(secondarySpacing).toEqual({
+            gap: 0,
+            agentBottomBorder: '0px',
+            openSourceTopBorder: '1px',
+        });
+
+        const githubIcon = page.getByRole('contentinfo').getByRole('link', { name: 'TaskTime Pro on GitHub' }).locator('svg');
+
+        await expect(githubIcon).toHaveAttribute('viewBox', '0 0 16 16');
     });
 
     test('stays usable offline after the production service worker is active', async ({ browser }) => {

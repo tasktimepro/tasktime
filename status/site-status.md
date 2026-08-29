@@ -2,7 +2,7 @@
 
 ## Current focus
 
-- [x] Prepare a static `/product/` overview with a direct Open App action, clear local-first/open-source benefits, responsive screenshot placeholders, public-site navigation, and an onboarding entry point. Production publication and final screenshots remain pending owner review.
+- [x] Refine the static `/product/` overview around “From task to paid. Without an account.”, a single primary hero action, compact trust signals, explicit solo-professional positioning, and a later focused local-first section. Responsive screenshot placeholders remain pending owner review and final captures.
 - [ ] Continue investigating blog indexing visibility.
 - [ ] Keep SEO terminology useful without weakening product clarity or accuracy.
 - [x] Add staggered, search-intent-focused posts for AI-agent task/time management, invoicing, expense management, and open-source task/time/invoice workflows.
