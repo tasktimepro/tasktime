@@ -55,12 +55,13 @@ make test-e2e-smoke
 
 ## Data Compatibility
 
-Existing browser IndexedDB data, Yjs document shapes, export files, and Drive sync state are live user data.
+Existing browser IndexedDB data, Yjs document shapes, export files, and Google
+Drive/Dropbox sync state are live user data.
 
 - Keep schema changes additive when possible.
 - Include explicit migrations for incompatible changes.
 - Preserve old entity shapes in validation and import paths.
-- Do not require users to clear browser data or Drive sync state.
+- Do not require users to clear browser data or Google Drive/Dropbox sync state.
 - Keep destructive sync, deletion, and billing actions explicit and reversible where practical.
 - Use existing Yjs hooks, stores, and command layers instead of adding parallel persistence.
 

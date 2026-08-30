@@ -6,7 +6,40 @@
 
 [ ] When I import data I should see a success toast notification
 
-[ ] Homepage and migration of product from / to app.
+[ ] Coordinated license, app-origin migration, homepage, and production-launch program
+    - Dependency rule: complete and locally verify Program Phase 1 before implementing Program Phase 2. Phase 1 may prepare origin-neutral contracts and configuration seams, but neither phase publishes or changes production by itself.
+    - Source plans: `tasktime-infra/docs/todo/client_edge_license_flow.md` and `tasktime-infra/docs/todo/app_subdomain_migration_implementation_plan.md`
+    [ ] Program Phase 1 — Complete and test the license flow locally
+        [x] Freeze the complete implementation/security contract: Free supports one active client and the current-local-month Reports Overview; Trial/Pro unlock unlimited active clients, advanced Reports/exports, and hosted email; all advanced tabs, including To Invoice, remain visible as lazy section-specific previews; founding Pro is `EUR 39/year` for the first 1,000 paid canonical principals; and new acquisition then uses the `EUR 59/year` standard offer
+        [ ] Assign an owner, required evidence, approval deadline, and fail-closed live behavior for each launch-only tax presentation/live Stripe mapping for both approved offers, allowance, grace, seller/tax/legal, support, retention, and payment/refund/Portal decision; final approval belongs to Program Phase 4, and synthetic open-policy fixtures must not leak into live mode
+        [ ] Implement the provider-neutral Worker, client, UI, and agent entitlement flow with production billing/trial/Checkout/enforcement controls disabled
+        [ ] Pass Worker tests/typecheck, the core release gate, and the local license acceptance matrix
+        [ ] Reconcile specifications, contracts, status, public-copy requirements, and rollback evidence without deploying
+        [ ] Record the Program Phase 1 local Definition of Done: Slices 0-8 green, real local D1/Stripe-test evidence complete, all production controls off, and no live migration/deployment/domain/homepage/payment action
+    [ ] Program Phase 2 — Prepare and test the `app.tasktime.pro` migration locally
+        [ ] Split the app and public-site build/deployment outputs without changing live domains
+        [ ] Implement a verified old-origin workspace transfer with portable-backup fallback; never copy OAuth sessions, tokens, licenses, Push subscriptions, or agent pairing credentials
+        [ ] Support both Google Drive and Dropbox reconnect/bootstrap paths through the same provider-neutral lifecycle
+        [ ] Prepare exact Worker/OAuth origin configuration, PWA/service-worker transition, Push, metrics, and agent-origin/default-URL compatibility
+        [ ] Pass the two-origin local rehearsal and produce the production cutover/rollback checklist
+    [ ] Program Phase 3 — Complete the homepage and UX/UI adjustments
+        [ ] Promote the approved public product page to the `tasktime.pro` homepage
+        [ ] Point every app CTA and app-launch flow to `https://app.tasktime.pro`
+        [ ] Reconcile migration guidance, billing/pricing, Privacy/Terms, support, SEO/discovery, PWA install, and agent setup copy
+        [ ] Complete responsive, accessibility, and cross-origin UX review without publishing
+    [ ] Program Phase 4 — Launch through controlled production changes
+        [ ] Pre-entry external gate, requiring explicit owner authorization before any App Console action: obtain Dropbox App Console production access and complete the non-destructive post-approval sign-in/token/direct-file canary before purchaser-facing billing launch work
+        [ ] Approve whether the `EUR 39/year` founding and `EUR 59/year` standard base prices are tax-inclusive or plus applicable tax, plus their exact immutable live Stripe Product/Price mappings, payment methods, and promotions
+        [ ] Approve the live Trial/Pro hosted-email allowance and paid payment-failure grace
+        [ ] Approve seller/tax/legal terms and payment/refund/dispute/cancellation/Portal behavior
+        [ ] Approve support ownership, retention periods, repair policy, and Privacy wording
+        [ ] Verify the live catalog contains both approved offers and that exhaustion/former-founder selection returns the `EUR 59/year` summary for explicit reconfirmation without mutating founding capacity
+        [ ] Obtain explicit deployment/release approval and record exact Worker, app, site, and agent artifact versions
+        [ ] Deploy compatible Worker and app-subdomain foundations with billing/trial/Checkout/enforcement controls still disabled
+        [ ] Migrate and verify the known production users, including complete data, provider reconnect, PWA/Push state, billing status, and agent re-pairing
+        [ ] Publish the homepage and app/agent launch URLs only after migration verification and rollback proof
+        [ ] With general Checkout still off, complete separately approved live `EUR 39/year` founding and `EUR 59/year` standard canaries; verify the founding purchase consumes exactly one permanent allocation and the standard purchase consumes none
+        [ ] Enable approved billing UI, trial, Checkout, active-client enforcement, advanced-Reports enforcement, and hosted-email enforcement as separate reversible steps with live canaries
 
 [ ] I think time entries widget is filtering with last 30 days? Because I would leave it that it always shows the most recent time entries no matter when they were last added
 

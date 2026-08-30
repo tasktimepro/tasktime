@@ -12,7 +12,7 @@ TaskTime Pro is a browser-owned local-first system with optional remote and loca
 | Hooks/context | React subscriptions and mutation APIs over Yjs store/domain operations |
 | Domain/application | Deterministic deletion, billing, expense, settings, and other reusable business behavior |
 | Yjs store | Collection ownership, cross-document operations, archival, timers, validation, and persistence lifecycle |
-| Providers/adapters | Drive/manifest, backup, auth, email, push, PDF, diagnostics, and exchange-rate boundaries |
+| Providers/adapters | Provider-neutral cloud/manifest, backup, auth, hosted email, planned billing/license, push, PDF, diagnostics, and exchange-rate boundaries |
 | Agent commands | Scoped business-action facade used by browser bridge/MCP tooling |
 | Local bridge | Pairing, sessions, origins, scopes, approvals, rate limiting, command transport, and MCP protocol |
 | Managed agent plugin | Host-lifecycle ownership and generated tool adaptation around the existing local bridge; no product-data or business-logic ownership |
@@ -34,9 +34,25 @@ The app uses `useUrlState` and History API events rather than React Router. App 
 
 ## External boundaries
 
-- Google OAuth, token-control, and push endpoints use the configured Worker URL. Routine Google Drive file requests go directly from the browser to Google Drive with a short-lived, memory-only access token.
+- Google Drive/Dropbox OAuth, token-control, hosted-service, and push endpoints
+  use the configured Worker URL. Routine sync-file requests go directly from the
+  browser to the lifecycle-selected provider with a short-lived, memory-only
+  access token.
 - The private Worker's source and deployment are external to this repository.
 - Email, exchange rates, DebugBundle, npm/MCP registries, and agent platforms are adapters with sanitized failure behavior.
+- Planned billing uses provider-bound opaque hosted identity, canonical Worker/D1
+  and Stripe reconciliation, a versioned public catalog, and short-lived signed
+  local assertions. Billing/license state remains outside Yjs/product/provider
+  data. One shared UI/agent policy controls advanced Reports, unlimited-client
+  forward transitions, and hosted Send. Reports uses a route shell, exact Free
+  current-month Overview, static locked previews, and lazy advanced modules so a
+  locked tab never loads protected history. Client-count transitions use one
+  domain operation below UI/agent adapters; import and sync remain compatibility
+  paths rather than enforcement paths. Worker-cost services always enforce
+  canonical state server-side. The catalog carries distinct immutable founding
+  and standard offers; canonical Worker capacity/account history selects the
+  applicable offer, and a stale founding request must return for explicit
+  standard-price confirmation before Stripe creation.
 - The local agent bridge binds to loopback, while the browser remains the mutation owner.
 - The official OpenClaw plugin runs in the supervised Gateway, owns one packaged bridge child for that Gateway/profile lifetime, and routes generated native tools through the existing bridge enforcement. Generic MCP and Claude integrations continue to own their stdio bridge processes directly.
 - Browser refresh retains a bounded app-session bearer token only in current-tab `sessionStorage`. Same-profile close/reopen continuity uses a dedicated origin-local IndexedDB credential store containing a non-exportable P-256 signing key and non-secret discovery metadata; it is isolated from Yjs, Drive, backup/export, and product state. The live bridge stores only the matching public-key authorization in memory, so Gateway restart remains an explicit re-pair boundary.

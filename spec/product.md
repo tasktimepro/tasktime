@@ -10,8 +10,18 @@ TaskTime Pro is a free, open-source, local-first work-management and billing app
 - Core use remains free, requires no TaskTime account, and stores work records in browser-local storage.
 - Time can move from a task/timer into reports and billing without manual re-entry.
 - Financial actions remain understandable, reviewable, and reversible where the product supports reversal.
-- Optional Drive sync and backup improve portability without becoming mandatory for core use.
+- Optional Google Drive or Dropbox sync and backup improve portability without becoming mandatory for core use.
 - Optional same-device agent access uses the same business actions as the UI and remains under explicit user control.
+- Planned optional Pro adds unlimited active clients, advanced professional
+  Reports/exports, and TaskTime-hosted sending. Free supports one active client,
+  unlimited projects/tasks for that client, the current-local-month Reports
+  Overview, invoices/PDFs, manual email delivery, tax bookkeeping, sync/backups,
+  portability, Web Push, and core agent actions. Existing, archived, imported,
+  synced, and over-limit records are never hidden or made unmaintainable. Launch
+  packaging contains only Free and Pro; the founding Pro offer is `EUR 39/year`
+  for the first 1,000 paid canonical principals, followed automatically by the
+  `EUR 59/year` standard offer for new purchases. Existing continuous/
+  recoverable founding subscriptions retain their founding Price.
 
 ## Primary users
 
@@ -34,7 +44,7 @@ TaskTime Pro is a free, open-source, local-first work-management and billing app
 
 - TaskTime Pro is not a multi-user hosted collaboration platform.
 - The browser is the primary product runtime and data owner.
-- Google Drive, push, email, diagnostics, and agent integrations are optional extensions.
+- Google Drive/Dropbox, push, hosted email, diagnostics, subscription, and agent integrations are optional extensions.
 - The production origin may send limited aggregate usage metrics, but those metrics exclude project, task, client, invoice, expense, note, time-entry, and other raw work-record content.
 - The public repository does not contain the private sync/notification Worker implementation or operational secrets.
 

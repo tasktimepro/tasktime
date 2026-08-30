@@ -1,6 +1,8 @@
 # TaskTime Pro Sync Source Of Truth
 
-This file is the source of truth for TaskTime Pro cloud sync behavior. Read it before changing Yjs storage, the shared cloud-sync core, Google Drive sync, import/export, backups, account deletion, or sync UI.
+This file is the source of truth for TaskTime Pro cloud sync behavior. Read it
+before changing Yjs storage, the shared cloud-sync core, either provider adapter,
+import/export, backups, account deletion, or sync UI.
 
 Handled production incident captures are documented in the private operations runbook. Update that runbook when adding or removing sync/auth/persistence incidents.
 
@@ -11,8 +13,9 @@ compatible and must not require users to clear local or provider data.
 ## Architecture
 
 - Storage is local-first Yjs CRDT data persisted in IndexedDB.
-- `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own shared behavior. `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google-only compatibility facades. Dropbox entry points are enabled, with an explicit false emergency UI opt-out; compatible Worker controls remain the fail-closed runtime boundary, and provider transfers remain disabled pending the final canary.
-- Drive sync stores Yjs base-state files, delta files, and one manifest in Google Drive appDataFolder.
+- `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own shared behavior. `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google-only compatibility facades. Dropbox entry points and explicit user-initiated provider transfers are deployed/enabled for approved/current accounts, with an explicit false emergency UI opt-out and independent fail-closed Worker endpoint/acquisition/transfer controls. No transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary.
+- The selected provider adapter stores Yjs base-state files, delta files, and one
+  manifest in Google Drive appDataFolder or Dropbox App Folder.
 - The Worker retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, and revocation. Routine Google Drive and Dropbox requests go directly from the browser to the selected provider.
 - In the provider-neutral implementation, the lifecycle-selected
   Google Drive or Dropbox session also authenticates hosted email, privacy-safe
@@ -36,7 +39,8 @@ compatible and must not require users to clear local or provider data.
 - `expenses-archived`: archived expenses loaded on demand.
 - `invoices-archived`: archived invoices loaded on demand.
 
-When adding a document, update export/import, Drive sync, validation, local clear/delete, tests, and this README.
+When adding a document, update export/import, both provider adapters, validation,
+local clear/delete, tests, and this README.
 
 ## Sync Modes
 

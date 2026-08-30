@@ -13,7 +13,7 @@
 
 1. **Backwards compatibility is mandatory** — Existing local and synced Yjs data must keep working
 2. **No destructive schema changes without migration** — Add optional fields first, migrate safely, and preserve old data
-3. **No user-data reset assumptions** — Users must not be expected to clear browser data or Drive sync state
+3. **No user-data reset assumptions** — Users must not be expected to clear browser data or Google Drive/Dropbox sync state
 4. **No clean breaks in persisted contracts** — Entity shapes, document names, sync metadata, and URL routes need compatibility handling
 5. **No automatic destructive sync actions** — Resets, claim states, archive moves, and billing mutations must be explicit and reversible where practical
 6. **Legacy code can be removed only after migration** — Delete old implementations after the replacement safely handles existing data

@@ -61,6 +61,55 @@ These invariants summarize critical production contracts. They supplement the de
 - Invoice references use `project.invoiceIds[]`; invoices are separate entities rather than embedded project records.
 - Import/export must preserve supported entity relationships and reject or safely normalize malformed external data without silently losing records.
 
+## Planned subscription and entitlement boundary
+
+- Billing/license/trial/quota state stays outside Yjs, provider files, product
+  backups/exports/imports, and app-origin migration. It never deletes, hides,
+  rewrites, archives, disconnects, or resets product/provider data.
+- `reports.access` gates advanced report data/ranges/outputs and equivalent
+  advanced agent scopes, not `/reports`, its exact current-month Free Overview,
+  or visible advanced-tab previews. A locked preview branches before protected
+  modules, history, calculations, rows, exchange rates, or export builders load.
+  Shared utilities and operations consumed by Dashboard, clients/projects,
+  unbilled/invoice calculations, Expenses/tax bookkeeping, PDFs, data integrity,
+  compatibility, or portability remain Free.
+- All seven tax-period/expense-claim bookkeeping commands remain Free and a
+  non-report Expenses surface must preserve equivalent browser access without
+  exposing Pro report aggregates.
+- `invoice.email.send` gates only TaskTime-hosted sending. Preparing/editing the
+  message/template/forward choice, previewing/downloading the PDF, copying, and
+  manual delivery remain Free. Trial/purchase return never sends automatically.
+- Free permits one active client, where missing or false `archived` is active;
+  Trial/Pro permit unlimited active clients. Only a forward create/unarchive
+  transition at the current limit is refused. Existing, imported, restored,
+  synced, downgraded, or concurrently merged over-limit clients and dependent
+  data remain visible, editable, usable, archivable, deletable, exportable, and
+  recoverable. Import/restore/sync never auto-corrects the count destructively.
+- Client assertions authorize only advanced report behavior and unlimited-client
+  forward transitions and require exact
+  lifecycle-subject binding, strict signature/time validation, and bounded
+  expiry. Worker-cost services always use canonical server-side entitlement and
+  atomic idempotent quota enforcement.
+- The founding offer permits at most 1,000 lifetime paid canonical-principal
+  allocations. Atomic bounded reservations may not oversell; paid allocations
+  never recycle after cancellation/refund/dispute/deletion. No public response
+  exposes the exact remaining count. Temporary reservation saturation remains
+  retryable. At 1,000 commits, new acquisition selects the approved
+  `EUR 59/year` standard offer; standard Checkout never touches a founding slot.
+  A stale `EUR 39` intent must be explicitly reconfirmed at `EUR 59` before any
+  Stripe side effect and is never silently substituted.
+- A successful canonical Free decision is signed and versioned. Identity
+  conflict, canonical unavailability, unsupported response versions, and stale
+  lifecycle responses never masquerade as Free or invite repurchase.
+- Acceptance-unknown email attempts remain durably reserved and are reconciled
+  through a caller-owned D1-only status operation that can never resend or expose
+  raw provider identifiers. Browser recovery state is privacy-minimized,
+  lifecycle-bound, non-Yjs, and excluded from product backup/sync.
+- Provider transfer across hosted-identity and email D1 databases uses a durable
+  prepare/commit/apply journal and fences both accounts until completion. It
+  never exposes partially moved entitlement/quota state or activates the target
+  merely because one database committed.
+
 ## Agent bridge and repository boundary
 
 - The browser app remains the mutation owner; MCP tools expose business actions rather than raw storage access.

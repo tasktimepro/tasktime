@@ -18,6 +18,15 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **WORK-3:** Support list and kanban project task views, project notes, estimates, deadlines, budgets, colors, sorting, and quote mode where implemented.
 - **WORK-4:** Plan clients, projects, tasks, and expenses by week/day without duplicating the referenced entity.
 - **WORK-5:** Track daily and weekly goals using the user's week-start preference.
+- **WORK-6:** Free permits one active client and Trial/Pro permit unlimited active
+  clients. Active means `client.archived !== true`, including legacy records
+  without the field. Create, explicit unarchive, and generic
+  `archived:false` transitions use one revalidating policy. The limit refuses
+  only a net increase; existing, downgraded, imported, restored, synced, or
+  concurrently merged over-limit clients and dependent data remain visible,
+  editable, usable, archivable, deletable, exportable, and recoverable. Import,
+  restore, and sync never fail, discard, or auto-archive records because of the
+  count.
 
 ## Time tracking
 
@@ -52,9 +61,100 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **REPORT-1:** Report totals must derive from the same canonical time, expense, invoice, payment, tax, date, client, project, and currency semantics used elsewhere.
 - **REPORT-2:** Filters and date ranges must apply consistently to on-screen summaries and exported CSV/PDF/accountant packs.
 - **REPORT-3:** Canceled invoices remain available as audit rows with original face value and cancellation metadata but contribute zero to revenue, payment, output-tax, profit, outstanding, overdue, aging, and client-statement totals.
+- **REPORT-4:** Free Reports Overview covers the current local calendar month and
+  exposes exactly **Received**, **Expenses**, and **Tracked time**. Received uses
+  the canonical effective paid timestamp and payment-currency fallback; Expenses
+  uses gross stored amounts by expense date; Tracked time uses actual completed-
+  entry duration by entry start. Currency totals remain grouped without a live
+  conversion request. It exposes no filters, history, rows, exports, current-
+  client, net/profit, tax, outstanding, or uninvoiced aggregate. It reads only
+  always-loaded local sources and renders without waiting for cloud connection,
+  catalog, JWKS, or billing status.
+- **REPORT-5:** `/reports` and every advanced tab, including To Invoice, remain
+  visible, directly addressable, and keyboard-selectable. Free selecting an
+  advanced tab sees a section-specific static Pro preview and non-color-only Pro
+  badge. Entitlement branches before mounting an advanced module or loading
+  protected history, report calculations, rows, exchange rates, or export code.
+  Missing, unknown, malformed, or case-mismatched report sections canonicalize
+  to Overview.
 - **BACKUP-1:** Export a portable backup containing supported account data without secret credentials.
 - **BACKUP-2:** Preview imports before mutation and restore valid supported backups without breaking relationships.
 - **BACKUP-3:** Keep public compatibility fixtures and regression tests for representative older backup shapes.
+
+## Subscription entitlements and hosted services (planned; not yet enabled)
+
+- **ENTL-1:** Keep core local use account-free and Free. Initial Pro gates are
+  limited to net-increasing active-client transitions beyond one, advanced
+  Reports/ranges/outputs and equivalent advanced report-agent scopes, and
+  TaskTime-hosted sending. `/reports`, its current-month Overview, and visible
+  advanced previews remain Free.
+- **ENTL-2:** Entitlement attaches to a semantic action, not a shared utility.
+  Dashboard, client/project/unbilled calculations, invoices/PDFs, Expenses/tax
+  bookkeeping, email preparation/manual delivery, sync/backups, portability, Web
+  Push, and core agents remain Free even where they reuse report/email code. A
+  compact Expenses surface must preserve tax-period list/create/update/file/pay
+  and expense claim/unclaim browser operations without report aggregates.
+- **ENTL-3:** Every hosted principal may explicitly start at most one server-timed
+  30 x 24-hour Pro trial without a card, Stripe trial/subscription, automatic
+  charge, renewal, reset, or navigation/OAuth side effect. Early paid access
+  takes precedence without pausing the immutable trial; if that higher-priority
+  source ends first, the trial remains a fallback only until its original end.
+- **ENTL-4:** Verify a short-lived ES256 assertion against the exact active
+  provider lifecycle binding and trusted time before advanced Reports access or
+  an unlimited-client transition. Free Overview needs no Pro assertion. An
+  assertion never authorizes Worker-cost services and never enters Yjs, provider
+  data, backups, exports, or origin migration.
+- **ENTL-5:** Canonical Stripe state, bounded reconciliation freshness, current
+  period/grace, and server configuration govern paid access. Redirects, cached
+  display state, stale D1 rows, and client-supplied identities never grant it.
+- **ENTL-6:** The Worker publishes a sanitized versioned catalog. Clients and the
+  homepage do not hardcode prices, tax labels, allowances, legal versions, or
+  Stripe IDs; a changed catalog requires fresh purchase confirmation.
+- **ENTL-7:** Hosted email uses a UTC calendar-month allowance and atomic,
+  idempotent primary/forward reservations. Provider-accepted parts consume;
+  proven pre-acceptance failure releases; ambiguous outcomes remain reserved and
+  are not automatically resent.
+- **ENTL-8:** Provider transfer, trial, Checkout, webhook reconciliation, grants,
+  deletion, and hosted-email reservations serialize or compare durable versions
+  so retries/concurrency cannot duplicate a trial, customer, subscription,
+  allowance, ownership, or send.
+- **ENTL-9:** Trial/subscription expiry or rollback removes only advanced
+  Reports, hosted Send, and future net-increasing active-client transitions. It
+  never deletes, hides, rewrites, disconnects, or makes existing product/
+  accounting data impossible to maintain or export.
+- **ENTL-10:** Trial, Checkout, and provider flows return to the originating safe
+  route/draft but never auto-send email, auto-export, replay an agent command, or
+  perform another consequential action without fresh confirmation.
+- **ENTL-11:** A versioned successful canonical Free status includes a signed
+  Free assertion. Identity conflict, canonical unavailability, unsupported
+  response version, and stale lifecycle responses cannot authorize Pro and must
+  render repair/retry/update state rather than Free or a repurchase prompt.
+- **ENTL-12:** An acceptance-unknown hosted email has a privacy-minimized durable
+  attempt and a caller-owned D1-only status operation. Status never contacts the
+  provider, resends, changes allowance, or returns raw provider IDs; accepted
+  local sent metadata is applied idempotently only after current-record/lifecycle
+  revalidation.
+- **ENTL-13:** Cross-database provider transfer uses a durable idempotent journal,
+  EMAIL_DB prepare/apply record, direct aliases, and a hosted-action fence until
+  both stores agree. Crashes/retries cannot expose a partial license/quota move,
+  reset allowance/trial, or activate the target early.
+- **ENTL-14:** Launch packaging has exactly Free and Pro. Trial is an entitlement
+  source and Founding/Standard are Pro offers, not additional plans. The founding offer is
+  annual EUR with `unitAmountMinor:3900` (`EUR 39.00`) for the first 1,000
+  canonical hosted principals whose initial subscription payment succeeds.
+  The standard offer is annual EUR with `unitAmountMinor:5900` (`EUR 59.00`).
+  Checkout capacity is reserved atomically and never oversold; committed paid
+  allocations are never recycled. Temporary reservation saturation is retryable
+  and does not activate standard pricing. Once 1,000 allocations are committed,
+  new purchases use standard without reading or mutating founding slots.
+  The same continuous/recoverable subscription retains its founding base price;
+  cancellation defaults to period end, reversal before that date preserves it,
+  and terminal cancellation followed by a new purchase uses standard. A
+  continuous/recoverable standard subscription likewise retains its recognized
+  `EUR 59.00` Price. A stale
+  founding intent must show the standard order summary and require fresh
+  confirmation before Stripe creation; it is never silently repriced. No exact
+  remaining count is exposed.
 
 ## Sync and offline behavior
 

@@ -1,6 +1,6 @@
 # TaskTime Pro System Overview
 
-TaskTime Pro is a production, local-first task management, time tracking, expense, reporting, and invoicing application for freelancers and solo professionals. The browser owns user data and business mutations. Optional services add Drive synchronization, push notifications, diagnostics, public documentation, and same-device agent access.
+TaskTime Pro is a production, local-first task management, time tracking, expense, reporting, and invoicing application for freelancers and solo professionals. The browser owns user data and business mutations. Optional services add provider-neutral Google Drive or Dropbox cloud synchronization, push notifications, diagnostics, public documentation, and same-device agent access.
 
 This is a context-compression document. Detailed requirements live in `spec/`, durable interfaces in `contracts/`, and mandatory constraints in `rules/`.
 
@@ -8,12 +8,16 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
-- **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, and agent behavior while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Dropbox endpoints and new connections are enabled; transfers remain disabled until the final production canary is green. Routine file bodies bypass the Worker. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
+- **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
 - **Public site:** Astro content under `blog/` builds the product overview, blog, legal pages, agent documentation, discovery metadata, and generated tool references.
 - **Operational evidence:** DebugBundle captures opted-in runtime incident evidence; local tests remain the first tool for deterministic failures.
+- **Planned subscription control plane:** Private Worker/D1/Stripe modules will
+  publish a sanitized catalog, canonical provider-bound billing status, and
+  short-lived signed local assertions. Production controls remain off until the
+  documented launch gates; billing state never becomes Yjs/product/provider data.
 
 ## Data model and ownership
 
@@ -39,6 +43,16 @@ The Yjs store is split into documents so current work stays loaded and historica
 5. Review dashboard metrics and reports, then export CSV, PDF, ZIP, backup, or accountant artifacts.
 6. Optionally connect Google Drive or Dropbox using manual, backup, or bidirectional sync modes.
 7. Optionally pair a same-device agent bridge and grant scoped business-action access.
+8. When the planned Pro release is enabled, Free permits one active client and a
+   useful Reports Overview for the current local calendar month. An optional
+   no-card trial or Pro subscription unlocks unlimited active clients, advanced
+   report tabs/outputs, and TaskTime-hosted sending. Existing/imported/synced
+   records, manual email delivery, PDFs, tax bookkeeping, sync/backups,
+   portability, and core agents remain available. Launch packaging is only Free
+   and Pro; the founding Pro offer is `EUR 39/year` for the first 1,000 paid
+   canonical principals, after which new acquisition automatically uses the
+   `EUR 59/year` standard offer. Existing continuous/recoverable founding
+   subscriptions remain on their founding Price.
 
 ## Reliability and security model
 
@@ -49,6 +63,13 @@ The Yjs store is split into documents so current work stays loaded and historica
 - Canceled invoices remain read-only audit records in `core`, are unmistakably marked in retained PDFs, and contribute zero to payment, revenue, output-tax, profit, outstanding, aging, statement, and project-allocation calculations. Portable backup `1.5` preserves the record while continuing to import every previously supported backup version.
 - Mark-as-unpaid is a paid-invoice correction only: it clears payment evidence while retaining billing-source claims and cannot reopen a sent, overdue, draft, or canceled invoice.
 - UI hooks and agent commands share domain operations for timer lifecycle/recovered stops, protected manual time-entry mutations, task completion/recurrence state, duplicate-safe entity identity, protected expense deletion, and relationship-safe project/client/task writes.
+- Planned entitlement policy is likewise shared across browser and agent paths.
+  It gates only a net-increasing active-client create/restore transition,
+  advanced Reports/exports, and hosted Send. `/reports`, its current-month
+  Overview, and every tab remain visible; a locked advanced tab branches to a
+  static section-specific preview before mounting protected modules, history,
+  calculations, rows, or export builders. Import/restore/sync never discards or
+  auto-archives an over-limit client.
 - Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.
 - Sync mode performs a lightweight manifest check every five minutes only while visible, coalesces tab-visible/browser-online signals within one second into one foreground pass, and lets genuine pending local work blocked by an active pass or cross-tab lock retry with bounded backoff after the lock can be released. External lazy-document loads serialize behind an active provider pass; lazy loads owned by that pass defer their manifest commit to the owner so revision-sensitive writes cannot overlap.

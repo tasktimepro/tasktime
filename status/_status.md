@@ -20,6 +20,16 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 - Installed OpenClaw validation and remaining agent-directory publication checks
 - OpenClaw durability implementation and automated release evidence are complete: credentials/contracts are reconciled, status/logging are hardened, browser refresh and same-profile reopen continuity are covered, and the native plugin owns one Gateway-lifecycle bridge while generic MCP/Claude stdio remain supported. CLI/Gateway alignment and disposable-profile migration/rollback now pass on `2026.7.1-2`; the final installed plugin/browser multi-turn acceptance remains pending.
 - Approved product backlog after its recorded ambiguities are resolved
+- The subscription/license implementation plan is contract-complete for local
+  Slices 0-8 with production controls off; implementation has not started. The
+  approved boundary is Free with one active client and a current-local-month
+  Reports Overview, Pro with unlimited active clients, advanced Reports/exports
+  and hosted sending, and a `EUR 39/year` founding offer for the first 1,000 paid
+  canonical principals followed automatically by the `EUR 59/year` standard
+  offer for new purchases. Email allowance, paid grace, tax-inclusive versus
+  additional-tax presentation, both live Stripe mappings, remaining payment/
+  refund/Portal/support policy, Dropbox broad-public access, the
+  app-origin migration, homepage work, and live release approval remain gates.
 
 The July 2026 deep validation and Critical/High remediation are complete. Evidence, decisions, and the full release gate are recorded in `status/critical-path-assurance.md`.
 The repository now has a zero-diagnostic TypeScript baseline enforced by the release gate; gradual source migration remains ongoing.
@@ -48,7 +58,7 @@ The repository now has a zero-diagnostic TypeScript baseline enforced by the rel
 ## Blockers and open questions
 
 - See `spec/ambiguities.md`. Remaining decisions concern future product work or compatibility-policy evolution; none blocks the completed assurance slice.
-- Provider-neutral sync is promoted as core app `1.5.0`; the compatible Worker/app rollout and focused production canary are complete. Agent bridge `1.1.0` is public on npm and MCP Registry, OpenClaw `1.1.0` is public on npm and ClawHub, and the repository-backed Claude `1.1.0` / marketplace `1.3.0` artifacts ship from `main`. The unchanged ClawHub skill stays at `1.2.1` and did not require republication. The only Dropbox follow-up is the external App Console production-access application; it does not change the shipped code or direct-data privacy boundary.
+- Provider-neutral sync is promoted as core app `1.5.0`; the compatible Worker/app rollout and focused production canary are complete. Agent bridge `1.1.0` is public on npm and MCP Registry, OpenClaw `1.1.0` is public on npm and ClawHub, and the repository-backed Claude `1.1.0` / marketplace `1.3.0` artifacts ship from `main`. The unchanged ClawHub skill stays at `1.2.1` and did not require republication. Broad Dropbox availability has one external two-part follow-up: obtain App Console production access, then pass the non-destructive post-approval sign-in/token/direct-file canary. This does not change the shipped code or direct-data privacy boundary.
 
 ## Quality gate
 

@@ -11,6 +11,32 @@ Let users understand exactly what will be billed, what changed after finalizatio
 - Expense views provide filters, due/recurrence context, paid state, categories, project/client links, and tax status.
 - Reports place filters near affected totals and use tables/exports where comparison matters.
 
+## Planned Free to Pro experience
+
+- Reports stays neutral in desktop/mobile navigation. Its Free Overview shows
+  only current-month **Received**, **Expenses**, and **Tracked time**; every
+  advanced tab remains visible with a non-color-only Pro badge and tailored
+  static preview before any protected data loads.
+- Invoice/quote email composition, templates, forwarding choice, PDF preview/
+  download, copying, and manual delivery remain usable. Only the final TaskTime-
+  hosted **Send** action becomes the Pro conversion point. It stays visible but
+  unavailable with an inline explanation and a separate enabled trial/Pro or
+  recovery action; a disabled control is never the only path forward. Trial/
+  purchase return restores the draft and always requires a fresh Send.
+- Pricing presents only Free and Pro. It labels annual `EUR 39` truthfully as
+  the founding base price for the first 1,000 paid members and annual `EUR 59`
+  as the automatic standard offer afterward. Temporary reservation saturation
+  shows a retry state rather than switching early. Amount, tax, applicability,
+  and availability derive from the versioned catalog/status projection; a price
+  change always returns to an explicit order confirmation.
+- Cancellation defaults to period end and shows continued access plus the exact
+  end date. A founder's confirmation explains that reversing before then
+  preserves the founding base price, while terminal cancellation permanently
+  ends founding eligibility and a later new subscription uses the current
+  standard offer (`EUR 59/year` under the approved launch catalog). A standard
+  subscriber sees no founding-language warning and is told that a later new
+  subscription uses the then-current standard catalog.
+
 ## Billing safety rules
 
 - UI and agent previews load active, historical, and archived billing candidates before selection.

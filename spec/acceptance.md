@@ -37,6 +37,109 @@
 - Import preview reports validation issues before mutation.
 - Accepted import preserves supported records and relationships; rejected input leaves current data unchanged.
 
+## Subscription and Pro boundary (planned; production controls remain off)
+
+- A Free user can open `/reports` and use Overview for the current local calendar
+  month. It shows exactly **Received**, **Expenses**, and **Tracked time** under
+  the canonical date, duration, legacy-payment, and currency semantics, with no
+  advanced filters, history, rows, exports, or other financial aggregates.
+  Overview renders immediately from always-loaded local data without waiting for
+  a provider, catalog, JWKS, or billing-status request. Missing, unknown,
+  malformed, and case-mismatched report sections canonicalize to Overview.
+  Every advanced tab, including To Invoice, remains visible, directly
+  addressable, and keyboard-accessible. Selecting one renders its section-
+  specific static Pro preview without mounting the advanced module, loading
+  protected history, requesting exchange rates, or exposing advanced values/
+  exports. Dashboard, client/project/unbilled views, invoices/PDFs, Expenses/tax
+  bookkeeping, email preparation/manual delivery, portability, supported cloud
+  behavior, Web Push, and core agents remain usable.
+- `get_report_summary({scope:"basic-current-month"})` is Free and returns only
+  the closed versioned three-metric Overview contract. Omitted scope compatibility-defaults to
+  `advanced`; advanced summary and all report CSV/PDF/accountant-pack exports
+  require `reports.access`, branching before `collectReportsData()`. All seven
+  tax-period/expense-claim commands remain Free and expose no report aggregate
+  through that path.
+- Free allows a first active client. At the limit, every browser and agent
+  create/unarchive path refuses only the net-increasing transition with the same
+  typed policy; archiving frees a slot and upgrading never auto-replays the
+  action. Idempotent replay is resolved before counting. Downgraded, imported,
+  restored, synced, or concurrently merged over-limit clients remain visible,
+  editable, usable, archivable, deletable, exportable, and recoverable without
+  silent correction.
+- A compact Expenses-side browser surface likewise keeps tax-period list/create/
+  update/mark-filed/mark-paid and expense claim/unclaim operations Free while
+  exposing no Reports aggregate, filter, or export.
+- An eligible connected account starts one 30-day no-card trial only after an
+  account-reference confirmation. OAuth/navigation/retry never starts or moves
+  it. Operational rollout/canary controls never grant Pro or consume it. Early
+  purchase takes precedence without pausing the original trial, which remains a
+  fallback until its immutable end.
+  Exact trial expiry removes only that source; advanced Reports, hosted Send, and
+  future active-client increases close only when no paid or grant source remains.
+- Cold-offline Pro is selected only through the exact provider/generation/session-
+  fingerprint binding. Wrong/missing/staged bindings, account switches, late
+  responses, invalid signatures, excessive clock rollback, and expiry cannot
+  authorize cached Pro and never delete product data. A verified signed Free
+  status renders Free; unresolved lifecycle, unsupported response version, or
+  transient/unsafe status failure renders eligibility unknown/unavailable with
+  retry/update/repair guidance, never a misleading **Get Pro** prompt. Stale
+  responses are ignored rather than converted into a plan decision.
+- A provider-disconnected user can inspect the current catalog without implying
+  a separate TaskTime login. Trial eligibility remains unknown until a selected
+  Google Drive or Dropbox session resolves canonical status. Checkout displays the exact
+  catalog amount/currency/interval/tax/renewal/legal summary, reconfirms a changed
+  revision, creates at most one active attempt per account, and waits for
+  canonical Stripe confirmation after return.
+- The catalog contains exactly Free and Pro, with annual `EUR 39` founding and
+  `EUR 59` standard offers under Pro. Founding applies to the first 1,000
+  successfully paid canonical principals. A 1,001-way concurrent
+  Checkout test never exceeds 1,000 live reservations plus committed slots;
+  unpaid canonically expired reservations release exactly once, while committed
+  paid slots never recycle. Reservation-only saturation remains retryable and
+  does not activate standard pricing. After the 1,000th commit, a stale founding
+  request creates no Stripe state and requires explicit confirmation of the
+  `EUR 59` order summary; the resulting standard Checkout touches no founding
+  slot. The same continuous/recoverable subscription retains its immutable
+  founding Price, while a terminally ended founder's new purchase uses standard.
+  No exact remaining count is disclosed.
+- Subscription cancellation defaults to period end and shows the effective date
+  and continued access. For a founder it states that reversal before then
+  preserves the founding base price and warns that terminal cancellation
+  permanently loses founding eligibility, so a later new subscription uses the
+  current standard offer (`EUR 59/year` under the approved launch catalog). A
+  standard subscriber sees no founding-specific warning and is told that a later
+  new subscription uses the then-current standard catalog.
+- Provider connection copy states that Google Drive/Dropbox is also the optional
+  storage connection, keeps the current sync mode, returns to the intended
+  surface, and requires a separate trial/purchase confirmation.
+- Email recipient/subject/body/template/forwarding/PDF preparation remains Free.
+  Free/over-quota users retain the draft, template editor, PDF/download, copy,
+  and manual-delivery path. The hosted Send control remains visible but
+  unavailable with an accessible inline reason and a separate enabled trial/Pro
+  or recovery action; a disabled control is never the only explanation or
+  action. Trial/purchase return restores the draft but never sends
+  automatically; a fresh Send uses one durable request key and exact primary/
+  forward units.
+- Public catalog/JWKS caching is isolated from private no-store billing/email
+  responses. Status and the signed license share one canonical entitlement
+  revision; a mismatch is unavailable/retryable and never a repurchase prompt.
+  Pending provider acceptance is written before Send to a privacy-minimized,
+  lifecycle-bound non-Yjs attempt store and returns a D1-only status-check path,
+  not an automatic send. Reload/account switch/transfer never queries the wrong
+  owner or exposes/resends content; terminal sent metadata converges once.
+- Provider loss does not prevent a subscriber obtaining invoices or canceling
+  through the approved Stripe-hosted login or audited support route. Provider,
+  product-data, billing, cancellation, and billing-profile deletion remain
+  distinct.
+- Real local D1 tests prove migration rollback, operation claims, founding-slot
+  contention/continuity, founding-to-standard selection/reconfirmation without
+  standard slot mutation, concurrent trial/Checkout/transfer/webhook/email
+  behavior, stale-lease recovery, legacy
+  email cutover, the fenced cross-database transfer saga, executable clean/
+  current-baseline ledgers, and representative backup/restore. Browser responses
+  and logs contain none of the
+  prohibited billing/provider/invoice/email payloads.
+
 ## Sync modes
 
 - Manual mode auto-connects but does not normally pull/push without “Sync Now,” except documented pristine-device bootstrap.

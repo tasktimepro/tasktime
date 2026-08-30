@@ -1,8 +1,8 @@
 # Cloud Sync Provider Expansion
 
-This is the public execution checklist for the planned provider-neutral cloud-sync and Dropbox phase. It complements `spec/roadmap.md`; private Worker contracts, capacity operations, provider-console setup, and deployment details remain in the private infrastructure plan.
+This is the public execution record for the deployed provider-neutral cloud-sync and Dropbox phase. It complements `spec/roadmap.md`; private Worker contracts, capacity operations, provider-console setup, and deployment details remain in the private infrastructure plan.
 
-The planned behavior contract is `spec/features/provider-neutral-cloud-sync-and-dropbox.md`.
+The deployed behavior contract is `spec/features/provider-neutral-cloud-sync-and-dropbox.md`.
 
 ## Current state
 
@@ -36,7 +36,7 @@ The planned behavior contract is `spec/features/provider-neutral-cloud-sync-and-
 - [x] Prepare a human-readable, search-friendly Dropbox sync announcement for the public blog. It is included in the verified merged production build and will publish with the app promotion.
 - [x] Promote the moved-source recovery fix and complete the focused production canary. The exact app release passed GitHub CI and was deployed to Pages; the retained Google Drive session survived the upgrade and an explicit Sync Now returned to In sync without new app, Yjs, or sync errors. The compatible Worker then passed its 105-test/typecheck gate, enabled transfers, exposed the provider-specific transfer action, and returned a valid Dropbox transfer authorization URL without starting an automatic move. The complete two-provider move and moved-source replacement paths remain covered by the real-account local production-preview canaries rather than repeating a destructive production transfer.
 - [x] Publish core app `v1.5.0`, agent bridge/MCP Registry `1.1.0`, OpenClaw npm/ClawHub `1.1.0`, and repository-backed Claude `1.1.0` / marketplace `1.3.0`; leave the unchanged ClawHub skill at `1.2.1`.
-- [ ] Apply for Dropbox App Console production access. This is the remaining external availability/capacity step; the production code, Worker, transfer flag, privacy boundary, canary, and package releases are complete.
+- [ ] Obtain Dropbox App Console production access, then complete a non-destructive post-approval sign-in/token/direct-file network canary. This is the remaining broad-public-availability step; production code, Worker, transfer flag, privacy boundary, existing-account canaries, and package releases are complete.
 
 Production now supports Google Drive and Dropbox connections plus explicit,
 user-initiated provider transfers. The moved-source recovery fix is promoted:
@@ -133,7 +133,7 @@ before enablement.
 - [x] Add memory-only browser token handling, provider-specific callback/invalidation, and the direct Dropbox App Folder adapter.
 - [x] Cover revision conflicts, hashes, pagination, ambiguous writes, rate limits, capacity errors, and large upload sessions with simulated provider contracts.
 - [x] Complete the owner-only Microsoft Edge real-credential synthetic App Folder and post-fix request-count canary using the prepared local setup.
-- [ ] Complete the production supported-browser credential and network canaries after the disabled Worker foundation is deployed.
+- [x] Supersede the former disabled-foundation supported-browser gate with the completed promoted-app/Worker canaries below; the distinct post-App-Console public-access canary is tracked in Current state.
 
 ### Slice 6 — Provider-aware client lifecycle
 
@@ -178,8 +178,8 @@ before enablement.
   salt, and deploy the compatible Worker before client enablement.
 - [x] Prepare next-release public contracts, privacy/terms, README, onboarding,
   agent guidance, and evergreen public copy for Google Drive/Dropbox parity.
-  These changes remain unshipped and must not be described as deployed until
-  the compatible Worker/app production canary is green.
+  These changes shipped with the compatible Worker/app after the recorded
+  production canary became green.
 - [x] Complete the focused Edge production credential canary with synthetic data: the existing Google Drive session survived the app promotion, an explicit Sync Now reached In sync, and the enabled transfer action initialized the Dropbox authorization flow without automatically moving data.
 - [x] Prove in the owner-only Edge canary that no Worker request carries routine Dropbox provider data.
 - [x] Confirm the promoted app still performs routine Google Drive sync directly from the browser and that production transfer initialization uses only the Worker control plane. The real-account Dropbox direct-data-path proof remains the pre-enable local production-preview canary because no production transfer was started during rollout.
@@ -194,7 +194,10 @@ before enablement.
 - Both providers pass the shared adapter, mode, request-budget, backup, destructive-action, and privacy matrices.
 - Both transfer directions reconstruct the same complete Yjs workspace and recover safely from every injected interruption.
 - Worker tests/typecheck, app coverage/lint/typecheck/build/browser/PWA/release gates, and generated agent checks are green as applicable.
-- Dropbox App Folder scopes, redirect URIs, current development access, and privacy disclosures are verified; App Console production access remains the external follow-up recorded above.
+- Dropbox App Folder scopes, redirect URIs, current development access, and
+  privacy disclosures are verified; App Console production access followed by
+  the non-destructive post-approval sign-in/token/direct-file canary remains the
+  external broad-availability follow-up recorded above.
 - Total Cloudflare usage retains at least two-times headroom under the selected plan after a doubled peak projection and canary comparison.
 - Existing Dropbox support survives acquisition/transfer rollback; no automatic Google fallback exists.
 - Exact releases/deployments and public enablement receive separate explicit approval.

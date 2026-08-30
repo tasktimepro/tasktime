@@ -50,25 +50,79 @@ The detailed finding-by-finding execution checklist and validation state live in
 - Remaining approved product backlog such as task templates after recorded ambiguities are resolved
 - Continued public-site indexing/SEO and agent distribution maintenance
 
-## Phase 6 — Subscription billing and hosted-service entitlements (planned; decision-gated)
+## Phase 6 — Subscription billing and hosted-service entitlements (planned; locally implementation-ready, launch-gated)
 
-- The approved initial Pro boundary is the main Reports workspace and report-specific browser/agent exports plus TaskTime-hosted invoice/quote/reminder email sending. The current Dashboard metrics widget, local core workflows, invoices/quotes and PDFs, supported cloud sync/backups, portable import/export, Web Push, and equivalent core agent workflows remain free without entity limits.
-- Every eligible hosted principal authenticated through its selected Google Drive or Dropbox provider may explicitly activate one account-bound 30-day Pro trial with no payment method, Stripe subscription, automatic charge, renewal, or reset. Trial expiry returns only Reports and hosted email to their Free states and never mutates product/provider data.
-- The private plan covers canonical D1 trial/subscription state, Stripe Billing/Portal/webhooks, signed subject-bound offline assertions capped at trial expiry, atomic email allowances, Reports/dashboard/tax-maintenance boundaries, account/deletion/support lifecycles, UI/agent parity, careful public-claim reconciliation, staged deployment, and non-destructive rollback.
-- Remaining open Phase 0 decisions in `spec/ambiguities.md` block Checkout, trial activation, and enforcement. Disabled Worker/schema, entitlement, and shadow-UI slices may proceed only while every current production feature remains available.
-- Delivery order is remaining contracts/decisions, inert Worker/trial/schema foundation, order-independent Stripe reconciliation, hardened status/trial/Checkout APIs, client shadow state, Reports upsell/trial/shared policy, Pro email with atomic allowance, downgrade/free-path reconciliation, then controlled public launch.
+- The approved initial Pro boundary is a net increase beyond Free's one active
+  client, advanced Reports/ranges/exports and equivalent advanced report-agent
+  scopes, and TaskTime-hosted invoice/quote/reminder email sending. `/reports`,
+  its exact current-local-month Received/Expenses/Tracked-time Overview, every
+  visible advanced-tab preview (including To Invoice), Dashboard/client/project/
+  unbilled calculations, tax bookkeeping, email preparation/manual PDF delivery,
+  invoices/quotes/PDFs, supported cloud sync/backups, portable import/export, Web
+  Push, and core agents remain Free. Existing/imported/synced over-limit data is
+  preserved and maintainable.
+- Every eligible hosted principal authenticated through its selected Google
+  Drive or Dropbox provider may explicitly activate one account-bound 30-day Pro
+  trial with no payment method, Stripe subscription, automatic charge, renewal,
+  or reset. Trial expiry removes only advanced Reports, hosted Send, and future
+  active-client increases; it never mutates product/provider data.
+- The private plan covers canonical D1 trial/subscription state, the exact annual
+  `EUR 39` first-1,000 founding offer, atomic capacity, automatic annual
+  `EUR 59` standard-offer transition, Stripe Billing/Portal/
+  webhooks, signed subject-bound offline assertions, active-client compatibility,
+  atomic email allowances, lazy Reports/free-path separation, account/deletion/
+  support lifecycles, UI/agent parity, public-claim reconciliation, staged
+  deployment, and non-destructive rollback.
+- Implementation/security contracts are frozen in the private plan. Local
+  Slices 0-8 use the exact test-mode `EUR 39/year` founding and `EUR 59/year`
+  standard offers plus synthetic fixtures only for still-open email allowance,
+  paid grace, tax presentation,
+  seller/legal/support, and payment/refund/Portal policy. Work may
+  proceed only while every production billing/trial/Checkout/upsell/enforcement
+  control is off and current production features remain available.
+- Local delivery order is the frozen contract/owned launch-decision packet,
+  inert Worker/trial/schema foundation, order-independent Stripe/founding-slot
+  reconciliation, hardened status/trial/Checkout APIs, client shadow state,
+  shared active-client transition enforcement, Free Reports Overview plus lazy
+  Pro previews/policy, Pro email with an atomic synthetic allowance, and expiry/
+  downgrade/free-path reconciliation. Final commercial/legal approvals occur
+  only in the controlled production-launch phase.
 - Public positioning continues to say TaskTime is free, open source, and local-first; Pro is an optional time-saving upgrade rather than a prerequisite for core use.
-- Success evidence requires Worker tests/typecheck, the core release gate, exact one-time trial/expiry proof, UI/agent parity, Reports/email/free-path and tax-correction coverage, multi-device/offline/downgrade/account-switch evidence, Stripe test-mode lifecycle evidence, approved live trial and low-value purchase validation, exact deployed-version evidence, owner approval, and separately tested Reports/email rollback flags.
+- Program Phase 1 local evidence requires Worker tests/typecheck, the core release
+  gate, one-time trial/expiry, 1,001-way founding contention/continuity,
+  founding-to-standard selection/reconfirmation with no standard slot mutation,
+  active-client compatibility, UI/agent parity, Free Overview/protected-load separation,
+  advanced Reports/email/free-path and tax-bookkeeping coverage, multi-device/
+  offline/downgrade/account-switch evidence, Stripe test-mode lifecycle evidence,
+  all three enforcement rollback paths, and proof all production controls remain
+  off.
+- Program Phase 4 launch evidence separately requires approved live commercial/
+  legal configuration, explicit owner authorization, one exact `EUR 39/year`
+  founding canary that permanently consumes an allocation, one exact
+  `EUR 59/year` standard canary that consumes none, exact deployed-version
+  evidence, and independently verified active-client/advanced-Reports/email
+  rollback flags.
 
-## Phase 7 — Provider-neutral cloud sync and Dropbox (connections deployed; transfer gated)
+## Phase 7 — Provider-neutral cloud sync and Dropbox (connections and transfers deployed; broad access follow-up)
 
-- The behavior contract is `spec/features/provider-neutral-cloud-sync-and-dropbox.md`; Google Drive and Dropbox connections are deployed, while provider transfers remain fail-closed until the production canary is green.
-- Product and agent parity, Dropbox App Console setup, compatible Worker/app deployment, remote D1 migration, production secrets/flags, and initial owner Edge canary are complete. The canary exposed a moved-source recovery dead end; its compatibility fix and the remaining supported-browser production canaries are the current gate before transfers are enabled.
+- The behavior contract is `spec/features/provider-neutral-cloud-sync-and-dropbox.md`; Google Drive and Dropbox connections plus explicit user-initiated provider transfers are deployed/enabled for approved/current accounts with independent fail-closed rollback controls. No transfer starts automatically.
+- Product and agent parity, compatible Worker/app deployment, remote D1 migration, production secrets/flags, moved-source recovery, owner canaries, and transfer enablement are complete. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by a non-destructive sign-in/token/direct-file canary.
 - Preserve the deployed direct Google Drive flow while extracting one provider-neutral sync/manifest/backup core and adding Dropbox through a least-privilege App Folder adapter.
 - Keep exactly one active provider per browser profile. Do not mirror providers. A verified, crash-resumable transfer copies the complete live workspace in either direction, creates one target handoff backup, activates the target only after readback verification, and retains source files and historical backups.
 - Keep routine manifests, Yjs state/deltas, backups, restores, wipes, and transfer bodies directly between the browser and the selected provider. The Worker remains an OAuth/encrypted-refresh-token/short-lived-token/revocation control plane and never becomes a Dropbox file proxy.
 - Preserve Manual, Backup, and Sync semantics, Google manifests/files/sessions, the existing cross-tab lock name, dirty recovery, request budgets, and Drive UI/API compatibility facades. Provider-neutral agent commands are canonical; already-shipped Drive-named commands remain deprecated Google-only compatibility aliases until a major-version migration can remove them safely.
-- Replace KV-backed abuse counters with Workers Rate Limiting bindings before Dropbox exposure. Public rollout requires measured doubled-peak headroom on the selected Cloudflare plan; encrypted sessions move to D1 or a paid KV plan first if that gate fails.
+- The Workers Rate Limiting bindings and measured capacity/plan gate were completed before the current Dropbox enablement. Preserve those bindings, doubled-peak headroom evidence, and the rule that encrypted sessions move to D1 or a paid KV plan before any future rollout if capacity no longer passes.
 - Make the selected provider session authoritative for storage and TaskTime-hosted services. Provider-separated subjects map to one opaque hosted principal, and verified transfer links that principal before activation so hosted email, metrics, and future Pro state move end to end without requiring Google.
 - Deliver through the checklist in `status/cloud-sync-provider-expansion.md`: contract/baseline, Drive characterization, Google-compatible seams, Worker capacity/session foundation, Dropbox direct vertical, provider lifecycle, hidden parity, verified transfer, product/agent parity, and staged release.
 - Success evidence requires Google non-regression, both-provider contract/mode/request-count tests, both transfer directions with failure injection and lazy data, token/privacy/cache proof, Worker tests/typecheck, the full app release gate, supported-browser credential canaries, Dropbox production approval, capacity evidence, rollback proof, and explicit release/deployment approval.
+
+## Coordinated delivery program — License, app origin, homepage, and launch (planned)
+
+This delivery sequence spans existing roadmap phases; its Program Phase numbers are release-order labels rather than replacements for the product roadmap above.
+
+1. Complete the provider-neutral subscription/license flow and its Worker, client, UI, agent, compatibility, rollback, and local release evidence with every production billing/trial/Checkout/enforcement control disabled.
+2. Prepare the move of the application from `https://tasktime.pro` to `https://app.tasktime.pro` locally. The migration must explicitly transfer existing origin-local workspace data, leave source data untouched until verified, use the same reconnect/bootstrap lifecycle for Google Drive and Dropbox, and re-establish rather than copy origin-scoped credentials, licenses, Push subscriptions, and agent pairing state.
+3. Complete the public homepage and related UX/UI adjustments so `https://tasktime.pro` is the marketing/documentation origin and all app-entry flows target `https://app.tasktime.pro`.
+4. Launch through separately approved, observable, and reversible Worker, app, user-migration, homepage, agent-artifact, and billing-enforcement steps.
+
+Program Phase 1 is the implementation dependency. It freezes a stable logical license audience and configurable exact-origin/return-URL seams before Program Phase 2, but the domain migration does not need to precede local license completion. The private implementation sources are `docs/todo/client_edge_license_flow.md` and `docs/todo/app_subdomain_migration_implementation_plan.md` in `tasktime-infra`; the operational checklist in `TODO.md` tracks progression across all four phases.

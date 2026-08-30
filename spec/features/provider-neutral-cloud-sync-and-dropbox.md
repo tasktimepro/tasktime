@@ -1,8 +1,8 @@
 # Provider-Neutral Cloud Sync And Dropbox
 
-> **State:** The compatible Worker and app are deployed, and new Dropbox connections are enabled with transfers still fail-closed. A production canary exposed the moved-source recovery case described below; its compatibility fix and local regression validation are complete, with promotion and production re-canary still pending.
+> **State:** The compatible Worker and app, Dropbox connections, moved-source recovery, and explicit user-initiated provider transfers are deployed/enabled for approved/current accounts. Independent fail-closed endpoint, acquisition, and transfer controls remain available for rollback. Broad Dropbox availability to new public users is still gated on Dropbox App Console production access followed by a non-destructive sign-in/token/direct-file canary.
 >
-> **Current production behavior:** Google Drive and Dropbox connections are available; provider transfers remain disabled until the production canary is green.
+> **Current production behavior:** Google Drive and Dropbox connections plus explicit provider transfers are available to approved/current accounts. No transfer starts automatically. Existing Dropbox sessions/data must remain usable during acquisition or transfer rollback.
 
 This specification locks the approved product behavior for Google Drive and
 Dropbox, including the staged rollout of provider transfer.
@@ -149,16 +149,16 @@ Dropbox, including the staged rollout of provider transfer.
 
 - Worker endpoint support, new Dropbox connections, and transfers retain
   separate fail-closed controls.
-- Release order is the compatible Worker foundation and production
-  configuration first, followed by one Dropbox-enabled app deployment. With
-  only the two known production users, no separate hidden-client or bounded
-  connection phase is required.
+- The compatible Worker foundation, production configuration, and Dropbox-
+  enabled app deployment are complete for approved/current accounts. Broad
+  new-user availability remains disabled until App Console production access
+  and the non-destructive post-approval sign-in/token/direct-file canary pass.
 - Rollback may stop new connections or transfers. Once a user has active Dropbox
   data, rollback must retain existing Dropbox read/write support and must never
   silently select Google.
-- Dropbox may be prepared in next-release source and copy, but it must not be
-  claimed as deployed until the compatible Worker and app are live and the
-  production canary is green.
+- Current copy may truthfully describe the deployed approved/current-account
+  capability, while broad public availability must not be claimed until the
+  App Console and post-approval canary gate is green.
 
 ## Required evidence
 
