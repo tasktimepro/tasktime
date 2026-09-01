@@ -21,6 +21,12 @@ const STATIC_ENTRIES = [
         priority: '0.9',
     },
     {
+        pathname: '/pricing/',
+        lastmod: '2026-08-31',
+        changefreq: 'monthly',
+        priority: '0.9',
+    },
+    {
         pathname: '/privacy/',
         lastmod: '2026-07-08',
         changefreq: 'monthly',

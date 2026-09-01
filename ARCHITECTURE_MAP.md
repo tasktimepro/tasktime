@@ -5,7 +5,10 @@ Browser / PWA
 ├── src/App.jsx + src/components/          UI composition and workflows
 ├── src/hooks/                             React-facing entity and behavior APIs
 ├── src/domain/                            Pure/central business operations
-│   └── entitlements/                      Planned shared semantic UI/agent policy
+│   └── entitlements/                      Implemented shared semantic UI/agent policy (production-disabled)
+├── src/config/billingFeatures.ts          Production-off flags + guarded loopback sandbox mode
+├── src/contexts/BillingContext.tsx        Normal Worker-backed billing client and lifecycle
+├── src/config/localReviewPricing.ts       Shared loopback app + public pricing review values
 ├── src/stores/yjs/
 │   ├── YjsStore.ts                        Store facade and cross-document operations
 │   ├── YjsDocManager.ts                   Multi-document lifecycle + IndexedDB
@@ -22,7 +25,7 @@ Browser / PWA
         ├── Google Drive appDataFolder direct data path (production optional)
         ├── Dropbox App Folder direct data path (production optional)
         ├── provider-neutral hosted identity (production control plane)
-        ├── planned Stripe/D1 billing + public catalog/signed-license control plane
+        ├── local Stripe/D1 billing + public catalog/signed-license control plane (not deployed)
         ├── DebugBundle endpoint (optional diagnostics)
         └── exchange-rate / email / push integrations as configured
 
@@ -39,7 +42,7 @@ Managed OpenClaw Gateway
 
 Public web build
 └── blog/ + scripts/build-pages.mjs
-    ├── product overview, blog, and legal pages
+    ├── product overview, Free/Pro pricing comparison, blog, and legal pages
     ├── /agents documentation and generated tool catalogs
     └── discovery manifests, sitemap, RSS, and llms.txt
 ```
@@ -62,7 +65,7 @@ Public web build
   transfer. Legacy `driveSessionId` remains a compatibility field, not a hidden
   Google requirement when Dropbox is active.
 - Agent commands call the same store/domain behaviors as the UI and never expose raw Yjs access to MCP clients.
-- Planned Pro enforcement is action-based through one pure entitlement policy.
+- Locally implemented Pro enforcement is action-based through one pure entitlement policy; production switches remain false.
   It gates only transitions that create or restore another active client,
   advanced Reports/exports, and TaskTime-hosted Send—not `/reports`, its current-
   month Overview, visible static tab previews, shared calculations, or underlying
@@ -72,7 +75,14 @@ Public web build
   and report-scope policy; Worker-cost email rechecks canonical server state and
   quota independently. Only a verified lifecycle-bound assertion authorizes an
   unlimited-client transition or advanced Reports.
-- Planned local license storage is origin-local and non-product: verified JWS
+- The local billing sandbox is an explicitly flagged Vite-development and
+  loopback-only input to `BillingContext`. It keeps the normal Worker-backed
+  catalog, status, trial, Checkout, webhook, reconciliation, license, return,
+  and Portal paths, while hosted Send and email delivery-status checks remain
+  disabled. `make dev-billing-sandbox` prepares and runs the app, local
+  Worker/D1, and Dockerized Stripe test listener as one attached Compose stack.
+  It is unavailable in production builds and is not release evidence.
+- Implemented local license storage is origin-local and non-product: verified JWS
   records are subject-keyed and selected only through the exact active provider/
   generation/session-fingerprint binding plus trusted-time evidence. It never
   enters Yjs, provider sync, backup/export/import, or origin migration.

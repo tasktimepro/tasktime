@@ -81,7 +81,7 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **BACKUP-2:** Preview imports before mutation and restore valid supported backups without breaking relationships.
 - **BACKUP-3:** Keep public compatibility fixtures and regression tests for representative older backup shapes.
 
-## Subscription entitlements and hosted services (planned; not yet enabled)
+## Subscription entitlements and hosted services (implemented locally; production-disabled)
 
 - **ENTL-1:** Keep core local use account-free and Free. Initial Pro gates are
   limited to net-increasing active-client transitions beyond one, advanced

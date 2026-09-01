@@ -221,7 +221,7 @@ Success: { ok: true, command: string, data: T }
 Failure: { ok: false, command: string, error: { code, message, details? } }
 ```
 
-Error codes: `APP_NOT_READY`, `NOT_FOUND`, `INVALID_INPUT`, `CONFLICT`, `PERMISSION_DENIED`, `RATE_LIMITED`, `UNAVAILABLE`. The planned entitlement release adds a stable `ENTITLEMENT_REQUIRED` code before publishing changed tool artifacts, with closed sanitized reason metadata for active-client limit, founding-offer temporarily reserved/ended, or billing suspension where applicable. Hosted-email details additionally preserve documented legacy fields while mapping quota, idempotency, ambiguous delivery, reauthentication, and temporary billing failures consistently.
+Error codes: `APP_NOT_READY`, `NOT_FOUND`, `INVALID_INPUT`, `CONFLICT`, `PERMISSION_DENIED`, `RATE_LIMITED`, `UNAVAILABLE`. The local entitlement candidate adds a stable `ENTITLEMENT_REQUIRED` code; it is not a published artifact change until the separately approval-gated agent release train ships. Closed sanitized reason metadata covers the active-client limit, founding-offer temporarily reserved/ended, or billing suspension where applicable. Hosted-email details additionally preserve documented legacy fields while mapping quota, idempotency, ambiguous delivery, reauthentication, and temporary billing failures consistently.
 
 Permission scopes: `read`, `write`, `billing`, `export`, `email`, `navigation`.
 
@@ -254,9 +254,9 @@ Command groups include:
 
 The authoritative command-name/metadata catalog is generated from `src/agent/commands/registry.ts`. A command may additionally require explicit TaskTime approval and idempotency/confirmation data. Changes require synchronized tool schemas, bridge package, bundles, public docs, and tests.
 
-The planned entitlement release adds declarative argument-aware entitlement
-metadata and central pre-data-access enforcement while keeping stable command
-names discoverable. `get_report_summary` adds
+The local, unpublished entitlement candidate adds declarative argument-aware
+entitlement metadata and central pre-data-access enforcement while keeping stable
+command names discoverable. `get_report_summary` adds
 `scope: 'basic-current-month' | 'advanced'`; omitted scope compatibility-defaults
 to `advanced`. Only the explicit basic scope, Overview section, default filters,
 and no rows are Free, and that branch runs before all-history collection. Advanced

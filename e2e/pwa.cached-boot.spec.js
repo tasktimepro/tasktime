@@ -8,6 +8,11 @@ const publicRouteExpectations = [
         heading: 'From task to paid. Without an account.',
     },
     {
+        path: '/pricing/',
+        title: 'TaskTime Pro Pricing — Free and Pro',
+        heading: 'Start free. Go Pro when it saves you time.',
+    },
+    {
         path: '/blog/',
         title: 'TaskTime Pro Blog',
         heading: 'Our Blog',

@@ -1,0 +1,70 @@
+services:
+  app:
+    environment:
+      VITE_SYNC_WORKER_URL: http://localhost:8787
+      VITE_BILLING_SANDBOX_MODE: "true"
+    depends_on:
+      billing-worker:
+        condition: service_healthy
+      billing-webhooks:
+        condition: service_started
+
+  billing-worker:
+    image: node:22-bookworm
+    init: true
+    user: "${TASKTIME_DEV_UID:-1000}:${TASKTIME_DEV_GID:-1000}"
+    working_dir: /app
+    environment:
+      HOME: /tmp
+    volumes:
+      - ./tasktime-infra/cloudflare:/app
+    ports:
+      - "8787:8787"
+    command:
+      - npm
+      - exec
+      - wrangler
+      - --
+      - dev
+      - --local
+      - --ip
+      - 0.0.0.0
+      - --port
+      - "8787"
+      - --env-file
+      - .dev.vars
+      - --env-file
+      - .dev.vars.billing-sandbox.local
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
+
+  billing-webhooks:
+    image: ${STRIPE_CLI_IMAGE:-stripe/stripe-cli:v1.50.6}
+    init: true
+    env_file:
+      - ./tasktime-infra/cloudflare/.dev.vars.billing-sandbox-stripe.local
+    volumes:
+      - ./tasktime-infra/cloudflare/scripts/run-stripe-billing-listener.sh:/run-stripe-billing-listener.sh:ro
+    entrypoint:
+      - /bin/sh
+      - /run-stripe-billing-listener.sh
+    command:
+      - listen
+      - --skip-update
+      - --color
+      - "off"
+      - --forward-to
+      - http://billing-worker:8787/billing/webhook
+      - --events
+      - checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,customer.subscription.paused,customer.subscription.resumed,invoice.paid,invoice.payment_failed,invoice.payment_action_required,invoice.finalization_failed,charge.refunded,charge.dispute.created,charge.dispute.closed
+    depends_on:
+      billing-worker:
+        condition: service_healthy

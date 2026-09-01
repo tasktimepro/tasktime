@@ -11,24 +11,32 @@ Let users understand exactly what will be billed, what changed after finalizatio
 - Expense views provide filters, due/recurrence context, paid state, categories, project/client links, and tax status.
 - Reports place filters near affected totals and use tables/exports where comparison matters.
 
-## Planned Free to Pro experience
+## Locally implemented Free to Pro experience (production-disabled)
 
 - Reports stays neutral in desktop/mobile navigation. Its Free Overview shows
   only current-month **Received**, **Expenses**, and **Tracked time**; every
-  advanced tab remains visible with a non-color-only Pro badge and tailored
-  static preview before any protected data loads.
+  advanced tab remains visible in the established single-row, horizontally
+  scrollable tab layout. Selecting a gated tab shows a tailored static Pro
+  preview before any protected data loads; the tabs do not repeat Pro badges.
 - Invoice/quote email composition, templates, forwarding choice, PDF preview/
   download, copying, and manual delivery remain usable. Only the final TaskTime-
   hosted **Send** action becomes the Pro conversion point. It stays visible but
   unavailable with an inline explanation and a separate enabled trial/Pro or
   recovery action; a disabled control is never the only path forward. Trial/
   purchase return restores the draft and always requires a fresh Send.
+- Modal upgrade explanations use the neutral notice treatment rather than a
+  warning state. Their primary upgrade action is the last, right-aligned footer
+  action and uses a rocket icon; account-status recovery remains distinct and
+  uses its cloud action instead.
 - Pricing presents only Free and Pro. It labels annual `EUR 39` truthfully as
   the founding base price for the first 1,000 paid members and annual `EUR 59`
   as the automatic standard offer afterward. Temporary reservation saturation
   shows a retry state rather than switching early. Amount, tax, applicability,
   and availability derive from the versioned catalog/status projection; a price
-  change always returns to an explicit order confirmation.
+  change always returns to an explicit order confirmation. Plan & Billing marks
+  the founding amount with an asterisk and keeps its first-1,000 capacity and
+  same-subscription retention terms directly below the displayed price; the
+  standard amount has no founding footnote.
 - Cancellation defaults to period end and shows continued access plus the exact
   end date. A founder's confirmation explains that reversing before then
   preserves the founding base price, while terminal cancellation permanently

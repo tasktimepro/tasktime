@@ -6,16 +6,18 @@
 
 [ ] When I import data I should see a success toast notification
 
+[ ] Please be careful and make sure that important infra data about payments and stripe and other details are not made publically available in the core repo
+
 [ ] Coordinated license, app-origin migration, homepage, and production-launch program
     - Dependency rule: complete and locally verify Program Phase 1 before implementing Program Phase 2. Phase 1 may prepare origin-neutral contracts and configuration seams, but neither phase publishes or changes production by itself.
     - Source plans: `tasktime-infra/docs/todo/client_edge_license_flow.md` and `tasktime-infra/docs/todo/app_subdomain_migration_implementation_plan.md`
-    [ ] Program Phase 1 — Complete and test the license flow locally
+    [x] Program Phase 1 — Complete and test the license flow locally
         [x] Freeze the complete implementation/security contract: Free supports one active client and the current-local-month Reports Overview; Trial/Pro unlock unlimited active clients, advanced Reports/exports, and hosted email; all advanced tabs, including To Invoice, remain visible as lazy section-specific previews; founding Pro is `EUR 39/year` for the first 1,000 paid canonical principals; and new acquisition then uses the `EUR 59/year` standard offer
-        [ ] Assign an owner, required evidence, approval deadline, and fail-closed live behavior for each launch-only tax presentation/live Stripe mapping for both approved offers, allowance, grace, seller/tax/legal, support, retention, and payment/refund/Portal decision; final approval belongs to Program Phase 4, and synthetic open-policy fixtures must not leak into live mode
-        [ ] Implement the provider-neutral Worker, client, UI, and agent entitlement flow with production billing/trial/Checkout/enforcement controls disabled
-        [ ] Pass Worker tests/typecheck, the core release gate, and the local license acceptance matrix
-        [ ] Reconcile specifications, contracts, status, public-copy requirements, and rollback evidence without deploying
-        [ ] Record the Program Phase 1 local Definition of Done: Slices 0-8 green, real local D1/Stripe-test evidence complete, all production controls off, and no live migration/deployment/domain/homepage/payment action
+        [x] Assign an owner, required evidence, approval deadline, and fail-closed live behavior for each launch-only tax presentation/live Stripe mapping for both approved offers, allowance, grace, seller/tax/legal, support, retention, and payment/refund/Portal decision; final approval belongs to Program Phase 4, and synthetic open-policy fixtures must not leak into live mode
+        [x] Implement the provider-neutral Worker, client, UI, and agent entitlement flow with production billing/trial/Checkout/enforcement controls disabled
+        [x] Pass Worker tests/typecheck, the core release gate, and the synthetic/local license acceptance matrix
+        [x] Reconcile specifications, contracts, status, public-copy requirements, and rollback evidence without deploying
+        [x] Record the formal Program Phase 1 local Definition of Done: the real Stripe test-mode Product/Price, Checkout/webhook/test-clock/Portal lifecycle passed and is recorded in `tasktime-infra/docs/todo/subscription-phase-1-local-evidence.md`. All production controls remain off, and no live migration/deployment/domain/homepage/payment action occurred.
     [ ] Program Phase 2 — Prepare and test the `app.tasktime.pro` migration locally
         [ ] Split the app and public-site build/deployment outputs without changing live domains
         [ ] Implement a verified old-origin workspace transfer with portable-backup fallback; never copy OAuth sessions, tokens, licenses, Push subscriptions, or agent pairing credentials

@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { BotIcon, CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
-import { Database, Mail } from 'lucide-react';
+import { CreditCard, Database, Mail } from 'lucide-react';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
 import Preferences from './Preferences';
@@ -27,6 +27,8 @@ import { queuePostReloadToast } from '../utils/postReloadToast.ts';
 import YjsSyncSettings from './sync/YjsSyncSettings';
 import AccountFooter from './account/AccountFooter';
 import AgentBridgeSettings from './agent/AgentBridgeSettings';
+import { BILLING_FEATURES } from '@/config/billingFeatures';
+import { BillingPanel } from './billing/BillingPanel';
 
 /**
  * Account component - Main account management page with side navigation
@@ -85,6 +87,12 @@ const Account = ({
             icon: CloudIcon,
             description: 'Manage cloud sync and backups'
         },
+        ...(BILLING_FEATURES.ui ? [{
+            id: 'billing',
+            name: 'Plan & Billing',
+            icon: CreditCard,
+            description: 'View your plan, usage, and billing state'
+        }] : []),
         {
             id: 'agent',
             name: 'Agent Access',
@@ -199,6 +207,8 @@ const Account = ({
                 return <EmailTemplates />;
             case 'sync':
                 return <YjsSyncSettings />;
+            case 'billing':
+                return <BillingPanel onOpenSync={() => handleSectionChange('sync')} />;
             case 'agent':
                 return <AgentBridgeSettings />;
             case 'data':

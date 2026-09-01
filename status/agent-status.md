@@ -2,6 +2,15 @@
 
 ## Current focus
 
+- [x] Add the local subscription policy surface to the command registry:
+  argument-aware Free `get_report_summary`, Pro report exports, hosted Send,
+  read-only email-attempt status, active-client transitions, stable entitlement
+  errors, and generated bridge schemas. Artifact publication/versioning remains
+  a separate approval-gated release train.
+- [x] Pass the subscription-aware agent release gate and align unpublished local
+  candidates at bridge/MCP `1.2.0`, OpenClaw `1.2.0`, Claude `1.2.0`, and
+  ClawHub skill `1.3.0`. No package, registry, marketplace, plugin, or skill was
+  published by Program Phase 1.
 - [ ] Complete the remaining installed native-plugin write/timer journey: inspect/create task, start timer, later stop the same timer, and verify one time entry. Migration, pairing/read, refresh/reopen, and restart recovery are complete.
 - [x] Configure and verify the `CLAWHUB_TOKEN` GitHub Actions secret without exposing its value; dry runs require no secret.
 - [x] Publish native OpenClaw `1.1.0` to ClawHub through its GitHub Actions trusted publisher and independently verify owner `tasktimepro`, clean scan state, repository/path, and immutable source SHA `f952ee0`. The unchanged skill required no republication.

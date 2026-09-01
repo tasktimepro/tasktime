@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState, useMemo, useRef, useContext, useCallback } from 'react';
 import './App.css';
 import { YjsProvider, useYjs } from './contexts/YjsContext.tsx';
+import { BillingProvider } from './contexts/BillingContext.tsx';
 import { AgentBridgeProvider } from './contexts/AgentBridgeContext.jsx';
 import { verifyStoredAgentBridgeApprovalToken } from './agent/browser/approvalTokens.ts';
 import { useProjects } from './hooks/useProjects.ts';
@@ -40,6 +41,7 @@ import ModalManager from './components/modals/ModalManager';
 import FloatingActionButton from './components/FloatingActionButton';
 import ErrorBoundary from './components/ErrorBoundary';
 import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
+import { LocalBillingSandboxBanner } from './components/billing/LocalBillingSandboxBanner';
 import { getYjsSyncStatusDescriptor, SYNC_STATUS_KIND } from './components/sync/syncStatusDescriptor';
 import MobileBottomNav from './components/app/MobileBottomNav';
 import MobileMoreSheet from './components/app/MobileMoreSheet';
@@ -136,9 +138,11 @@ function App() {
     return (
         <ToastProvider>
             <YjsProvider>
-                <AgentBridgeProvider verifyApprovalToken={verifyStoredAgentBridgeApprovalToken}>
-                    <AppContent />
-                </AgentBridgeProvider>
+                <BillingProvider>
+                    <AgentBridgeProvider verifyApprovalToken={verifyStoredAgentBridgeApprovalToken}>
+                        <AppContent />
+                    </AgentBridgeProvider>
+                </BillingProvider>
             </YjsProvider>
         </ToastProvider>
     );
@@ -1761,6 +1765,7 @@ function AppContent() {
                         '--app-content-padding-bottom': isMobileLayout ? mobileBottomPadding : desktopBottomPadding,
                     }}
                 >
+                    <LocalBillingSandboxBanner />
                     {activeView === 'dashboard' && (
                             <ErrorBoundary>
                             <Dashboard

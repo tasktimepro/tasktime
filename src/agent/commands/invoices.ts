@@ -59,9 +59,52 @@ import {
     updateValidatedEntity,
     withIdempotency,
 } from './shared';
+import { BILLING_FEATURES } from '@/config/billingFeatures';
+import { evaluateEntitlementFeature } from '@/domain/entitlements/entitlementPolicy';
 
 const DEFAULT_INVOICE_LIMIT = 25;
 const MAX_INVOICE_LIMIT = 100;
+
+function assertAgentHostedEmailEntitlement(context: AgentCommandContext): void {
+    if (!BILLING_FEATURES.emailEntitlementEnforcement) return;
+    const resolution = context.entitlementResolution ?? { kind: 'unresolved' as const, reason: 'lifecycle' as const };
+    if (resolution.kind === 'canonical' && resolution.snapshot.accessStatus === 'suspended') {
+        throw new AgentCommandError(
+            'BILLING_SUSPENDED',
+            'Resolve billing before starting a new hosted email send. Preview, PDF export, and manual delivery remain available.',
+            { recoveryRoute: '/account?section=billing' },
+        );
+    }
+    const decision = evaluateEntitlementFeature(resolution, 'invoice.email.send');
+    if (!decision.allowed) {
+        throw new AgentCommandError(
+            decision.reason === 'status_unavailable'
+                ? 'ENTITLEMENT_STATUS_UNAVAILABLE'
+                : 'ENTITLEMENT_REQUIRED',
+            decision.reason === 'status_unavailable'
+                ? 'Confirm the active TaskTime cloud account and refresh plan status before sending hosted email.'
+                : 'Hosted email sending requires a Pro trial or subscription. Preview, PDF export, and manual delivery remain available.',
+            {
+                feature: 'invoice.email.send',
+                recoveryRoute: decision.reason === 'status_unavailable'
+                    ? '/account?section=sync'
+                    : '/account?section=billing',
+            },
+        );
+    }
+}
+
+function billingLifecycleForAgent(context: AgentCommandContext) {
+    if (!context.activeStorageProvider
+        || context.activeStorageGeneration === null
+        || context.activeStorageGeneration === undefined
+        || !context.activeStorageSessionId) return undefined;
+    return {
+        provider: context.activeStorageProvider,
+        generation: context.activeStorageGeneration,
+        sessionId: context.activeStorageSessionId,
+    };
+}
 
 export interface ListInvoicesCommandInput {
     clientId?: string | null;
@@ -202,6 +245,10 @@ export interface PreviewProjectQuoteEmailInput extends ProjectQuoteInput, Omit<I
 export interface SendProjectQuoteEmailInput extends PreviewProjectQuoteEmailInput {
     confirmSend: boolean;
     idempotencyKey?: string;
+}
+
+export interface GetEmailSendStatusInput {
+    attemptId: string;
 }
 
 export interface InvoiceUnbilledWorkPreview {
@@ -1475,6 +1522,7 @@ export function sendProjectQuoteEmailCommand(
         if (!sessionId) {
             throw new AgentCommandError('UNAVAILABLE', 'A cloud provider must be connected before sending quote email.');
         }
+        assertAgentHostedEmailEntitlement(context);
 
         const quote = buildProjectQuoteDocument(context, input);
         const draft = buildProjectQuoteEmailDraft(context, quote, input);
@@ -1516,6 +1564,8 @@ export function sendProjectQuoteEmailCommand(
             pdfBase64,
             sendType: 'quote',
             attachmentTitle: draft.attachmentTitle,
+            billingLifecycle: billingLifecycleForAgent(context),
+            idempotencyKey: input.idempotencyKey,
         });
 
         return {
@@ -1545,6 +1595,28 @@ export function previewInvoiceEmailCommand(
     return buildInvoiceEmailDraft(context, invoice, input);
 }
 
+export async function getEmailSendStatusCommand(
+    context: AgentCommandContext,
+    input: GetEmailSendStatusInput,
+) {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'email');
+    const sessionId = typeof context.hostedServiceSessionId === 'string'
+        ? context.hostedServiceSessionId.trim()
+        : (typeof context.driveSessionId === 'string' ? context.driveSessionId.trim() : '');
+    const lifecycle = billingLifecycleForAgent(context);
+    if (!sessionId || !lifecycle) {
+        throw new AgentCommandError(
+            'UNAVAILABLE',
+            'Confirm the active cloud account before checking hosted email delivery.',
+        );
+    }
+    const attemptId = requireString(input.attemptId, 'attemptId');
+    const { checkEmailAttemptStatus } = await import('@/utils/emailService');
+    return checkEmailAttemptStatus({ sessionId, billingLifecycle: lifecycle, attemptId });
+}
+
 export function sendInvoiceEmailCommand(
     context: AgentCommandContext,
     input: SendInvoiceEmailInput
@@ -1566,6 +1638,7 @@ export function sendInvoiceEmailCommand(
         if (!sessionId) {
             throw new AgentCommandError('UNAVAILABLE', 'A cloud provider must be connected before sending invoice email.');
         }
+        assertAgentHostedEmailEntitlement(context);
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
@@ -1614,6 +1687,8 @@ export function sendInvoiceEmailCommand(
             pdfBase64,
             sendType: draft.sendType,
             attachmentTitle: draft.attachmentTitle,
+            billingLifecycle: billingLifecycleForAgent(context),
+            idempotencyKey: input.idempotencyKey,
         });
         const sentAt = getNow(context);
         let updatedInvoice = false;

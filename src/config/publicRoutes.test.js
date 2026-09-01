@@ -12,6 +12,8 @@ describe('matchesPublicStaticRoute', () => {
         '/blog/privacy-first-invoicing-tool',
         '/product',
         '/product/',
+        '/pricing',
+        '/pricing/',
         '/agents',
         '/agents/tools/',
         '/agents/mcp-tools.json',
@@ -41,7 +43,7 @@ describe('matchesPublicStaticRoute', () => {
 
 describe('PUBLIC_STATIC_ROUTE_DENYLIST', () => {
     it('includes a pattern for each static public route family', () => {
-        expect(PUBLIC_STATIC_ROUTE_DENYLIST).toHaveLength(7);
+        expect(PUBLIC_STATIC_ROUTE_DENYLIST).toHaveLength(8);
 
         expect(PUBLIC_STATIC_ROUTE_DENYLIST.every((pattern) => pattern instanceof RegExp)).toBe(true);
     });

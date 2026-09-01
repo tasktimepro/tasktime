@@ -47,11 +47,11 @@ const ClientList = ({
     const [clientToDelete, setClientToDelete] = useState(null);
     const [showArchiveProjectsModal, setShowArchiveProjectsModal] = useState(false);
     const [relatedProjects, setRelatedProjects] = useState([]);
-    const { showSuccess } = useToast();
+    const { showError, showSuccess } = useToast();
     const { store } = useYjs();
     
     // Yjs hooks for data access
-    const { clients, updateClient, deleteClient } = useClients();
+    const { clients, updateClient, updateClientWithPolicyLock, deleteClient } = useClients();
     const { projects, updateProject, deleteProject } = useProjects();
     const { tasks, deleteTask } = useTasks();
     const { entries: timeEntries, deleteEntry } = useTimeEntries();
@@ -270,9 +270,15 @@ const ClientList = ({
     /**
      * Unarchive a client
      */
-    const handleUnarchiveClient = (clientId) => {
-        updateClient(clientId, { archived: false, archivedOnDate: null });
-        showSuccess('Client unarchived successfully!');
+    const handleUnarchiveClient = async (clientId) => {
+        try {
+            await updateClientWithPolicyLock(clientId, { archived: false, archivedOnDate: null });
+            showSuccess('Client unarchived successfully!');
+        } catch (error) {
+            showError(error?.decision?.code === 'ENTITLEMENT_REQUIRED'
+                ? 'Free includes one active client. Unlock unlimited clients to restore another.'
+                : 'Confirm your TaskTime cloud account and refresh plan status before restoring this client.');
+        }
     };
 
     /**

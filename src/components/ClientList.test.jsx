@@ -6,6 +6,7 @@ import ClientList from './ClientList'
 
 const toastMocks = vi.hoisted(() => ({
 
+    showError: vi.fn(),
     showSuccess: vi.fn()
 }))
 
@@ -13,6 +14,7 @@ const clientsHookMocks = vi.hoisted(() => ({
 
     deleteClient: vi.fn(),
     updateClient: vi.fn(),
+    updateClientWithPolicyLock: vi.fn(),
     clients: []
 }))
 
@@ -45,6 +47,7 @@ const recurrencesHookMocks = vi.hoisted(() => ({
 vi.mock('../hooks/useToast.ts', () => ({
 
     useToast: () => ({
+        showError: toastMocks.showError,
         showSuccess: toastMocks.showSuccess
     })
 }))
@@ -64,6 +67,7 @@ vi.mock('../hooks/useClients.ts', () => ({
     useClients: () => ({
         clients: clientsHookMocks.clients,
         updateClient: clientsHookMocks.updateClient,
+        updateClientWithPolicyLock: clientsHookMocks.updateClientWithPolicyLock,
         deleteClient: clientsHookMocks.deleteClient
     })
 }))
@@ -130,6 +134,7 @@ describe('ClientList', () => {
 
     beforeEach(() => {
         clientsHookMocks.deleteClient.mockClear()
+        clientsHookMocks.updateClientWithPolicyLock.mockReset()
         projectHookMocks.deleteProject.mockClear()
         projectHookMocks.updateProject.mockClear()
         invoiceHookMocks.deleteInvoice.mockClear()
@@ -213,6 +218,33 @@ describe('ClientList', () => {
 
         expect(menuButtons).toHaveLength(2)
         expect(menuButtons[0].className).toBe(menuButtons[1].className)
+    })
+
+    it('explains the Free active-client limit when an archived client cannot be restored', async () => {
+        const user = userEvent.setup()
+        clientsHookMocks.clients = [
+            { id: 'client-1', title: 'Active Client', createdAt: Date.now(), archived: false },
+            { id: 'client-2', title: 'Archived Client', createdAt: Date.now(), archived: true },
+        ]
+        clientsHookMocks.updateClientWithPolicyLock.mockRejectedValue({
+            decision: { code: 'ENTITLEMENT_REQUIRED' },
+        })
+
+        render(
+            <ClientList
+                onSelectClient={vi.fn()}
+                openClientModal={vi.fn()}
+                editClientModal={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: /Archived Clients/i }))
+        await user.click(screen.getAllByRole('button', { name: 'More actions' })[1])
+        await user.click(screen.getByText('Unarchive'))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith(
+            'Free includes one active client. Unlock unlimited clients to restore another.'
+        )
     })
 
     it('deletes both project-linked and client-only invoices when deleting a client with projects', async () => {

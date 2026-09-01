@@ -37,8 +37,28 @@
 - Import preview reports validation issues before mutation.
 - Accepted import preserves supported records and relationships; rejected input leaves current data unchanged.
 
-## Subscription and Pro boundary (planned; production controls remain off)
+## Subscription and Pro boundary (implemented locally; production controls remain off)
 
+- An explicit local billing-sandbox flag is honored only by a Vite development
+  build on a loopback hostname. It visibly labels the entire app, disables the
+  bundled catalog fallback, and exercises the normal provider-bound catalog,
+  status/JWKS/license, trial, Stripe test Checkout, webhook, reconciliation,
+  Checkout-return, and Portal paths against the local Worker and Wrangler-local
+  D1. Checkout return handling waits for the matching active cloud lifecycle and
+  retains the return marker until that lifecycle exists. The local Worker accepts
+  only the exact `http://localhost:3101/account?section=billing` return base;
+  production retains only the exact HTTPS app return. Hosted Send and delivery-
+  status requests remain disabled in the sandbox. A production build or
+  non-loopback hostname ignores the flag, tracked production controls remain off,
+  and test-mode state is never launch or production evidence. Product-data
+  mutations remain ordinary real local-workspace operations and retain the
+  configured sync-mode behavior; billing sandbox mode is not a disposable data
+  sandbox.
+- The supported developer entrypoint is one root command. It prepares the
+  ignored local test configuration and migrations, then runs the app, local
+  Worker, and Stripe test-webhook listener as one attached Docker Compose
+  stack. Stopping that command stops the complete stack; only an expired or
+  missing owner-controlled Stripe test login requires separate intervention.
 - A Free user can open `/reports` and use Overview for the current local calendar
   month. It shows exactly **Received**, **Expenses**, and **Tracked time** under
   the canonical date, duration, legacy-payment, and currency semantics, with no
@@ -90,6 +110,11 @@
   catalog amount/currency/interval/tax/renewal/legal summary, reconfirms a changed
   revision, creates at most one active attempt per account, and waits for
   canonical Stripe confirmation after return.
+- On a loopback Vite development origin, Plan & Billing may use the same bundled
+  review values as `/pricing/` while the public Worker catalog is unavailable.
+  The Worker catalog replaces that display when available. Production builds do
+  not use the fallback, and it never authorizes trial, Checkout, entitlement, or
+  hosted-service work.
 - The catalog contains exactly Free and Pro, with annual `EUR 39` founding and
   `EUR 59` standard offers under Pro. Founding applies to the first 1,000
   successfully paid canonical principals. A 1,001-way concurrent

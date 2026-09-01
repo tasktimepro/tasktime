@@ -1,0 +1,274 @@
+---
+import ProductLayout from '../../layouts/ProductLayout.astro';
+import '../../styles/pricing.css';
+import { LOCAL_REVIEW_PRICING } from '../../../../src/config/localReviewPricing';
+
+const title = 'TaskTime Pro Pricing — Free and Pro';
+const description = 'Start with TaskTime Pro for free, then add unlimited active clients, advanced reports, exports, and hosted sending with one simple annual Pro plan.';
+const foundingMemberLimit = LOCAL_REVIEW_PRICING.foundingMemberLimit.toLocaleString('en-US');
+const softwareOffers = {
+    '@type': 'AggregateOffer',
+    priceCurrency: 'EUR',
+    lowPrice: '0',
+    highPrice: String(LOCAL_REVIEW_PRICING.standardAnnualEur),
+    offerCount: '3',
+    offers: [
+        {
+            '@type': 'Offer',
+            name: 'Free',
+            price: '0',
+            priceCurrency: 'EUR',
+        },
+        {
+            '@type': 'Offer',
+            name: 'Pro founding offer',
+            price: String(LOCAL_REVIEW_PRICING.foundingAnnualEur),
+            priceCurrency: 'EUR',
+        },
+        {
+            '@type': 'Offer',
+            name: 'Pro standard offer',
+            price: String(LOCAL_REVIEW_PRICING.standardAnnualEur),
+            priceCurrency: 'EUR',
+        },
+    ],
+};
+
+const freeFeatures = [
+    'One active client at a time, with all client history preserved',
+    'Unlimited projects, tasks, timers, expenses, quotes, and invoices',
+    'Current-month Reports Overview and manual document delivery',
+    'Optional Google Drive or Dropbox sync and backups',
+];
+
+const proFeatures = [
+    'Unlimited active clients',
+    'Advanced professional reports and exports',
+    'TaskTime-hosted invoice, quote, and reminder sending',
+    'Everything included in Free',
+];
+
+const comparisonRows = [
+    {
+        feature: 'Projects, tasks, timers, and expenses',
+        free: 'Unlimited',
+        pro: 'Unlimited',
+    },
+    {
+        feature: 'Active clients',
+        free: 'One at a time',
+        pro: 'Unlimited',
+    },
+    {
+        feature: 'Quotes, invoices, tax records, and PDFs',
+        free: 'Included',
+        pro: 'Included',
+    },
+    {
+        feature: 'Reports',
+        free: 'Current-month Overview',
+        pro: 'Advanced reports and exports',
+    },
+    {
+        feature: 'Invoice, quote, and reminder delivery',
+        free: 'Download, copy, or send manually',
+        pro: 'TaskTime-hosted sending included',
+    },
+    {
+        feature: 'Google Drive or Dropbox sync and backups',
+        free: 'Optional',
+        pro: 'Optional',
+    },
+    {
+        feature: 'Your records after a downgrade',
+        free: 'Kept and usable',
+        pro: 'Kept and usable',
+    },
+];
+
+const faqs = [
+    {
+        question: 'Is Free a limited trial?',
+        answer: 'No. Free stays free, open source, and usable without a TaskTime account. It includes the complete local-first workflow for one active client at a time.',
+    },
+    {
+        question: 'How does the Pro trial work?',
+        answer: `The Pro trial lasts ${LOCAL_REVIEW_PRICING.trialDays} consecutive days. It does not require a payment method, does not create a paid subscription, and never converts to a charge automatically.`,
+    },
+    {
+        question: 'What happens when I downgrade?',
+        answer: 'Your clients and work records remain visible and maintainable. If you are above the Free active-client limit, you can keep using and archiving existing clients, but you cannot add or reactivate another client until you are back within the limit. Advanced reports and TaskTime-hosted sending become unavailable.',
+    },
+    {
+        question: 'What happens to the founding price if I cancel?',
+        answer: 'A cancellation normally takes effect at the end of the paid period. Reversing it before that date keeps the founding price. If the subscription fully ends, a later new subscription uses the current standard price.',
+    },
+    {
+        question: 'Where does TaskTime store my work?',
+        answer: 'Core work records stay in your browser. Optional sync and backups connect directly to your Google Drive or Dropbox account, so a TaskTime cloud account is not required for the Free workflow.',
+    },
+];
+---
+
+<ProductLayout
+    title={title}
+    description={description}
+    canonicalPath="/pricing/"
+    activePage="pricing"
+    softwareOffers={softwareOffers}
+>
+    <section class="pricing-hero" aria-labelledby="pricing-title">
+        <p class="eyebrow">Simple pricing</p>
+        <h1 id="pricing-title">Start free. Go Pro when it saves you time.</h1>
+        <p>
+            TaskTime stays useful without an account. Pro adds scale, convenience, and deeper administration—not
+            access to your own work.
+        </p>
+    </section>
+
+    <ul class="product-trust-strip" aria-label="Pricing essentials">
+        <li>Free forever</li>
+        <li>{LOCAL_REVIEW_PRICING.trialDays}-day Pro trial</li>
+        <li>No card for trial</li>
+        <li>Your data stays yours</li>
+    </ul>
+
+    <section class="pricing-plans" aria-labelledby="plans-title">
+        <div class="pricing-section-heading">
+            <p class="eyebrow">Choose what fits today</p>
+            <h2 id="plans-title">One product. Two clear plans.</h2>
+            <p>Begin with the full local-first core, then upgrade only when you need more client capacity or hosted services.</p>
+        </div>
+
+        <div class="pricing-plan-grid">
+            <article class="pricing-plan-card" aria-labelledby="free-plan-title">
+                <header class="pricing-plan-header">
+                    <div>
+                        <p class="pricing-plan-kicker">Free</p>
+                        <h3 id="free-plan-title">The complete core</h3>
+                    </div>
+                    <span class="pricing-plan-badge pricing-plan-badge--quiet">Forever</span>
+                </header>
+                <p class="pricing-plan-price"><strong>€0</strong><span>forever</span></p>
+                <p class="pricing-plan-summary">For independent professionals who want a capable, private workspace without a subscription.</p>
+                <ul class="pricing-feature-list">
+                    {freeFeatures.map((feature) => <li>{feature}</li>)}
+                </ul>
+                <a class="product-button product-button--secondary pricing-plan-action" href="/">Open TaskTime</a>
+                <p class="pricing-plan-note">No signup required for core use.</p>
+            </article>
+
+            <article class="pricing-plan-card pricing-plan-card--featured" aria-labelledby="pro-plan-title">
+                <header class="pricing-plan-header">
+                    <div>
+                        <p class="pricing-plan-kicker">Pro</p>
+                        <h3 id="pro-plan-title">More scale. Less admin.</h3>
+                    </div>
+                    <span class="pricing-plan-badge">Founding offer</span>
+                </header>
+                <p class="pricing-plan-price"><strong>€{LOCAL_REVIEW_PRICING.foundingAnnualEur}</strong><span>per year</span></p>
+                <p class="pricing-plan-offer">For the first {foundingMemberLimit} paid members. Then €{LOCAL_REVIEW_PRICING.standardAnnualEur} per year for new subscriptions.</p>
+                <ul class="pricing-feature-list">
+                    {proFeatures.map((feature) => <li>{feature}</li>)}
+                </ul>
+                <a class="product-button product-button--primary pricing-plan-action" href="/account?section=billing">Review Pro in TaskTime</a>
+                <p class="pricing-plan-note">Try Pro for {LOCAL_REVIEW_PRICING.trialDays} days. No card and no automatic charge.</p>
+            </article>
+        </div>
+
+        <p class="pricing-tax-note">
+            Prices shown are annual base prices. The exact current price and any applicable tax are shown before you confirm payment.
+        </p>
+    </section>
+
+    <section class="pricing-comparison" aria-labelledby="comparison-title">
+        <div class="pricing-section-heading">
+            <p class="eyebrow">Compare plans</p>
+            <h2 id="comparison-title">The essentials never sit behind Pro.</h2>
+            <p>Planning, time, expenses, invoices, tax records, backups, and portability remain part of Free.</p>
+        </div>
+
+        <div class="pricing-table-wrap">
+            <table class="pricing-table">
+                <caption class="sr-only">TaskTime Free and Pro feature comparison</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Capability</th>
+                        <th scope="col">Free</th>
+                        <th scope="col">Pro</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {comparisonRows.map((row) => (
+                        <tr>
+                            <th scope="row">{row.feature}</th>
+                            <td data-label="Free">{row.free}</td>
+                            <td data-label="Pro">{row.pro}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+        <p class="pricing-table-note">TaskTime-hosted sending is subject to the allowance shown in the app.</p>
+    </section>
+
+    <section class="pricing-founding" aria-labelledby="founding-title">
+        <div>
+            <p class="eyebrow">Founding members</p>
+            <h2 id="founding-title">One Pro plan, with a thank-you price for early members.</h2>
+        </div>
+        <div class="pricing-founding-copy">
+            <p>
+                A founding place is confirmed after the first successful payment. Once the first {foundingMemberLimit} paid
+                memberships are taken, new Pro subscriptions automatically use the €{LOCAL_REVIEW_PRICING.standardAnnualEur} annual price.
+            </p>
+            <p>
+                Your €{LOCAL_REVIEW_PRICING.foundingAnnualEur} base price stays with the same continuous or recoverable subscription. If that subscription
+                fully ends, a later new subscription uses the current standard price.
+            </p>
+        </div>
+    </section>
+
+    <section class="pricing-principles" aria-labelledby="principles-title">
+        <div class="pricing-section-heading pricing-section-heading--centered">
+            <p class="eyebrow">Local-first by default</p>
+            <h2 id="principles-title">A subscription should add value, not hold your work hostage.</h2>
+        </div>
+        <div class="pricing-principle-grid">
+            <article>
+                <h3>Free remains useful</h3>
+                <p>The full workflow from task to invoice stays available for one active client at a time.</p>
+            </article>
+            <article>
+                <h3>Your history stays intact</h3>
+                <p>Downgrading never hides existing clients, invoices, entries, expenses, or other work records.</p>
+            </article>
+            <article>
+                <h3>Cloud is optional</h3>
+                <p>Core use works locally, with direct Google Drive or Dropbox sync available when you want it.</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="pricing-faq" aria-labelledby="faq-title">
+        <div class="pricing-section-heading">
+            <p class="eyebrow">Questions, answered</p>
+            <h2 id="faq-title">Before you choose</h2>
+        </div>
+        <div class="pricing-faq-list">
+            {faqs.map((faq) => (
+                <details>
+                    <summary>{faq.question}</summary>
+                    <p>{faq.answer}</p>
+                </details>
+            ))}
+        </div>
+    </section>
+
+    <section class="product-final-cta pricing-final-cta" aria-labelledby="pricing-cta-title">
+        <p class="eyebrow">Start with your real work</p>
+        <h2 id="pricing-cta-title">Use TaskTime free. Decide on Pro later.</h2>
+        <p>No setup call, no payment details, and no account required for the core workflow.</p>
+        <a class="product-button product-button--primary" href="/">Open TaskTime</a>
+    </section>
+</ProductLayout>

@@ -10,7 +10,7 @@ const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
     captureDebugBundleIncidentSpy: vi.fn(),
 }));
 
-vi.mock('@/config/google', () => ({
+vi.mock('@/config/syncWorker', () => ({
     SYNC_WORKER_CONFIG: {
         workerUrl: 'https://sync.test.worker',
     },

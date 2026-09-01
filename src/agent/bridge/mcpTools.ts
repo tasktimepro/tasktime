@@ -251,7 +251,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'create_client',
-        description: 'Create a non-archived TaskTime Pro client with contact, billing, tax, and notes fields.',
+        description: 'Create a non-archived TaskTime Pro client. Free includes one active client; trial and Pro include unlimited active clients.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -285,7 +285,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'update_client',
-        description: 'Update non-destructive client fields such as contact, billing, tax, notes, hourly rate, and color.',
+        description: 'Update client fields. Editing is always available; changing archived to false applies the active-client policy.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -315,7 +315,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'unarchive_client',
-        description: 'Restore an archived client without changing related data.',
+        description: 'Restore an archived client without changing related data. Free includes one active client; trial and Pro include unlimited active clients.',
         scopes: ['write'],
         inputSchema: {
             type: 'object',
@@ -1895,7 +1895,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'send_project_quote_email',
-        description: 'Send a non-persistent project quote email through the paired browser app session after explicit confirmation and TaskTime Pro approval. Generates the quote PDF in-browser and does not update invoice records.',
+        description: 'Hosted quote Send requires a Pro trial or subscription, explicit confirmation, and TaskTime Pro approval. Preview and PDF export remain available without hosted Send.',
         scopes: ['read', 'email'],
         inputSchema: {
             type: 'object',
@@ -1932,7 +1932,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'send_invoice_email',
-        description: 'Send an invoice, reminder, or quote email through the paired browser app session after explicit confirmation and TaskTime Pro approval. Generates the PDF in-browser and updates invoice sent metadata when applicable.',
+        description: 'Hosted invoice, reminder, or quote Send requires a Pro trial or subscription, explicit confirmation, and TaskTime Pro approval. Preview and PDF export remain available without hosted Send.',
         scopes: ['read', 'write', 'email'],
         inputSchema: {
             type: 'object',
@@ -1951,6 +1951,17 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
                 idempotencyKey: optionalString,
             },
             required: ['invoiceId', 'confirmSend'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_email_send_status',
+        description: 'Read one durable hosted-email attempt without contacting the provider or sending/retrying a message.',
+        scopes: ['read', 'email'],
+        inputSchema: {
+            type: 'object',
+            properties: { attemptId: optionalString },
+            required: ['attemptId'],
             additionalProperties: false,
         },
     },
@@ -1988,11 +1999,12 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     },
     {
         name: 'get_report_summary',
-        description: 'Get read-only Reports-page summaries for filtered invoices, expenses, hours, tax, outstanding, statement, work-summary, and to-invoice sections.',
+        description: 'Get the Free basic current-month Overview with scope=basic-current-month, or Pro advanced Reports summaries. Omitted scope remains advanced.',
         scopes: ['read'],
         inputSchema: {
             type: 'object',
             properties: {
+                scope: { type: 'string', enum: ['basic-current-month', 'advanced'] },
                 section: { type: 'string', enum: ['overview', 'monthly', 'statement', 'work-summary', 'tax', 'invoices', 'outstanding', 'expenses', 'hours', 'to-invoice'] },
                 period: { type: 'string', enum: ['this-month', 'last-month', 'this-quarter', 'last-quarter', 'this-year', 'last-year', 'custom'] },
                 customStart: nullableString,

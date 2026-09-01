@@ -3,6 +3,7 @@
 ## Current focus
 
 - [x] Refine the static `/product/` overview around “From task to paid. Without an account.”, a single primary hero action, compact trust signals, explicit solo-professional positioning, and a later focused local-first section. Responsive screenshot placeholders remain pending owner review and final captures.
+- [x] Prepare an unpublished `/pricing/` review candidate with exactly Free and Pro, the approved `EUR 39/year` founding and `EUR 59/year` standard offers, an accessible comparison, local-first/downgrade reassurance, FAQ copy, public navigation, sitemap output, and static-route/PWA protection. Publication remains launch-gated.
 - [ ] Continue investigating blog indexing visibility.
 - [ ] Keep SEO terminology useful without weakening product clarity or accuracy.
 - [x] Add staggered, search-intent-focused posts for AI-agent task/time management, invoicing, expense management, and open-source task/time/invoice workflows.

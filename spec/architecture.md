@@ -12,7 +12,7 @@ TaskTime Pro is a browser-owned local-first system with optional remote and loca
 | Hooks/context | React subscriptions and mutation APIs over Yjs store/domain operations |
 | Domain/application | Deterministic deletion, billing, expense, settings, and other reusable business behavior |
 | Yjs store | Collection ownership, cross-document operations, archival, timers, validation, and persistence lifecycle |
-| Providers/adapters | Provider-neutral cloud/manifest, backup, auth, hosted email, planned billing/license, push, PDF, diagnostics, and exchange-rate boundaries |
+| Providers/adapters | Provider-neutral cloud/manifest, backup, auth, hosted email, locally implemented production-disabled billing/license, push, PDF, diagnostics, and exchange-rate boundaries |
 | Agent commands | Scoped business-action facade used by browser bridge/MCP tooling |
 | Local bridge | Pairing, sessions, origins, scopes, approvals, rate limiting, command transport, and MCP protocol |
 | Managed agent plugin | Host-lifecycle ownership and generated tool adaptation around the existing local bridge; no product-data or business-logic ownership |

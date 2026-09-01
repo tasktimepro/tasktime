@@ -41,6 +41,32 @@ describe('useTimeEntries', () => {
         expect(result.current.entries.map((e) => e.id)).toEqual(['e3', 'e1'])
     })
 
+    it('can read only entries-active without touching already-loaded historical documents', async () => {
+        const activeTimeEntries = createTestYMap({
+            active: { id: 'active', taskId: 't1', start: 10, end: 20 },
+        })
+        const getAllTimeEntries = vi.fn(() => {
+            throw new Error('historical documents must stay outside the Free overview')
+        })
+
+        mockUseYjs.mockReturnValue({
+            store: {
+                activeTimeEntries,
+                getAllTimeEntries,
+                isYearLoaded: vi.fn(() => true),
+            },
+            isReady: true,
+            loadEntriesForYear: vi.fn(async () => {}),
+            getAvailableYears: vi.fn(() => [2025]),
+        })
+
+        const { result } = renderHook(() => useTimeEntries({ activeOnly: true }))
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+        expect(result.current.entries.map((entry) => entry.id)).toEqual(['active'])
+        expect(getAllTimeEntries).not.toHaveBeenCalled()
+    })
+
     it('creates, updates, and deletes entries', async () => {
         const createdAt = Date.parse('2026-04-14T12:00:00.000Z')
         const updatedAt = Date.parse('2026-04-14T12:00:05.000Z')

@@ -21,6 +21,8 @@ The plugin still requires the user to pair the running TaskTime Pro browser app 
 
 The billing-scoped bridge can cancel an eligible finalized unpaid invoice only with explicit TaskTime Pro approval, a reason, and exact invoice-number confirmation; the invoice remains as a numbered audit record.
 
+Free supports one active client and the exact `get_report_summary({"scope":"basic-current-month"})` overview. Advanced Reports/exports and TaskTime-hosted invoice/quote sending require Pro; previews, templates, PDFs, and manual email delivery remain Free. Use `get_email_send_status` for ambiguous delivery instead of resending automatically.
+
 For OpenClaw-managed installs, pair TaskTime Pro to the Gateway-owned bridge, not to a separately launched terminal bridge. Use `tasktime__get_pairing_status` to obtain the short-lived launch URL. If its code expired or was consumed, call `tasktime__refresh_pairing`.
 
 The plugin identifies itself as `tasktime.agent.openclaw` / `OpenClaw on this device`. Refreshing TaskTime restores the current tab from `sessionStorage`; closing and reopening it in the same browser profile uses a non-exportable browser signing key to obtain a fresh session. The bearer token is never stored durably. A Gateway/bridge restart, explicit disconnect, revoke, disable, expiry, or forgotten browser authorization requires pairing again.

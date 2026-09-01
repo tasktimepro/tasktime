@@ -50,7 +50,7 @@ The detailed finding-by-finding execution checklist and validation state live in
 - Remaining approved product backlog such as task templates after recorded ambiguities are resolved
 - Continued public-site indexing/SEO and agent distribution maintenance
 
-## Phase 6 — Subscription billing and hosted-service entitlements (planned; locally implementation-ready, launch-gated)
+## Phase 6 — Subscription billing and hosted-service entitlements (implemented locally; launch-gated)
 
 - The approved initial Pro boundary is a net increase beyond Free's one active
   client, advanced Reports/ranges/exports and equivalent advanced report-agent
@@ -96,6 +96,10 @@ The detailed finding-by-finding execution checklist and validation state live in
   offline/downgrade/account-switch evidence, Stripe test-mode lifecycle evidence,
   all three enforcement rollback paths, and proof all production controls remain
   off.
+- The recorded Program Phase 1 local evidence now satisfies that gate, including
+  the bounded real Stripe test-mode lifecycle and cleanup. This authorizes only
+  local Program Phase 2 preparation; it does not authorize live Stripe objects,
+  remote migrations, deployment, paid copy, or purchaser-facing enforcement.
 - Program Phase 4 launch evidence separately requires approved live commercial/
   legal configuration, explicit owner authorization, one exact `EUR 39/year`
   founding canary that permanently consumes an allocation, one exact

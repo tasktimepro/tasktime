@@ -3,6 +3,17 @@ import { cn } from "@/lib/utils"
 import { InformationCircleIcon } from "@/components/ui/icons"
 
 /**
+ * @typedef {React.HTMLAttributes<HTMLDivElement> & {
+ *   title?: string,
+ *   description?: string,
+ *   icon?: React.ComponentType<{ className?: string }>,
+ *   showIcon?: boolean,
+ *   variant?: "default" | "warning" | "destructive" | "success",
+ *   compact?: boolean,
+ * }} NoticeProps
+ */
+
+/**
  * Notice component for displaying informational messages, warnings, or tips
  * 
  * @param {Object} props
@@ -15,6 +26,7 @@ import { InformationCircleIcon } from "@/components/ui/icons"
  * @param {boolean} [props.compact=false] - Reduce internal spacing
  * @param {string} [props.className] - Additional CSS classes
  */
+/** @type {React.ForwardRefExoticComponent<NoticeProps & React.RefAttributes<HTMLDivElement>>} */
 const Notice = React.forwardRef(({ 
     title, 
     description,

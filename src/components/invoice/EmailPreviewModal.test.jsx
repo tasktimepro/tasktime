@@ -15,7 +15,17 @@ const mockShowSuccess = vi.fn();
 const mockOnClose = vi.fn();
 const mockGeneratePDFBase64 = vi.fn(async () => 'bW9ja3BkZg==');
 let mockHostedServiceSessionId = 'sess-abc';
+let mockActiveStorageProvider = 'google-drive';
+let mockActiveStorageGeneration = 4;
+let mockActiveStorageSessionId = 'sess-abc';
+let mockEmailEntitlementEnforcement = false;
+let mockBillingSandbox = false;
+let mockBillingResolution = { kind: 'unresolved', reason: 'lifecycle' };
 let mockEmailTemplates = [];
+const mockUpdateUrl = vi.fn();
+const mockCheckEmailAttemptStatus = vi.fn();
+const mockFindBoundUnreconciledEmailAttempt = vi.fn();
+const mockMarkEmailAttemptMetadataApplied = vi.fn();
 const mockGetByType = vi.fn((type) => mockEmailTemplates.filter((template) => template.type === type));
 const mockGetDefaultForType = vi.fn((type) => mockEmailTemplates.find((template) => template.type === type && template.isDefault) || null);
 const mockDefaultTemplate = {
@@ -48,7 +58,7 @@ vi.mock('../Modal', () => ({
             <div role="dialog" aria-label={title} data-size={size}>
                 <div>{title}</div>
                 <div>{children}</div>
-                <div>{footer}</div>
+                <div data-testid="modal-footer">{footer}</div>
             </div>
         ) : null
     ),
@@ -75,7 +85,36 @@ vi.mock('../modals/EmailTemplateModal.jsx', () => ({
 }));
 
 vi.mock('@/contexts/YjsContext', () => ({
-    useYjs: () => ({ hostedServiceSessionId: mockHostedServiceSessionId }),
+    useYjs: () => ({
+        hostedServiceSessionId: mockHostedServiceSessionId,
+        activeStorageProvider: mockActiveStorageProvider,
+        activeStorageGeneration: mockActiveStorageGeneration,
+        activeStorageSessionId: mockActiveStorageSessionId,
+    }),
+}));
+
+vi.mock('@/contexts/BillingContext', () => ({
+    useBilling: () => ({ resolution: mockBillingResolution }),
+}));
+
+vi.mock('@/config/billingFeatures', () => ({
+    BILLING_FEATURES: {
+        get emailEntitlementEnforcement() {
+            return mockEmailEntitlementEnforcement;
+        },
+        get sandbox() {
+            return mockBillingSandbox;
+        },
+    },
+}));
+
+vi.mock('@/hooks/useUrlState', () => ({
+    useUrlState: () => ({ updateUrl: mockUpdateUrl }),
+}));
+
+vi.mock('@/utils/emailAttemptStorage', () => ({
+    findBoundUnreconciledEmailAttempt: (...args) => mockFindBoundUnreconciledEmailAttempt(...args),
+    markEmailAttemptMetadataApplied: (...args) => mockMarkEmailAttemptMetadataApplied(...args),
 }));
 
 vi.mock('@/hooks/useInvoices.ts', () => ({
@@ -101,6 +140,7 @@ const mockSendInvoiceEmail = vi.fn();
 
 vi.mock('@/utils/emailService', () => ({
     sendInvoiceEmail: (...args) => mockSendInvoiceEmail(...args),
+    checkEmailAttemptStatus: (...args) => mockCheckEmailAttemptStatus(...args),
     isEmailSendError: (err) => typeof err === 'object' && err !== null && 'type' in err && 'message' in err,
 }));
 
@@ -187,8 +227,19 @@ describe('EmailPreviewModal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockHostedServiceSessionId = 'sess-abc';
+        mockActiveStorageProvider = 'google-drive';
+        mockActiveStorageGeneration = 4;
+        mockActiveStorageSessionId = 'sess-abc';
+        mockEmailEntitlementEnforcement = false;
+        mockBillingSandbox = false;
+        mockBillingResolution = { kind: 'unresolved', reason: 'lifecycle' };
         mockEmailTemplates = [];
         mockSendInvoiceEmail.mockReset();
+        mockCheckEmailAttemptStatus.mockReset();
+        mockFindBoundUnreconciledEmailAttempt.mockReset();
+        mockFindBoundUnreconciledEmailAttempt.mockResolvedValue(null);
+        mockMarkEmailAttemptMetadataApplied.mockReset();
+        mockMarkEmailAttemptMetadataApplied.mockResolvedValue(true);
         mockGeneratePDFBase64.mockReset();
         mockGeneratePDFBase64.mockResolvedValue('bW9ja3BkZg==');
         mockGetByType.mockClear();
@@ -730,6 +781,115 @@ describe('EmailPreviewModal', () => {
         });
 
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it('keeps draft and manual delivery controls available while hosted Send is locked on Free', async () => {
+        const user = userEvent.setup();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'free',
+                entitlements: [],
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByText('Hosted Send is a Pro feature')).toBeTruthy();
+        const upgradeNotice = screen.getByText('Hosted Send is a Pro feature').closest('.rounded-md');
+        const upgradeButton = screen.getByRole('button', { name: 'View Pro options' });
+
+        expect(upgradeNotice).toHaveClass('bg-muted', 'border-border');
+        expect(upgradeNotice).not.toHaveClass('status-warning-surface');
+        expect(screen.getByTestId('modal-footer')).toContainElement(upgradeButton);
+        expect(upgradeButton).toHaveClass('bg-primary');
+        expect(upgradeButton.querySelector('svg')).not.toBeNull();
+        expect(screen.queryByRole('button', { name: /Send Invoice/i })).toBeNull();
+        expect(screen.getByLabelText('Subject')).not.toBeDisabled();
+        expect(screen.getByLabelText('Message')).not.toBeDisabled();
+        expect(screen.getByRole('checkbox', { name: 'Forward this email to me' })).not.toBeDisabled();
+
+        await user.click(upgradeButton);
+
+        expect(mockOnClose).toHaveBeenCalledOnce();
+        expect(mockUpdateUrl).toHaveBeenCalledWith({ view: 'account', section: 'billing' });
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it('keeps hosted email disabled while real billing runs in the local sandbox', () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingSandbox = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByText('Hosted Send is disabled in the billing sandbox')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Send Invoice/i })).toBeDisabled();
+        expect(screen.getByLabelText('Subject')).not.toBeDisabled();
+        expect(screen.getByLabelText('Message')).not.toBeDisabled();
+        expect(mockFindBoundUnreconciledEmailAttempt).not.toHaveBeenCalled();
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it('reconciles an ambiguous delivery without starting a second send', async () => {
+        const user = userEvent.setup();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindBoundUnreconciledEmailAttempt.mockResolvedValue({ attemptId: 'attempt-existing' });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-08-30T08:00:00.000Z', reason: null },
+            forward: null,
+            quota: {
+                entitled: true,
+                effectiveRemaining: 9,
+                periodEnd: '2026-09-01T00:00:00.000Z',
+                awaitingConfirmation: 0,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await screen.findByText(/previous hosted send needs delivery confirmation/i);
+        await user.click(screen.getByRole('button', { name: 'Check status' }));
+
+        await waitFor(() => {
+            expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', {
+                sentAt: expect.any(Number),
+                sentToEmail: 'billing@acme.com',
+            });
+        });
+        expect(mockCheckEmailAttemptStatus).toHaveBeenCalledWith({
+            sessionId: 'sess-abc',
+            billingLifecycle: {
+                provider: 'google-drive',
+                generation: 4,
+                sessionId: 'sess-abc',
+            },
+            attemptId: 'attempt-existing',
+        });
+        expect(mockMarkEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-existing',
+            expect.objectContaining({ sessionId: 'sess-abc' }),
+        );
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+        expect(mockOnClose).toHaveBeenCalledOnce();
     });
 
     it('shows clear error when sending with blank subject (no template selected)', async () => {

@@ -8,6 +8,8 @@ The bridge does not read or write TaskTime Pro IndexedDB/Yjs data directly. It s
 
 Billing-scoped tools include approval-gated invoice finalization and cancellation. Cancellation is limited to finalized unpaid invoices, retains the invoice number and audit record, and releases only source work owned by that invoice.
 
+The paired app also owns subscription policy. Free supports one active client and the closed `get_report_summary({"scope":"basic-current-month"})` overview. Advanced Reports and report exports require Pro. Email preparation and PDF export remain Free, while TaskTime-hosted invoice/quote sending requires Pro and explicit confirmation. Use `get_email_send_status` to reconcile an ambiguous attempt without resending it.
+
 Install and run:
 
 ```bash

@@ -4,7 +4,7 @@
 APP_RUN_ENV ?=
 APP_RUN = docker compose run --rm $(APP_RUN_ENV) app
 
-.PHONY: help dev dev-push-local preview-push-local preview-push-cloud preview-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke test-e2e-drive-browsers test-e2e-pwa-smoke release-gate blog-install blog-dev blog-build
+.PHONY: help dev dev-billing-sandbox dev-push-local preview-push-local preview-push-cloud preview-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke release-gate blog-install blog-dev blog-build
 
 PREVIEW_PORT ?= 3101
 
@@ -14,6 +14,7 @@ help:
 	@echo "=============================="
 	@echo ""
 	@echo "  make dev      - Start development server (docker compose up)"
+	@echo "  make dev-billing-sandbox - Start loopback-only real Stripe test-mode billing against the local Worker"
 	@echo "  make dev-push-local - Start app dev server with Dropbox UI using local Worker at http://localhost:8787"
 	@echo "  make preview-push-local - Build production preview with Dropbox UI using local Worker at http://localhost:8787"
 	@echo "  make preview-push-cloud - Build production preview using deployed Worker at https://sync.tasktime.pro"
@@ -47,6 +48,12 @@ dev:
 	docker compose up -d
 	@echo "Development server running at http://localhost:3101"
 	@echo "Blog dev server is available through the same origin at http://localhost:3101/blog"
+
+# Prepare and start the app, local Worker, and Stripe test-webhook listener as
+# one attached Docker Compose stack. Ctrl+C stops the complete stack together.
+dev-billing-sandbox:
+	$(MAKE) -C tasktime-infra worker-billing-sandbox-prepare
+	sh ./scripts/run-billing-sandbox-stack.sh
 
 # Start local app dev server wired to local Wrangler Worker with Dropbox UI.
 dev-push-local:

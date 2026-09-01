@@ -188,6 +188,11 @@ img {
     color: var(--foreground);
 }
 
+.site-nav-links a[aria-current='page'] {
+    color: var(--foreground);
+    font-weight: 700;
+}
+
 .site-nav a.cta-button {
     display: inline-flex;
     align-items: center;

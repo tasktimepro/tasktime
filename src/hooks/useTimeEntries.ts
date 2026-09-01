@@ -18,6 +18,8 @@ import {
 } from '@/domain/time/manualTimeEntryOperations';
 
 export interface UseTimeEntriesOptions {
+    /** Read only the always-loaded entries-active document. */
+    activeOnly?: boolean;
     /** Filter to a specific task */
     taskId?: string;
     /** Start date filter (timestamp) */
@@ -41,7 +43,13 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
     const syncEntries = useCallback(() => {
         if (!isReady) return;
 
-        const allEntries = store.getAllTimeEntries();
+        const allEntries = options.activeOnly
+            ? collectValidatedEntities<TimeEntry>(
+                'timeEntries',
+                store.activeTimeEntries as any,
+                'active-only time entries',
+            )
+            : store.getAllTimeEntries();
         
         // Apply filters
         let filtered = allEntries;
@@ -66,7 +74,7 @@ export function useTimeEntries(options: UseTimeEntriesOptions = {}) {
         
         setEntries(filtered);
         setIsLoading(false);
-    }, [isReady, store, options.taskId, options.startDate, options.endDate]);
+    }, [isReady, store, options.activeOnly, options.taskId, options.startDate, options.endDate]);
 
     // Initial load and subscribe to active entries
     useEffect(() => {

@@ -141,6 +141,7 @@ import {
     previewInvoiceEmailCommand,
     sendProjectQuoteEmailCommand,
     sendInvoiceEmailCommand,
+    getEmailSendStatusCommand,
     undoLatestInvoiceCommand,
     updateInvoiceDraftCommand,
 } from './invoices';
@@ -162,7 +163,9 @@ import {
     getProjectOverviewCommand,
     listRecentEntriesCommand,
 } from './queries';
-import { exportAccountantPackCommand, exportReportCsvCommand, exportReportPdfCommand, getReportSummaryCommand } from './reports';
+import { exportAccountantPackCommand, exportReportCsvCommand, exportReportPdfCommand, getReportSummaryCommand, isFreeBasicReportInput } from './reports';
+import { BILLING_FEATURES } from '@/config/billingFeatures';
+import { evaluateEntitlementFeature } from '@/domain/entitlements/entitlementPolicy';
 
 export type AgentCommandName =
     | 'list_projects'
@@ -277,6 +280,7 @@ export type AgentCommandName =
     | 'send_project_quote_email'
     | 'preview_invoice_email'
     | 'send_invoice_email'
+    | 'get_email_send_status'
     | 'get_dashboard_summary'
     | 'get_project_overview'
     | 'get_client_overview'
@@ -315,10 +319,56 @@ export interface AgentCommandDefinition<Input = unknown, Output = unknown> {
     description: string;
     scopes: AgentPermissionScope[];
     requiresApproval?: boolean;
+    entitlement?: {
+        feature: 'reports.access' | 'invoice.email.send';
+        freeWhen?: (input: unknown) => boolean;
+    };
     handler: AgentCommandHandler<Input, Output>;
 }
 
 type Registry = Record<AgentCommandName, AgentCommandDefinition<any, any>>;
+
+export type AgentEntitlementControls = {
+    advancedReportsEnforcement: boolean;
+    emailEntitlementEnforcement: boolean;
+};
+
+export function agentEntitlementError(
+    definition: AgentCommandDefinition,
+    input: unknown,
+    resolution: AgentCommandContext['entitlementResolution'],
+    controls: AgentEntitlementControls,
+): AgentCommandError | null {
+    const enforcementEnabled = definition.entitlement?.feature === 'reports.access'
+        ? controls.advancedReportsEnforcement
+        : definition.entitlement?.feature === 'invoice.email.send'
+            ? controls.emailEntitlementEnforcement
+            : false;
+    if (!enforcementEnabled
+        || !definition.entitlement
+        || definition.entitlement.freeWhen?.(input)) return null;
+    const access = evaluateEntitlementFeature(
+        resolution ?? { kind: 'unresolved', reason: 'lifecycle' },
+        definition.entitlement.feature,
+    );
+    if (access.allowed) return null;
+    if (resolution?.kind === 'canonical' && resolution.snapshot.accessStatus === 'suspended') {
+        return new AgentCommandError(
+            'BILLING_SUSPENDED',
+            'Resolve billing before starting a new Pro action.',
+            { feature: definition.entitlement.feature, destination: '/account?section=billing' },
+        );
+    }
+    return new AgentCommandError(
+        access.reason === 'status_unavailable'
+            ? 'ENTITLEMENT_STATUS_UNAVAILABLE'
+            : 'ENTITLEMENT_REQUIRED',
+        access.reason === 'status_unavailable'
+            ? 'Confirm the active cloud account and refresh billing status.'
+            : 'This action requires a TaskTime Pro trial or subscription.',
+        { feature: definition.entitlement.feature, destination: '/account?section=billing' },
+    );
+}
 
 export const AGENT_COMMAND_REGISTRY: Registry = {
     list_projects: {
@@ -379,13 +429,13 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     create_client: {
         name: 'create_client',
-        description: 'Create a non-archived TaskTime Pro client with contact, billing, tax, and notes fields.',
+        description: 'Create a non-archived TaskTime Pro client. Free includes one active client; trial and Pro include unlimited active clients.',
         scopes: ['write'],
         handler: createClientCommand,
     },
     update_client: {
         name: 'update_client',
-        description: 'Update non-destructive client fields such as contact, billing, tax, notes, hourly rate, and color.',
+        description: 'Update client fields. Editing is always available; changing archived to false applies the same active-client policy as restore.',
         scopes: ['write'],
         handler: updateClientCommand,
     },
@@ -397,7 +447,7 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     unarchive_client: {
         name: 'unarchive_client',
-        description: 'Restore an archived client without changing related projects, tasks, entries, invoices, expenses, or synced data.',
+        description: 'Restore an archived client without changing related data. Free includes one active client; trial and Pro include unlimited active clients.',
         scopes: ['write'],
         handler: unarchiveClientCommand,
     },
@@ -1002,9 +1052,10 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     send_project_quote_email: {
         name: 'send_project_quote_email',
-        description: 'Generate a non-persistent project quote PDF in the paired browser app session and send it by email after explicit confirmation.',
+        description: 'Preview and PDF export remain available to everyone. Hosted quote Send requires a Pro trial or subscription and explicit confirmation.',
         scopes: ['read', 'email'],
         requiresApproval: true,
+        entitlement: { feature: 'invoice.email.send' },
         handler: sendProjectQuoteEmailCommand,
     },
     preview_invoice_email: {
@@ -1015,10 +1066,17 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
     },
     send_invoice_email: {
         name: 'send_invoice_email',
-        description: 'Generate the invoice PDF in the paired browser app session, send the invoice email through the existing cloud email service, and update sent metadata when applicable.',
+        description: 'Preview and PDF export remain available to everyone. Hosted invoice/reminder Send requires a Pro trial or subscription and updates sent metadata only after accepted delivery.',
         scopes: ['read', 'write', 'email'],
         requiresApproval: true,
+        entitlement: { feature: 'invoice.email.send' },
         handler: sendInvoiceEmailCommand,
+    },
+    get_email_send_status: {
+        name: 'get_email_send_status',
+        description: 'Read one durable hosted-email delivery attempt. This never contacts the email provider and never sends or retries a message.',
+        scopes: ['read', 'email'],
+        handler: getEmailSendStatusCommand,
     },
     get_dashboard_summary: {
         name: 'get_dashboard_summary',
@@ -1042,24 +1100,28 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         name: 'get_report_summary',
         description: 'Return read-only Reports-page summaries for filtered invoices, expenses, hours, tax, outstanding, statement, work-summary, and to-invoice sections.',
         scopes: ['read'],
+        entitlement: { feature: 'reports.access', freeWhen: isFreeBasicReportInput },
         handler: getReportSummaryCommand,
     },
     export_report_csv: {
         name: 'export_report_csv',
         description: 'Generate and download a CSV export for a Reports-page section in the paired browser app session without returning file contents through the bridge.',
         scopes: ['read', 'export'],
+        entitlement: { feature: 'reports.access' },
         handler: exportReportCsvCommand,
     },
     export_report_pdf: {
         name: 'export_report_pdf',
         description: 'Generate and download a PDF export for Reports-page sections that have existing UI PDF exporters, without returning file contents through the bridge.',
         scopes: ['read', 'export'],
+        entitlement: { feature: 'reports.access' },
         handler: exportReportPdfCommand,
     },
     export_accountant_pack: {
         name: 'export_accountant_pack',
         description: 'Generate and download the Reports accountant pack ZIP in the paired browser app session without returning file contents through the bridge.',
         scopes: ['read', 'export'],
+        entitlement: { feature: 'reports.access' },
         handler: exportAccountantPackCommand,
     },
     export_backup_json: {
@@ -1302,6 +1364,14 @@ export async function executeAgentCommand(
             },
         };
     }
+
+    const entitlementError = agentEntitlementError(
+        definition,
+        input,
+        context.entitlementResolution,
+        BILLING_FEATURES,
+    );
+    if (entitlementError) return normalizeError(command, entitlementError);
 
     try {
         const data = await definition.handler(context, input);

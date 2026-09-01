@@ -51,6 +51,14 @@ Trusted chat approvals default to until revoked for stable same-device managed a
 5. For approval-gated actions, use a valid exact-input TaskTime Pro approval token created through `tasktime/create_approval_token`, or let the browser-visible approval prompt handle the action. Do not reuse tokens for changed inputs.
 6. Keep the user in control for invoice finalization or cancellation, email sending, export, account data deletion, restore, sync wiping, and cascade deletes.
 
+## Free and Pro Boundaries
+
+- Free supports one active client at a time. Existing clients remain readable and editable, and archived clients remain restorable when the active-client count permits. If `create_client`, `unarchive_client`, or an archived-to-active `update_client` returns `ENTITLEMENT_REQUIRED`, do not bypass the check, archive another client without explicit user intent, or replay with a different idempotency key.
+- `get_report_summary` is Free only with the exact `scope: "basic-current-month"` request and no advanced arguments. That response contains only current-month Received, Expenses, and Tracked time. Omitted scope, `scope: "advanced"`, advanced report sections/ranges/filters/rows, and report exports require Pro.
+- Email preview, templates, invoice/quote PDF export, and manual delivery remain Free. TaskTime-hosted `send_invoice_email` and `send_project_quote_email` require a Pro trial or subscription plus fresh confirmation. Returning from trial or Checkout never authorizes an automatic send.
+- When a send has an ambiguous outcome, call `get_email_send_status` with the original attempt ID. It is read-only, does not contact the provider, and must never be replaced by an automatic resend. Start a fresh send only after TaskTime reports the prior attempt rejected and the user confirms again.
+- Treat `ENTITLEMENT_REQUIRED` and billing-suspension responses as policy results from the paired app. Use the supplied recovery route or `open_account_view` when the user wants to review Pro or billing; do not infer access from tool visibility alone.
+
 ## Useful First Tools
 
 - `list_projects`, `list_clients`, and `list_tasks` to understand the current workspace.

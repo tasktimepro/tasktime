@@ -20,6 +20,13 @@ const {
     canonicalPath = '/product/',
     socialImage = DEFAULT_SOCIAL_IMAGE,
     socialImageAlt = DEFAULT_SOCIAL_IMAGE_ALT,
+    activePage = 'product',
+    softwareOffers = {
+        '@type': 'Offer',
+        name: 'Free',
+        price: '0',
+        priceCurrency: 'EUR',
+    },
 } = Astro.props;
 
 const siteUrl = Astro.site ?? new URL(SITE_URL);
@@ -84,11 +91,7 @@ const structuredData = {
             publisher: {
                 '@id': organizationId,
             },
-            offers: {
-                '@type': 'Offer',
-                price: '0',
-                priceCurrency: 'USD',
-            },
+            offers: softwareOffers,
             featureList: [
                 'Project and task planning',
                 'Multiple project timers and time entries',
@@ -138,7 +141,7 @@ const structuredData = {
         <div class="page-shell product-page-shell">
             <header class="site-header">
                 <div class="site-header-top">
-                    <a class="brand" href="/product/" aria-current="page">
+                    <a class="brand" href="/product/" aria-current={activePage === 'product' ? 'page' : undefined}>
                         <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
                         <span class="brand-label">TaskTime Pro</span>
                     </a>
@@ -164,6 +167,7 @@ const structuredData = {
                 </div>
                 <nav class="site-nav" aria-label="Primary">
                     <div class="site-nav-links">
+                        <a href="/pricing/" aria-current={activePage === 'pricing' ? 'page' : undefined}>Pricing</a>
                         <a href="/blog/">Blog</a>
                         <a href="/agents/">Agent Docs</a>
                     </div>
@@ -192,6 +196,7 @@ const structuredData = {
                         </svg>
                     </a>
                     <a href="/agents/">Agent Docs</a>
+                    <a href="/pricing/">Pricing</a>
                     <a href="/blog/">Blog</a>
                     <a href="/contact/">Contact</a>
                     <a href="/privacy/">Privacy</a>

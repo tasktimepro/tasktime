@@ -35,6 +35,7 @@ import {
 } from '@/utils/invoiceUtils';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
 import { isTimestampStartWithinStoredDateRange } from '@/utils/reportDateBoundary';
+import { buildBasicReportsOverview } from '@/domain/reports/basicReportsOverview';
 import { assertPermission, assertReady } from './shared';
 
 type ReportSection =
@@ -71,6 +72,7 @@ interface ToInvoiceReportRow {
 }
 
 export interface ReportSummaryInput {
+    scope?: 'basic-current-month' | 'advanced';
     section?: ReportSection;
     period?: ReportPeriodValue;
     customStart?: string | null;
@@ -86,6 +88,47 @@ export interface ReportSummaryInput {
     includeRows?: boolean;
     rowLimit?: number;
     rowLimitMax?: number;
+}
+
+function isBasicCurrentMonthRequest(input: unknown): input is ReportSummaryInput & { scope: 'basic-current-month' } {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
+    const value = input as Record<string, unknown>;
+    const keys = Object.keys(value);
+    return value.scope === 'basic-current-month'
+        && (value.section === undefined || value.section === 'overview')
+        && keys.every(key => key === 'scope' || key === 'section');
+}
+
+export function isFreeBasicReportInput(input: unknown): boolean {
+    return isBasicCurrentMonthRequest(input);
+}
+
+function collectBasicReportsOverview(context: AgentCommandContext) {
+    const invoices = collectValidatedEntities<Invoice>(
+        'invoices',
+        context.store.invoices as any,
+        'agent basic report invoices',
+    );
+    const expenses = collectValidatedEntities<Expense>(
+        'expenses',
+        context.store.expenses as any,
+        'agent basic report expenses',
+    );
+    const entries = collectValidatedEntities<TimeEntry>(
+        'timeEntries',
+        context.store.activeTimeEntries as any,
+        'agent basic report active time entries',
+    ).filter(
+        (entry): entry is TimeEntry => Boolean(entry)
+            && typeof entry.id === 'string'
+            && typeof entry.taskId === 'string',
+    );
+    return buildBasicReportsOverview({
+        invoices,
+        expenses,
+        entries,
+        nowMs: context.now?.() ?? Date.now(),
+    });
 }
 
 export interface ExportReportCsvInput extends ReportSummaryInput {
@@ -296,6 +339,13 @@ const collectReportsData = async (context: AgentCommandContext) => {
 export async function getReportSummaryCommand(context: AgentCommandContext, input: ReportSummaryInput = {}) {
     assertReady(context);
     assertPermission(context, 'read');
+
+    if (input?.scope === 'basic-current-month') {
+        if (!isBasicCurrentMonthRequest(input)) {
+            throw new Error('Basic current-month Reports accepts only the Overview section and no filters or rows.');
+        }
+        return collectBasicReportsOverview(context);
+    }
 
     const customRange = getDefaultCustomRange(new Date(context.now?.() || Date.now()));
     const resolvedRange = resolveReportDateRange({

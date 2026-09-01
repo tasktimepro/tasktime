@@ -8,6 +8,8 @@ The plugin launches the same-device TaskTime Pro agent bridge, and the user must
 
 The billing-scoped bridge can cancel an eligible finalized unpaid invoice only with explicit TaskTime Pro approval, a reason, and exact invoice-number confirmation; the invoice remains as a numbered audit record.
 
+Free supports one active client and the exact `get_report_summary({"scope":"basic-current-month"})` overview. Advanced Reports/exports and TaskTime-hosted invoice/quote sending require Pro; previews, templates, PDFs, and manual email delivery remain Free. Use `get_email_send_status` for ambiguous delivery instead of resending automatically.
+
 ## Install
 
 Add the TaskTime Pro marketplace in Claude Code:

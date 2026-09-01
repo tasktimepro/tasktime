@@ -12,12 +12,29 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
-- **Public site:** Astro content under `blog/` builds the product overview, blog, legal pages, agent documentation, discovery metadata, and generated tool references.
+- **Public site:** Astro content under `blog/` builds the product overview, local-review pricing comparison, blog, legal pages, agent documentation, discovery metadata, and generated tool references. The pricing route uses the approved Free/Pro boundary but remains unpublished until the subscription launch gates are approved.
 - **Operational evidence:** DebugBundle captures opted-in runtime incident evidence; local tests remain the first tool for deterministic failures.
-- **Planned subscription control plane:** Private Worker/D1/Stripe modules will
-  publish a sanitized catalog, canonical provider-bound billing status, and
-  short-lived signed local assertions. Production controls remain off until the
-  documented launch gates; billing state never becomes Yjs/product/provider data.
+- **Locally implemented subscription control plane:** Private Worker/D1/Stripe
+  modules and the browser client now implement a sanitized catalog, canonical
+  provider-bound billing status, short-lived signed local assertions, recovery,
+  and action policy under guarded local plus bounded real Stripe test-mode
+  evidence. Program Phase 1 is complete locally. Production controls remain off
+  until the documented launch gates; no remote billing migration or live
+  Stripe/deployment evidence is claimed, and billing state never becomes
+  Yjs/product/provider data.
+- **Local billing sandbox:** An explicit Vite-development flag on a loopback
+  hostname keeps the normal Worker-backed billing client active against
+  Wrangler-local D1 and Stripe test mode. One root command prepares and runs the
+  app, local Worker, and Dockerized webhook listener as an attached Compose
+  stack. A persistent banner marks the boundary; hosted Send and email
+  delivery-status checks remain disabled, production builds ignore the flag,
+  and product data remains in the ordinary real local Yjs workspace with its
+  configured sync mode.
+- **Local pricing review fallback:** Vite development on a loopback hostname can
+  render the bundled `/pricing/` review catalog immediately inside Plan & Billing
+  while the Worker catalog is unavailable. The Worker response replaces it when
+  available; production builds never use the fallback, and no fallback value can
+  authorize trial, Checkout, entitlement, or hosted service work.
 
 ## Data model and ownership
 
@@ -43,7 +60,7 @@ The Yjs store is split into documents so current work stays loaded and historica
 5. Review dashboard metrics and reports, then export CSV, PDF, ZIP, backup, or accountant artifacts.
 6. Optionally connect Google Drive or Dropbox using manual, backup, or bidirectional sync modes.
 7. Optionally pair a same-device agent bridge and grant scoped business-action access.
-8. When the planned Pro release is enabled, Free permits one active client and a
+8. The locally implemented, production-disabled Pro release boundary gives Free one active client and a
    useful Reports Overview for the current local calendar month. An optional
    no-card trial or Pro subscription unlocks unlimited active clients, advanced
    report tabs/outputs, and TaskTime-hosted sending. Existing/imported/synced
@@ -63,13 +80,17 @@ The Yjs store is split into documents so current work stays loaded and historica
 - Canceled invoices remain read-only audit records in `core`, are unmistakably marked in retained PDFs, and contribute zero to payment, revenue, output-tax, profit, outstanding, aging, statement, and project-allocation calculations. Portable backup `1.5` preserves the record while continuing to import every previously supported backup version.
 - Mark-as-unpaid is a paid-invoice correction only: it clears payment evidence while retaining billing-source claims and cannot reopen a sent, overdue, draft, or canceled invoice.
 - UI hooks and agent commands share domain operations for timer lifecycle/recovered stops, protected manual time-entry mutations, task completion/recurrence state, duplicate-safe entity identity, protected expense deletion, and relationship-safe project/client/task writes.
-- Planned entitlement policy is likewise shared across browser and agent paths.
+- The locally implemented entitlement policy is shared across browser and agent paths but remains production-disabled.
   It gates only a net-increasing active-client create/restore transition,
   advanced Reports/exports, and hosted Send. `/reports`, its current-month
   Overview, and every tab remain visible; a locked advanced tab branches to a
   static section-specific preview before mounting protected modules, history,
   calculations, rows, or export builders. Import/restore/sync never discards or
   auto-archives an over-limit client.
+- Local Pro preview exercises those same browser policy branches without a cloud
+  account or Stripe. Its state is non-persisted, visibly synthetic, and cannot
+  authorize provider-backed billing or hosted-email work or establish production
+  evidence.
 - Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.
 - Sync mode performs a lightweight manifest check every five minutes only while visible, coalesces tab-visible/browser-online signals within one second into one foreground pass, and lets genuine pending local work blocked by an active pass or cross-tab lock retry with bounded backoff after the lock can be released. External lazy-document loads serialize behind an active provider pass; lazy loads owned by that pass defer their manifest commit to the owner so revision-sensitive writes cannot overlap.

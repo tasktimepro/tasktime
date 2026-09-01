@@ -86,6 +86,30 @@ describe('useClients', () => {
         expect(() => result.current.updateClient('c1', { id: 'replacement' })).toThrow(/identity/i)
     })
 
+    it('commits create and restore operations through the policy-lock boundary', async () => {
+        const existing = { id: 'c1', title: 'Archived', archived: true }
+        const create = vi.fn(client => client)
+        const update = vi.fn((id, updates) => ({ ...existing, ...updates, id }))
+        mockUseYjs.mockReturnValue({ store: { plannerAttachments: createTestYMap() }, isReady: true })
+        mockUseYjsCollection.mockReturnValue({
+            items: [existing],
+            isLoading: false,
+            get: vi.fn(id => id === 'c1' ? existing : undefined),
+            create,
+            update,
+            remove: vi.fn(),
+        })
+
+        const { result } = renderHook(() => useClients())
+        await act(async () => {
+            await result.current.createClientWithPolicyLock({ title: 'Created through lock' })
+            await result.current.updateClientWithPolicyLock('c1', { archived: false })
+        })
+
+        expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: 'Created through lock' }))
+        expect(update).toHaveBeenCalledWith('c1', { archived: false })
+    })
+
     it('cleans up planner attachments when deleting a client', () => {
         const plannerAttachments = createTestYMap({
             'att-1': { id: 'att-1', type: 'client', referenceId: 'c1' },

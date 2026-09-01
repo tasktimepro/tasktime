@@ -42,6 +42,7 @@ During local development, the public Astro pages are served through the same ori
 
 - http://localhost:3101/blog
 - http://localhost:3101/product
+- http://localhost:3101/pricing
 - http://localhost:3101/agents
 - http://localhost:3101/llms.txt
 
@@ -50,6 +51,7 @@ During local development, the public Astro pages are served through the same ori
 ```bash
 make install                         # install dependencies
 make dev                             # start the app on localhost:3101
+make dev-billing-sandbox             # use the real local Worker and Stripe test-mode billing
 make stop                            # stop local containers
 make lint                            # run ESLint
 make typecheck                       # run the repository-wide TypeScript check
@@ -61,6 +63,45 @@ make build                           # build the app and public site
 make preview                         # build and preview production output
 make npm CMD="run build:agent-bridge" # build the agent bridge package
 ```
+
+`make dev-billing-sandbox` replaces the retired synthetic billing-state preview.
+It works only in Vite development mode on `localhost`/loopback, points the app at
+the local Worker, and exercises the normal catalog, account, trial, Checkout,
+webhook, reconciliation, license, and Portal clients against Stripe test mode
+and Wrangler-local D1. A persistent banner marks the boundary. Hosted Send and
+delivery-status requests remain disabled so billing tests cannot send customer
+messages. Production builds ignore the sandbox flag, and the tracked production
+Worker controls remain unchanged and off.
+
+Start the complete billing sandbox from the repository root. The command
+prepares local D1/configuration and starts the app, Worker, and Dockerized
+Stripe webhook listener together. Their logs remain attached, and `Ctrl+C`
+stops and removes the complete stack:
+
+```bash
+make dev-billing-sandbox
+```
+
+Preparation accepts a current `STRIPE_SECRET_KEY=sk_test_...` or the authenticated
+Stripe CLI profiles. When several accounts are configured, it safely selects the
+test credential that can read TaskTime's exact configured Price instead of
+assuming `[default]`. It writes only ignored mode-`0600` local files,
+applies the checked-in migrations to Wrangler-local D1, and seeds local-only
+rollout approvals. If the CLI temporary key expired, run `stripe login` or pass
+a current test secret key and rerun the same command. Stripe authentication is
+the only occasional host prerequisite. A previously prepared valid local test
+key is reused, and the recurring validation plus runtime services use the
+pinned official Stripe CLI Docker image. The listener receives only its API key,
+not the Worker signing or HMAC configuration, and its attached output masks the
+local webhook signing secret. The lower-level private Worker
+commands remain available for diagnosing an individual service. Use only Stripe
+test cards and fictional customer details; never enter a real card or identity.
+
+The public comparison remains available from the same server at
+`http://localhost:3101/pricing/`. Ordinary loopback development can use the same
+bundled review prices while the live Worker catalog is unavailable. The billing
+sandbox deliberately disables that fallback so local Worker/configuration failures
+remain visible before any trial or test purchase.
 
 ## Architecture
 
@@ -92,6 +133,7 @@ Useful entry points:
 
 - `/agents/` - overview and integration model
 - `/product/` - static product overview and direct app entry point
+- `/pricing/` - Free and Pro comparison, including the founding and standard annual offers
 - `/agents/quickstart/` - bridge launch, pairing, and first MCP call
 - `/agents/security/` - scopes, approvals, revocation, and local-only rules
 - `/agents/tools/` - generated MCP tool reference

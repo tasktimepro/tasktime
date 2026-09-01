@@ -68,7 +68,7 @@ const ClientDashboard = ({
     const [showArchiveModal, setShowArchiveModal] = useState(false);
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
     const [mobileInvoiceGenerator, setMobileInvoiceGenerator] = useState(null);
-    const { updateClient, deleteClient } = useClients();
+    const { updateClient, updateClientWithPolicyLock, deleteClient } = useClients();
     const { deleteProject, updateProject } = useProjects();
     const { deleteTask } = useTasks();
     const { deleteEntry } = useTimeEntries();
@@ -77,7 +77,7 @@ const ClientDashboard = ({
     const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
     const { recurrences, deleteRecurrence } = useExpenseRecurrences();
     const { preferences } = usePreferences();
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
     const [exchangeRates, setExchangeRates] = useState(null);
     // Get client's currency
     const clientCurrency = useMemo(() => {
@@ -374,9 +374,15 @@ const ClientDashboard = ({
         setShowArchiveModal(true);
     };
 
-    const handleUnarchiveClient = () => {
-        updateClient(client.id, { archived: false, archivedOnDate: null });
-        showSuccess('Client unarchived');
+    const handleUnarchiveClient = async () => {
+        try {
+            await updateClientWithPolicyLock(client.id, { archived: false, archivedOnDate: null });
+            showSuccess('Client unarchived');
+        } catch (error) {
+            showError(error?.decision?.code === 'ENTITLEMENT_REQUIRED'
+                ? 'Free includes one active client. Unlock unlimited clients to restore another.'
+                : 'Confirm your TaskTime cloud account and refresh plan status before restoring this client.');
+        }
     };
 
     const handleDeleteClient = () => {

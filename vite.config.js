@@ -23,6 +23,10 @@ const publicRouteProxy = isPreviewCommand
         target: 'http://127.0.0.1:4321',
         changeOrigin: false,
       },
+      '/pricing': {
+        target: 'http://127.0.0.1:4321',
+        changeOrigin: false,
+      },
       '/agents': {
         target: 'http://127.0.0.1:4321',
         changeOrigin: false,

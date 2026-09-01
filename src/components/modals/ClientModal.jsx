@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Cloud, Rocket } from 'lucide-react';
 import { PlusIcon, TrashIcon } from '@/components/ui/icons';
 import { generateSlugId } from '../../utils/idUtils.ts';
 import { useToast } from '../../hooks/useToast.ts';
@@ -14,6 +15,12 @@ import Modal from '../Modal';
 import { ColorPicker } from '@/components/ui/color-picker';
 import CurrencySelect from '@/components/ui/currency-select';
 import { parseOptionalNumberInput, parseOptionalPositiveNumberInput } from '@/utils/numberInputUtils.ts';
+import { useBilling } from '@/contexts/BillingContext';
+import { BILLING_FEATURES } from '@/config/billingFeatures';
+import { evaluateActiveClientTransition } from '@/domain/entitlements/activeClientPolicy';
+import { activeClientEntitlementFromResolution, isActiveClientPolicyError } from '@/domain/work/activeClientApplication';
+import { EntitlementNotice } from '@/components/billing/EntitlementNotice';
+import { useUrlState } from '@/hooks/useUrlState';
 
 const createDefaultFormData = (preferredCurrency = DEFAULT_CURRENCY) => ({
     title: '',
@@ -78,8 +85,14 @@ const ClientModal = ({
     onClose,
     editingClient
 }) => {
-    const { showSuccess } = useToast();
-    const { createClient, updateClient } = useClients();
+    const { showSuccess, showError } = useToast();
+    const {
+        clients,
+        createClientWithPolicyLock,
+        updateClient,
+    } = useClients();
+    const { resolution } = useBilling();
+    const { updateUrl } = useUrlState();
     const { preferences } = usePreferences();
 
     const [formData, setFormData] = useState(() => createInitialFormData(
@@ -142,7 +155,7 @@ const ClientModal = ({
     /**
      * Create a new client
      */
-    const handleCreateClient = (e) => {
+    const handleCreateClient = async (e) => {
         e.preventDefault();
 
         if (!formData.title) {
@@ -161,32 +174,41 @@ const ClientModal = ({
             return; // Hourly rate is required when not using flat rate
         }
 
-        createClient({
-            id: generateSlugId(formData.title),
-            title: formData.title,
-            clientName: formData.clientName,
-            contactPerson: formData.contactPerson,
-            address: formData.address,
-            city: formData.city,
-            state: formData.state,
-            zip: formData.zip,
-            country: formData.country,
-            registrationNumber: formData.registrationNumber,
-            vat: formData.vat,
-            taxNumber: formData.taxNumber,
-            email: formData.email,
-            phone: formData.phone,
-            custom: formData.custom,
-            disableTax: formData.disableTax,
-            defaultCurrency: formData.defaultCurrency,
-            hourlyRate: parseOptionalNumberInput(formData.hourlyRate),
-            flatRate: formData.flatRate || false,
-            color: formData.color || null,
-            archived: false
-        });
-
-        showSuccess('Client created successfully!');
-        onClose();
+        try {
+            await createClientWithPolicyLock({
+                id: generateSlugId(formData.title),
+                title: formData.title,
+                clientName: formData.clientName,
+                contactPerson: formData.contactPerson,
+                address: formData.address,
+                city: formData.city,
+                state: formData.state,
+                zip: formData.zip,
+                country: formData.country,
+                registrationNumber: formData.registrationNumber,
+                vat: formData.vat,
+                taxNumber: formData.taxNumber,
+                email: formData.email,
+                phone: formData.phone,
+                custom: formData.custom,
+                disableTax: formData.disableTax,
+                defaultCurrency: formData.defaultCurrency,
+                hourlyRate: parseOptionalNumberInput(formData.hourlyRate),
+                flatRate: formData.flatRate || false,
+                color: formData.color || null,
+                archived: false
+            });
+            showSuccess('Client created successfully!');
+            onClose();
+        } catch (error) {
+            if (isActiveClientPolicyError(error)) {
+                showError(error.decision.code === 'ENTITLEMENT_REQUIRED'
+                    ? 'Free includes one active client. Unlock unlimited clients to add another.'
+                    : 'Confirm your TaskTime cloud account and refresh plan status before adding a client.');
+                return;
+            }
+            throw error;
+        }
     };
 
     /**
@@ -236,6 +258,51 @@ const ClientModal = ({
         showSuccess('Client updated successfully!');
         onClose();
     };
+
+    const createDecision = !editingClient && BILLING_FEATURES.clientLimitEnforcement
+        ? evaluateActiveClientTransition({
+            clients,
+            entitlement: activeClientEntitlementFromResolution(resolution),
+            transition: 'create',
+        })
+        : { allowed: true };
+
+    if (!editingClient && !createDecision.allowed) {
+        const unavailable = createDecision.code === 'ENTITLEMENT_STATUS_UNAVAILABLE';
+        const handleEntitlementAction = () => {
+            onClose();
+            updateUrl({ view: 'account', section: unavailable ? 'sync' : 'billing' });
+        };
+        const footer = (
+            <div className="flex flex-row flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={onClose}>Close</Button>
+                <Button
+                    leadingIcon={unavailable ? Cloud : Rocket}
+                    onClick={handleEntitlementAction}
+                >
+                    {unavailable ? 'Check cloud account' : 'Unlock unlimited clients'}
+                </Button>
+            </div>
+        );
+
+        return (
+            <Modal
+                isOpen={isOpen}
+                onClose={onClose}
+                title="Create New Client"
+                size="md"
+                footer={footer}
+            >
+                <EntitlementNotice
+                    title={unavailable ? 'Plan status needs confirmation' : 'Free includes one active client'}
+                >
+                    {unavailable
+                        ? 'Reconnect or refresh the active TaskTime cloud account before creating a client. Existing clients and data remain available.'
+                        : 'Archive an active client or unlock unlimited clients. Existing clients, projects, invoices, and time remain fully usable.'}
+                </EntitlementNotice>
+            </Modal>
+        );
+    }
 
     const footer = (
         <div className="flex flex-row flex-wrap justify-end gap-2">

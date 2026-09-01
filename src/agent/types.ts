@@ -1,6 +1,7 @@
 import type * as Y from 'yjs';
 import type { YjsStore } from '@/stores/yjs/YjsStore';
 import type { BackupImportPayload } from '@/utils/backupData';
+import type { EntitlementResolution } from '@/domain/entitlements/entitlementTypes';
 
 export type AgentPermissionScope =
     | 'read'
@@ -17,6 +18,9 @@ export type AgentCommandErrorCode =
     | 'CONFLICT'
     | 'PERMISSION_DENIED'
     | 'RATE_LIMITED'
+    | 'ENTITLEMENT_REQUIRED'
+    | 'ENTITLEMENT_STATUS_UNAVAILABLE'
+    | 'BILLING_SUSPENDED'
     | 'UNAVAILABLE';
 
 export class AgentCommandError extends Error {
@@ -52,6 +56,10 @@ export interface AgentCommandContext {
     /** @deprecated Google Drive compatibility field; hosted services use hostedServiceSessionId. */
     driveSessionId?: string | null;
     hostedServiceSessionId?: string | null;
+    entitlementResolution?: EntitlementResolution;
+    activeStorageProvider?: 'google-drive' | 'dropbox' | null;
+    activeStorageGeneration?: number | null;
+    activeStorageSessionId?: string | null;
 }
 
 export interface AgentCommandResult<T> {

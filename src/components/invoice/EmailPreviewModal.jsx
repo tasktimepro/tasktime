@@ -9,7 +9,7 @@ import { Notice } from '@/components/ui/notice';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import CustomCheckbox from '@/components/CustomCheckbox';
-import { Send } from 'lucide-react';
+import { Cloud, Rocket, Send } from 'lucide-react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useBusinessBrandAssets } from '@/hooks/useBusinessBrandAssets.ts';
 import { useInvoices } from '@/hooks/useInvoices.ts';
@@ -29,13 +29,22 @@ import {
     DEFAULT_QUOTE_ATTACHMENT_TITLE,
     getLastMonthPlaceholderValue,
 } from '@/utils/emailTemplateUtils';
-import { sendInvoiceEmail, isEmailSendError } from '@/utils/emailService';
+import { checkEmailAttemptStatus, sendInvoiceEmail, isEmailSendError } from '@/utils/emailService';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { getCurrentInvoiceHtmlContent, generatePDFBase64 } from '@/utils/pdfUtils.ts';
 import { getCurrencySymbol, normalizeCurrencyCode } from '@/utils/currencyUtils.ts';
 import { usePreferences } from '@/hooks/usePreferences.ts';
 import { getInvoiceTotal, isInvoiceCanceled } from '@/utils/invoiceUtils.ts';
 import { toDisplayDate } from '@/utils/dateUtils.ts';
+import { useBilling } from '@/contexts/BillingContext';
+import { BILLING_FEATURES } from '@/config/billingFeatures';
+import { evaluateEntitlementFeature } from '@/domain/entitlements/entitlementPolicy';
+import { EntitlementNotice } from '@/components/billing/EntitlementNotice';
+import { useUrlState } from '@/hooks/useUrlState';
+import {
+    findBoundUnreconciledEmailAttempt,
+    markEmailAttemptMetadataApplied,
+} from '@/utils/emailAttemptStorage';
 
 /**
  * EmailPreviewModal — shows the user what will be emailed before sending.
@@ -54,7 +63,14 @@ const EmailPreviewModal = ({
 
     const NO_TEMPLATE_ID = '__no_email_template__';
 
-    const { hostedServiceSessionId } = useYjs();
+    const {
+        hostedServiceSessionId,
+        activeStorageProvider,
+        activeStorageGeneration,
+        activeStorageSessionId,
+    } = useYjs();
+    const { resolution } = useBilling();
+    const { updateUrl } = useUrlState();
     const { businessBrandAssets } = useBusinessBrandAssets();
     const { updateInvoice } = useInvoices();
     const { getByType, getDefaultForType } = useEmailTemplates();
@@ -63,6 +79,7 @@ const EmailPreviewModal = ({
 
     const [sending, setSending] = useState(false);
     const [error, setError] = useState(null);
+    const [pendingAttemptId, setPendingAttemptId] = useState(null);
 
     // Editable fields (initialised from selected template)
     const [to, setTo] = useState('');
@@ -86,6 +103,21 @@ const EmailPreviewModal = ({
     const isReminderSend = sendType === 'reminder';
     const templateType = isQuoteSend ? 'quote' : 'invoice';
     const documentLabel = isQuoteSend ? 'quote' : 'invoice';
+    const emailAccess = BILLING_FEATURES.emailEntitlementEnforcement
+        ? evaluateEntitlementFeature(resolution, 'invoice.email.send')
+        : { allowed: true, reason: 'entitled', upgradeEligible: false };
+    const entitlementActionRequired = BILLING_FEATURES.emailEntitlementEnforcement
+        && !emailAccess.allowed
+        && !pendingAttemptId;
+    const billingLifecycle = useMemo(() => activeStorageProvider
+        && activeStorageGeneration !== null
+        && activeStorageSessionId
+        ? {
+            provider: activeStorageProvider,
+            generation: activeStorageGeneration,
+            sessionId: activeStorageSessionId,
+        }
+        : null, [activeStorageGeneration, activeStorageProvider, activeStorageSessionId]);
 
     const templateValues = useMemo(() => ({
         invoiceNumber: invoice?.invoiceNumber || '',
@@ -153,6 +185,7 @@ const EmailPreviewModal = ({
         setTo(client?.email || invoice?.client?.email || '');
         setError(null);
         setSending(false);
+        setPendingAttemptId(null);
 
         const tpl = availableTemplates.find((template) => template.id === preferredTemplateId)
             || defaultTemplate
@@ -173,6 +206,28 @@ const EmailPreviewModal = ({
         setIsTemplateModalOpen(false);
         setForwardToSelf(false);
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen
+            || !invoice
+            || !billingLifecycle
+            || BILLING_FEATURES.sandbox
+            || !BILLING_FEATURES.emailEntitlementEnforcement) return undefined;
+        let current = true;
+        const documentId = invoice.id || invoice.projectId || invoice.invoiceNumber;
+        void findBoundUnreconciledEmailAttempt(
+            billingLifecycle,
+            documentId,
+            sendType,
+        ).then((attempt) => {
+            if (!current || !attempt) return;
+            setPendingAttemptId(attempt.attemptId);
+            setError('A previous hosted send needs delivery confirmation before another send can start.');
+        });
+        return () => {
+            current = false;
+        };
+    }, [billingLifecycle, invoice, isOpen, sendType]);
 
     // When the user switches template, re-apply
     const handleTemplateChange = useCallback((templateId) => {
@@ -197,6 +252,18 @@ const EmailPreviewModal = ({
     }, [applyTemplate]);
 
     const handleSend = useCallback(async () => {
+
+        if (BILLING_FEATURES.sandbox) {
+            setError('Hosted Send is disabled in the local billing sandbox. Your draft and manual delivery options remain available.');
+            return;
+        }
+
+        if (!emailAccess.allowed) {
+            setError(emailAccess.reason === 'status_unavailable'
+                ? 'Confirm the active TaskTime cloud account and refresh plan status before sending.'
+                : 'Hosted email sending requires a Pro trial or subscription. Your draft and manual delivery options remain available.');
+            return;
+        }
 
         if (!hostedServiceSessionId) {
             setError(`Connect a cloud provider to enable ${documentLabel} emailing.`);
@@ -253,6 +320,7 @@ const EmailPreviewModal = ({
                 pdfBase64,
                 sendType,
                 attachmentTitle: normalizeAttachmentTitle(attachmentTitle),
+                billingLifecycle: billingLifecycle || undefined,
             });
 
             if (result.success) {
@@ -264,6 +332,9 @@ const EmailPreviewModal = ({
                     };
 
                     updateInvoice(invoice.id, updates);
+                }
+                if (result.attemptId && billingLifecycle) {
+                    await markEmailAttemptMetadataApplied(result.attemptId, billingLifecycle);
                 }
 
                 const remaining = result.remaining != null ? ` (${result.remaining} emails remaining this month)` : '';
@@ -303,6 +374,16 @@ const EmailPreviewModal = ({
                     case 'provider':
                         setError('Email delivery failed. Please try again later.');
                         break;
+                    case 'entitlement_required':
+                        setError('Hosted email sending requires a Pro trial or subscription. Your draft remains available.');
+                        break;
+                    case 'billing_suspended':
+                        setError('Resolve billing before starting a new hosted email send. Your draft remains available.');
+                        break;
+                    case 'pending':
+                        setPendingAttemptId(err.attemptId);
+                        setError(`${err.message} Attempt ${err.attemptId}.`);
+                        break;
                     default:
                         setError(err.message || 'Failed to send email');
                 }
@@ -329,7 +410,46 @@ const EmailPreviewModal = ({
         } finally {
             setSending(false);
         }
-    }, [attachmentTitle, body, businessBrandAssets, clients, documentLabel, hostedServiceSessionId, forwardToSelf, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, senderForwardAddress, showSuccess, subject, to, updateInvoice]);
+    }, [attachmentTitle, billingLifecycle, body, businessBrandAssets, clients, documentLabel, emailAccess.allowed, emailAccess.reason, hostedServiceSessionId, forwardToSelf, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, senderForwardAddress, showSuccess, subject, to, updateInvoice]);
+
+    const handleCheckStatus = useCallback(async () => {
+        if (BILLING_FEATURES.sandbox) {
+            setError('Delivery status checks are disabled in the local billing sandbox.');
+            return;
+        }
+        if (!pendingAttemptId || !hostedServiceSessionId || !billingLifecycle) return;
+        setSending(true);
+        setError(null);
+        try {
+            const attempt = await checkEmailAttemptStatus({
+                sessionId: hostedServiceSessionId,
+                billingLifecycle,
+                attemptId: pendingAttemptId,
+            });
+            if (attempt.state === 'pending') {
+                setError(`Delivery confirmation is still pending. Attempt ${pendingAttemptId}.`);
+                return;
+            }
+            if (attempt.primary.outcome !== 'accepted') {
+                setPendingAttemptId(null);
+                setError('The email was not accepted. Review the draft before starting a fresh send.');
+                return;
+            }
+            if (!isQuoteSend) {
+                updateInvoice(invoice.id, { sentAt: Date.now(), sentToEmail: to });
+            }
+            await markEmailAttemptMetadataApplied(pendingAttemptId, billingLifecycle);
+            showSuccess(`Delivery confirmed for ${to}.`);
+            setPendingAttemptId(null);
+            onClose();
+        } catch (statusError) {
+            setError(isEmailSendError(statusError)
+                ? statusError.message
+                : 'Delivery status could not be confirmed.');
+        } finally {
+            setSending(false);
+        }
+    }, [billingLifecycle, hostedServiceSessionId, invoice?.id, isQuoteSend, onClose, pendingAttemptId, showSuccess, to, updateInvoice]);
 
     const handleClose = useCallback(() => {
         setError(null);
@@ -337,6 +457,14 @@ const EmailPreviewModal = ({
         setIsTemplateModalOpen(false);
         onClose();
     }, [onClose]);
+
+    const handleEntitlementAction = () => {
+        handleClose();
+        updateUrl({
+            view: 'account',
+            section: emailAccess.reason === 'status_unavailable' ? 'sync' : 'billing',
+        });
+    };
 
     if (!invoice) return null;
 
@@ -364,13 +492,28 @@ const EmailPreviewModal = ({
                 <Button variant="outline" onClick={handleClose} disabled={sending}>
                     Cancel
                 </Button>
-                <Button
-                    onClick={handleSend}
-                    disabled={sending || !to}
-                    leadingIcon={Send}
-                >
-                    {sending ? 'Sending...' : (isQuoteSend ? 'Send Quote' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice'))}
-                </Button>
+                {entitlementActionRequired ? (
+                    <Button
+                        leadingIcon={emailAccess.reason === 'status_unavailable' ? Cloud : Rocket}
+                        onClick={handleEntitlementAction}
+                    >
+                        {emailAccess.reason === 'status_unavailable' ? 'Check cloud account' : 'View Pro options'}
+                    </Button>
+                ) : (
+                    <Button
+                        onClick={pendingAttemptId ? handleCheckStatus : handleSend}
+                        disabled={BILLING_FEATURES.sandbox
+                            || sending
+                            || (!pendingAttemptId && (!to || !emailAccess.allowed))}
+                        leadingIcon={Send}
+                    >
+                        {sending
+                            ? (pendingAttemptId ? 'Checking...' : 'Sending...')
+                            : pendingAttemptId
+                                ? 'Check status'
+                                : (isQuoteSend ? 'Send Quote' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice'))}
+                    </Button>
+                )}
             </div>
         </div>
     );
@@ -392,9 +535,30 @@ const EmailPreviewModal = ({
                     </Notice>
                 )}
 
+                {BILLING_FEATURES.sandbox && (
+                    <Notice title="Hosted Send is disabled in the billing sandbox">
+                        Billing and entitlement state comes from the local Worker, but hosted email is kept off.
+                        Draft editing, PDF preparation, download, copy, and manual delivery remain available.
+                    </Notice>
+                )}
+
+                {BILLING_FEATURES.emailEntitlementEnforcement && !emailAccess.allowed && (
+                    <EntitlementNotice
+                        title={emailAccess.reason === 'status_unavailable'
+                            ? 'Plan status needs confirmation'
+                            : 'Hosted Send is a Pro feature'}
+                    >
+                        Your email draft, template editing, forwarding choice, PDF preparation, download,
+                        and manual delivery workflow remain available. Starting a trial or purchase never sends this draft automatically.
+                    </EntitlementNotice>
+                )}
+
                 {/* Error display */}
                 {error && (
-                    <Notice variant="error" title="Send failed">
+                    <Notice
+                        variant={pendingAttemptId ? 'warning' : 'error'}
+                        title={pendingAttemptId ? 'Delivery confirmation needed' : 'Send failed'}
+                    >
                         {error}
                     </Notice>
                 )}

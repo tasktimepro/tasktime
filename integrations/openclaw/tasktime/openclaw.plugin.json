@@ -65,6 +65,7 @@
       "tasktime__get_active_timers",
       "tasktime__get_client_overview",
       "tasktime__get_dashboard_summary",
+      "tasktime__get_email_send_status",
       "tasktime__get_pairing_status",
       "tasktime__get_preferences",
       "tasktime__get_project_notes",

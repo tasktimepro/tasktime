@@ -1,7 +1,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import Reports from './Reports';
+import Reports from './reports/AdvancedReportsWorkspace';
 
 const mockUpdateUrl = vi.fn();
 const mockBuildCsvContent = vi.fn(() => 'csv-content');

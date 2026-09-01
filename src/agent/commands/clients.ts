@@ -24,6 +24,48 @@ import {
     buildClientEntity,
     buildClientUpdates,
 } from '@/domain/work/workEntityOperations';
+import { BILLING_FEATURES } from '@/config/billingFeatures';
+import {
+    ActiveClientPolicyError,
+    runActiveClientApplication,
+} from '@/domain/work/activeClientApplication';
+
+function translateActiveClientPolicyError(error: unknown): never {
+    if (error instanceof ActiveClientPolicyError) {
+        throw new AgentCommandError(
+            error.decision.code,
+            error.decision.code === 'ENTITLEMENT_REQUIRED'
+                ? 'Free includes one active client. Unlock unlimited clients or archive the active client before continuing.'
+                : 'Confirm the active TaskTime cloud account and refresh plan status before continuing.',
+            {
+                ...error.decision,
+                recoveryRoute: error.decision.code === 'ENTITLEMENT_REQUIRED'
+                    ? '/account?section=billing'
+                    : '/account?section=sync',
+            },
+        );
+    }
+    throw error;
+}
+
+function runAgentActiveClientApplication<T>(
+    context: AgentCommandContext,
+    input: { transition: 'create' | 'update'; existingClientId?: string; nextArchived?: boolean },
+    commit: () => T,
+): T | Promise<T> {
+    if (!BILLING_FEATURES.clientLimitEnforcement) return commit();
+    return runActiveClientApplication({
+            enforcementEnabled: true,
+            readClients: () => collectValidatedEntities<Client>(
+                'clients',
+                context.store.clients as any,
+                'agent active client application',
+            ),
+            resolution: context.entitlementResolution ?? { kind: 'unresolved', reason: 'lifecycle' },
+            ...input,
+            commit,
+        }).catch(translateActiveClientPolicyError);
+}
 
 export interface ListClientsCommandInput {
     includeArchived?: boolean;
@@ -162,50 +204,69 @@ export function listClientsCommand(context: AgentCommandContext, input: ListClie
         .sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
 }
 
-export function createClientCommand(context: AgentCommandContext, input: CreateClientCommandInput): Client {
+export function createClientCommand(
+    context: AgentCommandContext,
+    input: CreateClientCommandInput,
+): Client | Promise<Client> {
     assertReady(context);
     assertPermission(context, 'write');
 
     return withIdempotency(context, input.idempotencyKey, () => {
-        const title = requireString(input.title, 'title');
-        const now = getNow(context);
-        const id = input.id || getId(context);
-        const { idempotencyKey: _idempotencyKey, ...entityInput } = input;
-        let built: Client;
-        try {
-            built = buildClientEntity({ data: { ...entityInput, title }, id, now });
-        } catch (error) {
-            throwAgentWorkError(error);
-        }
-        const client = createValidatedEntity<Client>(context.store.clients as any, 'clients', built as unknown as Record<string, unknown>, `agent create client ${id}`);
+        // Idempotent replay is resolved before entering the cross-tab policy
+        // lock. A genuinely new create re-reads immediately before commit.
+        return runAgentActiveClientApplication(context, { transition: 'create' }, () => {
+            const title = requireString(input.title, 'title');
+            const now = getNow(context);
+            const id = input.id || getId(context);
+            const { idempotencyKey: _idempotencyKey, ...entityInput } = input;
+            let built: Client;
+            try {
+                built = buildClientEntity({ data: { ...entityInput, title }, id, now });
+            } catch (error) {
+                throwAgentWorkError(error);
+            }
+            const client = createValidatedEntity<Client>(context.store.clients as any, 'clients', built as unknown as Record<string, unknown>, `agent create client ${id}`);
 
-        markMeaningfulActivity('client_create');
-        return client;
+            markMeaningfulActivity('client_create');
+            return client;
+        });
     });
 }
 
-export function updateClientCommand(context: AgentCommandContext, input: UpdateClientCommandInput): Client {
+export function updateClientCommand(
+    context: AgentCommandContext,
+    input: UpdateClientCommandInput,
+): Client | Promise<Client> {
     assertReady(context);
     assertPermission(context, 'write');
 
     const clientId = requireString(input.clientId, 'clientId');
-    const existing = readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
-    let built: Client;
-    try {
-        built = buildClientUpdates({ existing, updates: input.updates || {}, now: getNow(context) });
-    } catch (error) {
-        throwAgentWorkError(error);
-    }
-    const clientFieldUpdates: Record<string, unknown> = {
-        ...(input.updates || {}),
-        updatedAt: built.updatedAt,
-    };
-    delete clientFieldUpdates.id;
-    if (Object.prototype.hasOwnProperty.call(input.updates || {}, 'title')) clientFieldUpdates.title = built.title;
-    const updated = updateValidatedEntity<Client>(context.store.clients as any, 'clients', clientId, clientFieldUpdates, `agent update client ${clientId}`);
+    const commit = () => {
+        const existing = readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
+        let built: Client;
+        try {
+            built = buildClientUpdates({ existing, updates: input.updates || {}, now: getNow(context) });
+        } catch (error) {
+            throwAgentWorkError(error);
+        }
+        const clientFieldUpdates: Record<string, unknown> = {
+            ...(input.updates || {}),
+            updatedAt: built.updatedAt,
+        };
+        delete clientFieldUpdates.id;
+        if (Object.prototype.hasOwnProperty.call(input.updates || {}, 'title')) clientFieldUpdates.title = built.title;
+        const updated = updateValidatedEntity<Client>(context.store.clients as any, 'clients', clientId, clientFieldUpdates, `agent update client ${clientId}`);
 
-    markMeaningfulActivity('client_update');
-    return updated;
+        markMeaningfulActivity('client_update');
+        return updated;
+    };
+    return input.updates?.archived === false
+        ? runAgentActiveClientApplication(context, {
+            transition: 'update',
+            existingClientId: clientId,
+            nextArchived: false,
+        }, commit)
+        : commit();
 }
 
 export function archiveClientCommand(context: AgentCommandContext, input: ArchiveClientCommandInput): Client {
@@ -224,20 +285,29 @@ export function archiveClientCommand(context: AgentCommandContext, input: Archiv
     return updated;
 }
 
-export function unarchiveClientCommand(context: AgentCommandContext, input: ArchiveClientCommandInput): Client {
+export function unarchiveClientCommand(
+    context: AgentCommandContext,
+    input: ArchiveClientCommandInput,
+): Client | Promise<Client> {
     assertReady(context);
     assertPermission(context, 'write');
 
     const clientId = requireString(input.clientId, 'clientId');
-    readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
-    const updated = updateValidatedEntity<Client>(context.store.clients as any, 'clients', clientId, {
-        archived: false,
-        archivedOnDate: null,
-        updatedAt: getNow(context),
-    }, `agent unarchive client ${clientId}`);
+    return runAgentActiveClientApplication(context, {
+        transition: 'update',
+        existingClientId: clientId,
+        nextArchived: false,
+    }, () => {
+        readRequiredEntity<Client>(context.store.clients as any, clientId, 'Client');
+        const updated = updateValidatedEntity<Client>(context.store.clients as any, 'clients', clientId, {
+            archived: false,
+            archivedOnDate: null,
+            updatedAt: getNow(context),
+        }, `agent unarchive client ${clientId}`);
 
-    markMeaningfulActivity('client_unarchive');
-    return updated;
+        markMeaningfulActivity('client_unarchive');
+        return updated;
+    });
 }
 
 export async function previewDeleteClientCommand(context: AgentCommandContext, input: PreviewDeleteClientCommandInput): Promise<PreviewDeleteClientResult> {

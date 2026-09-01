@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import type { AgentCommandContext } from '@/agent/types';
 import { useYjs } from '@/contexts/YjsContext';
 import { useGoogleAuth } from './useGoogleAuth';
+import { useBilling } from '@/contexts/BillingContext';
 
 function openAppRoute(path: string): void {
     const url = new URL(path, window.location.origin);
@@ -14,11 +15,15 @@ export function useAgentCommandContext(): AgentCommandContext {
         isReady,
         driveSessionId,
         hostedServiceSessionId,
+        activeStorageProvider,
+        activeStorageGeneration,
+        activeStorageSessionId,
         clearAllData,
         restoreBackupData,
         disconnectActiveCloudSession,
     } = useYjs();
     const { revokeAccess } = useGoogleAuth();
+    const { resolution: entitlementResolution } = useBilling();
     const idempotencyRef = useRef(new Map<string, unknown>());
 
     return useMemo(() => ({
@@ -34,5 +39,9 @@ export function useAgentCommandContext(): AgentCommandContext {
         },
         driveSessionId,
         hostedServiceSessionId,
-    }), [store, isReady, clearAllData, restoreBackupData, disconnectActiveCloudSession, revokeAccess, driveSessionId, hostedServiceSessionId]);
+        entitlementResolution,
+        activeStorageProvider,
+        activeStorageGeneration,
+        activeStorageSessionId,
+    }), [store, isReady, clearAllData, restoreBackupData, disconnectActiveCloudSession, revokeAccess, driveSessionId, hostedServiceSessionId, entitlementResolution, activeStorageProvider, activeStorageGeneration, activeStorageSessionId]);
 }
