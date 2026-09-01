@@ -148,6 +148,41 @@ describe('InvoiceTaskSelector', () => {
         expect(handleHoursChange).toHaveBeenCalledWith('parent-1', '3');
     });
 
+    it('does not select hidden merged children when selecting all tasks', () => {
+        const setSelectedTasksForBilling = vi.fn();
+
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    setSelectedTasksForBilling,
+                    invoiceTasks: [
+                        {
+                            id: 'parent-1',
+                            title: 'Parent task',
+                            parentTaskId: null,
+                            hours: 2,
+                            originalHours: 2,
+                            originalTimeMs: 7200000
+                        },
+                        {
+                            id: 'child-1',
+                            title: 'Child task',
+                            parentTaskId: 'parent-1',
+                            hours: 1,
+                            originalHours: 1,
+                            originalTimeMs: 3600000
+                        }
+                    ],
+                    mergedSubtasks: { 'parent-1': true }
+                })}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
+
+        expect(setSelectedTasksForBilling).toHaveBeenCalledWith({ 'parent-1': true });
+    });
+
     it('uses standard foreground text for merge subtasks', () => {
         render(
             <InvoiceTaskSelector
@@ -265,6 +300,41 @@ describe('InvoiceTaskSelector', () => {
 
         expect(screen.getByText('Original: 1h')).toBeInTheDocument();
         expect(screen.queryByText(/10s/)).not.toBeInTheDocument();
+    });
+
+    it('shows decimal browser values without losing the selected recorded time', () => {
+        const handleHoursChange = vi.fn();
+        const handleTaskHourlyRateChange = vi.fn();
+
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    invoiceTasks: [{
+                        id: 'task-1',
+                        title: 'Forge Homepage design and development',
+                        parentTaskId: null,
+                        hours: 25,
+                        originalHours: 25,
+                        originalTimeMs: 25 * 60 * 60 * 1000,
+                        hourlyRate: 55,
+                    }],
+                    selectedTasksForBilling: { 'task-1': true },
+                    editableHours: { 'task-1': '25.3' },
+                    taskHourlyRates: { 'task-1': '55' },
+                    handleHoursChange,
+                    handleTaskHourlyRateChange,
+                })}
+            />
+        );
+
+        expect(screen.getByText('Original: 25h')).toBeInTheDocument();
+        expect(screen.getByText('Hours (1518min)')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('25.3')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('55')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByDisplayValue('25.3'), { target: { value: '25.4' } });
+
+        expect(handleHoursChange).toHaveBeenCalledWith('task-1', '25.4');
     });
 
     it('uses the invoice-task flat-rate toggle handler for existing tasks', () => {

@@ -122,6 +122,9 @@ const InvoiceTaskSelector = ({
                                         onClick={() => {
                                             const allSelected = {};
                                             invoiceTasks.forEach(task => {
+                                                if (task.parentTaskId && mergedSubtasks[task.parentTaskId]) {
+                                                    return;
+                                                }
                                                 allSelected[task.id] = true;
                                             });
                                             setSelectedTasksForBilling(allSelected);

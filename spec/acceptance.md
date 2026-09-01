@@ -21,6 +21,7 @@
 
 - Invoice preview includes only eligible selected work/expenses and its totals equal the visible line calculation, adjustments, and tax.
 - Invoice source timestamps remain exact, while invoice-facing task summaries, notices, and default pricing ignore sub-minute remainders. The resulting whole-minute, two-decimal-hours value finalizes unchanged without a false reduction or adjustment; real reductions are rejected once with every affected task named and no internal identifiers shown.
+- A finite value entered in an invoice number field produces the same numeric hours, rate, quantity, amount, and total in the visible preview, saved invoice tasks/project breakdowns, immutable billing snapshot, and finalization plan. Compatible legacy task copies may supply missing fields; conflicting copies or unsupported nested merged subtasks are rejected by task name before billing state changes.
 - Finalization applies billing markers once and preserves snapshots needed for reporting/payment/undo.
 - A paid invoice exposes an explicitly confirmed **Mark as unpaid** correction that clears its recorded payment date and currency snapshot, preserves its finalized billing-source claims, and returns it to the effective Outstanding or Overdue bucket; the UI makes clear that this does not issue a refund.
 - Undo restores only the supported latest invoice effects and is safe against repeated invocation.

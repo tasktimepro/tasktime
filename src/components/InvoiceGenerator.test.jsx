@@ -68,6 +68,9 @@ let modalConfig = {
     applyDateOverride: false,
     skipTemplateSelection: false,
     adjustTaskHours: null,
+    adjustTaskHourlyRate: null,
+    adjustTaskQuantity: null,
+    mergeTaskId: null,
     additionalTask: null,
     deselectExpenseIds: [],
     billingPeriodPreset: null,
@@ -175,6 +178,8 @@ vi.mock('./invoice/InvoiceModal', () => {
         showInvoiceForm,
         handleClose,
         handleHoursChange,
+        handleTaskHourlyRateChange,
+        handleQuantityChange,
         handleSaveInvoice,
         handleTemplateSelection,
         calculatePricing,
@@ -193,6 +198,9 @@ vi.mock('./invoice/InvoiceModal', () => {
         setNewTaskQuantity,
         handleToggleNewTaskFlatRate,
         handleAddAdditionalTask,
+        handleToggleMergeSubtasks,
+        setSelectedTasksForBilling,
+        invoiceTasks = [],
         setInvoiceDateOverride,
         setUseInvoiceDateOverride,
         setBillingPeriodPreset,
@@ -208,6 +216,7 @@ vi.mock('./invoice/InvoiceModal', () => {
         const didAddAdditionalTask = React.useRef(false)
         const didApplyExpenseSelection = React.useRef(false)
         const didApplyBillingPeriod = React.useRef(false)
+        const didApplyMergeSelection = React.useRef(false)
 
         React.useEffect(() => {
             if (!showInvoiceForm) {
@@ -215,19 +224,51 @@ vi.mock('./invoice/InvoiceModal', () => {
                 didAddAdditionalTask.current = false
                 didApplyExpenseSelection.current = false
                 didApplyBillingPeriod.current = false
+                didApplyMergeSelection.current = false
                 return
             }
 
-            if (didApplyAdjustments.current || !modalConfig.adjustTaskHours) {
+            if (
+                didApplyAdjustments.current
+                || (
+                    !modalConfig.adjustTaskHours
+                    && !modalConfig.adjustTaskHourlyRate
+                    && !modalConfig.adjustTaskQuantity
+                )
+            ) {
                 return
             }
 
             didApplyAdjustments.current = true
-            handleHoursChange(
-                modalConfig.adjustTaskHours.taskId,
-                modalConfig.adjustTaskHours.hours
-            )
-        }, [showInvoiceForm, handleHoursChange])
+            if (modalConfig.adjustTaskHours) {
+                handleHoursChange(
+                    modalConfig.adjustTaskHours.taskId,
+                    modalConfig.adjustTaskHours.hours
+                )
+            }
+            if (modalConfig.adjustTaskHourlyRate) {
+                handleTaskHourlyRateChange(
+                    modalConfig.adjustTaskHourlyRate.taskId,
+                    modalConfig.adjustTaskHourlyRate.hourlyRate
+                )
+            }
+            if (modalConfig.adjustTaskQuantity) {
+                handleQuantityChange(
+                    modalConfig.adjustTaskQuantity.taskId,
+                    modalConfig.adjustTaskQuantity.quantity
+                )
+            }
+        }, [showInvoiceForm, handleHoursChange, handleQuantityChange, handleTaskHourlyRateChange])
+
+        React.useEffect(() => {
+            if (!showInvoiceForm || !modalConfig.mergeTaskId || didApplyMergeSelection.current) {
+                return
+            }
+
+            didApplyMergeSelection.current = true
+            handleToggleMergeSubtasks(modalConfig.mergeTaskId, true)
+            setSelectedTasksForBilling(Object.fromEntries(invoiceTasks.map((task) => [task.id, true])))
+        }, [handleToggleMergeSubtasks, invoiceTasks, setSelectedTasksForBilling, showInvoiceForm])
 
         React.useEffect(() => {
             if (!showInvoiceForm || !modalConfig.additionalTask || didAddAdditionalTask.current) {
@@ -466,6 +507,9 @@ describe('InvoiceGenerator', () => {
             applyDateOverride: false,
             skipTemplateSelection: false,
             adjustTaskHours: null,
+            adjustTaskHourlyRate: null,
+            adjustTaskQuantity: null,
+            mergeTaskId: null,
             additionalTask: null,
             deselectExpenseIds: [],
             billingPeriodPreset: null,
@@ -1120,6 +1164,168 @@ describe('InvoiceGenerator', () => {
             taskId: 'task-1',
             billableDurationMs: (60 * 60 * 1000) + (10 * 1000)
         }))
+    })
+
+    it('normalizes hours entered through the browser before invoice finalization', async () => {
+
+        modalConfig.billingPeriodPreset = 'all-time'
+        modalConfig.adjustTaskHours = { taskId: 'task-1', hours: '25.3' }
+        modalConfig.adjustTaskHourlyRate = { taskId: 'task-1', hourlyRate: '55' }
+        const user = userEvent.setup()
+        const sourceDurationMs = 25 * 60 * 60 * 1000
+
+        renderGenerator({
+            timeEntries: [{
+                ...baseEntry,
+                end: baseEntry.start + sourceDurationMs
+            }]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(toastMocks.showError).not.toHaveBeenCalled()
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        expect(timeEntryHookMocks.createEntry).toHaveBeenCalledTimes(1)
+        expect(timeEntryHookMocks.createEntry.mock.calls[0][0]).toEqual(expect.objectContaining({
+            taskId: 'task-1',
+            source: 'invoice-adjustment',
+            billedHourlyRate: 55
+        }))
+        expect(timeEntryHookMocks.createEntry.mock.calls[0][0].end - timeEntryHookMocks.createEntry.mock.calls[0][0].start).toBe(18 * 60 * 1000)
+        expect(timeEntryHookMocks.updateEntry).toHaveBeenCalledWith(baseEntry.id, expect.objectContaining({
+            billedHourlyRate: 55
+        }))
+
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData).toEqual(expect.objectContaining({
+            totalHours: 25.3,
+            subtotal: 1391.5,
+            total: 1391.5
+        }))
+        expect(invoiceData.tasks[0]).toEqual(expect.objectContaining({
+            originalTimeMs: sourceDurationMs,
+            originalHours: 25,
+            hours: 25.3,
+            hourlyRate: 55
+        }))
+        expect(invoiceData.projectBreakdowns[0]).toEqual(expect.objectContaining({
+            totalHours: 25.3,
+            subtotal: 1391.5
+        }))
+        expect(invoiceData.projectBreakdowns[0].tasks[0]).toEqual(expect.objectContaining({
+            hours: 25.3,
+            hourlyRate: 55
+        }))
+        expect(invoiceData.billingSelectionSnapshot.tasks[0]).toEqual(expect.objectContaining({
+            quantity: 25.3,
+            rate: 55,
+            amount: 1391.5
+        }))
+    })
+
+    it('saves a merged parent once even when select-all reselects its hidden child', async () => {
+
+        modalConfig.billingPeriodPreset = 'all-time'
+        modalConfig.mergeTaskId = 'parent-task'
+        taskHookMocks.tasks = [
+            { id: 'parent-task', projectId: 'project-1', title: 'Homepage', billable: true, hourlyRate: 100 },
+            { id: 'child-task', projectId: 'project-1', parentTaskId: 'parent-task', title: 'Responsive polish', billable: true, hourlyRate: 100 }
+        ]
+        const user = userEvent.setup()
+
+        renderGenerator({
+            timeEntries: [
+                { id: 'parent-entry', taskId: 'parent-task', start: 1000, end: 3601000 },
+                { id: 'child-entry', taskId: 'child-task', start: 3602000, end: 7202000 }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(toastMocks.showError).not.toHaveBeenCalled()
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.tasks).toHaveLength(1)
+        expect(invoiceData.tasks[0]).toEqual(expect.objectContaining({
+            id: 'parent-task',
+            mergedSubtasks: [expect.objectContaining({ id: 'child-task' })]
+        }))
+    })
+
+    it('does not replace an explicit zero hourly rate with a billable fallback', async () => {
+
+        modalConfig.billingPeriodPreset = 'all-time'
+        modalConfig.adjustTaskHourlyRate = { taskId: 'task-1', hourlyRate: '0' }
+        expenseHookMocks.expenses = [{
+            id: 'expense-1',
+            title: 'Hosting',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            billable: true,
+            billingStatus: 'unbilled',
+            amount: 25,
+            date: '2026-01-10',
+            currency: 'EUR'
+        }]
+        const user = userEvent.setup()
+
+        renderGenerator()
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        expect(invoiceHookMocks.createInvoice.mock.calls[0][0].tasks).toEqual([])
+        expect(timeEntryHookMocks.updateEntry).not.toHaveBeenCalled()
+        expect(expenseHookMocks.updateExpense).toHaveBeenCalledWith('expense-1', expect.objectContaining({
+            billingStatus: 'billed'
+        }))
+    })
+
+    it('falls back to the stored flat quantity while the quantity input is empty', async () => {
+
+        modalConfig.adjustTaskQuantity = { taskId: 'task-1', quantity: '' }
+        const user = userEvent.setup()
+        const editingInvoice = {
+            id: 'invoice-flat-quantity',
+            invoiceNumber: 'INV-FLAT-QUANTITY',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            tasks: [{
+                id: 'task-1',
+                title: 'Task',
+                hours: 0,
+                flatRate: 100,
+                quantity: 5,
+                useFlatRate: true
+            }],
+            subtotal: 500,
+            total: 500,
+            items: [],
+            date: '2026-01-05',
+            createdAt: 111,
+            status: 'draft',
+            template: { id: 'tpl-1', name: 'Template One' }
+        }
+
+        renderGenerator({
+            editingInvoice,
+            project: { ...baseProject, flatRate: true },
+            timeEntries: []
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
+        expect(invoiceHookMocks.updateInvoice.mock.calls[0][1].tasks[0]).toEqual(expect.objectContaining({
+            flatRate: 100,
+            quantity: 5,
+            useFlatRate: true
+        }))
+        expect(invoiceHookMocks.updateInvoice.mock.calls[0][1].subtotal).toBe(500)
     })
 
     it('does not create an adjustment when canonical two-decimal display rounding is above exact time', async () => {

@@ -179,6 +179,47 @@ describe('useInvoicePricing', () => {
         expect(result.current.subtotal).toBe(160)
     })
 
+    it('preserves an explicit zero hourly-rate override instead of using a fallback rate', () => {
+
+        const { result } = renderHook(() => useInvoicePricing({
+            ...baseParams,
+            invoiceTasks: [{ id: 'task-1', hours: 2, hourlyRate: 50 }],
+            selectedTasksForBilling: { 'task-1': true },
+            taskHourlyRates: { 'task-1': '0' },
+            selectedProject: { hourlyRate: 100 },
+            selectedClient: { defaultHourlyRate: 125 }
+        }))
+
+        expect(result.current.subtotal).toBe(0)
+        expect(result.current.totalHours).toBe(2)
+    })
+
+    it('falls back to the stored flat quantity while the quantity input is empty', () => {
+
+        const { result } = renderHook(() => useInvoicePricing({
+            ...baseParams,
+            invoiceTasks: [{ id: 'task-1', hours: 0, flatRate: 100, quantity: 5, useFlatRate: true }],
+            selectedTasksForBilling: { 'task-1': true },
+            taskQuantities: { 'task-1': '' }
+        }))
+
+        expect(result.current.subtotal).toBe(500)
+        expect(result.current.totalHours).toBe(0)
+    })
+
+    it('does not partially parse malformed hours when calculating the preview', () => {
+
+        const { result } = renderHook(() => useInvoicePricing({
+            ...baseParams,
+            invoiceTasks: [{ id: 'task-1', hours: 25, hourlyRate: 55 }],
+            selectedTasksForBilling: { 'task-1': true },
+            editableHours: { 'task-1': '25.3x' }
+        }))
+
+        expect(result.current.subtotal).toBe(0)
+        expect(result.current.totalHours).toBe(0)
+    })
+
     it('rounds totals to two decimals', () => {
 
         const { result } = renderHook(() => useInvoicePricing({

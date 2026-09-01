@@ -62,6 +62,7 @@ import {
     buildInvoiceFinalizationApplication,
 } from '../domain/invoices/invoiceFinalizationApplication.ts';
 import { buildInvoiceBillingSelectionSnapshotFromPlan } from '../domain/invoices/invoiceBillingSelection.ts';
+import { getFiniteInvoiceNumber } from '../domain/invoices/invoiceNumbers.ts';
 
 const INVOICE_DRAFT_CACHE = new Map();
 const INVOICE_DRAFT_TTL_MS = 12 * 60 * 60 * 1000;
@@ -2019,8 +2020,7 @@ const InvoiceGenerator = ({
     }, [updateInvoiceTemplate]);
 
     const parseInvoiceNumber = useCallback((value, fallback = 0) => {
-        const parsedValue = Number.parseFloat(String(value ?? ''));
-        return Number.isFinite(parsedValue) ? parsedValue : fallback;
+        return getFiniteInvoiceNumber(value) ?? fallback;
     }, []);
 
     const getInvoiceTaskAmount = useCallback((task, mergedTaskList = []) => {
@@ -2032,20 +2032,47 @@ const InvoiceGenerator = ({
         }
 
         const fallbackHourlyRate = parseInvoiceNumber(task?.projectHourlyRate) || parseInvoiceNumber(selectedProject?.hourlyRate) || parseInvoiceNumber(selectedClientHourlyRate);
-        const parentHourlyRate = parseInvoiceNumber(task?.hourlyRate) || fallbackHourlyRate;
+        const parentHourlyRate = getFiniteInvoiceNumber(task?.hourlyRate) ?? fallbackHourlyRate;
         let taskAmount = parseInvoiceNumber(task?.hours) * parentHourlyRate;
 
         mergedTaskList.forEach((mergedTask) => {
-            const mergedTaskHourlyRate = parseInvoiceNumber(mergedTask?.hourlyRate) || fallbackHourlyRate;
+            const mergedTaskHourlyRate = getFiniteInvoiceNumber(mergedTask?.hourlyRate) ?? fallbackHourlyRate;
             taskAmount += parseInvoiceNumber(mergedTask?.hours) * mergedTaskHourlyRate;
         });
 
         return taskAmount;
     }, [parseInvoiceNumber, selectedClientHourlyRate, selectedProject?.hourlyRate]);
 
+    const resolveTaskHourlyRate = useCallback((task, parentTask = null) => {
+        if (Object.prototype.hasOwnProperty.call(taskHourlyRates, task.id)) {
+            const customRate = getFiniteInvoiceNumber(taskHourlyRates[task.id]);
+
+            if (customRate !== null) {
+                return customRate;
+            }
+
+            if (taskHourlyRates[task.id] !== '') {
+                return 0;
+            }
+        }
+
+        return parseInvoiceNumber(task.hourlyRate)
+            || parseInvoiceNumber(task.projectHourlyRate)
+            || parseInvoiceNumber(parentTask?.projectHourlyRate)
+            || parseInvoiceNumber(selectedProject?.hourlyRate)
+            || parseInvoiceNumber(selectedClientHourlyRate);
+    }, [parseInvoiceNumber, selectedClientHourlyRate, selectedProject?.hourlyRate, taskHourlyRates]);
+
+    const resolveTaskQuantity = useCallback((task) => {
+        return getFiniteInvoiceNumber(taskQuantities[task.id])
+            ?? getFiniteInvoiceNumber(task.quantity)
+            ?? 1;
+    }, [taskQuantities]);
+
     const getNormalizedDocumentTasks = useCallback(() => {
         const orderedSelectedInvoiceTasks = orderTasksWithSubtasks(
             invoiceTasks.filter(task => task && task.id && selectedTasksForBilling[task.id])
+                .filter(task => !(task.parentTaskId && mergedSubtasks[task.parentTaskId]))
         );
 
         return orderedSelectedInvoiceTasks
@@ -2053,15 +2080,17 @@ const InvoiceGenerator = ({
                 ...task,
                 projectId: task.projectId || null,
                 projectTitle: task.projectTitle || '',
-                projectHourlyRate: task.projectHourlyRate || 0,
+                projectHourlyRate: parseInvoiceNumber(task.projectHourlyRate),
                 projectFlatRate: task.projectFlatRate === true,
-                hours: editableHours[task?.id] || task?.originalHours || 0,
-                flatRate: taskFlatRates[task.id] ?? task.flatRate ?? 0,
-                hourlyRate: taskHourlyRates[task.id] || task.hourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0,
+                hours: parseInvoiceNumber(
+                    editableHours[task?.id] !== undefined ? editableHours[task.id] : task?.originalHours
+                ),
+                flatRate: parseInvoiceNumber(taskFlatRates[task.id] ?? task.flatRate),
+                hourlyRate: resolveTaskHourlyRate(task),
                 useFlatRate: Object.prototype.hasOwnProperty.call(useFlatRate, task.id)
                     ? useFlatRate[task.id]
                     : task.useFlatRate === true,
-                quantity: taskQuantities[task.id] || task.quantity || 1,
+                quantity: resolveTaskQuantity(task),
                 isMerged: (task && task.id && mergedSubtasks[task.id]) || false,
                 mergedSubtasks: (task && task.id && mergedSubtasks[task.id])
                     ? invoiceTasks
@@ -2070,30 +2099,42 @@ const InvoiceGenerator = ({
                             ...subtask,
                             projectId: subtask.projectId || task.projectId || null,
                             projectTitle: subtask.projectTitle || task.projectTitle || '',
-                            projectHourlyRate: subtask.projectHourlyRate || task.projectHourlyRate || 0,
+                            projectHourlyRate: parseInvoiceNumber(subtask.projectHourlyRate)
+                                || parseInvoiceNumber(task.projectHourlyRate),
                             projectFlatRate: subtask.projectFlatRate === true || task.projectFlatRate === true,
-                            hours: editableHours[subtask.id] || subtask.originalHours || 0,
-                            flatRate: taskFlatRates[subtask.id] ?? subtask.flatRate ?? 0,
-                            hourlyRate: taskHourlyRates[subtask.id] || subtask.hourlyRate || subtask.projectHourlyRate || task.projectHourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0,
-                            useFlatRate: Object.prototype.hasOwnProperty.call(useFlatRate, subtask.id)
-                                ? useFlatRate[subtask.id]
-                                : subtask.useFlatRate === true,
-                            quantity: taskQuantities[subtask.id] || subtask.quantity || 1
+                            hours: parseInvoiceNumber(
+                                editableHours[subtask.id] !== undefined ? editableHours[subtask.id] : subtask.originalHours
+                            ),
+                            flatRate: parseInvoiceNumber(taskFlatRates[subtask.id] ?? subtask.flatRate),
+                            hourlyRate: resolveTaskHourlyRate(subtask, task),
+                            useFlatRate: Object.prototype.hasOwnProperty.call(useFlatRate, task.id)
+                                ? useFlatRate[task.id]
+                                : task.useFlatRate === true,
+                            quantity: resolveTaskQuantity(subtask)
                         }))
                     : []
             }))
             .filter((task) => getInvoiceTaskAmount(task, task.isMerged ? task.mergedSubtasks : []) > 0);
-    }, [editableHours, getInvoiceTaskAmount, invoiceTasks, mergedSubtasks, selectedClientHourlyRate, selectedProject?.hourlyRate, selectedTasksForBilling, taskFlatRates, taskHourlyRates, taskQuantities, useFlatRate]);
+    }, [editableHours, getInvoiceTaskAmount, invoiceTasks, mergedSubtasks, parseInvoiceNumber, resolveTaskHourlyRate, resolveTaskQuantity, selectedTasksForBilling, taskFlatRates, useFlatRate]);
 
     const getNormalizedAdditionalDocumentTasks = useCallback(() => {
         return additionalTasks
             .filter(task => task)
-            .map(task => ({
-                ...task,
-                hourlyRate: task.hourlyRate || selectedProject?.hourlyRate || selectedClientHourlyRate || 0
-            }))
+            .map(task => {
+                const hourlyRate = getFiniteInvoiceNumber(task.hourlyRate)
+                    ?? (parseInvoiceNumber(selectedProject?.hourlyRate)
+                        || parseInvoiceNumber(selectedClientHourlyRate));
+
+                return {
+                    ...task,
+                    hours: parseInvoiceNumber(task.hours),
+                    flatRate: parseInvoiceNumber(task.flatRate),
+                    hourlyRate,
+                    quantity: getFiniteInvoiceNumber(task.quantity) ?? 1
+                };
+            })
             .filter((task) => getInvoiceTaskAmount(task) > 0);
-    }, [additionalTasks, getInvoiceTaskAmount, selectedClientHourlyRate, selectedProject?.hourlyRate]);
+    }, [additionalTasks, getInvoiceTaskAmount, parseInvoiceNumber, selectedClientHourlyRate, selectedProject?.hourlyRate]);
 
     const buildInvoiceProjectBreakdowns = useCallback((documentTasks, expenseItems, pricing) => {
         const projectById = new Map(selectedProjectsForInvoice.map((projectItem) => [projectItem.id, projectItem]));

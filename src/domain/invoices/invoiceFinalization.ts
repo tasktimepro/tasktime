@@ -8,6 +8,9 @@ import {
     getInvoiceWholeMinutesFromDuration,
     getInvoiceWholeMinutesFromHours,
 } from './invoiceTimePrecision';
+import { getFiniteInvoiceNumber } from './invoiceNumbers';
+import { collectInvoiceTaskRoots } from './invoiceTaskRecords';
+import { usesInvoiceTaskFlatRate } from './invoiceTaskPricing';
 
 export interface InvoiceFinalizationEntryMutation {
     entry: TimeEntry;
@@ -76,7 +79,7 @@ export function planInvoiceFinalization({
     }
     const projectById = new Map(projects.map((project) => [project.id, project]));
     const clientById = new Map(clients.map((client) => [client.id, client]));
-    const invoiceTasks = collectInvoiceTasks(invoiceRecord);
+    const invoiceTasks = collectInvoiceTaskRoots(invoiceRecord);
     const invoiceTaskIds = collectInvoiceTaskIds(invoiceTasks);
     const selectedTaskIds = billingSelection
         ? new Set([
@@ -194,7 +197,15 @@ export function planInvoiceFinalization({
     return {
         selectedTaskIds,
         entriesToBill,
-        ...planInvoiceAdjustments({ invoice, invoiceTasks, taskById, entries, finalizedAt, createAdjustmentId }),
+        ...planInvoiceAdjustments({
+            invoice,
+            invoiceTasks,
+            taskById,
+            billedRateByTaskId,
+            entries,
+            finalizedAt,
+            createAdjustmentId,
+        }),
         expensesToBill,
         taskLastBilledAt,
         nextTaskCutoffs,
@@ -228,11 +239,23 @@ function assertInvoiceMatchesBillingSelection(
 
     snapshot.tasks.forEach((selection) => {
         const item = itemRecords.find((candidate) => candidate.taskId === selection.taskId);
+        const itemQuantity = getFiniteInvoiceNumber(item?.quantity);
+        const itemRate = getFiniteInvoiceNumber(item?.rate);
+        const itemAmount = getFiniteInvoiceNumber(item?.amount);
+        const selectedQuantity = getFiniteInvoiceNumber(selection.quantity);
+        const selectedRate = getFiniteInvoiceNumber(selection.rate);
+        const selectedAmount = getFiniteInvoiceNumber(selection.amount);
         if (
             !item
-            || Math.abs(item.quantity - selection.quantity) >= 0.000001
-            || Math.abs(item.rate - selection.rate) >= 0.005
-            || Math.abs(item.amount - selection.amount) >= 0.005
+            || itemQuantity === null
+            || itemRate === null
+            || itemAmount === null
+            || selectedQuantity === null
+            || selectedRate === null
+            || selectedAmount === null
+            || Math.abs(itemQuantity - selectedQuantity) >= 0.000001
+            || Math.abs(itemRate - selectedRate) >= 0.005
+            || Math.abs(itemAmount - selectedAmount) >= 0.005
         ) {
             const taskTitle = getDisplayTitle(selection.title, selection.taskId)
                 || getDisplayTitle(taskById.get(selection.taskId)?.title, selection.taskId);
@@ -243,7 +266,14 @@ function assertInvoiceMatchesBillingSelection(
 
     snapshot.expenses.forEach((selection) => {
         const item = itemRecords.find((candidate) => candidate.expenseId === selection.expenseId);
-        if (!item || Math.abs(item.amount - selection.invoiceAmount) >= 0.005) {
+        const itemAmount = getFiniteInvoiceNumber(item?.amount);
+        const selectedAmount = getFiniteInvoiceNumber(selection.invoiceAmount);
+        if (
+            !item
+            || itemAmount === null
+            || selectedAmount === null
+            || Math.abs(itemAmount - selectedAmount) >= 0.005
+        ) {
             throw new Error(`${describeNamedEntity('Invoice line for expense', selection.title, selection.expenseId)} changed after preview. Refresh the invoice before finalizing.`);
         }
     });
@@ -303,54 +333,56 @@ function collectSnapshotQuotedTaskClaims(
     });
 }
 
-function collectInvoiceTasks(invoice: { tasks?: unknown; projectBreakdowns?: unknown }) {
-    const tasks: Array<Record<string, unknown>> = [];
-
-    if (Array.isArray(invoice.tasks)) {
-        tasks.push(...invoice.tasks.filter(isRecord));
-    }
-
-    if (Array.isArray(invoice.projectBreakdowns)) {
-        invoice.projectBreakdowns.filter(isRecord).forEach((breakdown) => {
-            if (Array.isArray(breakdown.tasks)) {
-                tasks.push(...breakdown.tasks.filter(isRecord));
-            }
-        });
-    }
-
-    const seen = new Set<string>();
-
-    return tasks.filter((task) => {
-        const id = getString(task.id);
-
-        if (!id || seen.has(id)) {
-            return false;
-        }
-
-        seen.add(id);
-        return true;
-    });
-}
-
 function collectInvoiceTaskIds(invoiceTasks: Array<Record<string, unknown>>) {
     const ids = new Set<string>();
 
-    invoiceTasks.forEach((task) => {
-        const taskId = getString(task.id);
+    const collect = (records: unknown) => {
+        if (!Array.isArray(records)) return;
 
-        if (taskId) {
-            ids.add(taskId);
-        }
+        records.filter(isRecord).forEach((task) => {
+            const taskId = getString(task.id);
+            if (taskId) ids.add(taskId);
+            collect(task.mergedSubtasks);
+        });
+    };
 
-        if (Array.isArray(task.mergedSubtasks)) {
-            task.mergedSubtasks.filter(isRecord).forEach((subtask) => {
-                const subtaskId = getString(subtask.id);
-                if (subtaskId) ids.add(subtaskId);
-            });
-        }
-    });
+    collect(invoiceTasks);
 
     return ids;
+}
+
+function collectInvoiceAdjustmentTasks(invoiceTasks: Array<Record<string, unknown>>) {
+    const tasks: Array<Record<string, unknown>> = [];
+    const visited = new Set<Record<string, unknown>>();
+    const seenIds = new Set<string>();
+
+    const collect = (records: unknown, inheritedUseFlatRate: boolean | null = null) => {
+        if (!Array.isArray(records)) {
+            return;
+        }
+
+        records.filter(isRecord).forEach((task) => {
+            if (visited.has(task)) {
+                return;
+            }
+
+            visited.add(task);
+            const effectiveUseFlatRate = inheritedUseFlatRate ?? usesInvoiceTaskFlatRate(task);
+            const taskId = getString(task.id);
+
+            if (taskId && !seenIds.has(taskId)) {
+                seenIds.add(taskId);
+                tasks.push(task.useFlatRate === effectiveUseFlatRate
+                    ? task
+                    : { ...task, useFlatRate: effectiveUseFlatRate });
+            }
+
+            collect(task.mergedSubtasks, effectiveUseFlatRate);
+        });
+    };
+
+    collect(invoiceTasks);
+    return tasks;
 }
 
 function collectFallbackAgentDraftTaskIds({
@@ -391,22 +423,29 @@ function buildBilledRateByTaskId({
 }) {
     const rates = new Map<string, number | null>();
 
-    invoiceTasks.forEach((task) => {
-        const taskId = getString(task.id);
-        const rate = getInvoiceTaskHourlyRate(task);
+    const collectRates = (
+        records: unknown,
+        inheritedUseFlatRate: boolean | null = null,
+        inheritedHourlyRate: number | null = null
+    ) => {
+        if (!Array.isArray(records)) return;
 
-        if (taskId) {
-            rates.set(taskId, rate);
-        }
+        records.filter(isRecord).forEach((task) => {
+            const taskId = getString(task.id);
+            const effectiveUseFlatRate = inheritedUseFlatRate ?? usesInvoiceTaskFlatRate(task);
+            const rate = effectiveUseFlatRate
+                ? null
+                : (getInvoiceTaskHourlyRate(task) ?? inheritedHourlyRate);
 
-        if (Array.isArray(task.mergedSubtasks)) {
-            task.mergedSubtasks.filter(isRecord).forEach((subtask) => {
-                const subtaskId = getString(subtask.id);
-                const subtaskRate = getInvoiceTaskHourlyRate(subtask) ?? rate;
-                if (subtaskId) rates.set(subtaskId, subtaskRate);
-            });
-        }
-    });
+            if (taskId) {
+                rates.set(taskId, rate);
+            }
+
+            collectRates(task.mergedSubtasks, effectiveUseFlatRate, rate);
+        });
+    };
+
+    collectRates(invoiceTasks);
 
     selectedTaskIds.forEach((taskId) => {
         if (rates.has(taskId)) {
@@ -427,6 +466,7 @@ function planInvoiceAdjustments({
     invoice,
     invoiceTasks,
     taskById,
+    billedRateByTaskId,
     entries,
     finalizedAt,
     createAdjustmentId,
@@ -434,6 +474,7 @@ function planInvoiceAdjustments({
     invoice: Invoice;
     invoiceTasks: Array<Record<string, unknown>>;
     taskById: Map<string, Task>;
+    billedRateByTaskId: Map<string, number | null>;
     entries: TimeEntry[];
     finalizedAt: number;
     createAdjustmentId: () => string;
@@ -455,17 +496,29 @@ function planInvoiceAdjustments({
         existingEntry?: TimeEntry;
     }> = [];
 
-    invoiceTasks.forEach((task) => {
+    collectInvoiceAdjustmentTasks(invoiceTasks).forEach((task) => {
         const taskId = getString(task.id);
 
         if (!taskId) return;
         taskIdsToAdjust.add(taskId);
         if (task.useFlatRate === true) return;
 
-        const sourceDurationMs = getFiniteNumber(task.originalTimeMs)
-            ?? ((getFiniteNumber(task.originalHours) ?? 0) * 3_600_000);
-        const desiredHours = getFiniteNumber(task.hours) ?? 0;
+        const sourceDurationMs = getFiniteInvoiceNumber(task.originalTimeMs)
+            ?? ((getFiniteInvoiceNumber(task.originalHours) ?? 0) * 3_600_000);
         const canonicalDisplayHours = getCanonicalInvoiceHours(sourceDurationMs);
+        const parsedDesiredHours = getFiniteInvoiceNumber(task.hours);
+
+        if (parsedDesiredHours === null && task.hours !== undefined && task.hours !== null) {
+            const taskTitle = getDisplayTitle(task.title, taskId)
+                || getDisplayTitle(taskById.get(taskId)?.title, taskId);
+
+            throw new Error(
+                `${describeNamedEntity('Invoice hours for', taskTitle)} are invalid. `
+                + 'Enter a valid number of hours, then try again.'
+            );
+        }
+
+        const desiredHours = parsedDesiredHours ?? canonicalDisplayHours;
         const originalInvoiceMs = getInvoiceWholeMinutesFromDuration(sourceDurationMs) * 60_000;
         const desiredInvoiceMs = getInvoiceWholeMinutesFromHours(desiredHours) * 60_000;
         // The composer ignores source seconds and displays the remaining whole
@@ -529,7 +582,7 @@ function planInvoiceAdjustments({
 
         const start = existingEntry?.start || (finalizedAt - deltaMs);
         const end = start + deltaMs;
-        const billedHourlyRate = getInvoiceTaskHourlyRate(task);
+        const billedHourlyRate = billedRateByTaskId.get(taskId) ?? getInvoiceTaskHourlyRate(task);
         const updates = {
             taskId,
             start,
@@ -601,7 +654,7 @@ function collectQuotedTaskClaims(invoiceTasks: Array<Record<string, unknown>>, t
         const task = taskId ? taskById.get(taskId) : null;
 
         if (!taskId || !task) return;
-        if (invoiceTask.useFlatRate !== true && invoiceTask.projectFlatRate !== true) return;
+        if (!usesInvoiceTaskFlatRate(invoiceTask)) return;
         if (task.quotedAmountBilling?.invoiceId) return;
 
         const quotedAmount = getPositiveFiniteNumber(task.estimatedFlatAmount);
@@ -663,7 +716,7 @@ function normalizeAgentDraft(value: unknown): Record<string, unknown> | undefine
 }
 
 function getInvoiceTaskHourlyRate(task: Record<string, unknown>): number | null {
-    return getFiniteNumber(task.hourlyRate) ?? getFiniteNumber(task.projectHourlyRate) ?? null;
+    return getFiniteInvoiceNumber(task.hourlyRate) ?? getFiniteInvoiceNumber(task.projectHourlyRate) ?? null;
 }
 
 function getString(value: unknown): string {
@@ -693,10 +746,6 @@ function describeNamedEntity(prefix: string, title: string, entityId = ''): stri
 
 function describeTaskTime(taskTitle: string): string {
     return describeNamedEntity('Selected time for task', taskTitle);
-}
-
-function getFiniteNumber(value: unknown): number | null {
-    return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function getPositiveFiniteNumber(value: unknown): number | null {

@@ -90,6 +90,8 @@ Historical invoices may omit cancellation metadata. A newly written canceled inv
 
 Each invoice item requires description, quantity, rate, and amount and may reference project/task/expense, original currency/exchange rate, line type, labels, and pricing mode (`hourly|flat|mixed`).
 
+Composer invoices may retain `tasks[]` and `projectBreakdowns[].tasks[]` copies of the same selected task. Readers reconcile missing fields from a richer compatible copy, treat finite decimal strings from historical/browser drafts as their numeric value, and reject conflicting financial/pricing fields before billing mutation. A merged parent may contain one level of `mergedSubtasks[]`; the same task cannot simultaneously be a root and merged child, and deeper or conflicting merged topology is not finalized.
+
 `billingSelectionSnapshot` is additive, immutable versioned evidence captured before finalization. Version 1 records the invoice currency; exact selected entry IDs, task IDs, intervals, actual/billable durations, and billed rates; exact task pricing mode, quantity, rate, amount, and quoted allocation; and exact expense source/invoice amounts, currencies, and exchange rate. Finalization of a snapshot-backed draft must reject missing, changed, or already-consumed source records and must not discover newly arrived work during commit.
 
 Billing snapshots are immutable evidence used for reporting/undo. Historical invoices may lack newer snapshots and require compatible fallback behavior; their absence must not make old records unreadable.

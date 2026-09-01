@@ -3,8 +3,10 @@
 ## Behavior
 
 - Preview gathers eligible unbilled time/tasks/expenses into explicit invoice line and project-breakdown data.
+- Finite values from browser number inputs are normalized before pricing or persistence so preview, task/project-breakdown records, billing snapshots, and finalization agree. Valid zero rates remain zero rather than falling back to a default.
 - Drafts remain editable without applying billed markers.
 - Finalization snapshots billing/currency/branding data and applies source billing state once.
+- Finalization reconciles compatible legacy duplicate task copies, preserves merged-parent pricing/rate inheritance, and rejects conflicting copies or unsupported nested merged tasks before source billing state changes.
 - Payments record their financial context. **Mark as unpaid** is a confirmed correction for a mistakenly recorded payment: it removes `paidAt` and the payment-currency snapshot, preserves the finalized invoice and its billing-source claims, and returns the invoice to effective Outstanding or Overdue. It does not record or issue a refund.
 - Undo latest invoice uses stored billing snapshots to restore eligible source records safely.
 - Cancellation is a terminal, void-like workflow for finalized unpaid invoices whose effective status is sent or overdue. It preserves the invoice, number, original totals, immutable snapshots, sent metadata, and project links while releasing only billing sources still owned by that invoice.
@@ -23,7 +25,7 @@
 
 ## Edge cases
 
-- Mixed hourly/flat work, billing increments, expense currency conversion, tax-disabled clients, discounts/tax, repeated finalization/undo/payment/cancellation calls, archived and historical sources, missing legacy snapshots, later unrelated work, stale Drive replay, and interrupted multi-document operations.
+- Mixed hourly/flat work, browser-serialized numeric values, zero rates, merged task selection, compatible/conflicting duplicate task copies, billing increments, expense currency conversion, tax-disabled clients, discounts/tax, repeated finalization/undo/payment/cancellation calls, archived and historical sources, missing legacy snapshots, later unrelated work, stale Drive replay, and interrupted multi-document operations.
 
 ## Evidence
 
