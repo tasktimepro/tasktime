@@ -46,6 +46,7 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **BILL-8:** Canceling a finalized unpaid invoice must retain its immutable invoice record, number, totals, snapshots, and project links while terminally marking it canceled and releasing only source records still claimed by that invoice.
 - **BILL-9:** Cancellation requires a non-empty reason and exact invoice-number confirmation, is idempotent and replay-safe, never rewinds numbering, and rejects drafts, paid invoices, repeated cancellation under a different operation, and all uncancel attempts.
 - **BILL-10:** Canceled invoices are non-payable, non-emailable, immutable outside explicit deletion cascades, and visibly canceled in every retained invoice document; credit notes, refunds, partial cancellation, filed-tax adjustment, and cancellation notices are separate future workflows.
+- **BILL-11:** Browser and agent invoice composition must derive default billable hours from whole source minutes, retain exact selected duration evidence, and reject true user reductions with task-name guidance rather than internal identifiers.
 
 ## Reports and export/import
 

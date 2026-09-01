@@ -1,6 +1,6 @@
 import { TrashIcon } from '@/components/ui/icons';
 import { getCurrencySymbol } from '../../utils/currencyUtils.ts';
-import { formatDurationWithSeconds, hoursToMinutes } from '../../utils/dateUtils.ts';
+import { formatDuration, hoursToMinutes } from '../../utils/dateUtils.ts';
 import CustomCheckbox from '../CustomCheckbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -179,7 +179,7 @@ const InvoiceTaskSelector = ({
                                 const originalFlatRate = Number.isFinite(task.flatRate) ? task.flatRate : null;
                                 const originalQuantity = Number.isFinite(task.quantity) && task.quantity > 0 ? task.quantity : 1;
                                 const originalSummary = hasOriginalDuration
-                                    ? `Original: ${formatDurationWithSeconds(originalTimeMs)}`
+                                    ? `Original: ${formatDuration(originalTimeMs)}`
                                     : (originalFlatRate !== null
                                         ? `Original: ${originalQuantity > 1 ? `${originalQuantity} x ` : ''}${getCurrencySymbol(getInvoiceCurrency())}${originalFlatRate.toFixed(2)} flat rate`
                                         : null);

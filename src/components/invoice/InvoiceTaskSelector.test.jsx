@@ -244,6 +244,29 @@ describe('InvoiceTaskSelector', () => {
         expect(screen.getByText('Original: CHF500.00 flat rate')).toBeInTheDocument();
     });
 
+    it('ignores seconds in the invoice-facing original-time summary', () => {
+        render(
+            <InvoiceTaskSelector
+                {...createBaseProps({
+                    invoiceTasks: [
+                        {
+                            id: 'task-1',
+                            title: 'Timed task',
+                            parentTaskId: null,
+                            hours: 1,
+                            originalHours: 1,
+                            originalTimeMs: (60 * 60 * 1000) + (10 * 1000),
+                        }
+                    ],
+                    selectedTasksForBilling: { 'task-1': true },
+                })}
+            />
+        );
+
+        expect(screen.getByText('Original: 1h')).toBeInTheDocument();
+        expect(screen.queryByText(/10s/)).not.toBeInTheDocument();
+    });
+
     it('uses the invoice-task flat-rate toggle handler for existing tasks', () => {
         const handleToggleFlatRate = vi.fn();
         const handleToggleAdditionalTaskFlatRate = vi.fn();

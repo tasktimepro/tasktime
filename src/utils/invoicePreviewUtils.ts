@@ -1,8 +1,8 @@
 import type { Client, Expense, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { getInvoiceEligibleTimeEntries } from '@/domain/invoices/invoiceEligibility';
+import { getCanonicalInvoiceHours } from '@/domain/invoices/invoiceTimePrecision';
 import { getBillingPeriodRange, isStoredDateWithinBillingRange } from './billingPeriodUtils';
 import { convertCurrency, getProjectCurrency, normalizeCurrencyCode } from './currencyUtils';
-import { millisecondsToHours } from './dateUtils';
 import { getClientHourlyRate } from './projectPlanningUtils';
 import { getBillableDurationMs } from './timeEntryDurationUtils';
 
@@ -177,7 +177,7 @@ export const getProjectInvoicePreview = (
     projectTasks
         .filter((task) => task.billable === true)
         .forEach((task) => {
-            const taskHours = roundCurrency(millisecondsToHours(taskTimeMap.get(task.id) || 0));
+            const taskHours = getCanonicalInvoiceHours(taskTimeMap.get(task.id) || 0);
 
             unbilledHours += taskHours;
 

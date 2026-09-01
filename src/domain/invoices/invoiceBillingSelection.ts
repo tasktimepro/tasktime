@@ -73,7 +73,7 @@ export function buildInvoiceBillingSelectionSnapshotFromPlan({
 
             return {
                 taskId,
-                title: stringValue(item?.description) || stringValue(task?.title) || taskId,
+                title: stringValue(item?.description) || stringValue(task?.title) || 'Task',
                 pricingMode: useFlatRate ? 'flat' : 'hourly',
                 quantity,
                 rate,

@@ -46,7 +46,7 @@ These invariants summarize critical production contracts. They supplement the de
 
 - At most one active timer exists per project, while different projects may have active timers concurrently.
 - Pausing preserves elapsed time and does not create a time entry; stopping creates the entry exactly once.
-- Time calculations must use a consistent unit and preserve exact stored duration semantics across timers, entries, reports, invoices, imports, and exports.
+- Time calculations must use a consistent unit and preserve exact stored duration semantics across timers, entries, reports, invoice billing evidence, imports, and exports. Invoice-facing presentation and pricing intentionally ignore sub-minute source remainders while retaining the exact selected milliseconds in the billing snapshot.
 - Tasks belong to projects, subtasks use `parentTaskId`, and subtasks cannot be recurring.
 
 ## Invoices, expenses, and reporting
@@ -54,7 +54,7 @@ These invariants summarize critical production contracts. They supplement the de
 - Invoice calculations, billed state, payments, undo operations, currency handling, expense inclusion, and report totals must agree on the same source records and rounding rules.
 - Current billing and report ranges assign a time entry wholly to the local calendar date of its start timestamp and include the complete selected end date. Historical snapshot-less invoice recovery retains the period-boundary behavior that produced the invoice's stored source totals.
 - UI badges, invoice composition, and agent preview/draft commands share one invoice-eligibility operation. Neither a task cutoff alone nor entry markers alone may redefine legacy eligibility: exact finalized-invoice evidence may suppress markerless historical entries, while ambiguous or later-arriving work remains eligible.
-- Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval; financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
+- Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval. Invoice hours derive from whole billable minutes and then use the existing two-decimal-hours presentation; an untouched canonical value is not a reduction or adjustment. Financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
 - Billing mutations must be explicit, reversible where supported, and idempotent against retries or repeated commands.
 - Cancellation is the terminal void-like exception to ordinary reversibility: only finalized unpaid sent/overdue invoices may be canceled; the retained invoice number, original values/snapshots, and project links are immutable, only sources still owned by that invoice are released, and template numbering is never rewound.
 - Canceled invoices remain audit records but contribute zero to revenue, payment, output-tax, profit, outstanding, overdue, aging, statement, and project-allocation totals. They cannot be edited, paid, emailed, undone, uncanceled, or rendered without an unmistakable canceled treatment.

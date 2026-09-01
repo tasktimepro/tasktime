@@ -1088,6 +1088,94 @@ describe('InvoiceGenerator', () => {
         dateNowSpy.mockRestore()
     })
 
+    it('does not treat canonical two-decimal display rounding as an invoice hours edit', async () => {
+
+        modalConfig.billingPeriodPreset = 'all-time'
+        const user = userEvent.setup()
+
+        renderGenerator({
+            timeEntries: [
+                {
+                    ...baseEntry,
+                    end: baseEntry.start + (60 * 60 * 1000) + (10 * 1000)
+                }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(toastMocks.showError).not.toHaveBeenCalled()
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        expect(timeEntryHookMocks.createEntry).not.toHaveBeenCalled()
+
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.tasks[0]).toEqual(expect.objectContaining({
+            title: 'Task',
+            originalTimeMs: (60 * 60 * 1000) + (10 * 1000),
+            originalHours: 1,
+            hours: 1
+        }))
+        expect(invoiceData.billingSelectionSnapshot.entries[0]).toEqual(expect.objectContaining({
+            taskId: 'task-1',
+            billableDurationMs: (60 * 60 * 1000) + (10 * 1000)
+        }))
+    })
+
+    it('does not create an adjustment when canonical two-decimal display rounding is above exact time', async () => {
+
+        modalConfig.billingPeriodPreset = 'all-time'
+        const user = userEvent.setup()
+
+        renderGenerator({
+            timeEntries: [
+                {
+                    ...baseEntry,
+                    end: baseEntry.start + (60 * 60 * 1000) + (20 * 1000)
+                }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(toastMocks.showError).not.toHaveBeenCalled()
+        expect(invoiceHookMocks.createInvoice).toHaveBeenCalledTimes(1)
+        expect(timeEntryHookMocks.createEntry).not.toHaveBeenCalled()
+
+        const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
+        expect(invoiceData.tasks[0]).toEqual(expect.objectContaining({
+            originalHours: 1,
+            hours: 1
+        }))
+    })
+
+    it('creates whole-minute adjustments after source seconds are ignored', async () => {
+
+        modalConfig.billingPeriodPreset = 'all-time'
+        modalConfig.adjustTaskHours = { taskId: 'task-1', hours: 1.01 }
+        const user = userEvent.setup()
+
+        renderGenerator({
+            timeEntries: [
+                {
+                    ...baseEntry,
+                    end: baseEntry.start + (60 * 60 * 1000) + (20 * 1000)
+                }
+            ]
+        })
+
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+
+        expect(toastMocks.showError).not.toHaveBeenCalled()
+        expect(timeEntryHookMocks.createEntry).toHaveBeenCalledTimes(1)
+
+        const adjustment = timeEntryHookMocks.createEntry.mock.calls[0][0]
+        expect(adjustment.source).toBe('invoice-adjustment')
+        expect(adjustment.end - adjustment.start).toBe(60 * 1000)
+    })
+
     it('refuses to consume recorded time when invoice hours are reduced', async () => {
 
         modalConfig.billingPeriodPreset = 'all-time'
@@ -1099,9 +1187,10 @@ describe('InvoiceGenerator', () => {
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
         await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
 
-        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining(
-            'Split or edit the source time entries before finalizing'
-        ))
+        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining('Invoice hours for "Task"'))
+        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining('30m'))
+        expect(toastMocks.showError).toHaveBeenCalledWith(expect.stringContaining('selected recorded time of 1h'))
+        expect(toastMocks.showError).not.toHaveBeenCalledWith(expect.stringContaining('task-1'))
         expect(invoiceHookMocks.createInvoice).not.toHaveBeenCalled()
         expect(timeEntryHookMocks.updateEntry).not.toHaveBeenCalled()
         expect(taskHookMocks.updateTask).not.toHaveBeenCalled()

@@ -129,6 +129,33 @@ describe('timer operations', () => {
         })).toThrow(/overlaps/);
     });
 
+    it('allows stopped timer intervals to overlap across different projects', () => {
+        const crossProjectTasks = [
+            ...tasks,
+            { id: 'task-3', title: 'Other project task', projectId: 'project-2' },
+        ];
+        const timer = {
+            projectId: 'project-2',
+            taskId: 'task-3',
+            timerInstanceId: 'timer-other-project',
+            startTime: 1_000,
+            paused: true,
+            pausedElapsedTime: 5_000,
+        };
+
+        expect(planStoppedTimer({
+            timerKey: 'project-2',
+            timer,
+            entries: [{ id: 'existing', taskId: 'task-1', start: 4_000, end: 8_000 }],
+            tasks: crossProjectTasks,
+            now: 20_000,
+        }).entry).toEqual(expect.objectContaining({
+            taskId: 'task-3',
+            start: 1_000,
+            end: 6_000,
+        }));
+    });
+
     it('uses one deterministic entry key when two devices stop the same timer instance', () => {
         const timer = buildStartedTimer({
             task: tasks[0],
