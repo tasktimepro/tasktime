@@ -68,10 +68,11 @@ make npm CMD="run build:agent-bridge" # build the agent bridge package
 It works only in Vite development mode on `localhost`/loopback, points the app at
 the local Worker, and exercises the normal catalog, account, trial, Checkout,
 webhook, reconciliation, license, and Portal clients against Stripe test mode
-and Wrangler-local D1. A persistent banner marks the boundary. Hosted Send and
-delivery-status requests remain disabled so billing tests cannot send customer
-messages. Production builds ignore the sandbox flag, and the tracked production
-Worker controls remain unchanged and off.
+and Wrangler-local D1. Product screens remain visually production-like, without
+sandbox-only banners or developer-facing notices. Hosted Send and delivery-status
+requests remain disabled behind neutral failure copy so billing tests cannot send
+customer messages. Production builds ignore the sandbox flag, and the tracked
+production Worker controls remain unchanged and off.
 
 Start the complete billing sandbox from the repository root. The command
 prepares local D1/configuration and starts the app, Worker, and Dockerized

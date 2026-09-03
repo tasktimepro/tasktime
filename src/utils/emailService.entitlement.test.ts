@@ -113,7 +113,7 @@ describe('entitled email client boundary', () => {
             billingLifecycle: lifecycle,
         })).rejects.toMatchObject({
             type: 'auth',
-            message: 'Hosted Send is disabled in the local billing sandbox.',
+            message: 'Hosted Send is temporarily unavailable.',
         });
         await expect(checkEmailAttemptStatus({
             sessionId: lifecycle.sessionId,
@@ -121,7 +121,7 @@ describe('entitled email client boundary', () => {
             attemptId,
         })).rejects.toMatchObject({
             type: 'auth',
-            message: 'Delivery status is disabled in the local billing sandbox.',
+            message: 'Delivery status is temporarily unavailable.',
         });
         expect(storage.find).not.toHaveBeenCalled();
         expect(storage.store).not.toHaveBeenCalled();

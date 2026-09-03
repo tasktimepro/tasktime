@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 28, 2026
+Last updated: September 2, 2026
 
 This repository-level policy summarizes how TaskTime Pro handles privacy in the public app, public source repository, packages, and same-device agent bridge. The canonical product policy is published at https://tasktime.pro/privacy/.
 
@@ -14,6 +14,7 @@ TaskTime Pro stores app data in your browser using IndexedDB, Yjs documents, and
 - expenses, tax-return periods, recurrence settings, and reports
 - invoices, invoice templates, business information, payment methods, and email templates
 - sync preferences, local UI preferences, and local agent bridge pairing state
+- the connected cloud account email used to identify the selected provider in the interface
 
 This data stays on your device unless you choose a feature that intentionally sends or syncs it elsewhere.
 
@@ -23,7 +24,7 @@ Cloud sync is optional. If you connect Google Drive or Dropbox, TaskTime Pro sto
 
 The public app uses a small edge authentication service at `sync.tasktime.pro` to securely maintain the selected provider connection. It stores the session record and encrypted OAuth refresh token needed for that connection, issues short-lived provider access tokens only to an authorized browser connection, and supports revocation. Routine sync file requests travel directly between your browser and Google Drive or Dropbox. The access token stays only in active-browser memory, and the edge service does not receive or retain routine sync file bodies or your work records as a TaskTime-hosted workspace.
 
-Google Drive and Dropbox sync use the minimum practical provider scopes for application-folder storage and account identification. Dropbox storage identity uses a TaskTime-scoped account pseudonym rather than requesting or retaining your Dropbox email address. The selected provider's own terms and privacy policy apply to your account and cloud storage.
+Google Drive and Dropbox sync use the minimum practical provider scopes for application-folder storage and account identification. Dropbox grants include account-information read access so your browser can retrieve the verified account email directly from Dropbox and show which account is connected. That email is stored only in the local browser authentication record; it is excluded from work-data sync, backups, exports, aggregate metrics, and the edge service. The edge service continues to identify Dropbox storage through a TaskTime-scoped account pseudonym and does not receive or retain the Dropbox profile response. The selected provider's own terms and privacy policy apply to your account and cloud storage.
 
 You can disconnect cloud sync without deleting the provider files. You can also explicitly wipe validated TaskTime Pro sync files and backups from the selected provider, revoke access, and disconnect the browser.
 

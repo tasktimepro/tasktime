@@ -41,7 +41,6 @@ import ModalManager from './components/modals/ModalManager';
 import FloatingActionButton from './components/FloatingActionButton';
 import ErrorBoundary from './components/ErrorBoundary';
 import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
-import { LocalBillingSandboxBanner } from './components/billing/LocalBillingSandboxBanner';
 import { getYjsSyncStatusDescriptor, SYNC_STATUS_KIND } from './components/sync/syncStatusDescriptor';
 import MobileBottomNav from './components/app/MobileBottomNav';
 import MobileMoreSheet from './components/app/MobileMoreSheet';
@@ -958,6 +957,8 @@ function AppContent() {
         syncPhase,
         syncState,
     ]);
+    const cloudSyncNeedsReconnect = mobileSyncStatus.kind === SYNC_STATUS_KIND.DISCONNECTED
+        && cloudHadPreviousSession;
 
     useEffect(() => {
         if (mobileSyncHideTimeoutRef.current) {
@@ -1765,7 +1766,6 @@ function AppContent() {
                         '--app-content-padding-bottom': isMobileLayout ? mobileBottomPadding : desktopBottomPadding,
                     }}
                 >
-                    <LocalBillingSandboxBanner />
                     {activeView === 'dashboard' && (
                             <ErrorBoundary>
                             <Dashboard
@@ -1948,6 +1948,7 @@ function AppContent() {
                                 dailyGoals={dailyGoals}
                                 plannerAttachments={plannerAttachments}
                                 onImport={handleImport}
+                                cloudSyncNeedsReconnect={cloudSyncNeedsReconnect}
                             />
                             </ErrorBoundary>
                         )}

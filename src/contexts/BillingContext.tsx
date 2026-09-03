@@ -54,6 +54,11 @@ const DISABLED_VALUE: BillingContextValue = {
 
 const BillingContext = createContext<BillingContextValue>(DISABLED_VALUE);
 
+function isChangedCheckoutOffer(error: unknown): error is BillingClientError {
+    return error instanceof BillingClientError
+        && (error.code === 'FOUNDING_OFFER_ENDED' || error.code === 'CATALOG_CHANGED');
+}
+
 export function BillingProvider({ children }: { children: React.ReactNode }) {
     const {
         activeStorageProvider,
@@ -124,13 +129,30 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
                 planConfigVersion,
             );
         } catch (error) {
-            if (error instanceof BillingClientError
-                && (error.code === 'FOUNDING_OFFER_ENDED' || error.code === 'CATALOG_CHANGED')) {
+            if (error instanceof BillingClientError && error.code === 'CHECKOUT_EXPIRED') {
                 await refresh();
-                announceRefresh();
-                throw new Error('The Pro offer changed. Review the updated order summary and confirm again.');
+                try {
+                    result = await billingClient.createCheckout(
+                        lifecycle.sessionId,
+                        offerId,
+                        planConfigVersion,
+                    );
+                } catch (retryError) {
+                    if (isChangedCheckoutOffer(retryError)) {
+                        await refresh();
+                        announceRefresh();
+                        throw new Error('The Pro offer changed. Review the updated order summary and confirm again.');
+                    }
+                    throw retryError;
+                }
+            } else {
+                if (isChangedCheckoutOffer(error)) {
+                    await refresh();
+                    announceRefresh();
+                    throw new Error('The Pro offer changed. Review the updated order summary and confirm again.');
+                }
+                throw error;
             }
-            throw error;
         }
         await writePendingBillingCheckout({ lifecycle, attemptId: result.attemptId });
         announceRefresh();

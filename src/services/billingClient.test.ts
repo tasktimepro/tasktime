@@ -6,6 +6,7 @@ import {
     parseBillingCatalog,
     parseBillingStatus,
 } from './billingClient';
+import { buildLocalReviewBillingCatalog } from '@/config/localReviewPricing';
 
 const freeEntitlement = {
     version: 1,
@@ -106,6 +107,23 @@ const disabledCatalog = {
 };
 
 describe('billing client contract', () => {
+    it('accepts the exact 250-member founding catalog and rejects the retired limit', () => {
+        const catalog = buildLocalReviewBillingCatalog();
+
+        expect(parseBillingCatalog(catalog)).toEqual(catalog);
+        const foundingOffer = catalog.plans[1].offers[0];
+        expect(() => parseBillingCatalog({
+            ...catalog,
+            plans: [catalog.plans[0], {
+                ...catalog.plans[1],
+                offers: [{
+                    ...foundingOffer,
+                    founding: { ...foundingOffer.founding, memberLimit: 1000 },
+                }, catalog.plans[1].offers[1]],
+            }],
+        })).toThrow(expect.objectContaining({ code: 'INVALID_CATALOG' }));
+    });
+
     it('accepts the exact disabled catalog and rejects purchaser data while disabled', () => {
         expect(parseBillingCatalog(disabledCatalog)).toEqual(disabledCatalog);
         expect(() => parseBillingCatalog({
@@ -173,10 +191,47 @@ describe('billing client contract', () => {
         expect(parsed.usage.invoiceEmail).not.toHaveProperty('futureRemaining');
     });
 
+    it('accepts an exact Stripe Checkout redirect with Stripe client fragment state', async () => {
+        const checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_test_fixture#fidkdWxOYHwnPyd1blpxYHZxWjA0T';
+        const attemptId = '0c57f1be-0dc8-4ec1-867e-84e7278fd0c6';
+        const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+            version: 1,
+            url: checkoutUrl,
+            attemptId,
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        const client = createBillingClient({ baseUrl: 'https://sync.test.worker', fetchImpl });
+
+        await expect(client.createCheckout(
+            'session-fixture',
+            'pro-founding-annual-eur',
+            'test-catalog-1',
+            'idempotency-key-fixture',
+        )).resolves.toEqual({ version: 1, url: checkoutUrl, attemptId });
+    });
+
     it('refuses a non-Stripe Checkout redirect even on a successful response', async () => {
         const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
             version: 1,
             url: 'https://checkout.stripe.com.attacker.invalid/session',
+            attemptId: '0c57f1be-0dc8-4ec1-867e-84e7278fd0c6',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        const client = createBillingClient({ baseUrl: 'https://sync.test.worker', fetchImpl });
+
+        await expect(client.createCheckout(
+            'session-fixture',
+            'pro-founding-annual-eur',
+            'test-catalog-1',
+            'idempotency-key-fixture',
+        )).rejects.toEqual(expect.objectContaining<Partial<BillingClientError>>({
+            code: 'INVALID_RESPONSE',
+            retryable: false,
+        }));
+    });
+
+    it('refuses Checkout redirect credentials even on the exact Stripe host', async () => {
+        const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+            version: 1,
+            url: 'https://user:password@checkout.stripe.com/c/pay/cs_test_fixture#client-state',
             attemptId: '0c57f1be-0dc8-4ec1-867e-84e7278fd0c6',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
         const client = createBillingClient({ baseUrl: 'https://sync.test.worker', fetchImpl });

@@ -222,7 +222,7 @@ export async function sendInvoiceEmail(
 ): Promise<SendInvoiceEmailResult> {
 
     if (BILLING_FEATURES.sandbox) {
-        throw createEmailError('auth', 'Hosted Send is disabled in the local billing sandbox.');
+        throw createEmailError('auth', 'Hosted Send is temporarily unavailable.');
     }
 
     const workerUrl = SYNC_WORKER_CONFIG.workerUrl;
@@ -449,7 +449,7 @@ export async function checkEmailAttemptStatus(input: {
     attemptId: string;
 }): Promise<EmailAttemptProjectionV1> {
     if (BILLING_FEATURES.sandbox) {
-        throw createEmailError('auth', 'Delivery status is disabled in the local billing sandbox.');
+        throw createEmailError('auth', 'Delivery status is temporarily unavailable.');
     }
     const workerUrl = SYNC_WORKER_CONFIG.workerUrl;
     if (!workerUrl || input.billingLifecycle.sessionId !== input.sessionId) {

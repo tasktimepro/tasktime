@@ -28,15 +28,39 @@ Let users understand exactly what will be billed, what changed after finalizatio
   warning state. Their primary upgrade action is the last, right-aligned footer
   action and uses a rocket icon; account-status recovery remains distinct and
   uses its cloud action instead.
+- Plan & Billing reuses the visible sync lifecycle when a Pro action needs a
+  cloud identity: a returning user sees reassuring reconnect copy rather than
+  first-time setup instructions. Setup and reconnect notices stay neutral and
+  use the primary icon-labelled cloud action so it remains clear on the muted
+  notice background.
+- Plan & Billing uses the same side-by-side Free/Pro comparison in disconnected,
+  Free, trial, paid, grace, suspended, and recovery states. A neutral **Current
+  plan** badge sits beside the verified Free or Pro card title; unresolved state
+  shows no guessed badge. Trial, Checkout, billing management, and recovery are
+  contextual actions inside the Pro card. **Manage billing** is limited to a
+  verified subscription-backed Pro state; a Stripe customer record alone does
+  not add it to Free, trial, or grant states. Hosted-email allowance is enforced
+  and explained at the Send action rather than through a separate account card.
+  The one-time trial names the connected provider email beside **Start free
+  trial**, falling back to neutral connected-provider copy when an email is
+  unavailable. Copy ties eligibility to the connected TaskTime cloud account and
+  explains that it stays with that account after reconnect or verified provider
+  transfer. The stable TaskTime account reference remains
+  internal and is never used as the customer-facing identity; selecting the
+  action is the explicit confirmation, without a second checkbox.
 - Pricing presents only Free and Pro. It labels annual `EUR 39` truthfully as
-  the founding base price for the first 1,000 paid members and annual `EUR 59`
+  the founding base price for the first 250 paid members and annual `EUR 59`
   as the automatic standard offer afterward. Temporary reservation saturation
   shows a retry state rather than switching early. Amount, tax, applicability,
   and availability derive from the versioned catalog/status projection; a price
   change always returns to an explicit order confirmation. Plan & Billing marks
-  the founding amount with an asterisk and keeps its first-1,000 capacity and
+  the founding amount with an asterisk and keeps its first-250 capacity and
   same-subscription retention terms directly below the displayed price; the
-  standard amount has no founding footnote.
+  standard amount has no founding footnote. The action footer keeps trial on
+  the left and the rocket-led Get Pro action on the right, replaces the rocket
+  with the shared loading spinner while Checkout opens, and places only the
+  right-aligned tax qualifier below the actions. Hosted Checkout owns the final
+  recurring-subscription disclosure and confirmation.
 - Cancellation defaults to period end and shows continued access plus the exact
   end date. A founder's confirmation explains that reversing before then
   preserves the founding base price, while terminal cancellation permanently

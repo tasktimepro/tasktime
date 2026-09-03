@@ -161,6 +161,12 @@ before enablement.
 ### Slice 9 — Product, destructive-flow, and agent parity
 
 - [x] Add accessible provider choice, status, transfer progress/recovery, a destination-marked transfer action in the overflow menu, and the same two connected-provider lifecycle actions: Disconnect, plus a trash-icon Wipe data & disconnect action that deletes sync files and backups before revocation. Dropbox entry points now default on for the next release, with only an explicit false emergency UI opt-out.
+- [x] Align connected-account presentation with Google Drive by adding the
+  narrowly scoped `account_info.read` grant for new/reconnected Dropbox
+  sessions. The browser reads and validates the email directly from Dropbox,
+  stores it only in the origin-local auth record, and gives older sessions an
+  explicit reconnect path; the Worker remains pseudonymous and existing file-
+  scope-only sessions remain usable.
 - [x] Generalize cloud backup/status agent commands while preserving Drive-named commands as Google-only.
 - [x] Route browser and agent hosted email plus synced metrics through the active
   provider session; preserve legacy Google behavior and prove Dropbox-only

@@ -24,10 +24,10 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   signed status/license, shadow billing UI, active-client transitions, the Free
   Reports Overview/static Pro boundary, hosted-email quota/status recovery, and
   browser/agent policy. Fresh real-local D1 execution covers ordered migrations,
-  one-time trial contention, 1,001-way founding capacity, atomic email quota,
+  one-time trial contention, 251-way founding capacity, atomic email quota,
   one-sided and compatible same-Stripe-owner provider transfers, conflicting
   dual ownership, cross-D1 recovery, and alternate-binding restore. The private
-  Worker gate passes 24 files / 172 tests plus typecheck; the public release gate
+  Worker gate passes 27 files / 177 tests plus typecheck; the public release gate
   passes 260 files / 2,332 tests, coverage thresholds, 39 Chromium smokes, four
   PWA smokes, and the 49-page merged build; changed agent artifacts pass their
   local release smoke. The bounded main-account Stripe test-mode rehearsal now
@@ -38,7 +38,7 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   production canary is part of this local phase. The
   approved boundary is Free with one active client and a current-local-month
   Reports Overview, Pro with unlimited active clients, advanced Reports/exports
-  and hosted sending, and a `EUR 39/year` founding offer for the first 1,000 paid
+  and hosted sending, and a `EUR 39/year` founding offer for the first 250 paid
   canonical principals followed automatically by the `EUR 59/year` standard
   offer for new purchases. Email allowance, paid grace, tax-inclusive versus
   additional-tax presentation, both live Stripe mappings, remaining payment/
@@ -48,7 +48,8 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   The synthetic billing-state preview has been retired in favor of a guarded
   loopback-development pre-production sandbox. It runs the normal app against
   local Worker/D1 and real Stripe test-mode Checkout/webhooks, keeps hosted email
-  off, and leaves every tracked production control unchanged. The supported app
+  off, keeps the visible product UI production-like without sandbox-only notices,
+  and leaves every tracked production control unchanged. The supported app
   command is `make dev-billing-sandbox`; it now prepares and starts the app,
   local Worker, and Dockerized Stripe listener as one attached Compose stack.
   The private per-service commands remain diagnostic escape hatches rather than

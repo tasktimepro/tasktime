@@ -254,7 +254,7 @@ const EmailPreviewModal = ({
     const handleSend = useCallback(async () => {
 
         if (BILLING_FEATURES.sandbox) {
-            setError('Hosted Send is disabled in the local billing sandbox. Your draft and manual delivery options remain available.');
+            setError('Hosted Send is temporarily unavailable. Your draft and manual delivery options remain available.');
             return;
         }
 
@@ -414,7 +414,7 @@ const EmailPreviewModal = ({
 
     const handleCheckStatus = useCallback(async () => {
         if (BILLING_FEATURES.sandbox) {
-            setError('Delivery status checks are disabled in the local billing sandbox.');
+            setError('Delivery status is temporarily unavailable.');
             return;
         }
         if (!pendingAttemptId || !hostedServiceSessionId || !billingLifecycle) return;
@@ -502,8 +502,7 @@ const EmailPreviewModal = ({
                 ) : (
                     <Button
                         onClick={pendingAttemptId ? handleCheckStatus : handleSend}
-                        disabled={BILLING_FEATURES.sandbox
-                            || sending
+                        disabled={sending
                             || (!pendingAttemptId && (!to || !emailAccess.allowed))}
                         leadingIcon={Send}
                     >
@@ -532,13 +531,6 @@ const EmailPreviewModal = ({
                 {!hostedServiceSessionId && (
                     <Notice variant="warning" title="Cloud provider required">
                         Connect Google Drive or Dropbox in Account settings to enable {documentLabel} emailing.
-                    </Notice>
-                )}
-
-                {BILLING_FEATURES.sandbox && (
-                    <Notice title="Hosted Send is disabled in the billing sandbox">
-                        Billing and entitlement state comes from the local Worker, but hosted email is kept off.
-                        Draft editing, PDF preparation, download, copy, and manual delivery remain available.
                     </Notice>
                 )}
 

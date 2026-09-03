@@ -35,4 +35,17 @@ describe('billing sandbox development workflow', () => {
         );
         expect(compose).not.toContain('--api-key');
     });
+
+    it('keeps local sandbox implementation details out of product UI', () => {
+        const app = readFileSync(resolve(process.cwd(), 'src/App.jsx'), 'utf8');
+        const emailPreview = readFileSync(
+            resolve(process.cwd(), 'src/components/invoice/EmailPreviewModal.jsx'),
+            'utf8',
+        );
+
+        expect(app).not.toContain('LocalBillingSandboxBanner');
+        expect(emailPreview).not.toContain('Hosted Send is disabled in the billing sandbox');
+        expect(emailPreview).not.toContain('Billing and entitlement state comes from the local Worker');
+        expect(emailPreview).not.toContain('disabled={BILLING_FEATURES.sandbox');
+    });
 });

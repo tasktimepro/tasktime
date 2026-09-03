@@ -19,7 +19,7 @@ TaskTime Pro is a free, open-source, local-first work-management and billing app
   portability, Web Push, and core agent actions. Existing, archived, imported,
   synced, and over-limit records are never hidden or made unmaintainable. Launch
   packaging contains only Free and Pro; the founding Pro offer is `EUR 39/year`
-  for the first 1,000 paid canonical principals, followed automatically by the
+  for the first 250 paid canonical principals, followed automatically by the
   `EUR 59/year` standard offer for new purchases. Existing continuous/
   recoverable founding subscriptions retain their founding Price.
 

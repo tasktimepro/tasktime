@@ -33,6 +33,7 @@ describe('dropboxAuthStorage', () => {
             provider: 'dropbox' as const,
             sessionId: 'dropbox-session-fixture',
             createdAt: '2026-08-19T10:00:00.000Z',
+            accountEmail: 'owner@example.com',
         };
 
         await storeDropboxSession(session);
@@ -40,6 +41,32 @@ describe('dropboxAuthStorage', () => {
         expect(mockDb.put).toHaveBeenCalledWith('app-data', session, 'dropbox-auth-session');
         expect(JSON.stringify(mockDb.put.mock.calls[0])).not.toContain('accessToken');
         expect(JSON.stringify(mockDb.put.mock.calls[0])).not.toContain('accountId');
+    });
+
+    it('preserves legacy references and discards only an invalid optional account email', async () => {
+        mockDb.get
+            .mockResolvedValueOnce({
+                provider: 'dropbox',
+                sessionId: 'legacy-dropbox-session',
+                createdAt: '2026-08-19T10:00:00.000Z',
+            })
+            .mockResolvedValueOnce({
+                provider: 'dropbox',
+                sessionId: 'current-dropbox-session',
+                createdAt: '2026-08-19T10:00:00.000Z',
+                accountEmail: 'not-an-email',
+            });
+
+        await expect(getStoredDropboxSession()).resolves.toEqual({
+            provider: 'dropbox',
+            sessionId: 'legacy-dropbox-session',
+            createdAt: '2026-08-19T10:00:00.000Z',
+        });
+        await expect(getStoredDropboxSession()).resolves.toEqual({
+            provider: 'dropbox',
+            sessionId: 'current-dropbox-session',
+            createdAt: '2026-08-19T10:00:00.000Z',
+        });
     });
 
     it('returns only a valid Dropbox reference and ignores malformed records', async () => {

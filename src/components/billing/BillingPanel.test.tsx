@@ -1,21 +1,23 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BillingClientError } from '@/services/billingClient';
 
 const state = vi.hoisted(() => ({
     value: {} as Record<string, unknown>,
     clients: [] as Array<{ id: string; archived?: boolean }>,
+    features: {
+        sandbox: false,
+        ui: true,
+        trialActivation: false,
+        checkout: false,
+    },
 }));
 
 vi.mock('@/contexts/BillingContext', () => ({
     useBilling: () => state.value,
 }));
 vi.mock('@/config/billingFeatures', () => ({
-    BILLING_FEATURES: {
-        sandbox: false,
-        ui: true,
-        trialActivation: false,
-        checkout: false,
-    },
+    BILLING_FEATURES: state.features,
 }));
 vi.mock('@/hooks/useClients', () => ({
     useClients: () => ({ clients: state.clients }),
@@ -66,7 +68,7 @@ const testCatalog = {
                     taxPresentation: 'calculated_at_checkout',
                     renewal: 'automatic',
                     founding: {
-                        memberLimit: 1000,
+                        memberLimit: 250,
                         availability: 'available',
                         priceRetention: 'while_same_subscription_continues_or_is_recoverable',
                     },
@@ -96,6 +98,7 @@ function billingValue(overrides: Record<string, unknown> = {}) {
         resolution: { kind: 'canonical', snapshot: freeSnapshot },
         status: {
             account: {
+                provider: 'dropbox',
                 displayLabel: 'Dropbox · TaskTime account TT-ABCD-EFGH',
                 accountReference: 'TT-ABCD-EFGH',
             },
@@ -147,6 +150,8 @@ describe('BillingPanel shadow-mode UX', () => {
         vi.clearAllMocks();
         window.history.replaceState({}, '', '/account?section=billing');
         state.clients = [];
+        state.features.trialActivation = false;
+        state.features.checkout = false;
         state.value = billingValue();
     });
 
@@ -168,9 +173,13 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(screen.getByText(/One active client at a time/)).toBeInTheDocument();
         expect(screen.getByText(/Unlimited active clients/)).toBeInTheDocument();
         expect(screen.getByText(/€39\/year\*/)).toBeInTheDocument();
-        expect(screen.getByText(/\* Founding pricing is limited to the first 1,000 paid members/)).toBeInTheDocument();
+        expect(screen.getByText(/\* Founding pricing is limited to the first 250 paid members/)).toBeInTheDocument();
         expect(screen.getByText(/new subscriptions are.*59.*year afterward/i)).toBeInTheDocument();
+        expect(screen.getByText(
+            'Trial eligibility and the exact offer are confirmed for your connected TaskTime cloud account when you continue.',
+        )).toBeInTheDocument();
         expect(screen.queryByText(/Set up Cloud Sync to/)).toBeNull();
+        expect(screen.queryByText('Current plan')).toBeNull();
 
         fireEvent.click(screen.getByRole('button', { name: 'Start free trial' }));
 
@@ -183,7 +192,30 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(screen.getByText('Set up Cloud Sync to continue with Pro')).toBeInTheDocument();
         expect(createCheckout).not.toHaveBeenCalled();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Set up Cloud Sync' }));
+        const setupButton = screen.getByRole('button', { name: 'Set up Cloud Sync' });
+        expect(setupButton).toHaveClass('bg-primary');
+        fireEvent.click(setupButton);
+        expect(onOpenSync).toHaveBeenCalledOnce();
+    });
+
+    it('reassures returning users that Cloud Sync only needs reconnecting', () => {
+        const onOpenSync = vi.fn();
+        state.value = billingValue({
+            status: null,
+            resolution: { kind: 'unresolved', reason: 'lifecycle' },
+            hasActiveCloudAccount: false,
+        });
+        render(<BillingPanel onOpenSync={onOpenSync} cloudSyncNeedsReconnect />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Get Pro' }));
+
+        expect(screen.getByText('Reconnect Cloud Sync to continue with Pro')).toBeInTheDocument();
+        expect(screen.getByText(/Cloud Sync is already set up/)).toBeInTheDocument();
+        expect(screen.queryByText(/Set up Cloud Sync to continue/)).toBeNull();
+        const reconnectButton = screen.getByRole('button', { name: 'Reconnect Cloud Sync' });
+        expect(reconnectButton).toHaveClass('bg-primary');
+
+        fireEvent.click(reconnectButton);
         expect(onOpenSync).toHaveBeenCalledOnce();
     });
 
@@ -222,21 +254,147 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(screen.getByLabelText('Loading plan options')).toHaveAttribute('aria-busy', 'true');
     });
 
-    it('states the no-card/no-auto-charge trial contract while production activation stays disabled', () => {
+    it('uses the trial action itself to confirm the visible account without an extra checkbox', async () => {
+        const startTrial = vi.fn(async () => undefined);
+        state.features.trialActivation = true;
+        state.value = billingValue({ startTrial });
         render(<BillingPanel onOpenSync={vi.fn()} />);
 
-        expect(screen.getByText(/requires no payment method, does not auto-charge/)).toBeTruthy();
-        const checkbox = screen.getByRole('checkbox');
-        fireEvent.click(checkbox);
-        expect(screen.getByRole('button', { name: 'Start free trial' })).toBeDisabled();
+        expect(screen.queryByRole('checkbox')).toBeNull();
+        expect(screen.getByText('Dropbox · Connected account')).toBeInTheDocument();
+        expect(screen.getByText(/Start your one-time 30-day Pro trial for your connected Dropbox account/)).toBeInTheDocument();
+        expect(screen.getByText(
+            /This trial stays with your TaskTime cloud account if you reconnect it or transfer cloud providers/,
+        )).toBeInTheDocument();
+        expect(screen.queryByText(/TT-ABCD-EFGH/)).toBeNull();
+        expect(screen.getByText(/No payment method is required, and you won't be charged automatically/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Start free trial' }));
+        await waitFor(() => expect(startTrial).toHaveBeenCalledOnce());
         expect(screen.getByText(/One active client/)).toBeTruthy();
     });
 
-    it('does not misrepresent Free zero allowance as a live usage projection', () => {
+    it('keeps the comparison layout after status loads and hides billing management for Free', () => {
+        const value = billingValue();
+        state.value = billingValue({
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    checkoutEnabled: true,
+                    checkoutOffer: {
+                        offerId: 'pro-founding-annual-eur',
+                        offerKind: 'founding',
+                        price: {
+                            currency: 'EUR',
+                            unitAmountMinor: 3900,
+                            interval: 'year',
+                            taxPresentation: 'calculated_at_checkout',
+                            renewal: 'automatic',
+                        },
+                    },
+                    checkoutOfferReason: 'founding_available',
+                    portalAvailable: true,
+                },
+            },
+        });
+
         render(<BillingPanel onOpenSync={vi.fn()} />);
 
-        expect(screen.getByText(/Usage is temporarily unavailable/)).toBeTruthy();
-        expect(screen.queryByText('0 remaining')).toBeNull();
+        const freeCard = screen.getByRole('region', { name: 'Free' });
+        const proCard = screen.getByRole('region', { name: 'Pro' });
+        expect(within(freeCard).getByText('Current plan')).toBeInTheDocument();
+        expect(within(proCard).queryByText('Current plan')).toBeNull();
+        expect(within(proCard).getByRole('button', { name: 'Start free trial' })).toBeInTheDocument();
+        expect(within(proCard).queryByRole('button', { name: 'Manage billing' })).toBeNull();
+        expect(within(proCard).getByRole('button', { name: 'Get Pro' })).toBeInTheDocument();
+        expect(screen.queryByText('Hosted invoice email')).toBeNull();
+        expect(screen.queryByText(/Usage is temporarily unavailable/)).toBeNull();
+    });
+
+    it('uses the connected provider email as the customer-facing identity and keeps the stable reference hidden', () => {
+        render(
+            <BillingPanel
+                onOpenSync={vi.fn()}
+                connectedAccountEmail="owner@example.com"
+            />,
+        );
+
+        expect(screen.getByText('Dropbox · owner@example.com')).toBeInTheDocument();
+        expect(screen.getByText((_, element) => (
+            element?.tagName === 'P'
+            && element.textContent?.includes('Pro trial for owner@example.com') === true
+        ))).toBeInTheDocument();
+        expect(screen.queryByText(/TT-ABCD-EFGH/)).toBeNull();
+    });
+
+    it('marks Pro as the current plan and keeps billing management inside its card', () => {
+        const value = billingValue();
+        state.value = billingValue({
+            resolution: {
+                kind: 'canonical',
+                snapshot: {
+                    ...freeSnapshot,
+                    accessStatus: 'active',
+                    source: 'subscription',
+                    trialStatus: 'eligible',
+                    limits: { activeClients: null },
+                },
+            },
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    portalAvailable: true,
+                },
+                subscription: {
+                    ...value.status.subscription,
+                    offerId: 'pro-founding-annual-eur',
+                    offerKind: 'founding',
+                    billingStatus: 'active',
+                    price: {
+                        currency: 'EUR',
+                        unitAmountMinor: 3900,
+                        interval: 'year',
+                        taxPresentation: 'calculated_at_checkout',
+                        renewal: 'automatic',
+                    },
+                },
+            },
+        });
+
+        render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        const freeCard = screen.getByRole('region', { name: 'Free' });
+        const proCard = screen.getByRole('region', { name: 'Pro' });
+        expect(within(freeCard).queryByText('Current plan')).toBeNull();
+        expect(within(proCard).getByText('Current plan')).toBeInTheDocument();
+        expect(within(proCard).getByRole('button', { name: 'Manage billing' })).toBeInTheDocument();
+        expect(within(proCard).queryByRole('button', { name: 'Start free trial' })).toBeNull();
+        expect(screen.queryByText('Hosted invoice email')).toBeNull();
+    });
+
+    it('does not invite repurchase while cached Pro waits for canonical status', () => {
+        state.value = billingValue({
+            status: null,
+            resolution: {
+                kind: 'canonical',
+                snapshot: {
+                    ...freeSnapshot,
+                    accessStatus: 'active',
+                    source: 'subscription',
+                    limits: { activeClients: null },
+                },
+            },
+            hasActiveCloudAccount: true,
+        });
+
+        render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        const proCard = screen.getByRole('region', { name: 'Pro' });
+        expect(within(proCard).getByText('Current plan')).toBeInTheDocument();
+        expect(within(proCard).queryByRole('button', { name: 'Start free trial' })).toBeNull();
+        expect(within(proCard).queryByRole('button', { name: 'Get Pro' })).toBeNull();
+        expect(within(proCard).getByRole('button', { name: 'Refresh billing status' })).toBeInTheDocument();
     });
 
     it('marks the available founding Checkout price and explains its capacity and retention', () => {
@@ -258,6 +416,7 @@ describe('BillingPanel shadow-mode UX', () => {
                         },
                     },
                     checkoutOfferReason: 'founding_available',
+                    portalAvailable: true,
                 },
             },
         });
@@ -265,8 +424,103 @@ describe('BillingPanel shadow-mode UX', () => {
         render(<BillingPanel onOpenSync={vi.fn()} />);
 
         expect(screen.getByText(/€39\/year\*/)).toBeInTheDocument();
-        expect(screen.getByText(/\* Founding pricing is limited to the first 1,000 paid members/)).toBeInTheDocument();
+        expect(screen.getByText(/\* Founding pricing is limited to the first 250 paid members/)).toBeInTheDocument();
         expect(screen.getByText(/retained while the same subscription continues or remains recoverable/)).toBeInTheDocument();
+        const proCard = screen.getByRole('region', { name: 'Pro' });
+        const actions = within(proCard).getByTestId('pro-plan-actions');
+        const rightActions = within(proCard).getByTestId('pro-plan-actions-right');
+        const trialButton = within(proCard).getByRole('button', { name: 'Start free trial' });
+        const checkoutButton = within(proCard).getByRole('button', { name: 'Get Pro' });
+        const qualifier = within(proCard).getByText('Tax calculated at checkout');
+        expect(actions).toHaveClass('w-full');
+        expect(actions).toContainElement(trialButton);
+        expect(rightActions).toHaveClass('ml-auto', 'justify-end');
+        expect(within(proCard).queryByRole('button', { name: 'Manage billing' })).toBeNull();
+        expect(rightActions).toContainElement(checkoutButton);
+        expect(rightActions.lastElementChild).toBe(checkoutButton);
+        expect(checkoutButton.querySelector('svg')).toHaveClass('lucide-rocket');
+        expect(qualifier).toHaveClass('text-right');
+        expect(within(proCard).queryByText(/renews automatically/i)).toBeNull();
+        expect(actions.compareDocumentPosition(qualifier) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('replaces the Get Pro rocket with the standard spinner while Checkout is opening', async () => {
+        let rejectCheckout: ((reason?: unknown) => void) | null = null;
+        const createCheckout = vi.fn(() => new Promise((_, reject) => {
+            rejectCheckout = reject;
+        }));
+        const value = billingValue();
+        state.features.checkout = true;
+        state.value = billingValue({
+            createCheckout,
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    checkoutEnabled: true,
+                    checkoutOffer: {
+                        offerId: 'pro-founding-annual-eur',
+                        offerKind: 'founding',
+                        price: {
+                            currency: 'EUR',
+                            unitAmountMinor: 3900,
+                            interval: 'year',
+                            taxPresentation: 'calculated_at_checkout',
+                            renewal: 'automatic',
+                        },
+                    },
+                    checkoutOfferReason: 'founding_available',
+                },
+            },
+        });
+
+        render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        const checkoutButton = screen.getByRole('button', { name: 'Get Pro' });
+        fireEvent.click(checkoutButton);
+
+        const loadingButton = await screen.findByRole('button', { name: 'Opening Checkout…' });
+        expect(loadingButton).toBeDisabled();
+        expect(loadingButton.querySelector('svg')).toHaveClass('animate-spin', 'lucide-loader-circle');
+        expect(loadingButton.querySelector('svg')).not.toHaveClass('lucide-rocket');
+
+        rejectCheckout?.(new Error('Checkout test stop'));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Get Pro' })).toBeEnabled());
+    });
+
+    it('never exposes an internal billing code when Checkout recovery cannot complete', async () => {
+        const value = billingValue();
+        state.features.checkout = true;
+        state.value = billingValue({
+            createCheckout: vi.fn(async () => {
+                throw new BillingClientError('CHECKOUT_EXPIRED', 409, false);
+            }),
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    checkoutEnabled: true,
+                    checkoutOffer: {
+                        offerId: 'pro-founding-annual-eur',
+                        offerKind: 'founding',
+                        price: {
+                            currency: 'EUR',
+                            unitAmountMinor: 3900,
+                            interval: 'year',
+                            taxPresentation: 'calculated_at_checkout',
+                            renewal: 'automatic',
+                        },
+                    },
+                    checkoutOfferReason: 'founding_available',
+                },
+            },
+        });
+
+        render(<BillingPanel onOpenSync={vi.fn()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Get Pro' }));
+
+        expect(await screen.findByText(/previous Checkout link expired/i)).toBeInTheDocument();
+        expect(screen.queryByText(/CHECKOUT_EXPIRED/)).toBeNull();
     });
 
     it('shows the standard Checkout price without a founding footnote after capacity is exhausted', () => {
@@ -355,7 +609,7 @@ describe('BillingPanel shadow-mode UX', () => {
 
         expect(screen.getByText(/2 active clients/)).toBeInTheDocument();
         expect(screen.getByText(/Existing over-limit clients remain fully usable/)).toBeInTheDocument();
-        expect(screen.getByText(/one-time Pro trial has already been used/)).toBeInTheDocument();
+        expect(screen.getByText(/This TaskTime cloud account has already used its one-time Pro trial/)).toBeInTheDocument();
         expect(screen.getByText(/Subscription ended/)).toBeInTheDocument();
         expect(screen.getByText(/You are offline/)).toBeInTheDocument();
     });

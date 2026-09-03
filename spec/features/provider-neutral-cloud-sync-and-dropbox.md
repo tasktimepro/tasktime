@@ -43,8 +43,9 @@ Dropbox, including the staged rollout of provider transfer.
 ## Provider and data-plane boundary
 
 - Provider identifiers are durable: `google-drive` and `dropbox`.
-- Dropbox uses App Folder access with only `files.metadata.read`,
-  `files.metadata.write`, `files.content.read`, and `files.content.write`.
+- Dropbox uses App Folder access with `files.metadata.read`,
+  `files.metadata.write`, `files.content.read`, and `files.content.write` for
+  storage, plus `account_info.read` only to display the connected account email.
 - Routine manifests, Yjs states/deltas, backup snapshots, restores, wipes, and
   transfer bodies travel directly between the browser and the selected provider.
 - The Worker is an OAuth/session/token/revocation control plane. It must not
@@ -64,8 +65,15 @@ Dropbox, including the staged rollout of provider transfer.
   API limits or outages may differ, but TaskTime does not give one provider a
   larger product capability set.
 - The Worker derives a domain-separated subject hash from the provider account
-  subject. Dropbox stores only a TaskTime-scoped account pseudonym and exact
-  granted file scopes; it does not request or retain Dropbox email/profile data.
+  subject. For Dropbox it stores only a TaskTime-scoped account pseudonym and
+  exact granted scopes; it never requests, receives, or retains the account
+  email/profile response.
+- After a new or reconnected Dropbox grant, the browser uses the short-lived
+  memory-only token to request the verified account email directly from Dropbox.
+  The optional email is stored only in the origin-local auth-session record for
+  connected-account presentation. It never enters React/Yjs product state,
+  provider sync, backup/export/import, logs, metrics, or Worker storage. Existing
+  file-scope-only sessions remain valid and can reconnect explicitly to add it.
 - A durable opaque hosted principal links provider subjects only during an
   explicit transfer authenticated with both provider sessions. This principal,
   not a raw Google/Dropbox identifier, is the future billing/trial subject.
@@ -172,7 +180,7 @@ Dropbox, including the staged rollout of provider transfer.
   recovery at every journal stage, including hosted-identity linking and former
   local-session cleanup.
 - Network inspection proves that no routine provider body reaches the Worker.
-- Dropbox redirect URIs, App Folder access, exact scopes, branding, production
+- Dropbox redirect URIs, App Folder access, exact file/account-identity scopes, branding, production
   approval, supported-browser credential canaries, Cloudflare capacity, and
   rollback behavior are verified before public enablement.
 

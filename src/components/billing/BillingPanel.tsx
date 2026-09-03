@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Cloud, CreditCard, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, Cloud, CreditCard, RefreshCw, Rocket } from 'lucide-react';
 import { BILLING_FEATURES } from '@/config/billingFeatures';
 import { useBilling } from '@/contexts/BillingContext';
+import { BillingClientError } from '@/services/billingClient';
 import { formatBillingOffer, billingTaxQualifier } from '@/utils/billingOfferFormatter';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { useClients } from '@/hooks/useClients';
@@ -23,15 +25,45 @@ function deferredActionPhrase(action: DeferredBillingAction): string {
     return action === 'trial' ? 'start your Pro trial' : 'continue with Pro';
 }
 
-export function BillingPanel({ onOpenSync }: { onOpenSync: () => void }) {
+function billingActionErrorMessage(error: unknown): string {
+    if (error instanceof BillingClientError) {
+        if (error.code === 'CHECKOUT_EXPIRED') {
+            return 'The previous Checkout link expired. Please try Get Pro again.';
+        }
+        if (error.code === 'CHECKOUT_COMPLETED' || error.code === 'ACTIVE_SUBSCRIPTION') {
+            return 'TaskTime found an existing Checkout or subscription. Refresh your plan status to continue.';
+        }
+        if (error.code === 'FOUNDING_OFFER_BUSY') {
+            return 'The founding offer is temporarily busy. Refresh your plan status and try again shortly.';
+        }
+        if (error.retryable) {
+            return 'TaskTime could not reach billing. Check your connection and try again.';
+        }
+    }
+    if (error instanceof Error
+        && error.message === 'The Pro offer changed. Review the updated order summary and confirm again.') {
+        return error.message;
+    }
+    return 'TaskTime could not complete this billing action. Refresh your plan status and try again.';
+}
+
+export function BillingPanel({
+    onOpenSync,
+    cloudSyncNeedsReconnect = false,
+    connectedAccountEmail = null,
+}: {
+    onOpenSync: () => void;
+    cloudSyncNeedsReconnect?: boolean;
+    connectedAccountEmail?: string | null;
+}) {
     const billing = useBilling();
     const { handleCheckoutReturn } = billing;
     const { clients } = useClients();
-    const [accountConfirmed, setAccountConfirmed] = useState(false);
     const [busyAction, setBusyAction] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const [deferredAction, setDeferredAction] = useState<DeferredBillingAction | null>(null);
     const checkoutReturnHandled = useRef<string | null>(null);
+    const status = billing.status;
     const snapshot = billing.resolution.kind === 'canonical'
         ? billing.resolution.snapshot
         : null;
@@ -40,18 +72,13 @@ export function BillingPanel({ onOpenSync }: { onOpenSync: () => void }) {
     const foundingOffer = proPlan?.offers.find(offer => offer.offerKind === 'founding') ?? null;
     const standardOffer = proPlan?.offers.find(offer => offer.offerKind === 'standard') ?? null;
     const foundingMemberLimit = foundingOffer?.founding?.memberLimit ?? null;
-    const currentOffer = billing.status?.actions.checkoutOffer ?? null;
+    const currentOffer = status?.actions.checkoutOffer ?? null;
     const trialTime = trialRemaining(snapshot?.trialEndsAt ?? null);
     const activeClientCount = countActiveClients(clients);
     const activeClientLimit = snapshot?.limits?.activeClients;
-    const statusLabel = useMemo(() => {
-        if (!snapshot) return 'Status unavailable';
-        if (snapshot.accessStatus === 'trial') return 'Pro trial';
-        if (snapshot.accessStatus === 'active') return 'Pro';
-        if (snapshot.accessStatus === 'grace') return 'Pro — payment grace';
-        if (snapshot.accessStatus === 'suspended') return 'Pro — action required';
-        return 'Free';
-    }, [snapshot]);
+    const currentPlan = snapshot
+        ? (snapshot.accessStatus === 'free' ? 'free' : 'pro')
+        : null;
 
     const run = useCallback(async (name: string, action: () => Promise<void>) => {
         setBusyAction(name);
@@ -59,7 +86,7 @@ export function BillingPanel({ onOpenSync }: { onOpenSync: () => void }) {
         try {
             await action();
         } catch (error) {
-            setActionError(error instanceof Error ? error.message : 'The billing action could not be completed.');
+            setActionError(billingActionErrorMessage(error));
         } finally {
             setBusyAction(null);
         }
@@ -90,166 +117,58 @@ export function BillingPanel({ onOpenSync }: { onOpenSync: () => void }) {
         if (billing.status) setDeferredAction(null);
     }, [billing.status]);
 
-    if (!billing.status) {
-        const actionPhrase = deferredAction ? deferredActionPhrase(deferredAction) : null;
-        const foundingAvailability = foundingOffer?.founding?.availability ?? null;
-
-        return (
-            <div className="space-y-6">
-                <div>
-                    <h2 className="text-2xl font-bold text-foreground">Plan &amp; Billing</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Compare plans without connecting. TaskTime checks your cloud account only when you start a trial,
-                        subscribe, or manage existing billing.
-                    </p>
-                </div>
-
-                {freePlan && proPlan ? (
-                    <section className="space-y-4" aria-labelledby="plan-options-title">
-                        <div>
-                            <h3 id="plan-options-title" className="text-lg font-semibold text-foreground">Plan options</h3>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Free keeps the complete local-first core. Pro adds client scale, advanced reporting, and hosted sending.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle><h4>{freePlan.displayName}</h4></CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <p className="text-3xl font-semibold">€0</p>
-                                    <p className="text-sm text-muted-foreground">Free forever. No TaskTime account is required for core use.</p>
-                                    <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                                        <li>One active client at a time, with all client history preserved</li>
-                                        <li>Unlimited projects, tasks, timers, expenses, quotes, and invoices</li>
-                                        <li>Current-month Reports Overview and manual document delivery</li>
-                                        <li>Optional Google Drive or Dropbox sync and backups</li>
-                                    </ul>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="border-foreground/30">
-                                <CardHeader>
-                                    <CardTitle><h4>{proPlan.displayName}</h4></CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {foundingOffer && foundingMemberLimit !== null && foundingAvailability !== 'exhausted' ? (
-                                        <div>
-                                            <p className="text-3xl font-semibold">{formatBillingOffer(foundingOffer)}*</p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                * Founding pricing is limited to the first {foundingMemberLimit.toLocaleString()} paid members
-                                                {standardOffer ? `; new subscriptions are ${formatBillingOffer(standardOffer)} afterward.` : '.'}
-                                            </p>
-                                        </div>
-                                    ) : standardOffer ? (
-                                        <div>
-                                            <p className="text-3xl font-semibold">{formatBillingOffer(standardOffer)}</p>
-                                            <p className="mt-1 text-sm text-muted-foreground">Current standard annual offer.</p>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">Pro pricing is not currently available.</p>
-                                    )}
-                                    {foundingAvailability === 'temporarily_reserved' ? (
-                                        <Notice title="Founding offer is temporarily busy" compact>
-                                            TaskTime will confirm availability for your account before Checkout. Standard pricing is never selected early.
-                                        </Notice>
-                                    ) : null}
-                                    <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                                        <li>Unlimited active clients</li>
-                                        <li>Advanced professional reports and exports</li>
-                                        <li>TaskTime-hosted invoice, quote, and reminder sending</li>
-                                        <li>Everything included in Free</li>
-                                    </ul>
-                                    <p className="text-sm text-muted-foreground">
-                                        Trial eligibility and the exact offer for your account are confirmed only when you continue.
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            variant="secondary"
-                                            leadingIcon={Check}
-                                            onClick={() => setDeferredAction('trial')}
-                                        >
-                                            Start free trial
-                                        </Button>
-                                        {billing.catalog?.purchaseEnabled && proPlan.offers.length > 0 ? (
-                                            <Button
-                                                leadingIcon={CreditCard}
-                                                onClick={() => setDeferredAction('checkout')}
-                                            >
-                                                Get Pro
-                                            </Button>
-                                        ) : null}
-                                    </div>
-                                    {deferredAction && actionPhrase ? (
-                                        <Notice
-                                            title={`${billing.hasActiveCloudAccount ? 'Refresh billing status' : 'Set up Cloud Sync'} to ${actionPhrase}`}
-                                            icon={Cloud}
-                                            variant={billing.hasActiveCloudAccount ? 'warning' : 'default'}
-                                            aria-live="polite"
-                                        >
-                                            <div className="space-y-3">
-                                                <p>
-                                                    {billing.hasActiveCloudAccount
-                                                        ? 'Cloud Sync is connected, but TaskTime could not confirm the current plan. Nothing has started yet. Refresh billing status, then try again.'
-                                                        : 'TaskTime uses your selected Google Drive or Dropbox connection to identify the account for trials and subscriptions. Nothing has started yet. Set up Cloud Sync, then return here; your chosen sync mode stays unchanged.'}
-                                                </p>
-                                                <Button
-                                                    variant="secondary"
-                                                    disabled={busyAction !== null}
-                                                    onClick={billing.hasActiveCloudAccount
-                                                        ? () => void run('refresh', billing.refresh)
-                                                        : onOpenSync}
-                                                >
-                                                    {billing.hasActiveCloudAccount
-                                                        ? (busyAction === 'refresh' ? 'Refreshing…' : 'Refresh billing status')
-                                                        : 'Set up Cloud Sync'}
-                                                </Button>
-                                            </div>
-                                        </Notice>
-                                    ) : null}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </section>
-                ) : billing.catalogError ? (
-                    <Notice title="Plan details are not available" variant="warning">
-                        TaskTime could not load the public plan catalog. No trial or purchase action is available until the catalog can be verified.
-                    </Notice>
-                ) : (
-                    <section
-                        aria-label="Loading plan options"
-                        aria-busy="true"
-                        className="grid gap-4 lg:grid-cols-2"
-                    >
-                        {[0, 1].map(index => (
-                            <Card key={index} aria-hidden="true">
-                                <CardContent className="space-y-4 p-6">
-                                    <div className="h-5 w-20 rounded bg-muted" />
-                                    <div className="h-9 w-28 rounded bg-muted" />
-                                    <div className="h-4 w-3/4 rounded bg-muted" />
-                                    <div className="h-4 w-full rounded bg-muted" />
-                                    <div className="h-4 w-5/6 rounded bg-muted" />
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </section>
-                )}
-
-                {billing.clockUntrusted ? (
-                    <Notice title="Device clock needs an online check" variant="warning">
-                        Cached Pro access is paused because this device clock moved backwards. Reconnect and refresh billing status.
-                    </Notice>
-                ) : null}
-                {billing.hasActiveCloudAccount && billing.error ? (
-                    <Notice title="Billing status is not available" variant="warning">
-                        Your data and existing core features remain available. Refresh the active cloud account before a billing action.
-                    </Notice>
-                ) : null}
-            </div>
-        );
-    }
+    const actionPhrase = deferredAction ? deferredActionPhrase(deferredAction) : null;
+    const foundingAvailability = foundingOffer?.founding?.availability ?? null;
+    const cloudActionLabel = billing.hasActiveCloudAccount
+        ? 'Refresh billing status'
+        : cloudSyncNeedsReconnect
+            ? 'Reconnect Cloud Sync'
+            : 'Set up Cloud Sync';
+    const canRenderPlans = Boolean((freePlan && proPlan) || status);
+    const freePlanName = freePlan?.displayName ?? 'Free';
+    const proPlanName = proPlan?.displayName ?? 'Pro';
+    const subscriptionPrice = currentPlan === 'pro' && snapshot?.source === 'subscription'
+        ? status?.subscription.price ?? null
+        : null;
+    const displayedOffer = subscriptionPrice
+        ? {
+            price: subscriptionPrice,
+            offerKind: status?.subscription.offerKind ?? null,
+            source: 'subscription' as const,
+        }
+        : currentOffer
+            ? {
+                price: currentOffer.price,
+                offerKind: currentOffer.offerKind,
+                source: 'checkout' as const,
+            }
+            : foundingOffer && foundingAvailability !== 'exhausted'
+                ? {
+                    price: foundingOffer,
+                    offerKind: foundingOffer.offerKind,
+                    source: 'catalog' as const,
+                }
+                : standardOffer
+                    ? {
+                        price: standardOffer,
+                        offerKind: standardOffer.offerKind,
+                        source: 'catalog' as const,
+                    }
+                    : null;
+    const trialEligible = status
+        && snapshot?.accessStatus === 'free'
+        && snapshot.trialStatus === 'eligible';
+    const checkoutAvailable = Boolean(status && currentOffer);
+    const canManageBilling = Boolean(
+        status?.actions.portalAvailable
+        && currentPlan === 'pro'
+        && snapshot?.source === 'subscription',
+    );
+    const accountEmail = connectedAccountEmail?.trim() || null;
+    const connectedProviderLabel = status?.account.provider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const accountDisplayLabel = status
+        ? `${connectedProviderLabel} · ${accountEmail ?? 'Connected account'}`
+        : null;
 
     return (
         <div className="space-y-6">
@@ -257,17 +176,21 @@ export function BillingPanel({ onOpenSync }: { onOpenSync: () => void }) {
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Plan &amp; Billing</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        {billing.status.account.displayLabel}
+                        {status
+                            ? accountDisplayLabel
+                            : 'Compare plans without connecting. TaskTime checks your cloud account only when you start a trial, subscribe, or manage existing billing.'}
                     </p>
                 </div>
-                <Button
-                    variant="secondary"
-                    leadingIcon={RefreshCw}
-                    disabled={billing.isLoading}
-                    onClick={() => void run('refresh', billing.refresh)}
-                >
-                    {billing.isLoading ? 'Refreshing…' : 'Refresh status'}
-                </Button>
+                {billing.hasActiveCloudAccount ? (
+                    <Button
+                        variant="secondary"
+                        leadingIcon={RefreshCw}
+                        disabled={billing.isLoading || busyAction !== null}
+                        onClick={() => void run('refresh', billing.refresh)}
+                    >
+                        {billing.isLoading || busyAction === 'refresh' ? 'Refreshing…' : 'Refresh status'}
+                    </Button>
+                ) : null}
             </div>
 
             {billing.offline ? (
@@ -277,191 +200,357 @@ export function BillingPanel({ onOpenSync }: { onOpenSync: () => void }) {
                 </Notice>
             ) : null}
 
-            <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                    <CardHeader><CardTitle>Current plan</CardTitle></CardHeader>
-                    <CardContent className="space-y-3">
-                        <p className="text-2xl font-semibold">{statusLabel}</p>
-                        {trialTime ? <p className="text-sm text-muted-foreground">{trialTime}</p> : null}
-                        {snapshot?.accessStatus === 'free' ? (
-                            <p className="text-sm text-muted-foreground">
-                                One active client, the current-month Reports Overview, and all shared core tools remain available.
-                            </p>
-                        ) : null}
-                        <p className="text-sm text-muted-foreground">
-                            {activeClientCount} active client{activeClientCount === 1 ? '' : 's'}.
-                            {activeClientLimit === null ? ' Your plan includes unlimited active clients.' : ''}
+            {canRenderPlans ? (
+                <section className="space-y-4" aria-labelledby="plan-options-title">
+                    <div>
+                        <h3 id="plan-options-title" className="text-lg font-semibold text-foreground">Plan options</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Free keeps the complete local-first core. Pro adds client scale, advanced reporting, and hosted sending.
                         </p>
-                        {activeClientLimit === 1 && activeClientCount > activeClientLimit ? (
-                            <Notice title="Active clients are above the Free forward-action limit" variant="warning">
-                                Existing over-limit clients remain fully usable. Archive to one active client before creating
-                                or restoring another, or unlock unlimited active clients.
-                            </Notice>
-                        ) : null}
-                        {snapshot?.accessStatus === 'free' && snapshot.trialStatus === 'used' ? (
-                            <p className="text-sm text-muted-foreground">
-                                Your one-time Pro trial has already been used. Starting a subscription still requires an explicit Checkout confirmation.
-                            </p>
-                        ) : null}
-                        {snapshot?.accessStatus === 'free'
-                            && (billing.status.subscription.billingStatus === 'canceled'
-                                || billing.status.subscription.billingStatus === 'incomplete_expired') ? (
-                            <Notice title="Subscription ended">
-                                Core tools and all existing data remain available. A new purchase never mutates or hides your records.
-                            </Notice>
-                        ) : null}
-                        {billing.status.subscription.price && snapshot?.source === 'subscription' ? (
-                            <p className="text-sm text-muted-foreground">
-                                Current subscription base price: {formatBillingOffer(billing.status.subscription.price)}.
-                                Founding pricing is retained only while this same subscription continues or remains recoverable.
-                            </p>
-                        ) : null}
-                        {billing.status.subscription.repairRequired ? (
-                            <Notice title="Billing state needs review" variant="warning">
-                                New acquisition is paused while TaskTime support reconciles the canonical subscription state.
-                            </Notice>
-                        ) : null}
-                        {snapshot?.cancelAtPeriodEnd ? (
-                            <Notice title="Cancellation scheduled" variant="warning">
-                                Pro remains available through {snapshot.subscriptionCurrentPeriodEnd
-                                    ? new Date(snapshot.subscriptionCurrentPeriodEnd).toLocaleDateString()
-                                    : 'the current billing period'}.
-                            </Notice>
-                        ) : null}
-                        {snapshot?.accessStatus === 'grace' ? (
-                            <Notice title="Payment needs attention" variant="warning">
-                                Pro access is temporarily available during the approved payment grace period.
-                            </Notice>
-                        ) : null}
-                        {snapshot?.accessStatus === 'suspended' ? (
-                            <Notice title="Resolve billing before new Pro actions" variant="warning">
-                                Existing data remains available. Use billing management or support to resolve the account state.
-                            </Notice>
-                        ) : null}
-                    </CardContent>
-                </Card>
+                    </div>
 
-                <Card>
-                    <CardHeader><CardTitle>Hosted invoice email</CardTitle></CardHeader>
-                    <CardContent className="space-y-2">
-                        {billing.status.usage.invoiceEmail.available
-                            && billing.status.usage.invoiceEmail.entitled ? (
-                            <>
-                                <p className="text-2xl font-semibold">
-                                    {billing.status.usage.invoiceEmail.effectiveRemaining} remaining
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    Resets {billing.status.usage.invoiceEmail.window?.periodEnd
-                                        ? new Date(billing.status.usage.invoiceEmail.window.periodEnd).toLocaleDateString()
-                                        : 'at the next UTC monthly boundary'}.
-                                </p>
-                            </>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                Usage is temporarily unavailable. The Worker remains authoritative before any hosted send.
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <Card role="region" aria-labelledby="free-plan-title">
+                            <CardHeader>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <CardTitle><h4 id="free-plan-title">{freePlanName}</h4></CardTitle>
+                                    {currentPlan === 'free' ? (
+                                        <Badge variant="secondary" className="">Current plan</Badge>
+                                    ) : null}
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <p className="text-3xl font-semibold">€0</p>
+                                <p className="text-sm text-muted-foreground">Free forever. No TaskTime account is required for core use.</p>
+                                <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                                    <li>One active client at a time, with all client history preserved</li>
+                                    <li>Unlimited projects, tasks, timers, expenses, quotes, and invoices</li>
+                                    <li>Current-month Reports Overview and manual document delivery</li>
+                                    <li>Optional Google Drive or Dropbox sync and backups</li>
+                                </ul>
 
-            {billing.status.actions.checkoutOfferReason === 'temporarily_reserved' ? (
-                <Notice title="Founding offer is temporarily busy">
-                    A bounded Checkout reservation is still in progress. This does not switch you to standard pricing;
-                    refresh and explicitly try again after capacity is released.
+                                {status && currentPlan === 'free' ? (
+                                    <div className="space-y-3 border-t pt-4">
+                                        <p className="text-sm text-muted-foreground">
+                                            {activeClientCount} active client{activeClientCount === 1 ? '' : 's'} on this device.
+                                        </p>
+                                        {activeClientLimit === 1 && activeClientCount > activeClientLimit ? (
+                                            <Notice title="Active clients are above the Free forward-action limit" variant="warning" compact>
+                                                Existing over-limit clients remain fully usable. Archive to one active client before creating
+                                                or restoring another, or unlock unlimited active clients.
+                                            </Notice>
+                                        ) : null}
+                                        {snapshot?.trialStatus === 'used' ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                This TaskTime cloud account has already used its one-time Pro trial. Starting a subscription still requires an explicit Checkout confirmation.
+                                            </p>
+                                        ) : null}
+                                        {status.subscription.billingStatus === 'canceled'
+                                            || status.subscription.billingStatus === 'incomplete_expired' ? (
+                                            <Notice title="Subscription ended" compact>
+                                                Core tools and all existing data remain available. A new purchase never mutates or hides your records.
+                                            </Notice>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </CardContent>
+                        </Card>
+
+                        <Card role="region" aria-labelledby="pro-plan-title" className="border-foreground/30">
+                            <CardHeader>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <CardTitle><h4 id="pro-plan-title">{proPlanName}</h4></CardTitle>
+                                    {currentPlan === 'pro' ? (
+                                        <Badge variant="secondary" className="">Current plan</Badge>
+                                    ) : null}
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {displayedOffer ? (
+                                    <div>
+                                        <p className="text-3xl font-semibold">
+                                            {formatBillingOffer(displayedOffer.price)}
+                                            {displayedOffer.offerKind === 'founding' ? '*' : ''}
+                                        </p>
+                                        {displayedOffer.source === 'catalog' && displayedOffer.offerKind === 'standard' ? (
+                                            <p className="mt-1 text-sm text-muted-foreground">Current standard annual offer.</p>
+                                        ) : null}
+                                        {displayedOffer.offerKind === 'founding' ? (
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                * Founding pricing is limited {foundingMemberLimit !== null
+                                                    ? `to the first ${foundingMemberLimit.toLocaleString()} paid members`
+                                                    : 'while founding places remain'}
+                                                {displayedOffer.source === 'catalog'
+                                                    ? (standardOffer ? `; new subscriptions are ${formatBillingOffer(standardOffer)} afterward.` : '.')
+                                                    : ' and is retained while the same subscription continues or remains recoverable.'}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Pro pricing is not currently available.</p>
+                                )}
+
+                                <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                                    <li>Unlimited active clients</li>
+                                    <li>Advanced professional reports and exports</li>
+                                    <li>TaskTime-hosted invoice, quote, and reminder sending</li>
+                                    <li>Everything included in Free</li>
+                                </ul>
+
+                                {!status ? (
+                                    <>
+                                        {currentPlan === 'pro' ? (
+                                            <>
+                                                <p className="text-sm text-muted-foreground">
+                                                    This device has a last verified Pro plan. Refresh the connected account before managing billing;
+                                                    TaskTime will not invite you to purchase Pro again while status is being confirmed.
+                                                </p>
+                                                <Button
+                                                    variant="secondary"
+                                                    leadingIcon={RefreshCw}
+                                                    disabled={busyAction !== null}
+                                                    onClick={() => void run('refresh', billing.refresh)}
+                                                >
+                                                    {busyAction === 'refresh' ? 'Refreshing…' : 'Refresh billing status'}
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Trial eligibility and the exact offer are confirmed for your connected TaskTime cloud account when you continue.
+                                                </p>
+                                                <div
+                                                    className="flex w-full flex-wrap items-center gap-2"
+                                                    data-testid="pro-plan-actions"
+                                                >
+                                                    <Button
+                                                        variant="secondary"
+                                                        leadingIcon={Check}
+                                                        onClick={() => setDeferredAction('trial')}
+                                                    >
+                                                        Start free trial
+                                                    </Button>
+                                                    <div
+                                                        className="ml-auto flex flex-wrap justify-end gap-2"
+                                                        data-testid="pro-plan-actions-right"
+                                                    >
+                                                        {billing.catalog?.purchaseEnabled && (proPlan?.offers.length ?? 0) > 0 ? (
+                                                            <Button
+                                                                leadingIcon={Rocket}
+                                                                onClick={() => setDeferredAction('checkout')}
+                                                            >
+                                                                Get Pro
+                                                            </Button>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+                                                {deferredAction && actionPhrase ? (
+                                                    <Notice
+                                                        title={`${cloudActionLabel} to ${actionPhrase}`}
+                                                        icon={Cloud}
+                                                        variant={billing.hasActiveCloudAccount ? 'warning' : 'default'}
+                                                        aria-live="polite"
+                                                    >
+                                                        <div className="space-y-3">
+                                                            <p>
+                                                                {billing.hasActiveCloudAccount
+                                                                    ? 'Cloud Sync is connected, but TaskTime could not confirm the current plan. Nothing has started yet. Refresh billing status, then try again.'
+                                                                    : cloudSyncNeedsReconnect
+                                                                        ? 'Cloud Sync is already set up. Reconnect it to confirm your TaskTime account for trials and subscriptions. Nothing has started yet, and your chosen sync mode stays unchanged.'
+                                                                        : 'TaskTime uses your selected Google Drive or Dropbox connection to identify the account for trials and subscriptions. Nothing has started yet. Set up Cloud Sync, then return here; your chosen sync mode stays unchanged.'}
+                                                            </p>
+                                                            <Button
+                                                                variant={billing.hasActiveCloudAccount ? 'secondary' : 'default'}
+                                                                leadingIcon={billing.hasActiveCloudAccount || cloudSyncNeedsReconnect
+                                                                    ? RefreshCw
+                                                                    : Cloud}
+                                                                disabled={busyAction !== null}
+                                                                onClick={billing.hasActiveCloudAccount
+                                                                    ? () => void run('refresh', billing.refresh)
+                                                                    : onOpenSync}
+                                                            >
+                                                                {billing.hasActiveCloudAccount
+                                                                    ? (busyAction === 'refresh' ? 'Refreshing…' : 'Refresh billing status')
+                                                                    : cloudActionLabel}
+                                                            </Button>
+                                                        </div>
+                                                    </Notice>
+                                                ) : null}
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {currentPlan === 'pro' ? (
+                                            <div className="space-y-3 border-t pt-4">
+                                                <p className="text-sm font-medium text-foreground">
+                                                    {snapshot?.accessStatus === 'trial'
+                                                        ? 'Pro trial'
+                                                        : snapshot?.accessStatus === 'grace'
+                                                            ? 'Pro · payment grace'
+                                                            : snapshot?.accessStatus === 'suspended'
+                                                                ? 'Pro · action required'
+                                                                : 'Pro subscription'}
+                                                </p>
+                                                {trialTime ? <p className="text-sm text-muted-foreground">{trialTime}</p> : null}
+                                                <p className="text-sm text-muted-foreground">
+                                                    {activeClientCount} active client{activeClientCount === 1 ? '' : 's'} on this device.
+                                                    {activeClientLimit === null ? ' Your plan includes unlimited active clients.' : ''}
+                                                </p>
+                                            </div>
+                                        ) : null}
+
+                                        {trialEligible ? (
+                                            <div className="space-y-3 border-t pt-4">
+                                                <p className="text-sm text-muted-foreground">
+                                                    Start your one-time {billing.catalog?.trial.durationHours
+                                                        ? `${billing.catalog.trial.durationHours / 24}-day `
+                                                        : ''}Pro trial for{' '}
+                                                    {accountEmail ? (
+                                                        <strong className="text-foreground">{accountEmail}</strong>
+                                                    ) : (
+                                                        <>your connected {connectedProviderLabel} account</>
+                                                    )}.
+                                                    {' '}This trial stays with your TaskTime cloud account if you reconnect it or transfer cloud providers.
+                                                </p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    No payment method is required, and you won't be charged automatically. The trial does not
+                                                    reserve a founding place.
+                                                </p>
+                                            </div>
+                                        ) : null}
+
+                                        {status.actions.checkoutOfferReason === 'temporarily_reserved' ? (
+                                            <Notice title="Founding offer is temporarily busy" compact>
+                                                A bounded Checkout reservation is still in progress. This does not switch you to standard pricing;
+                                                refresh and explicitly try again after capacity is released.
+                                            </Notice>
+                                        ) : null}
+                                        {status.subscription.repairRequired ? (
+                                            <Notice title="Billing state needs review" variant="warning" compact>
+                                                New acquisition is paused while TaskTime support reconciles the canonical subscription state.
+                                            </Notice>
+                                        ) : null}
+                                        {snapshot?.cancelAtPeriodEnd ? (
+                                            <Notice title="Cancellation scheduled" variant="warning" compact>
+                                                Pro remains available through {snapshot.subscriptionCurrentPeriodEnd
+                                                    ? new Date(snapshot.subscriptionCurrentPeriodEnd).toLocaleDateString()
+                                                    : 'the current billing period'}.
+                                            </Notice>
+                                        ) : null}
+                                        {snapshot?.accessStatus === 'grace' ? (
+                                            <Notice title="Payment needs attention" variant="warning" compact>
+                                                Pro access is temporarily available during the approved payment grace period.
+                                            </Notice>
+                                        ) : null}
+                                        {snapshot?.accessStatus === 'suspended' ? (
+                                            <Notice title="Resolve billing before new Pro actions" variant="warning" compact>
+                                                Existing data remains available. Use billing management or support to resolve the account state.
+                                            </Notice>
+                                        ) : null}
+
+                                        <div
+                                            className="flex w-full flex-wrap items-center gap-2"
+                                            data-testid="pro-plan-actions"
+                                        >
+                                            {trialEligible ? (
+                                                <Button
+                                                    variant="secondary"
+                                                    leadingIcon={Check}
+                                                    disabled={!BILLING_FEATURES.trialActivation
+                                                        || !status.actions.trialActivationEnabled
+                                                        || busyAction !== null}
+                                                    onClick={() => void run('trial', billing.startTrial)}
+                                                >
+                                                    {busyAction === 'trial' ? 'Starting…' : 'Start free trial'}
+                                                </Button>
+                                            ) : null}
+                                            <div
+                                                className="ml-auto flex flex-wrap justify-end gap-2"
+                                                data-testid="pro-plan-actions-right"
+                                            >
+                                                {canManageBilling ? (
+                                                    <Button
+                                                        variant="secondary"
+                                                        leadingIcon={CreditCard}
+                                                        disabled={busyAction !== null}
+                                                        onClick={() => void run('portal', async () => {
+                                                            const url = await billing.openPortal();
+                                                            window.location.assign(url);
+                                                        })}
+                                                    >
+                                                        Manage billing
+                                                    </Button>
+                                                ) : null}
+                                                {checkoutAvailable && currentOffer ? (
+                                                    <Button
+                                                        leadingIcon={Rocket}
+                                                        loading={busyAction === 'checkout'}
+                                                        loadingText="Opening Checkout…"
+                                                        disabled={!BILLING_FEATURES.checkout
+                                                            || !status.actions.checkoutEnabled
+                                                            || busyAction !== null}
+                                                        onClick={() => void run('checkout', async () => {
+                                                            const checkout = await billing.createCheckout(
+                                                                currentOffer.offerId,
+                                                                status.planConfigVersion,
+                                                            );
+                                                            window.location.assign(checkout.url);
+                                                        })}
+                                                    >
+                                                        Get Pro
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        {displayedOffer?.source !== 'catalog' ? (
+                                            <p className="w-full text-right text-sm text-muted-foreground">
+                                                {billingTaxQualifier(displayedOffer.price.taxPresentation)}
+                                            </p>
+                                        ) : null}
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </section>
+            ) : billing.catalogError ? (
+                <Notice title="Plan details are not available" variant="warning">
+                    TaskTime could not load the public plan catalog. No trial or purchase action is available until the catalog can be verified.
+                </Notice>
+            ) : (
+                <section
+                    aria-label="Loading plan options"
+                    aria-busy="true"
+                    className="grid gap-4 lg:grid-cols-2"
+                >
+                    {[0, 1].map(index => (
+                        <Card key={index} aria-hidden="true">
+                            <CardContent className="space-y-4 p-6">
+                                <div className="h-5 w-20 rounded bg-muted" />
+                                <div className="h-9 w-28 rounded bg-muted" />
+                                <div className="h-4 w-3/4 rounded bg-muted" />
+                                <div className="h-4 w-full rounded bg-muted" />
+                                <div className="h-4 w-5/6 rounded bg-muted" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                </section>
+            )}
+
+            {billing.clockUntrusted ? (
+                <Notice title="Device clock needs an online check" variant="warning">
+                    Cached Pro access is paused because this device clock moved backwards. Reconnect and refresh billing status.
                 </Notice>
             ) : null}
-
-            {snapshot?.accessStatus === 'free' && snapshot.trialStatus === 'eligible' ? (
-                <Card>
-                    <CardHeader><CardTitle>Try Pro</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            The trial lasts {billing.catalog?.trial.durationHours
-                                ? billing.catalog.trial.durationHours / 24
-                                : 'the displayed number of'} days, requires no payment method, does not auto-charge,
-                            and does not reserve a founding place.
-                        </p>
-                        <label className="flex items-start gap-2 text-sm">
-                            <input
-                                type="checkbox"
-                                checked={accountConfirmed}
-                                onChange={event => setAccountConfirmed(event.target.checked)}
-                                className="mt-1"
-                            />
-                            <span>
-                                Start the trial for TaskTime account <strong>{billing.status.account.accountReference}</strong>.
-                            </span>
-                        </label>
-                        <Button
-                            leadingIcon={Check}
-                            disabled={!accountConfirmed
-                                || !BILLING_FEATURES.trialActivation
-                                || !billing.status.actions.trialActivationEnabled
-                                || busyAction !== null}
-                            onClick={() => void run('trial', billing.startTrial)}
-                        >
-                            {busyAction === 'trial' ? 'Starting…' : 'Start free trial'}
-                        </Button>
-                    </CardContent>
-                </Card>
+            {billing.hasActiveCloudAccount && billing.error ? (
+                <Notice title="Billing status is not available" variant="warning">
+                    Your data and existing core features remain available. Refresh the active cloud account before a billing action.
+                </Notice>
             ) : null}
-
-            {currentOffer && proPlan ? (
-                <Card>
-                    <CardHeader><CardTitle>Get Pro</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <p className="text-2xl font-semibold">
-                                {formatBillingOffer(currentOffer.price)}{currentOffer.offerKind === 'founding' ? '*' : ''}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                {billingTaxQualifier(currentOffer.price.taxPresentation)} · renews automatically
-                            </p>
-                        </div>
-                        {currentOffer.offerKind === 'founding' ? (
-                            <p className="text-sm text-muted-foreground">
-                                * Founding pricing is limited {foundingMemberLimit !== null
-                                    ? `to the first ${foundingMemberLimit.toLocaleString()} paid members `
-                                    : 'while founding places remain '}
-                                and is retained while the same subscription continues or remains recoverable.
-                            </p>
-                        ) : null}
-                        <Button
-                            leadingIcon={CreditCard}
-                            disabled={!BILLING_FEATURES.checkout
-                                || !billing.status.actions.checkoutEnabled
-                                || busyAction !== null}
-                            onClick={() => void run('checkout', async () => {
-                                const checkout = await billing.createCheckout(
-                                    currentOffer.offerId,
-                                    billing.status!.planConfigVersion,
-                                );
-                                window.location.assign(checkout.url);
-                            })}
-                        >
-                            Continue to secure checkout
-                        </Button>
-                    </CardContent>
-                </Card>
-            ) : null}
-
-            {billing.status.actions.portalAvailable ? (
-                <Button
-                    variant="secondary"
-                    disabled={busyAction !== null}
-                    onClick={() => void run('portal', async () => {
-                        const url = await billing.openPortal();
-                        window.location.assign(url);
-                    })}
-                >
-                    Manage billing
-                </Button>
-            ) : null}
-
             {actionError ? (
                 <Notice title="Billing action was not completed" variant="warning">
-                    No new action was started automatically. Refresh status before trying again. ({actionError})
+                    {actionError}
                 </Notice>
             ) : null}
         </div>

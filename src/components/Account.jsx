@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils';
 import { useToast } from '../hooks/useToast.ts';
 import { useYjs } from '../contexts/YjsContext';
 import { usePreferences } from '../hooks/usePreferences.ts';
+import { useDropboxAuth } from '../hooks/useDropboxAuth.ts';
+import { useGoogleAuth } from '../hooks/useGoogleAuth.ts';
 import { resetOnboardingCompleted } from '../utils/onboardingUtils.ts';
 import { queuePostReloadToast } from '../utils/postReloadToast.ts';
 import YjsSyncSettings from './sync/YjsSyncSettings';
@@ -45,6 +47,7 @@ const Account = ({
     emailTemplates,
     expenses,
     onImport,
+    cloudSyncNeedsReconnect = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
@@ -59,12 +62,17 @@ const Account = ({
         deleteAllBackups,
     } = useYjs();
     const { preferences, updatePreferences } = usePreferences();
+    const { user: googleUser } = useGoogleAuth();
+    const { accountEmail: dropboxAccountEmail } = useDropboxAuth();
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [showSignOutModal, setShowSignOutModal] = useState(false);
     const activeProviderName = activeStorageProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
+    const connectedAccountEmail = activeStorageProvider === 'dropbox'
+        ? dropboxAccountEmail
+        : (activeStorageProvider === 'google-drive' ? googleUser?.email ?? null : null);
     const providerNeedsReconnect = Boolean(activeStorageProvider && !isCloudConnected);
     
     // Define sections in order (first will be default)
@@ -208,7 +216,13 @@ const Account = ({
             case 'sync':
                 return <YjsSyncSettings />;
             case 'billing':
-                return <BillingPanel onOpenSync={() => handleSectionChange('sync')} />;
+                return (
+                    <BillingPanel
+                        onOpenSync={() => handleSectionChange('sync')}
+                        cloudSyncNeedsReconnect={cloudSyncNeedsReconnect}
+                        connectedAccountEmail={connectedAccountEmail}
+                    />
+                );
             case 'agent':
                 return <AgentBridgeSettings />;
             case 'data':

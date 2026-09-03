@@ -84,6 +84,10 @@ const reportsComponentState = vi.hoisted(() => ({
     readyHandler: null,
 }))
 
+const accountComponentState = vi.hoisted(() => ({
+    props: null,
+}))
+
 const onboardingModalMock = vi.hoisted(() => vi.fn(({ isOpen, onComplete }) => (
     isOpen ? (
         <div data-testid="onboarding-modal">
@@ -344,7 +348,12 @@ vi.mock('./components/Dashboard', () => ({
         </div>
     )
 }))
-vi.mock('./components/Account', () => ({ default: () => <div data-testid="account" /> }))
+vi.mock('./components/Account', () => ({
+    default: (props) => {
+        accountComponentState.props = props
+        return <div data-testid="account" />
+    },
+}))
 vi.mock('./components/Invoices', () => ({ default: () => <div data-testid="invoices" /> }))
 vi.mock('./components/Reports', () => {
     const MockReportsView = ({ onReadyChange }) => {
@@ -400,6 +409,7 @@ describe('App component', () => {
         googleAuthHookState.hadPreviousSession = false
         googleAuthHookState.isLoading = false
         googleAuthHookState.isSignedIn = false
+        accountComponentState.props = null
         onboardingModalMock.mockClear()
         setNavigatorOnline(true)
         yjsHookState.isReady = true
@@ -824,6 +834,15 @@ describe('App component', () => {
 
         expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
         expect(screen.getByTestId('mobile-more-status-dot').className.includes('status-danger-fill')).toBe(true)
+    })
+
+    it('passes the sidebar reconnect state to Plan & Billing', () => {
+        googleAuthHookState.hadPreviousSession = true
+        urlHookState.urlParams = { view: 'account', projectId: null, clientId: null }
+
+        render(<App />)
+
+        expect(accountComponentState.props?.cloudSyncNeedsReconnect).toBe(true)
     })
 
     it('does not show a red More-button dot while a previous auth session is still restoring', () => {

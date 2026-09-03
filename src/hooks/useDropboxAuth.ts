@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import { getDropboxAccountEmail } from '@/services/dropboxAccountProfile';
 import { dropboxAccessTokenProvider } from '@/stores/yjs/providers/DropboxAccessTokenProvider';
 import {
     claimActiveCloudStorageSession,
@@ -42,6 +43,7 @@ interface DropboxAuthState {
     isSignedIn: boolean;
     isLoading: boolean;
     sessionId: string | null;
+    accountEmail: string | null;
     storageGeneration: number | null;
     storageRole: CloudStorageSessionRole;
     error: string | null;
@@ -271,6 +273,7 @@ export function useDropboxAuth() {
         isSignedIn: false,
         isLoading: true,
         sessionId: null,
+        accountEmail: null,
         storageGeneration: null,
         storageRole: 'inactive',
         error: null,
@@ -289,6 +292,7 @@ export function useDropboxAuth() {
                 isSignedIn: false,
                 isLoading: false,
                 sessionId: null,
+                accountEmail: null,
                 storageGeneration: null,
                 storageRole: 'inactive',
                 error: null,
@@ -304,6 +308,7 @@ export function useDropboxAuth() {
                     isSignedIn: false,
                     isLoading: false,
                     sessionId: null,
+                    accountEmail: null,
                     storageGeneration: null,
                     storageRole: 'inactive',
                     error: 'Cloud storage state is temporarily unavailable.',
@@ -328,6 +333,7 @@ export function useDropboxAuth() {
                     isSignedIn: false,
                     isLoading: false,
                     sessionId: null,
+                    accountEmail: null,
                     storageGeneration: null,
                     storageRole: 'inactive',
                     error: null,
@@ -344,6 +350,7 @@ export function useDropboxAuth() {
                     isSignedIn: false,
                     isLoading: false,
                     sessionId: stored.sessionId,
+                    accountEmail: stored.accountEmail ?? null,
                     storageGeneration: storageSession.generation,
                     storageRole,
                     error: 'The Dropbox connection service is temporarily unavailable.',
@@ -359,6 +366,7 @@ export function useDropboxAuth() {
                 isSignedIn: true,
                 isLoading: false,
                 sessionId: stored.sessionId,
+                accountEmail: stored.accountEmail ?? null,
                 storageGeneration: storageSession.generation,
                 storageRole,
                 error: null,
@@ -375,6 +383,7 @@ export function useDropboxAuth() {
             isSignedIn: false,
             isLoading: false,
             sessionId: isDefinitivelyInvalid ? null : stored.sessionId,
+            accountEmail: isDefinitivelyInvalid ? null : (stored.accountEmail ?? null),
             storageGeneration: isDefinitivelyInvalid ? null : storageSession.generation,
             storageRole: isDefinitivelyInvalid ? 'inactive' : storageRole,
             error: statusResult.ok
@@ -412,6 +421,7 @@ export function useDropboxAuth() {
                     isSignedIn: false,
                     isLoading: false,
                     sessionId: null,
+                    accountEmail: null,
                     storageGeneration: null,
                     storageRole: 'inactive',
                     error: null,
@@ -483,11 +493,13 @@ export function useDropboxAuth() {
                 throw new Error(workerErrorMessage(callbackResponse, callbackBody));
             }
             const connected = parseCallbackResponse(callbackBody);
-            await storeDropboxSession({
+            const createdAt = new Date().toISOString();
+            const storedSession = {
                 provider: 'dropbox',
                 sessionId: connected.sessionId,
-                createdAt: new Date().toISOString(),
-            });
+                createdAt,
+            } as const;
+            await storeDropboxSession(storedSession);
             let boundLifecycle;
             try {
                 boundLifecycle = transferOwnerId
@@ -510,11 +522,22 @@ export function useDropboxAuth() {
                 throw new Error('Dropbox storage ownership could not be established.');
             }
             dropboxAccessTokenProvider.setSession(connected.sessionId);
+            let accountEmail: string | null = null;
+            try {
+                const accessToken = await dropboxAccessTokenProvider.getToken();
+                const verifiedAccountEmail = await getDropboxAccountEmail(accessToken);
+                await storeDropboxSession({ ...storedSession, accountEmail: verifiedAccountEmail });
+                accountEmail = verifiedAccountEmail;
+            } catch {
+                // Account identity is presentational. A profile outage must not
+                // invalidate an otherwise healthy direct-file connection.
+            }
             rememberAuthenticatedSession(connected.sessionId);
             setState({
                 isSignedIn: true,
                 isLoading: false,
                 sessionId: connected.sessionId,
+                accountEmail,
                 storageGeneration: storageSession.generation,
                 storageRole,
                 error: null,
@@ -600,6 +623,7 @@ export function useDropboxAuth() {
             isSignedIn: false,
             isLoading: false,
             sessionId: null,
+            accountEmail: null,
             storageGeneration: null,
             storageRole: 'inactive',
             error: null,

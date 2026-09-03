@@ -14,9 +14,10 @@
   catalog/status/license/trial/Stripe test Checkout/webhook/reconciliation/Portal
   flow, disables the bundled catalog fallback, waits for a matching connected
   cloud lifecycle before consuming a Checkout return, and keeps hosted Send plus
-  delivery-status checks disabled. The local Worker has exact localhost return
-  validation, ignored mode-0600 secret/signing material preparation, repeatable
-  local D1 migrations and rollout approvals, and a bounded Stripe webhook
+  delivery-status checks disabled without adding sandbox-only banners or
+  developer-facing notices to product screens. The local Worker has exact
+  localhost return validation, ignored mode-0600 secret/signing material
+  preparation, repeatable local D1 migrations and rollout approvals, and a bounded Stripe webhook
   listener command. Production controls/configuration remain unchanged and off.
 - [x] Collapse the recurring billing-sandbox workflow into the single root
   `make dev-billing-sandbox` entrypoint. It prepares local configuration/D1 and
@@ -29,15 +30,43 @@
 - [x] Keep the public Free/Pro catalog visible in Plan & Billing before cloud
   setup, defer the Google Drive or Dropbox prerequisite to trial and purchase
   actions with nearby guidance, and distinguish missing cloud identity from a
-  connected account whose billing status needs refreshing. No billing mutation
-  starts before canonical provider-bound status is available. Loopback review
-  now renders the same bundled values as `/pricing/` immediately, without a
+  previous Cloud Sync connection that only needs reconnecting or a connected
+  account whose billing status needs refreshing. Setup/reconnect guidance stays
+  neutral and uses the primary icon-labelled action. No billing mutation
+  starts before canonical provider-bound status is available. The same Free/Pro
+  cards now remain visible after status loads, mark only the verified active
+  card as **Current plan**, and contain trial, purchase, Portal, and recovery
+  actions without a separate hosted-email usage card. The one-time trial names
+  the connected provider email beside its action and uses neutral provider copy
+  until that email is available, ties eligibility to the connected TaskTime cloud
+  account, and explains that reconnect or verified provider transfer preserves
+  it; the stable TaskTime reference stays internal.
+  **Start free trial** itself provides the explicit confirmation without a redundant checkbox. Loopback
+  review now renders the same bundled values as `/pricing/` immediately, without a
   blocking loading notice. The founding amount is footnoted as limited to the
-  first 1,000 paid members, while exhausted status displays the unstarred
+  first 250 paid members, while exhausted status displays the unstarred
   standard offer; production catalog authority remains Worker-only.
+- [x] Refine the Plan & Billing purchase footer and Dropbox identity fallback.
+  Start trial remains on the left; the rocket-led Get Pro action and the
+  tax qualifier align right, with the shared loading spinner shown while
+  Checkout opens. Renewal disclosure remains in hosted Checkout. **Manage
+  billing** appears only for verified subscription-backed Pro, even when an
+  otherwise-Free account retains a Stripe customer record. Dropbox shows the
+  connected email when available and stays quiet for a legacy session without
+  one instead of prompting for identity-only reconnection. An expired prior
+  Checkout is now retired and retried once from the same explicit Get Pro click
+  when the offer remains unchanged; changed offers still require reconfirmation,
+  and failed actions never expose internal billing codes.
+- [x] Correct the local Stripe Checkout redirect boundary after the real hosted
+  URL exposed opaque fragment state. The browser and Worker now preserve that
+  fragment only for the exact credential-free HTTPS Stripe Checkout host, with
+  red/green contract coverage. A provider-authenticated browser proof reached
+  Stripe test Checkout without entering payment details or completing a
+  purchase; Checkout return, webhook, and subscription convergence remain
+  separate owner-entered evidence.
 - [x] Pass the local subscription candidate gates. The pre-production sandbox
-  update passes 259 app files / 2,329 tests, lint, repository typecheck, merged
-  50-page build, and the private Worker test/typecheck gates. The finalized
+  candidate now passes 259 app files / 2,345 tests, lint, repository typecheck,
+  the production app build, and the private Worker test/typecheck gates. The finalized
   sandbox orchestration passes 27 Worker files / 177 tests, Worker typecheck,
   and its focused public workflow test. A fresh authenticated multi-profile
   startup selected the TaskTime account by exact Price, reached the attached
@@ -54,6 +83,18 @@
 - [x] Make direct Drive sync more responsive without weakening mode boundaries: Backup and Sync modes debounce note edits for 1.5 seconds, pending local work retries with bounded backoff after active-sync/Web Lock contention, Sync mode checks every five minutes only while visible, and Manual mode remains explicit-only.
 - [x] Retire the Drive data proxy and temporary staging environment. Active Worker version `37` serves direct Drive control-plane sessions only, denies old `/drive/*` browser preflight without CORS permission, and permits the exact local production-preview origin. The isolated staging Worker, KV namespace, D1 databases, secret file, config, tests, and runbook are removed. Current privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary.
 - [x] Complete the provider-neutral cloud-sync and Dropbox production rollout for approved/current accounts recorded in `status/cloud-sync-provider-expansion.md`. Google Drive and Dropbox now share the direct browser-to-provider data plane, active-provider hosted identity, backup and destructive lifecycles, and explicit transfer flow. The promoted moved-source recovery offers the recorded destination first and permits source reuse only through verified source-only deletion plus a complete push-only seed. The existing production Google Drive session survived the upgrade and returned to In sync; transfer initialization and UI exposure are live, while full two-provider move coverage comes from the real-account local production-preview canaries. Broad new-user Dropbox availability remains gated on App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary.
+- [x] Align connected-account presentation across providers. New/reconnected
+  Dropbox grants add only `account_info.read`; the browser reads the verified
+  email directly from Dropbox and keeps it in the local auth record, while the
+  Worker retains only its pseudonymous subject. Cloud Sync and Plan & Billing
+  show the provider email when available and neutral connected-provider copy
+  otherwise; the stable `TT-…` reference remains an internal/support contract
+  and is never the customer-facing identity. Existing file-scope-only Dropbox
+  sessions stay valid and can reconnect explicitly to add the email. Final
+  focused billing/Dropbox-auth coverage passes 38 tests; the completed broader
+  gate passes 2,344 app tests, 177 Worker tests, lint, both typechecks, and the
+  merged app/site build. Local browser review confirms the legacy Dropbox
+  connection shows neutral identity copy in Cloud Sync and Plan & Billing.
 - [x] Refine provider-transfer hierarchy: show the selected provider's official mark beside its lifecycle-driven title, place transient transfer state first, and expose durable-stage determinate progress with accessible semantics.
 - [x] Replace provider-transfer storage jargon with provider-specific plain language and a compact warning that distinguishes closing TaskTime on other devices from disconnecting their authorization.
 - [x] Simplify the transfer warning to one title-free instruction and add the destination provider mark to the Connect & transfer action.

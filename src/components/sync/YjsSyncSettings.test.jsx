@@ -41,6 +41,7 @@ const yjsSyncSettingsMocks = vi.hoisted(() => ({
     isDropboxSignedIn: false,
     dropboxSessionId: null,
     dropboxAuthError: null,
+    dropboxAccountEmail: null,
     isMobileLayout: false,
     user: null,
     pendingSyncChanges: false,
@@ -114,6 +115,7 @@ vi.mock('@/hooks/useDropboxAuth', () => ({
         isLoading: false,
         sessionId: yjsSyncSettingsMocks.dropboxSessionId,
         error: yjsSyncSettingsMocks.dropboxAuthError,
+        accountEmail: yjsSyncSettingsMocks.dropboxAccountEmail,
         signIn: signInDropboxMock,
         disconnect: disconnectDropboxMock,
         refresh: vi.fn(),
@@ -178,6 +180,7 @@ describe('YjsSyncSettings', () => {
         yjsSyncSettingsMocks.isDropboxSignedIn = false
         yjsSyncSettingsMocks.dropboxSessionId = null
         yjsSyncSettingsMocks.dropboxAuthError = null
+        yjsSyncSettingsMocks.dropboxAccountEmail = null
         yjsSyncSettingsMocks.isMobileLayout = false
         yjsSyncSettingsMocks.user = null
         yjsSyncSettingsMocks.pendingSyncChanges = false
@@ -263,6 +266,28 @@ describe('YjsSyncSettings', () => {
 
         const dropboxTitle = screen.getByText('Dropbox')
         expect(dropboxTitle.parentElement?.querySelector('[data-provider-icon="dropbox"]')).toHaveAttribute('aria-hidden', 'true')
+    })
+
+    it('shows the connected Dropbox email and stays quiet when legacy sessions have none', () => {
+        dropboxFeatureState.enabled = true
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'dropbox'
+        yjsSyncSettingsMocks.isDropboxSignedIn = true
+        yjsSyncSettingsMocks.dropboxSessionId = 'dropbox-session'
+        yjsSyncSettingsMocks.dropboxAccountEmail = 'owner@example.com'
+
+        const { rerender } = render(<YjsSyncSettings />)
+
+        expect(screen.getByText('owner@example.com')).toBeInTheDocument()
+        expect(screen.queryByText(/storage identity only/i)).toBeNull()
+        expect(screen.queryByRole('button', { name: /reconnect dropbox to show account email/i })).toBeNull()
+
+        yjsSyncSettingsMocks.dropboxAccountEmail = null
+        rerender(<YjsSyncSettings />)
+
+        expect(screen.queryByText(/connected account email/i)).toBeNull()
+        expect(screen.queryByRole('button', { name: /reconnect dropbox to show account email/i })).toBeNull()
+        expect(signInDropboxMock).not.toHaveBeenCalled()
     })
 
     it('places durable transfer progress above the active provider card', () => {

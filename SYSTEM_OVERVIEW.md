@@ -8,7 +8,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
-- **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
+- **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. Dropbox's verified connected-account email is likewise read browser-to-provider and retained only in the origin-local auth record; the Worker keeps its existing pseudonymous subject. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
@@ -26,10 +26,11 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   hostname keeps the normal Worker-backed billing client active against
   Wrangler-local D1 and Stripe test mode. One root command prepares and runs the
   app, local Worker, and Dockerized webhook listener as an attached Compose
-  stack. A persistent banner marks the boundary; hosted Send and email
-  delivery-status checks remain disabled, production builds ignore the flag,
-  and product data remains in the ordinary real local Yjs workspace with its
-  configured sync mode.
+  stack. Product screens remain visually production-like without sandbox-only
+  banners or developer-facing notices. Hosted Send and email delivery-status
+  checks remain disabled behind neutral failure copy, production builds ignore
+  the flag, and product data remains in the ordinary real local Yjs workspace
+  with its configured sync mode.
 - **Local pricing review fallback:** Vite development on a loopback hostname can
   render the bundled `/pricing/` review catalog immediately inside Plan & Billing
   while the Worker catalog is unavailable. The Worker response replaces it when
@@ -66,7 +67,7 @@ The Yjs store is split into documents so current work stays loaded and historica
    report tabs/outputs, and TaskTime-hosted sending. Existing/imported/synced
    records, manual email delivery, PDFs, tax bookkeeping, sync/backups,
    portability, and core agents remain available. Launch packaging is only Free
-   and Pro; the founding Pro offer is `EUR 39/year` for the first 1,000 paid
+   and Pro; the founding Pro offer is `EUR 39/year` for the first 250 paid
    canonical principals, after which new acquisition automatically uses the
    `EUR 59/year` standard offer. Existing continuous/recoverable founding
    subscriptions remain on their founding Price.

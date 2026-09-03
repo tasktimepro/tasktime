@@ -67,7 +67,7 @@ The detailed finding-by-finding execution checklist and validation state live in
   or reset. Trial expiry removes only advanced Reports, hosted Send, and future
   active-client increases; it never mutates product/provider data.
 - The private plan covers canonical D1 trial/subscription state, the exact annual
-  `EUR 39` first-1,000 founding offer, atomic capacity, automatic annual
+  `EUR 39` first-250 founding offer, atomic capacity, automatic annual
   `EUR 59` standard-offer transition, Stripe Billing/Portal/
   webhooks, signed subject-bound offline assertions, active-client compatibility,
   atomic email allowances, lazy Reports/free-path separation, account/deletion/
@@ -89,7 +89,7 @@ The detailed finding-by-finding execution checklist and validation state live in
   only in the controlled production-launch phase.
 - Public positioning continues to say TaskTime is free, open source, and local-first; Pro is an optional time-saving upgrade rather than a prerequisite for core use.
 - Program Phase 1 local evidence requires Worker tests/typecheck, the core release
-  gate, one-time trial/expiry, 1,001-way founding contention/continuity,
+  gate, one-time trial/expiry, 251-way founding contention/continuity,
   founding-to-standard selection/reconfirmation with no standard slot mutation,
   active-client compatibility, UI/agent parity, Free Overview/protected-load separation,
   advanced Reports/email/free-path and tax-bookkeeping coverage, multi-device/

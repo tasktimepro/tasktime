@@ -59,6 +59,10 @@ Public web build
 - Both provider transports are direct per connection: the selected adapter keeps
   its short-lived token in memory and sends routine file requests only to Google
   Drive or Dropbox API/content origins. The Worker has no provider-data route.
+- `useDropboxAuth` also reads the verified account email directly from Dropbox
+  after new/reconnected authorization and stores it only in the allowlisted
+  origin-local auth-session record. UI consumers use that email for presentation;
+  Worker hosted identity and billing remain keyed by stable opaque subjects.
 - The lifecycle-selected provider session is also the hosted-service session.
   Private Worker code derives provider-separated subjects, resolves an opaque
   hosted principal, and links source/target identities only inside verified
@@ -79,9 +83,11 @@ Public web build
   loopback-only input to `BillingContext`. It keeps the normal Worker-backed
   catalog, status, trial, Checkout, webhook, reconciliation, license, return,
   and Portal paths, while hosted Send and email delivery-status checks remain
-  disabled. `make dev-billing-sandbox` prepares and runs the app, local
-  Worker/D1, and Dockerized Stripe test listener as one attached Compose stack.
-  It is unavailable in production builds and is not release evidence.
+  disabled behind neutral failure copy. It does not inject sandbox-only banners
+  or developer-facing notices into product screens. `make dev-billing-sandbox`
+  prepares and runs the app, local Worker/D1, and Dockerized Stripe test listener
+  as one attached Compose stack. It is unavailable in production builds and is
+  not release evidence.
 - Implemented local license storage is origin-local and non-product: verified JWS
   records are subject-keyed and selected only through the exact active provider/
   generation/session-fingerprint binding plus trusted-time evidence. It never

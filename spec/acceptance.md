@@ -40,16 +40,18 @@
 ## Subscription and Pro boundary (implemented locally; production controls remain off)
 
 - An explicit local billing-sandbox flag is honored only by a Vite development
-  build on a loopback hostname. It visibly labels the entire app, disables the
-  bundled catalog fallback, and exercises the normal provider-bound catalog,
+  build on a loopback hostname. It does not add sandbox-only banners or
+  developer-facing notices to product screens, disables the bundled catalog
+  fallback, and exercises the normal provider-bound catalog,
   status/JWKS/license, trial, Stripe test Checkout, webhook, reconciliation,
   Checkout-return, and Portal paths against the local Worker and Wrangler-local
   D1. Checkout return handling waits for the matching active cloud lifecycle and
   retains the return marker until that lifecycle exists. The local Worker accepts
   only the exact `http://localhost:3101/account?section=billing` return base;
   production retains only the exact HTTPS app return. Hosted Send and delivery-
-  status requests remain disabled in the sandbox. A production build or
-  non-loopback hostname ignores the flag, tracked production controls remain off,
+  status requests remain disabled behind neutral failure copy in the sandbox. A
+  production build or non-loopback hostname ignores the flag, tracked production
+  controls remain off,
   and test-mode state is never launch or production evidence. Product-data
   mutations remain ordinary real local-workspace operations and retain the
   configured sync-mode behavior; billing sandbox mode is not a disposable data
@@ -89,9 +91,15 @@
 - A compact Expenses-side browser surface likewise keeps tax-period list/create/
   update/mark-filed/mark-paid and expense claim/unclaim operations Free while
   exposing no Reports aggregate, filter, or export.
-- An eligible connected account starts one 30-day no-card trial only after an
-  account-reference confirmation. OAuth/navigation/retry never starts or moves
-  it. Operational rollout/canary controls never grant Pro or consume it. Early
+- An eligible connected TaskTime cloud account starts one 30-day no-card trial only after the
+  user explicitly selects **Start free trial** with the connected provider email
+  shown beside that action, or neutral connected-provider copy when the email is
+  unavailable. The stable account reference remains internal and no redundant
+  checkbox is required. The trial remains consumed across devices, reconnecting
+  the same provider identity, product-data deletion/import, and a verified
+  Google Drive/Dropbox transfer. OAuth/navigation/
+  retry never starts or moves it. Operational rollout/canary controls never
+  grant Pro or consume it. Early
   purchase takes precedence without pausing the original trial, which remains a
   fallback until its immutable end.
   Exact trial expiry removes only that source; advanced Reports, hosted Send, and
@@ -109,19 +117,34 @@
   Google Drive or Dropbox session resolves canonical status. Checkout displays the exact
   catalog amount/currency/interval/tax/renewal/legal summary, reconfirms a changed
   revision, creates at most one active attempt per account, and waits for
-  canonical Stripe confirmation after return.
+  canonical Stripe confirmation after return. If the selected account still has
+  an expired hosted Checkout attempt, the same explicit click may retire it,
+  refresh canonical status, and retry once only for the unchanged offer and plan
+  revision. Any changed offer returns to explicit confirmation, and product copy
+  never exposes an internal billing error code.
 - On a loopback Vite development origin, Plan & Billing may use the same bundled
   review values as `/pricing/` while the public Worker catalog is unavailable.
   The Worker catalog replaces that display when available. Production builds do
   not use the fallback, and it never authorizes trial, Checkout, entitlement, or
   hosted-service work.
+- Plan & Billing keeps one responsive Free/Pro comparison before and after
+  canonical status loads. The verified active card carries a neutral
+  **Current plan** badge beside its plan name; unresolved lifecycle state does
+  not guess a current plan. Trial, purchase, recovery, and Portal actions adapt
+  inside the Pro card instead of replacing the comparison with a second billing
+  layout. **Manage billing** appears only for a verified subscription-backed Pro
+  state; a Free, trial, or grant state does not expose it merely because a Stripe
+  customer record exists. The purchase footer keeps the applicable tax qualifier
+  but leaves renewal disclosure and confirmation to hosted Checkout. Hosted-email
+  quota authority remains at the hosted Send action and is not presented as a
+  standalone billing-dashboard card.
 - The catalog contains exactly Free and Pro, with annual `EUR 39` founding and
-  `EUR 59` standard offers under Pro. Founding applies to the first 1,000
-  successfully paid canonical principals. A 1,001-way concurrent
-  Checkout test never exceeds 1,000 live reservations plus committed slots;
+  `EUR 59` standard offers under Pro. Founding applies to the first 250
+  successfully paid canonical principals. A 251-way concurrent
+  Checkout test never exceeds 250 live reservations plus committed slots;
   unpaid canonically expired reservations release exactly once, while committed
   paid slots never recycle. Reservation-only saturation remains retryable and
-  does not activate standard pricing. After the 1,000th commit, a stale founding
+  does not activate standard pricing. After the 250th commit, a stale founding
   request creates no Stripe state and requires explicit confirmation of the
   `EUR 59` order summary; the resulting standard Checkout touches no founding
   slot. The same continuous/recoverable subscription retains its immutable
@@ -136,7 +159,10 @@
   new subscription uses the then-current standard catalog.
 - Provider connection copy states that Google Drive/Dropbox is also the optional
   storage connection, keeps the current sync mode, returns to the intended
-  surface, and requires a separate trial/purchase confirmation.
+  surface, and requires a separate trial/purchase confirmation. Billing action
+  guidance distinguishes first-time Cloud Sync setup from a previous connection
+  that only needs reconnecting, and uses a visible primary cloud action on the
+  neutral notice surface.
 - Email recipient/subject/body/template/forwarding/PDF preparation remains Free.
   Free/over-quota users retain the draft, template editor, PDF/download, copy,
   and manual-delivery path. The hosted Send control remains visible but

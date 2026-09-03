@@ -108,4 +108,67 @@ describe('BillingProvider Checkout continuity', () => {
         expect(state.createCheckout).toHaveBeenCalledOnce();
         expect(state.writePending).not.toHaveBeenCalled();
     });
+
+    it('clears an expired Checkout attempt and retries the unchanged offer from the same click', async () => {
+        state.createCheckout
+            .mockRejectedValueOnce(new BillingClientError('CHECKOUT_EXPIRED', 409, false))
+            .mockResolvedValueOnce({
+                version: 1,
+                url: 'https://checkout.stripe.com/c/pay/cs_test_replacement',
+                attemptId: 'replacement-attempt',
+            });
+        render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Start Checkout' }));
+
+        await waitFor(() => expect(state.createCheckout).toHaveBeenCalledTimes(2));
+        expect(state.createCheckout).toHaveBeenNthCalledWith(
+            1,
+            'session-fixture',
+            'pro-founding-annual-eur',
+            'test-catalog-1',
+        );
+        expect(state.createCheckout).toHaveBeenNthCalledWith(
+            2,
+            'session-fixture',
+            'pro-founding-annual-eur',
+            'test-catalog-1',
+        );
+        expect(state.refresh).toHaveBeenCalled();
+        expect(state.writePending).toHaveBeenCalledWith({
+            lifecycle: {
+                provider: 'dropbox',
+                generation: 3,
+                sessionId: 'session-fixture',
+            },
+            attemptId: 'replacement-attempt',
+        });
+        expect(screen.queryByText(/CHECKOUT_EXPIRED/)).toBeNull();
+    });
+
+    it('requires fresh confirmation if the offer changes while replacing an expired Checkout', async () => {
+        state.createCheckout
+            .mockRejectedValueOnce(new BillingClientError('CHECKOUT_EXPIRED', 409, false))
+            .mockRejectedValueOnce(new BillingClientError(
+                'FOUNDING_OFFER_ENDED',
+                409,
+                false,
+                {
+                    effectiveOfferId: 'pro-standard-annual-eur',
+                    planConfigVersion: 'test-catalog-2',
+                },
+            ));
+        render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Start Checkout' }));
+
+        await waitFor(() => expect(state.createCheckout).toHaveBeenCalledTimes(2));
+        expect(await screen.findByText(/offer changed.*review.*confirm again/i)).toBeInTheDocument();
+        expect(state.createCheckout).toHaveBeenLastCalledWith(
+            'session-fixture',
+            'pro-founding-annual-eur',
+            'test-catalog-1',
+        );
+        expect(state.writePending).not.toHaveBeenCalled();
+    });
 });

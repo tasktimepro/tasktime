@@ -2,8 +2,8 @@
 import PublicPageLayout from './PublicPageLayout.astro';
 
 const { canonicalPath = '/privacy' } = Astro.props;
-const LAST_UPDATED = '27 August 2026';
-const LAST_UPDATED_ISO = '2026-08-27';
+const LAST_UPDATED = '2 September 2026';
+const LAST_UPDATED_ISO = '2026-09-02';
 ---
 
 <PublicPageLayout
@@ -58,7 +58,7 @@ const LAST_UPDATED_ISO = '2026-08-27';
             Google Drive or Dropbox stores the sync documents and backups you choose to place in your own account. While cloud authorization remains active, TaskTime Pro&apos;s edge service stores the encrypted OAuth refresh token needed to issue short-lived browser access. Disconnect detaches the current browser without deleting your provider files; Wipe data &amp; disconnect removes validated TaskTime sync files and backups, revokes access, and disconnects the browser.
         </p>
         <p>
-            The aggregate usage data described in section 3 may include a generated device-install identifier and, when cloud sync is connected, a sync-session header used by the service boundary. These are technical identifiers rather than names or email addresses, and the metrics exclude raw work-record content. Dropbox storage identity uses a TaskTime-scoped account pseudonym rather than requesting your Dropbox email address.
+            The aggregate usage data described in section 3 may include a generated device-install identifier and, when cloud sync is connected, a sync-session header used by the service boundary. These are technical identifiers rather than names or email addresses, and the metrics exclude raw work-record content. Dropbox grants include account-information read access so your browser can retrieve the verified account email directly from Dropbox and show which account is connected. That email remains in the local browser authentication record and is excluded from work-data sync, backups, exports, metrics, and the edge service; the edge service continues to use a TaskTime-scoped Dropbox account pseudonym.
         </p>
         <p>
             When you send an invoice by email, a minimal audit record is saved: a hashed identifier derived from your sync session, a hashed form of the recipient&apos;s address, and a timestamp. This is used only to enforce monthly sending limits and prevent duplicate sends. No invoice content, PDF data, or message body is stored server-side.

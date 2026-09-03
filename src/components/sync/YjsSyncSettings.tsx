@@ -109,6 +109,7 @@ export default function YjsSyncSettings() {
         isSignedIn: isDropboxSignedIn,
         isLoading: dropboxAuthLoading,
         sessionId: dropboxSessionId,
+        accountEmail: dropboxAccountEmail,
         error: dropboxAuthError,
         signIn: signInDropbox,
         refresh: refreshDropboxAuth,
@@ -731,9 +732,9 @@ export default function YjsSyncSettings() {
                                     {provider !== 'dropbox' && isSignedIn && user?.email && (
                                         <div className="truncate text-xs text-muted-foreground">{user.email}</div>
                                     )}
-                                    {provider === 'dropbox' && (
+                                    {provider === 'dropbox' && (dropboxAuthError || dropboxAccountEmail) && (
                                         <div className="truncate text-xs text-muted-foreground">
-                                            {dropboxAuthError ?? 'App Folder access · storage identity only'}
+                                            {dropboxAuthError ?? dropboxAccountEmail}
                                         </div>
                                     )}
                                     {provider && movedToStorageProvider && (

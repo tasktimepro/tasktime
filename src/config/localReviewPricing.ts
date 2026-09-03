@@ -8,7 +8,7 @@ export const LOCAL_REVIEW_PRICING = Object.freeze({
     trialDurationHours: 720,
     foundingAnnualEur: 39,
     foundingAnnualMinor: 3900,
-    foundingMemberLimit: 1000,
+    foundingMemberLimit: 250,
     standardAnnualEur: 59,
     standardAnnualMinor: 5900,
     invoiceEmailSendsPerUtcMonth: 25,

@@ -8,6 +8,8 @@ const accountLayoutMocks = vi.hoisted(() => ({
     isDriveConnected: false,
     isCloudConnected: false,
     activeStorageProvider: null,
+    googleUser: null,
+    dropboxAccountEmail: null,
     activeSection: 'preferences',
     clearAllData: vi.fn(),
     forceSyncDrive: vi.fn(),
@@ -62,8 +64,15 @@ vi.mock('../contexts/YjsContext', () => ({
 
 vi.mock('../hooks/useGoogleAuth', () => ({
     useGoogleAuth: () => ({
+        user: accountLayoutMocks.googleUser,
         signOut: accountLayoutMocks.signOut,
         revokeAccess: accountLayoutMocks.revokeAccess,
+    }),
+}));
+
+vi.mock('../hooks/useDropboxAuth.ts', () => ({
+    useDropboxAuth: () => ({
+        accountEmail: accountLayoutMocks.dropboxAccountEmail,
     }),
 }));
 
@@ -82,6 +91,10 @@ vi.mock('../hooks/usePreferences.ts', () => ({
     }),
 }));
 
+vi.mock('@/config/billingFeatures', () => ({
+    BILLING_FEATURES: { ui: true },
+}));
+
 vi.mock('./ExportImport', () => ({ default: () => <div data-testid="backup-content" /> }));
 vi.mock('./Preferences', () => ({ default: () => <div data-testid="preferences-content" /> }));
 vi.mock('./sync/YjsSyncSettings', () => ({ default: () => <div data-testid="sync-content" /> }));
@@ -91,6 +104,11 @@ vi.mock('./agent/AgentBridgeSettings', () => ({
             <h2>Agent Access</h2>
             <div>Local Agent Bridge</div>
         </div>
+    ),
+}));
+vi.mock('./billing/BillingPanel', () => ({
+    BillingPanel: ({ connectedAccountEmail }) => (
+        <div data-testid="billing-account-email">{connectedAccountEmail ?? 'no-email'}</div>
     ),
 }));
 vi.mock('./Modal', () => ({
@@ -125,6 +143,8 @@ beforeEach(() => {
     accountLayoutMocks.isDriveConnected = false;
     accountLayoutMocks.isCloudConnected = false;
     accountLayoutMocks.activeStorageProvider = null;
+    accountLayoutMocks.googleUser = null;
+    accountLayoutMocks.dropboxAccountEmail = null;
     accountLayoutMocks.activeSection = 'preferences';
 
     accountLayoutMocks.clearAllData.mockReset();
@@ -215,6 +235,16 @@ describe('Account', () => {
         expect(screen.getByRole('tab', { name: 'Agent Access' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Agent Access' })).toBeInTheDocument();
         expect(screen.getByText('Local Agent Bridge')).toBeInTheDocument();
+    });
+
+    it('passes the active provider email to Plan & Billing', () => {
+        accountLayoutMocks.activeSection = 'billing';
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
+        accountLayoutMocks.dropboxAccountEmail = 'owner@example.com';
+
+        renderAccount();
+
+        expect(screen.getByTestId('billing-account-email')).toHaveTextContent('owner@example.com');
     });
 
     it('redirects the removed backup tab to your data', () => {

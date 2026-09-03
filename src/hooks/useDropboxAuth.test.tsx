@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
     stageCloudStorageSession: vi.fn(),
     setSession: vi.fn(),
     clearToken: vi.fn(),
+    getToken: vi.fn(),
+    getDropboxAccountEmail: vi.fn(),
 }));
 
 vi.mock('@/config/google', () => ({
@@ -37,7 +39,12 @@ vi.mock('@/stores/yjs/providers/DropboxAccessTokenProvider', () => ({
     dropboxAccessTokenProvider: {
         setSession: mocks.setSession,
         clearToken: mocks.clearToken,
+        getToken: mocks.getToken,
     },
+}));
+
+vi.mock('@/services/dropboxAccountProfile', () => ({
+    getDropboxAccountEmail: mocks.getDropboxAccountEmail,
 }));
 
 vi.mock('@/stores/yjs/cloudStorageLifecycle', () => ({
@@ -76,6 +83,8 @@ describe('useDropboxAuth', () => {
         mocks.getStoredDropboxSession.mockResolvedValue(null);
         mocks.clearStoredDropboxSession.mockResolvedValue(true);
         mocks.storeDropboxSession.mockResolvedValue(undefined);
+        mocks.getToken.mockResolvedValue('dropbox-access-token-fixture');
+        mocks.getDropboxAccountEmail.mockResolvedValue('owner@example.com');
         mocks.getCloudStorageLifecycle.mockResolvedValue(storedDropboxLifecycle);
         mocks.claimActiveCloudStorageSession.mockResolvedValue({
             ...emptyLifecycle,
@@ -112,6 +121,7 @@ describe('useDropboxAuth', () => {
             provider: 'dropbox',
             sessionId: 'stored-dropbox-session',
             createdAt: '2026-08-19T10:00:00.000Z',
+            accountEmail: 'owner@example.com',
         });
         vi.mocked(fetch).mockResolvedValueOnce(Response.json({
             authenticated: true,
@@ -126,6 +136,7 @@ describe('useDropboxAuth', () => {
         expect(result.current).toMatchObject({
             isSignedIn: true,
             sessionId: 'stored-dropbox-session',
+            accountEmail: 'owner@example.com',
         });
         expect(mocks.setSession).toHaveBeenCalledWith('stored-dropbox-session');
         expect(fetch).toHaveBeenCalledWith(
@@ -292,14 +303,18 @@ describe('useDropboxAuth', () => {
         expect(result.current).toMatchObject({
             isSignedIn: true,
             sessionId: 'new-dropbox-session',
+            accountEmail: 'owner@example.com',
             error: null,
         });
-        expect(mocks.storeDropboxSession).toHaveBeenCalledWith({
+        expect(mocks.storeDropboxSession).toHaveBeenLastCalledWith({
             provider: 'dropbox',
             sessionId: 'new-dropbox-session',
             createdAt: expect.any(String),
+            accountEmail: 'owner@example.com',
         });
         expect(JSON.stringify(mocks.storeDropboxSession.mock.calls)).not.toContain('accessToken');
+        expect(mocks.getToken).toHaveBeenCalledOnce();
+        expect(mocks.getDropboxAccountEmail).toHaveBeenCalledWith('dropbox-access-token-fixture');
         expect(mocks.setSession).toHaveBeenCalledWith('new-dropbox-session');
         expect(mocks.claimActiveCloudStorageSession).toHaveBeenCalledWith(
             'dropbox',

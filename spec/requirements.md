@@ -140,12 +140,12 @@ Requirement identifiers are stable references for acceptance criteria, design do
   reset allowance/trial, or activate the target early.
 - **ENTL-14:** Launch packaging has exactly Free and Pro. Trial is an entitlement
   source and Founding/Standard are Pro offers, not additional plans. The founding offer is
-  annual EUR with `unitAmountMinor:3900` (`EUR 39.00`) for the first 1,000
+  annual EUR with `unitAmountMinor:3900` (`EUR 39.00`) for the first 250
   canonical hosted principals whose initial subscription payment succeeds.
   The standard offer is annual EUR with `unitAmountMinor:5900` (`EUR 59.00`).
   Checkout capacity is reserved atomically and never oversold; committed paid
   allocations are never recycled. Temporary reservation saturation is retryable
-  and does not activate standard pricing. Once 1,000 allocations are committed,
+  and does not activate standard pricing. Once 250 allocations are committed,
   new purchases use standard without reading or mutating founding slots.
   The same continuous/recoverable subscription retains its founding base price;
   cancellation defaults to period end, reversal before that date preserves it,

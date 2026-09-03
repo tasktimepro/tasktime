@@ -818,7 +818,8 @@ describe('EmailPreviewModal', () => {
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
     });
 
-    it('keeps hosted email disabled while real billing runs in the local sandbox', () => {
+    it('keeps the local hosted-email safeguard out of the production-like UI', async () => {
+        const user = userEvent.setup();
         mockEmailEntitlementEnforcement = true;
         mockBillingSandbox = true;
         mockBillingResolution = {
@@ -832,11 +833,16 @@ describe('EmailPreviewModal', () => {
 
         render(<EmailPreviewModal {...defaultProps} />);
 
-        expect(screen.getByText('Hosted Send is disabled in the billing sandbox')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Send Invoice/i })).toBeDisabled();
+        expect(screen.queryByText(/billing sandbox/i)).not.toBeInTheDocument();
+        const sendButton = screen.getByRole('button', { name: /Send Invoice/i });
+        expect(sendButton).not.toBeDisabled();
         expect(screen.getByLabelText('Subject')).not.toBeDisabled();
         expect(screen.getByLabelText('Message')).not.toBeDisabled();
         expect(mockFindBoundUnreconciledEmailAttempt).not.toHaveBeenCalled();
+
+        await user.click(sendButton);
+
+        expect(screen.getByText('Hosted Send is temporarily unavailable. Your draft and manual delivery options remain available.')).toBeInTheDocument();
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
     });
 

@@ -66,6 +66,9 @@ These invariants summarize critical production contracts. They supplement the de
 - Billing/license/trial/quota state stays outside Yjs, provider files, product
   backups/exports/imports, and app-origin migration. It never deletes, hides,
   rewrites, archives, disconnects, or resets product/provider data.
+- Trial use and paid entitlement follow the canonical hosted principal across
+  reconnects, devices, and verified provider transfer. Reconnecting the same
+  provider identity cannot reset a trial.
 - `reports.access` gates advanced report data/ranges/outputs and equivalent
   advanced agent scopes, not `/reports`, its exact current-month Free Overview,
   or visible advanced-tab previews. A locked preview branches before protected
@@ -90,11 +93,11 @@ These invariants summarize critical production contracts. They supplement the de
   lifecycle-subject binding, strict signature/time validation, and bounded
   expiry. Worker-cost services always use canonical server-side entitlement and
   atomic idempotent quota enforcement.
-- The founding offer permits at most 1,000 lifetime paid canonical-principal
+- The founding offer permits at most 250 lifetime paid canonical-principal
   allocations. Atomic bounded reservations may not oversell; paid allocations
   never recycle after cancellation/refund/dispute/deletion. No public response
   exposes the exact remaining count. Temporary reservation saturation remains
-  retryable. At 1,000 commits, new acquisition selects the approved
+  retryable. At 250 commits, new acquisition selects the approved
   `EUR 59/year` standard offer; standard Checkout never touches a founding slot.
   A stale `EUR 39` intent must be explicitly reconfirmed at `EUR 59` before any
   Stripe side effect and is never silently substituted.

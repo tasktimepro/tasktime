@@ -4,6 +4,7 @@ export interface StoredDropboxSession {
     provider: 'dropbox';
     sessionId: string;
     createdAt: string;
+    accountEmail?: string;
 }
 
 const DB_NAME = 'tasktime-db';
@@ -21,23 +22,39 @@ function getDb() {
     });
 }
 
-function isStoredDropboxSession(value: unknown): value is StoredDropboxSession {
-    return Boolean(
-        value
-        && typeof value === 'object'
-        && !Array.isArray(value)
-        && (value as Partial<StoredDropboxSession>).provider === 'dropbox'
-        && typeof (value as Partial<StoredDropboxSession>).sessionId === 'string'
-        && Boolean((value as Partial<StoredDropboxSession>).sessionId)
-        && typeof (value as Partial<StoredDropboxSession>).createdAt === 'string',
-    );
+function normalizedAccountEmail(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const email = value.trim();
+    return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        ? email
+        : null;
+}
+
+function parseStoredDropboxSession(value: unknown): StoredDropboxSession | null {
+    if (!value
+        || typeof value !== 'object'
+        || Array.isArray(value)
+        || (value as Partial<StoredDropboxSession>).provider !== 'dropbox'
+        || typeof (value as Partial<StoredDropboxSession>).sessionId !== 'string'
+        || !Boolean((value as Partial<StoredDropboxSession>).sessionId)
+        || typeof (value as Partial<StoredDropboxSession>).createdAt !== 'string') {
+        return null;
+    }
+    const stored = value as StoredDropboxSession;
+    const accountEmail = normalizedAccountEmail(stored.accountEmail);
+    return {
+        provider: 'dropbox',
+        sessionId: stored.sessionId,
+        createdAt: stored.createdAt,
+        ...(accountEmail ? { accountEmail } : {}),
+    };
 }
 
 export async function getStoredDropboxSession(): Promise<StoredDropboxSession | null> {
     try {
         const db = await getDb();
         const value: unknown = await db.get(STORE_NAME, SESSION_KEY);
-        return isStoredDropboxSession(value) ? value : null;
+        return parseStoredDropboxSession(value);
     } catch (error) {
         console.error('Error loading Dropbox session from IndexedDB:', error);
         return null;
@@ -47,7 +64,13 @@ export async function getStoredDropboxSession(): Promise<StoredDropboxSession | 
 export async function storeDropboxSession(session: StoredDropboxSession): Promise<void> {
     try {
         const db = await getDb();
-        await db.put(STORE_NAME, session, SESSION_KEY);
+        const accountEmail = normalizedAccountEmail(session.accountEmail);
+        await db.put(STORE_NAME, {
+            provider: 'dropbox',
+            sessionId: session.sessionId,
+            createdAt: session.createdAt,
+            ...(accountEmail ? { accountEmail } : {}),
+        }, SESSION_KEY);
     } catch (error) {
         console.error('Error saving Dropbox session to IndexedDB:', error);
         throw new Error('Dropbox session could not be saved.');

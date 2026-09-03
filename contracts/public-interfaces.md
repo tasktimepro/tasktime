@@ -161,26 +161,34 @@ Catalog version 1 contains exactly one Free row and one Pro row. Free advertises
 `activeClients:1`, the basic current-month Reports Overview, zero hosted sends,
 and no offers. Pro advertises unlimited active clients, advanced Reports, hosted
 email, and the configured allowance. It contains two annual EUR offers in stable
-order: founding with `unitAmountMinor:3900`, `memberLimit:1000`, and availability
+order: founding with `unitAmountMinor:3900`, `memberLimit:250`, and availability
 `available | temporarily_reserved | exhausted`; then standard with
 `unitAmountMinor:5900` and no founding capacity. No Stripe identifier or exact
 remaining count is public. Checkout atomically reserves founding capacity before
 creating a founding Session. `temporarily_reserved` is retryable and does not
-select standard early. At 1,000 committed allocations—or for a former founder
+select standard early. At 250 committed allocations—or for a former founder
 whose founding subscription ended terminally—the effective new-purchase offer is
 standard. Standard Checkout never mutates founding slots. A stale founding
 request returns the standard order summary for explicit reconfirmation and
 creates no Stripe state. Paid allocations never recycle and the same continuous/
 recoverable subscription retains its recognized immutable Price. The client
 consumes catalog/status values and never embeds price/tax/allowance/legal or
-Stripe configuration as its authority.
+Stripe configuration as its authority. Checkout redirects require the exact
+credential-free `https://checkout.stripe.com` host and preserve Stripe's opaque
+URL fragment state for hosted Checkout navigation. An expired recovered Checkout
+is retired server-side before the browser retries once from the same explicit
+purchase action. The retry remains bound to the requested offer and plan version;
+normal stale-offer reconfirmation still applies, and raw Worker billing codes are
+not customer-facing copy.
 
 The initial Portal contract exposes invoice/payment-method maintenance and
 cancel-at-period-end only; it cannot switch Price, interval, quantity, or prorate
 a founding subscription. Cancellation surfaces the effective date and founding-
 eligibility consequence. Reversal before period end preserves the same Price;
 terminal cancellation cannot be reactivated as a founding purchase and a later
-new subscription uses the current standard offer.
+new subscription uses the current standard offer. The status-level Portal signal
+does not by itself make billing management a Free-plan action: the browser shows
+**Manage billing** only while canonical Pro is backed by a subscription.
 
 The authenticated billing-status envelope is itself versioned. Every successful
 canonical Free response includes a signed Free JWS that definitively deselects
@@ -192,7 +200,9 @@ cannot display old remaining units as currently usable.
 
 `POST /auth/access-token` accepts the existing opaque `X-Session-Id`, optional non-secret `X-TaskTime-App-Version`, and no credential in its URL. It accepts only an optional boolean `forceRefresh` body field, returns a short-lived bearer token, its absolute expiry, Worker time, and known grant scope. Every success and failure response is `no-store`.
 
-The `/auth/dropbox/*` family is provider-bound and accepts no Dropbox file path or file body. Dropbox authorization uses App Folder access and only the approved content/metadata read/write scopes. `POST /auth/dropbox/access-token` returns a short-lived memory-only token for direct browser-to-Dropbox requests.
+The `/auth/dropbox/*` family is provider-bound and accepts no Dropbox file path or file body. Dropbox authorization uses App Folder access with the approved content/metadata read/write scopes plus `account_info.read` solely for connected-account presentation. `POST /auth/dropbox/access-token` returns a short-lived memory-only token for direct browser-to-Dropbox requests. The browser calls Dropbox's current-account endpoint directly, validates the verified/non-disabled email, and may add it to the origin-local Dropbox auth-session record. The Worker never receives or persists that profile response; the email never enters Yjs, provider sync, backup/export/import, logs, or metrics. File-scope-only stored sessions remain valid and expose a null email until explicit reconnect.
+
+Billing status retains the stable opaque `accountReference` and provider-scoped `displayLabel` as compatibility/support contracts. Plan & Billing presents the connected provider email when locally available and otherwise uses neutral connected-provider copy; it never exposes the stable reference as customer identity, and trial/billing authority never derives from the email.
 
 `POST /auth/hosted-identity/transfer` accepts two authenticated provider sessions,
 the additive UUID-v4 `X-TaskTime-Transfer-Id`, and no payload after target

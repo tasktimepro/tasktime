@@ -19,7 +19,7 @@ export type BillingCatalogOfferV1 = BillingOfferPrice & {
     offerId: string;
     offerKind: 'founding' | 'standard';
     founding: {
-        memberLimit: 1000;
+        memberLimit: 250;
         availability: 'available' | 'temporarily_reserved' | 'exhausted';
         priceRetention: 'while_same_subscription_continues_or_is_recoverable';
     } | null;
@@ -174,7 +174,7 @@ function parseOffer(value: unknown, index: number): BillingCatalogOfferV1 {
             || value.unitAmountMinor !== 3900
             || !isRecord(value.founding)
             || !exact(value.founding, ['memberLimit', 'availability', 'priceRetention'])
-            || value.founding.memberLimit !== 1000
+            || value.founding.memberLimit !== 250
             || !['available', 'temporarily_reserved', 'exhausted'].includes(String(value.founding.availability))
             || value.founding.priceRetention !== 'while_same_subscription_continues_or_is_recoverable') {
             throw new BillingClientError('INVALID_CATALOG', null, false);
@@ -467,8 +467,10 @@ function parseCheckoutResponse(value: unknown): { version: 1; url: string; attem
     } catch {
         throw new BillingClientError('INVALID_RESPONSE', null, false);
     }
+    // Stripe Checkout carries opaque client state in the fragment; preserve it after
+    // validating the exact HTTPS host and rejecting credential-bearing URLs.
     if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com'
-        || url.username || url.password || url.hash) {
+        || url.username || url.password) {
         throw new BillingClientError('INVALID_RESPONSE', null, false);
     }
     return { version: 1, url: url.toString(), attemptId: value.attemptId };
