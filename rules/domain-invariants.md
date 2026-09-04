@@ -110,6 +110,13 @@ These invariants summarize critical production contracts. They supplement the de
 - A successful canonical Free decision is signed and versioned. Identity
   conflict, canonical unavailability, unsupported response versions, and stale
   lifecycle responses never masquerade as Free or invite repurchase.
+- Permanent complimentary Pro is an explicit owner-issued, account-bound,
+  revocable entitlement source. It is separate from Stripe, trial-consumption,
+  founding-capacity, product-data, and rollout-control state. Issue/revoke are
+  private, audited, idempotent, transaction-safe operations; one grant may be
+  active per canonical principal, transfer preserves it, revocation retains its
+  history, explicit billing-profile deletion revokes it in the same transaction,
+  and cached access never outlives the normal signed assertion.
 - Acceptance-unknown email attempts remain durably reserved and are reconciled
   through a caller-owned D1-only status operation that can never resend or expose
   raw provider identifiers. Browser recovery state is privacy-minimized,

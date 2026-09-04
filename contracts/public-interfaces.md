@@ -229,6 +229,26 @@ and subscription webhooks remains authoritative. Browser-offline presentation
 requires the browser network state to be offline rather than any retryable
 billing transport or session error.
 
+The stable `TT-XXXX-XXXX` account reference in authenticated billing status is
+an opaque support/operator handle derived from the canonical hosted principal.
+Plan & Billing shows it after the selected provider label and available email;
+it is not an authentication credential, provider subject, billing contact, or
+Stripe identifier. The private infrastructure CLI is the only permanent
+complimentary-Pro administration surface: it supports preview by exact account
+reference, issue, retained-history list, and revoke by grant ID. Issue/revoke
+require exact production confirmation, parameterized transactional D1 writes,
+one active grant per canonical principal, monotonic account-revision changes,
+and retained owner/reason audit events. There is no public grant HTTP endpoint.
+The source has no scheduled expiry, but normal signed assertions remain bounded;
+verified provider transfer carries the grant. It never mutates Stripe objects,
+founding allocations, trial activation/eligibility, product data, or Yjs state.
+If a paid subscription and complimentary grant coexist, subscription remains the
+displayed/effective source until its access ends. Explicit billing-profile
+deletion is the only public-flow consequence that revokes an active grant; it
+does so transactionally, invalidates the
+canonical account revision, and retains both grant history and a self-service
+revocation audit event.
+
 The authenticated billing-status envelope is itself versioned. Every successful
 canonical Free response includes a signed Free JWS that definitively deselects
 older Pro for the same lifecycle. Identity conflict and canonical unavailability

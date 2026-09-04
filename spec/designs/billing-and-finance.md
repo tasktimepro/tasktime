@@ -45,9 +45,9 @@ Let users understand exactly what will be billed, what changed after finalizatio
   trial**, falling back to neutral connected-provider copy when an email is
   unavailable. Copy ties eligibility to the connected TaskTime cloud account and
   explains that it stays with that account after reconnect or verified provider
-  transfer. The stable TaskTime account reference remains
-  internal and is never used as the customer-facing identity; selecting the
-  action is the explicit confirmation, without a second checkbox.
+  transfer. The stable TaskTime account reference follows the provider label and
+  email as a support/operator reference; it is not a login or Stripe identity.
+  Selecting the action is the explicit confirmation, without a second checkbox.
 - Pricing presents only Free and Pro. It labels annual `EUR 39` truthfully as
   the founding base price for the first 250 paid members and annual `EUR 59`
   as the automatic standard offer afterward. Temporary reservation saturation
@@ -68,6 +68,14 @@ Let users understand exactly what will be billed, what changed after finalizatio
   never becomes account, trial, or entitlement identity. Checkout keeps automatic tax and business
   tax-ID support, lets Stripe collect only the location detail it needs, and does
   not force a full-address form or separate TaskTime Terms checkbox.
+- Owner-selected complimentary Pro is a separate permanent, revocable grant
+  source. The Pro card replaces paid pricing with **Complimentary**, explains
+  that there is no charge or renewal and that access remains until revoked, and
+  omits trial/purchase/Portal controls. The private infra CLI operates on the
+  opaque account reference, retains issue/revoke audit history, and never calls
+  Stripe or changes founding/trial accounting. Subscription-backed Pro keeps
+  precedence when both sources exist, so the ordinary paid lifecycle and Portal
+  experience are unchanged.
 - Cancellation defaults to period end and shows continued access plus the exact
   end date in a neutral **Subscription set to end** notice; it never describes
   the end as "soon." Returning from the Stripe Portal waits for the selected

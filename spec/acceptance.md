@@ -102,8 +102,10 @@
 - An eligible connected TaskTime cloud account starts one 30-day no-card trial only after the
   user explicitly selects **Start free trial** with the connected provider email
   shown beside that action, or neutral connected-provider copy when the email is
-  unavailable. The stable account reference remains internal and no redundant
-  checkbox is required. The trial remains consumed across devices, reconnecting
+  unavailable. The stable opaque account reference is shown at the end of the
+  Plan & Billing account label as a support/operator reference; it is not an
+  email address, login identifier, or Stripe identifier. No redundant checkbox
+  is required. The trial remains consumed across devices, reconnecting
   the same provider identity, product-data deletion/import, and a verified
   Google Drive/Dropbox transfer. OAuth/navigation/
   retry never starts or moves it. Operational rollout/canary controls never
@@ -173,6 +175,19 @@
   confirmation to hosted Checkout. Hosted-email
   quota authority remains at the hosted Send action and is not presented as a
   standalone billing-dashboard card.
+- A permanent complimentary grant renders the Pro card as **Current plan** with
+  **Complimentary Pro**, no charge/renewal wording, and no founding-price,
+  Checkout-tax, **Get Pro**, or **Manage billing** controls. It remains a normal
+  canonical Pro entitlement online and through the existing bounded signed
+  offline assertion, without mutating Stripe, founding capacity, or one-time
+  trial eligibility. An owner-only private-infrastructure CLI resolves only the
+  exact opaque account reference, previews state before mutation, writes one
+  active grant and one audit event idempotently, lists retained history, and
+  revokes without deleting that history. A missing/ambiguous reference, active
+  identity transfer, malformed input, missing confirmation, or partial database
+  operation fails without granting or revoking access. Explicit billing-profile
+  deletion revokes an active complimentary grant in the same transaction and
+  retains a distinct self-service revocation audit event.
 - The catalog contains exactly Free and Pro, with annual `EUR 39` founding and
   `EUR 59` standard offers under Pro. Founding applies to the first 250
   successfully paid canonical principals. A 251-way concurrent

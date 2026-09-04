@@ -21,9 +21,24 @@ The recurring-subscription architecture has been reconciled against the current 
 - **BILL-DEC-2 — Email technical boundary:** Free has no TaskTime-hosted sends. Trial and paid Pro share one configured UTC calendar-month allowance. Each provider-accepted primary or forwarded message consumes one unit; definite pre-acceptance failure releases it and ambiguity stays reserved. Activation/purchase/provider transfer does not reset the window. Pre-enforcement legacy sends preserve duplicate safety but do not reduce the purchaser's first Trial/Pro allowance. The exact live allowance remains launch-open.
 - **BILL-DEC-3 — Supported cloud providers:** Manual, Backup, and Sync modes and
   all Google Drive and Dropbox backup/recovery/privacy controls remain free.
-- **BILL-DEC-4 — Existing/new users:** There is no permanent grandfathered Pro access. Every eligible existing or new canonical hosted principal may explicitly start the same one-time 30-day Pro trial; launch does not automatically start it. Reconnecting the same provider identity or completing verified provider transfer preserves trial history.
+- **BILL-DEC-4 — Existing/new users:** There is no automatic permanent
+  grandfathered Pro access. Every eligible existing or new canonical hosted
+  principal may explicitly start the same one-time 30-day Pro trial; launch does
+  not automatically start it. Reconnecting the same provider identity or
+  completing verified provider transfer preserves trial history. Individually
+  selected owner-issued complimentary grants are the explicit exception defined
+  by BILL-DEC-14 below.
 - **BILL-DEC-5 — Provider-neutral OAuth identity:** TaskTime does not add a separate identity-only Google login. The one selected cloud provider (Google Drive or Dropbox) authenticates storage and TaskTime-hosted services. The Worker maps its domain-separated provider subject to one opaque hosted principal used by email, metrics, and future trial/subscription state. Explicit provider transfer links the two authenticated subjects before activation so allowances and entitlements follow the user without requiring Google.
-- **BILL-DEC-6 — Offline technical contract:** Signed assertions last at most seven days with five-minute skew and are additionally capped by trial, subscription-period/grace, grant, and key boundaries. A detected backward clock jump beyond skew disables cached Pro until online refresh. Already-issued offline assertions cannot be remotely revoked before expiry. The exact paid payment-failure grace remains launch-open and bounded to zero through seven days. V1 has no global entitlement-granting rollout source; rollout/canary controls govern exposure/readiness only.
+- **BILL-DEC-6 — Offline technical contract:** Signed assertions last at most
+  seven days with five-minute skew and are additionally capped by trial,
+  subscription-period/grace, finite-grant, and key boundaries. A permanent
+  complimentary grant has no source-date cap but never extends the normal
+  seven-day assertion lifetime. A detected backward clock jump beyond skew
+  disables cached Pro until online refresh. Already-issued offline assertions
+  cannot be remotely revoked before expiry. The exact paid payment-failure grace
+  remains launch-open and bounded to zero through seven days. V1 has no global
+  entitlement-granting rollout source; rollout/canary controls govern exposure/
+  readiness only.
 - **BILL-DEC-7 — Trial portion:** The initial trial is a TaskTime-owned, account-bound 30 x 24-hour entitlement with no card, Stripe subscription, automatic charge, renewal, reset, or payment-failure grace. It begins only after an explicit account-specific confirmation.
 - **BILL-DEC-10 — Web Push:** Web Push remains free for the initial Pro release.
 
@@ -69,6 +84,20 @@ The recurring-subscription architecture has been reconciled against the current 
   Free and Pro, explains “one active client at a time” without implying lost
   history, and introduces Pro through scale, convenience, and administration.
 
+### Approved September 4, 2026
+
+- **BILL-DEC-14 — Owner-issued complimentary Pro:** The owner may permanently
+  grant Pro to individually selected canonical hosted accounts through the
+  private infrastructure CLI and may later revoke it. The input is the stable
+  opaque TaskTime account reference shown after the provider email in Plan &
+  Billing, not an email or raw provider principal. These grants are audited,
+  idempotent, preserved through verified provider transfer and history/backup
+  operations, do not consume trial eligibility or founding capacity, and create
+  no Stripe customer, Checkout, subscription, invoice, coupon, or promotion.
+  Paid subscription state keeps precedence if both sources exist. Permanent
+  refers to the absence of a renewal/expiry date; revocation remains possible,
+  and already-issued offline assertions retain only their normal bounded life.
+
 ### Still open before live launch
 
 - **BILL-DEC-2 — Pro email allowance:** Approve the exact monthly Trial/Pro send allowance.
@@ -87,8 +116,9 @@ The recurring-subscription architecture has been reconciled against the current 
   contract is closed: append-only audit, explicit actor/reason/expiry and trial-
   consumption policy, versioned keyed trial marker with no email/product data,
   canonical ownership proof, and state-machine repair/deletion. Approve the live
-  marker retention duration, founder/beta/goodwill policy, trial-extension
-  exceptions, support SLA/approvers, and Privacy wording before launch.
+  marker retention duration, broader founder/beta/goodwill policy beyond the
+  approved owner-issued complimentary grants, trial-extension exceptions,
+  support SLA/approvers, and Privacy wording before launch.
 
 Before enforcement, every approved answer must be reflected in product requirements, acceptance criteria, public interface contracts, Privacy/Terms, active public claims, tests, and the release plan without claiming unimplemented behavior is already live.
 

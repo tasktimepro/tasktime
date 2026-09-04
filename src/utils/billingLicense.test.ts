@@ -162,6 +162,34 @@ describe('verifyBillingLicense', () => {
         })).code).toBe('INVALID_CLAIMS');
     });
 
+    it('accepts a permanent complimentary grant only within the normal seven-day license window', async () => {
+        const grant = await fixture({
+            accessStatus: 'active',
+            billingStatus: 'none',
+            source: 'grant',
+            trialStatus: 'eligible',
+            trialStartedAt: null,
+            trialEndsAt: null,
+            sourceExpiresAt: null,
+            exp: 1_787_140_800 + (7 * 86_400),
+        });
+        const result = await verifyBillingLicense(grant.token, {
+            keys: [grant.key],
+            expectedSubject: 'principal-1',
+            expectedIssuer: 'https://sync.tasktime.pro',
+            nowMs: grant.nowSeconds * 1000,
+        });
+
+        expect(result).toMatchObject({
+            ok: true,
+            payload: {
+                source: 'grant',
+                sourceExpiresAt: null,
+                exp: grant.nowSeconds + (7 * 86_400),
+            },
+        });
+    });
+
     it('fails closed for malformed, unknown-key, invalid-signature, issuer, and expired assertions', async () => {
         expect((await verifyBillingLicense('short', {
             keys: [], expectedSubject: 'principal-1',

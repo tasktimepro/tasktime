@@ -161,6 +161,17 @@ Requirement identifiers are stable references for acceptance criteria, design do
   founding intent must show the standard order summary and require fresh
   confirmation before Stripe creation; it is never silently repriced. No exact
   remaining count is exposed.
+- **ENTL-15:** An owner may issue permanent complimentary Pro to one canonical
+  hosted account through a private infrastructure CLI using the opaque account
+  reference shown in Plan & Billing. Standalone preview, issue, list, and owner
+  revoke remain outside the public Worker HTTP surface; issue/revoke require an
+  exact production confirmation and append retained audit evidence. A complimentary
+  grant never creates or changes Stripe state, consumes trial eligibility, or
+  reserves/commits a founding allocation. At most one may be active per account;
+  retries are idempotent, provider transfer preserves ownership, revocation
+  retains history, explicit billing-profile deletion atomically revokes an
+  active grant while retaining that evidence, and cached offline access remains
+  bounded by the normal signed-license lifetime.
 
 ## Sync and offline behavior
 

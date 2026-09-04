@@ -64,7 +64,8 @@
   the connected provider email beside its action and uses neutral provider copy
   until that email is available, ties eligibility to the connected TaskTime cloud
   account, and explains that reconnect or verified provider transfer preserves
-  it; the stable TaskTime reference stays internal.
+  it; the stable TaskTime reference now follows that email as an opaque support/
+  operator handle rather than an authentication or Stripe identity.
   **Start free trial** itself provides the explicit confirmation without a redundant checkbox. Loopback
   review now renders the same bundled values as `/pricing/` immediately, without a
   blocking loading notice. The founding amount is footnoted as limited to the
@@ -95,6 +96,15 @@
   change, and reserves the **You are offline** notice for a browser-reported
   offline state. A known Pro browser never falls back to trial or **Get Pro**
   presentation during that reconnect.
+- [x] Add the locally verified permanent complimentary-Pro path. Plan & Billing
+  shows the opaque account reference after the provider email and renders a
+  grant-backed plan as **Complimentary Pro** with no paid pricing, tax, purchase,
+  or Portal controls. The private infra repo contains the additive grant table,
+  entitlement/transfer integration, owner-only preview/issue/list/revoke CLI,
+  retained audit trail, atomic billing-profile-deletion revocation, and
+  regression coverage proving that trial eligibility, founding capacity, and
+  Stripe state are untouched. Production migration,
+  Worker/app release, and real grants remain explicit release operations.
 - [x] Correct the local Stripe Checkout redirect boundary after the real hosted
   URL exposed opaque fragment state. The browser and Worker now preserve that
   fragment only for the exact credential-free HTTPS Stripe Checkout host, with

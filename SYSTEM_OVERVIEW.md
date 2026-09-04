@@ -100,14 +100,19 @@ The Yjs store is split into documents so current work stays loaded and historica
 7. Optionally pair a same-device agent bridge and grant scoped business-action access.
 8. The locally implemented, production-disabled Pro release boundary gives Free one active client and a
    useful Reports Overview for the current local calendar month. An optional
-   no-card trial or Pro subscription unlocks unlimited active clients, advanced
-   report tabs/outputs, and TaskTime-hosted sending. Existing/imported/synced
+   no-card trial, Pro subscription, or owner-issued complimentary grant unlocks
+   unlimited active clients, advanced report tabs/outputs, and TaskTime-hosted
+   sending. Existing/imported/synced
    records, manual email delivery, PDFs, tax bookkeeping, sync/backups,
    portability, and core agents remain available. Launch packaging is only Free
    and Pro; the founding Pro offer is `EUR 39/year` for the first 250 paid
    canonical principals, after which new acquisition automatically uses the
    `EUR 59/year` standard offer. Existing continuous/recoverable founding
-   subscriptions remain on their founding Price.
+   subscriptions remain on their founding Price. Permanent complimentary grants
+   are owner-administered only through the audited private infra CLI, consume no
+   founding place or trial eligibility, and create no Stripe state. Explicit
+   billing-profile deletion transactionally revokes an active grant while
+   retaining its audit history.
 
 ## Reliability and security model
 

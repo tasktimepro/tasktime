@@ -265,12 +265,12 @@ describe('BillingPanel shadow-mode UX', () => {
         render(<BillingPanel onOpenSync={vi.fn()} />);
 
         expect(screen.queryByRole('checkbox')).toBeNull();
-        expect(screen.getByText('Dropbox · Connected account')).toBeInTheDocument();
+        expect(screen.getByText('Dropbox · Connected account · TT-ABCD-EFGH')).toBeInTheDocument();
         expect(screen.getByText(/Start your one-time 30-day Pro trial for your connected Dropbox account/)).toBeInTheDocument();
         expect(screen.getByText(
             /This trial stays with your TaskTime cloud account if you reconnect it or transfer cloud providers/,
         )).toBeInTheDocument();
-        expect(screen.queryByText(/TT-ABCD-EFGH/)).toBeNull();
+        expect(screen.getByText(/TT-ABCD-EFGH/)).toBeInTheDocument();
         expect(screen.getByText(/No payment method is required, and you won't be charged automatically/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Start free trial' }));
         await waitFor(() => expect(startTrial).toHaveBeenCalledOnce());
@@ -315,7 +315,7 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(screen.queryByText(/Usage is temporarily unavailable/)).toBeNull();
     });
 
-    it('uses the connected provider email for display and Checkout while keeping the stable reference hidden', async () => {
+    it('shows the stable account reference after the connected provider email and uses only the email for Checkout', async () => {
         const value = billingValue();
         const createCheckout = vi.fn(async () => ({
             url: 'https://checkout.stripe.com/c/pay/cs_test_fixture',
@@ -351,12 +351,12 @@ describe('BillingPanel shadow-mode UX', () => {
             />,
         );
 
-        expect(screen.getByText('Dropbox · owner@example.com')).toBeInTheDocument();
+        expect(screen.getByText('Dropbox · owner@example.com · TT-ABCD-EFGH')).toBeInTheDocument();
         expect(screen.getByText((_, element) => (
             element?.tagName === 'P'
             && element.textContent?.includes('Pro trial for owner@example.com') === true
         ))).toBeInTheDocument();
-        expect(screen.queryByText(/TT-ABCD-EFGH/)).toBeNull();
+        expect(screen.getByText(/TT-ABCD-EFGH/)).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Get Pro' }));
         await waitFor(() => expect(createCheckout).toHaveBeenCalledWith(
@@ -364,6 +364,94 @@ describe('BillingPanel shadow-mode UX', () => {
             'test-catalog-1',
             'owner@example.com',
         ));
+    });
+
+    it('presents permanent grant-backed Pro as complimentary without Stripe purchase or management copy', () => {
+        const value = billingValue();
+        state.value = billingValue({
+            resolution: {
+                kind: 'canonical',
+                snapshot: {
+                    ...freeSnapshot,
+                    accessStatus: 'active',
+                    source: 'grant',
+                    sourceExpiresAt: null,
+                    trialStatus: 'eligible',
+                    limits: { activeClients: null },
+                },
+            },
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    checkoutEnabled: false,
+                    checkoutOffer: null,
+                    portalAvailable: true,
+                },
+            },
+        });
+
+        render(
+            <BillingPanel
+                onOpenSync={vi.fn()}
+                connectedAccountEmail="friend@example.com"
+            />,
+        );
+
+        const proCard = screen.getByRole('region', { name: 'Pro' });
+        expect(screen.getByText('Dropbox · friend@example.com · TT-ABCD-EFGH')).toBeInTheDocument();
+        expect(within(proCard).getByText('Current plan')).toBeInTheDocument();
+        expect(within(proCard).getByText('Complimentary Pro')).toBeInTheDocument();
+        expect(within(proCard).getByText(/No charge or renewal/)).toBeInTheDocument();
+        expect(within(proCard).queryByText(/Founding pricing/)).toBeNull();
+        expect(within(proCard).queryByText(/Tax calculated at checkout/)).toBeNull();
+        expect(within(proCard).queryByRole('button', { name: 'Get Pro' })).toBeNull();
+        expect(within(proCard).queryByRole('button', { name: 'Manage billing' })).toBeNull();
+    });
+
+    it('preserves purchase availability for an existing finite support grant', () => {
+        const value = billingValue();
+        state.value = billingValue({
+            resolution: {
+                kind: 'canonical',
+                snapshot: {
+                    ...freeSnapshot,
+                    accessStatus: 'active',
+                    source: 'grant',
+                    sourceExpiresAt: '2026-10-01T00:00:00.000Z',
+                    trialStatus: 'used',
+                    limits: { activeClients: null },
+                },
+            },
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    checkoutEnabled: true,
+                    checkoutOffer: {
+                        offerId: 'pro-founding-annual-eur',
+                        offerKind: 'founding',
+                        price: {
+                            currency: 'EUR',
+                            unitAmountMinor: 3900,
+                            interval: 'year',
+                            taxPresentation: 'calculated_at_checkout',
+                            renewal: 'automatic',
+                        },
+                    },
+                    checkoutOfferReason: 'founding_available',
+                    portalAvailable: true,
+                },
+            },
+        });
+
+        render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        const proCard = screen.getByRole('region', { name: 'Pro' });
+        expect(within(proCard).getByRole('button', { name: 'Get Pro' })).toBeInTheDocument();
+        expect(within(proCard).queryByText('Complimentary')).toBeNull();
+        expect(within(proCard).getByText('Pro access')).toBeInTheDocument();
+        expect(within(proCard).queryByRole('button', { name: 'Manage billing' })).toBeNull();
     });
 
     it('marks Pro as current, hides purchase tax copy, and shows progress while billing opens', async () => {

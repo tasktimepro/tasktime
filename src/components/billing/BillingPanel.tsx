@@ -80,6 +80,9 @@ export function BillingPanel({
     const currentPlan = snapshot
         ? (snapshot.accessStatus === 'free' ? 'free' : 'pro')
         : null;
+    const isComplimentaryPro = currentPlan === 'pro'
+        && snapshot?.source === 'grant'
+        && snapshot.sourceExpiresAt === null;
 
     const run = useCallback(async (name: string, action: () => Promise<void>) => {
         setBusyAction(name);
@@ -192,7 +195,9 @@ export function BillingPanel({
     const trialEligible = status
         && snapshot?.accessStatus === 'free'
         && snapshot.trialStatus === 'eligible';
-    const checkoutAvailable = Boolean(status && currentOffer);
+    const checkoutAvailable = Boolean(status
+        && currentOffer
+        && !(snapshot?.source === 'grant' && snapshot.sourceExpiresAt === null));
     const canManageBilling = Boolean(
         status?.actions.portalAvailable
         && currentPlan === 'pro'
@@ -201,7 +206,7 @@ export function BillingPanel({
     const accountEmail = connectedAccountEmail?.trim() || null;
     const connectedProviderLabel = status?.account.provider === 'dropbox' ? 'Dropbox' : 'Google Drive';
     const accountDisplayLabel = status
-        ? `${connectedProviderLabel} · ${accountEmail ?? 'Connected account'}`
+        ? `${connectedProviderLabel} · ${accountEmail ?? 'Connected account'} · ${status.account.accountReference}`
         : null;
 
     return (
@@ -308,7 +313,14 @@ export function BillingPanel({
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {displayedOffer ? (
+                                {isComplimentaryPro ? (
+                                    <div>
+                                        <p className="text-3xl font-semibold">Complimentary</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            No charge or renewal. This complimentary access remains active until it is revoked.
+                                        </p>
+                                    </div>
+                                ) : displayedOffer ? (
                                     <div>
                                         <p className="text-3xl font-semibold">
                                             {formatBillingOffer(displayedOffer.price)}
@@ -426,6 +438,10 @@ export function BillingPanel({
                                                 <p className="text-sm font-medium text-foreground">
                                                     {snapshot?.accessStatus === 'trial'
                                                         ? 'Pro trial'
+                                                        : isComplimentaryPro
+                                                            ? 'Complimentary Pro'
+                                                            : snapshot?.source === 'grant'
+                                                                ? 'Pro access'
                                                         : snapshot?.accessStatus === 'grace'
                                                             ? 'Pro · payment grace'
                                                             : snapshot?.accessStatus === 'suspended'
