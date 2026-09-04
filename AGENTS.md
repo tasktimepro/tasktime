@@ -241,7 +241,8 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 ### Quick Commands (Makefile)
 
 ```bash
-make dev          # Start dev server (http://localhost:3101)
+make dev          # Start the complete production-like local stack (http://localhost:3101)
+make dev-core     # Start only the public core app for isolated diagnostics
 make stop         # Stop dev server
 make build        # Production build
 make install      # Install dependencies
@@ -253,6 +254,13 @@ make shell        # Open shell in container
 make clean        # Full rebuild (after package.json changes)
 make npm CMD="run test"  # Run arbitrary npm command
 ```
+
+When the private `tasktime-infra` checkout is present, `make dev` prepares and
+starts the app, local Worker/D1, Stripe test listener, and hosted-service paths.
+The explicit `make dev-billing-sandbox` target is a compatibility alias for that
+same stack. Public checkouts without the private repository retain the core-app
+fallback. Missing required local credentials must fail during preparation rather
+than leaving a partially working product UI.
 
 ### Raw Docker Commands (if needed)
 ```bash

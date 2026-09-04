@@ -107,7 +107,15 @@ These invariants summarize critical production contracts. They supplement the de
 - Acceptance-unknown email attempts remain durably reserved and are reconciled
   through a caller-owned D1-only status operation that can never resend or expose
   raw provider identifiers. Browser recovery state is privacy-minimized,
-  lifecycle-bound, non-Yjs, and excluded from product backup/sync.
+  lifecycle-bound, non-Yjs, and excluded from product backup/sync. One bounded
+  byte-identical retry may reuse the same attempt and idempotency evidence; it
+  must never become a second logical send. The browser checks status
+  automatically and may silently release only an exact `ATTEMPT_NOT_FOUND`.
+  Accepted metadata is applied only to the unchanged current document, while a
+  changed, deleted, or canceled document remains untouched. A retained terminal
+  completion may be rediscovered only when the matching invoice still lacks sent
+  metadata, and must be re-proven through owned no-send status before idempotent
+  application; an already-sent invoice does not poll again.
 - Provider transfer across hosted-identity and email D1 databases uses a durable
   prepare/commit/apply journal and fences both accounts until completion. It
   never exposes partially moved entitlement/quota state or activates the target

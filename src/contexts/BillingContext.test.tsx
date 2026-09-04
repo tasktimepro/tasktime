@@ -62,7 +62,7 @@ vi.mock('@/utils/billingStorage', () => ({
 import { BillingClientError } from '@/services/billingClient';
 import { BillingProvider, useBilling } from './BillingContext';
 
-function CheckoutProbe() {
+function CheckoutProbe({ billingContactEmail }: { billingContactEmail?: string }) {
     const billing = useBilling();
     const [message, setMessage] = useState('');
     return (
@@ -72,6 +72,7 @@ function CheckoutProbe() {
                 onClick={() => void billing.createCheckout(
                     'pro-founding-annual-eur',
                     'test-catalog-1',
+                    billingContactEmail,
                 ).catch(error => setMessage(error instanceof Error ? error.message : 'unknown'))}
             >
                 Start Checkout
@@ -107,6 +108,32 @@ describe('BillingProvider Checkout continuity', () => {
         expect(await screen.findByText(/offer changed.*review.*confirm again/i)).toBeInTheDocument();
         expect(state.createCheckout).toHaveBeenCalledOnce();
         expect(state.writePending).not.toHaveBeenCalled();
+    });
+
+    it('passes an explicit billing contact through without making it account authority', async () => {
+        state.createCheckout.mockResolvedValueOnce({
+            version: 1,
+            url: 'https://checkout.stripe.com/c/pay/cs_test_contact',
+            attemptId: 'contact-attempt',
+        });
+        render(
+            <BillingProvider>
+                <CheckoutProbe billingContactEmail="owner@example.com" />
+            </BillingProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Start Checkout' }));
+
+        await waitFor(() => expect(state.createCheckout).toHaveBeenCalledWith(
+            'session-fixture',
+            'pro-founding-annual-eur',
+            'test-catalog-1',
+            undefined,
+            'owner@example.com',
+        ));
+        expect(state.writePending).toHaveBeenCalledWith(expect.objectContaining({
+            attemptId: 'contact-attempt',
+        }));
     });
 
     it('clears an expired Checkout attempt and retries the unchanged offer from the same click', async () => {

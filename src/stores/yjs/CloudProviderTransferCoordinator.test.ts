@@ -155,9 +155,12 @@ type ProviderId = 'google-drive' | 'dropbox';
 const OWNER_ID = '42de9b18-445c-4d28-b5c9-88bc476fc7f1';
 const WORKSPACE_ID = 'b0b8dbef-bb0b-46ea-99c1-e83aa10b6b23';
 
-function createSnapshot(title = 'Transferred') {
+function createSnapshot(title = 'Transferred', targetTitle?: string) {
     const doc = new Y.Doc();
     doc.getMap('projects').set('project-1', new Y.Map([['title', title]]));
+    if (targetTitle) {
+        doc.getMap('projects').set('target-project', new Y.Map([['title', targetTitle]]));
+    }
     const snapshot = {
         documents: [{
             docName: 'core' as const,
@@ -189,6 +192,28 @@ function createSnapshot(title = 'Transferred') {
     };
     doc.destroy();
     return snapshot;
+}
+
+async function replaceCoreState(
+    manifest: CloudManifestManager,
+    update: Uint8Array,
+    stateVersion: number,
+): Promise<void> {
+    await manifest.load();
+    const stateFileName = 'tasktime-yjs-core.bin';
+    const stateFileId = await manifest.getFileIdWithFallback(stateFileName);
+    if (!stateFileId) throw new Error('target state fixture missing');
+    await manifest.updateFile(
+        stateFileId,
+        stateFileName,
+        new Blob([new Uint8Array(update)]),
+    );
+    const metadata = await manifest.getFileMetadata(stateFileName);
+    manifest.updateDocManifest('core', {
+        stateVersion,
+        stateModifiedTime: metadata!.modifiedTime,
+    });
+    await manifest.save();
 }
 
 function createLifecycle(sourceProvider: ProviderId, targetProvider: ProviderId): CloudStorageLifecycleState {
@@ -347,6 +372,9 @@ describe('CloudProviderTransferCoordinator', () => {
         expect(linkHostedServiceIdentity).toHaveBeenCalledWith({
             source: expect.objectContaining({ provider: sourceProvider }),
             target: expect.objectContaining({ provider: targetProvider }),
+            operationId: expect.stringMatching(
+                /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+            ),
         });
         expect(linkHostedServiceIdentity.mock.invocationCallOrder[0])
             .toBeLessThan(harness.activate.mock.invocationCallOrder[0]);
@@ -384,6 +412,250 @@ describe('CloudProviderTransferCoordinator', () => {
         expect(harness.getLifecycle().active?.provider).toBe('google-drive');
         expect(harness.activate).not.toHaveBeenCalled();
         expect((await sourceManifest.readCloudBindingMarker())).toMatchObject({ state: 'active' });
+    });
+
+    it('reuses the durable transfer operation id when hosted identity linking is retried', async () => {
+        const sourceFiles = new MemoryFileStore('google-drive');
+        const targetFiles = new MemoryFileStore('dropbox');
+        const sourceManifest = new CloudManifestManager({ fileStore: sourceFiles });
+        const targetManifest = new CloudManifestManager({ fileStore: targetFiles });
+        const snapshot = createSnapshot();
+        await seedSource(sourceManifest, snapshot.documents[0].update);
+        const harness = createHarness(createLifecycle('google-drive', 'dropbox'), snapshot);
+        const attemptedOperationIds: string[] = [];
+        const unavailableLink = vi.fn(async ({ operationId }: { operationId: string }) => {
+            attemptedOperationIds.push(operationId);
+            throw new Error('hosted identity unavailable');
+        });
+
+        await expect(harness.coordinator.run({
+            ownerId: OWNER_ID,
+            sourceManifest,
+            targetManifest,
+            linkHostedServiceIdentity: unavailableLink,
+        })).rejects.toThrow('hosted identity unavailable');
+
+        const durableOperationId = harness.getJournal()?.operationId;
+        expect(durableOperationId).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        );
+
+        const recoveredLink = vi.fn(async ({ operationId }: { operationId: string }) => {
+            attemptedOperationIds.push(operationId);
+        });
+        await harness.coordinator.run({
+            ownerId: OWNER_ID,
+            sourceManifest,
+            targetManifest,
+            linkHostedServiceIdentity: recoveredLink,
+        });
+
+        expect(attemptedOperationIds).toEqual([durableOperationId, durableOperationId]);
+        expect(harness.getJournal()).toBeNull();
+    });
+
+    it('restages source changes that arrive while hosted identity linking is in flight', async () => {
+        const sourceFiles = new MemoryFileStore('google-drive');
+        const targetFiles = new MemoryFileStore('dropbox');
+        const sourceManifest = new CloudManifestManager({ fileStore: sourceFiles });
+        const targetManifest = new CloudManifestManager({ fileStore: targetFiles });
+        const initialSnapshot = createSnapshot('Before hosted identity link');
+        const changedSnapshot = createSnapshot('Changed during hosted identity link');
+        await seedSource(sourceManifest, initialSnapshot.documents[0].update);
+        const harness = createHarness(
+            createLifecycle('google-drive', 'dropbox'),
+            initialSnapshot,
+        );
+        const operationIds: string[] = [];
+        const linkHostedServiceIdentity = vi.fn(async ({ operationId }: { operationId: string }) => {
+            operationIds.push(operationId);
+            if (operationIds.length !== 1) return;
+
+            const concurrentManifest = new CloudManifestManager({ fileStore: sourceFiles });
+            await concurrentManifest.load();
+            const stateFileName = 'tasktime-yjs-core.bin';
+            const stateFileId = await concurrentManifest.getFileIdWithFallback(stateFileName);
+            if (!stateFileId) throw new Error('source state fixture missing');
+            await concurrentManifest.updateFile(
+                stateFileId,
+                stateFileName,
+                new Blob([new Uint8Array(changedSnapshot.documents[0].update)]),
+            );
+            const metadata = await concurrentManifest.getFileMetadata(stateFileName);
+            concurrentManifest.updateDocManifest('core', {
+                stateVersion: 2,
+                stateModifiedTime: metadata!.modifiedTime,
+            });
+            await concurrentManifest.save();
+            harness.store.createCloudTransferSnapshot.mockResolvedValue(changedSnapshot);
+        });
+
+        await harness.coordinator.run({
+            ownerId: OWNER_ID,
+            sourceManifest,
+            targetManifest,
+            linkHostedServiceIdentity,
+        });
+
+        expect(linkHostedServiceIdentity).toHaveBeenCalledTimes(2);
+        expect(operationIds).toEqual([operationIds[0], operationIds[0]]);
+        expect(harness.store.forceCloudSync).toHaveBeenCalledWith(
+            { allowPull: true, forceFullState: true },
+            expect.any(Object),
+        );
+        const targetStateId = await targetManifest.getFileIdWithFallback('tasktime-yjs-core.bin');
+        expect(targetStateId).not.toBeNull();
+        const transferred = await targetManifest.downloadFileAsArrayBuffer(targetStateId!);
+        expect(new Uint8Array(transferred)).toEqual(changedSnapshot.documents[0].update);
+        expect((await sourceManifest.readCloudBindingMarker())).toMatchObject({ state: 'moved' });
+    });
+
+    it('restages local changes that arrive while hosted identity linking is in flight', async () => {
+        const sourceFiles = new MemoryFileStore('google-drive');
+        const targetFiles = new MemoryFileStore('dropbox');
+        const sourceManifest = new CloudManifestManager({ fileStore: sourceFiles });
+        const targetManifest = new CloudManifestManager({ fileStore: targetFiles });
+        const initialSnapshot = createSnapshot('Before local hosted identity link');
+        const changedSnapshot = createSnapshot('Changed locally during hosted identity link');
+        await seedSource(sourceManifest, initialSnapshot.documents[0].update);
+        const harness = createHarness(
+            createLifecycle('google-drive', 'dropbox'),
+            initialSnapshot,
+        );
+        const operationIds: string[] = [];
+        const linkHostedServiceIdentity = vi.fn(async ({ operationId }: { operationId: string }) => {
+            operationIds.push(operationId);
+            if (operationIds.length !== 1) return;
+
+            harness.store.createCloudTransferSnapshot.mockResolvedValue(changedSnapshot);
+            harness.store.isCloudTransferSnapshotCurrent
+                .mockReturnValueOnce(false)
+                .mockReturnValue(true);
+        });
+
+        await harness.coordinator.run({
+            ownerId: OWNER_ID,
+            sourceManifest,
+            targetManifest,
+            linkHostedServiceIdentity,
+        });
+
+        expect(linkHostedServiceIdentity).toHaveBeenCalledTimes(2);
+        expect(operationIds).toEqual([operationIds[0], operationIds[0]]);
+        expect(harness.store.forceCloudSync).toHaveBeenCalledWith(
+            { allowPull: false, forceFullState: true },
+            expect.any(Object),
+        );
+        const targetStateId = await targetManifest.getFileIdWithFallback('tasktime-yjs-core.bin');
+        expect(targetStateId).not.toBeNull();
+        const transferred = await targetManifest.downloadFileAsArrayBuffer(targetStateId!);
+        expect(new Uint8Array(transferred)).toEqual(changedSnapshot.documents[0].update);
+        expect((await sourceManifest.readCloudBindingMarker())).toMatchObject({ state: 'moved' });
+    });
+
+    it('merges same-lineage target changes that arrive while hosted identity linking is in flight', async () => {
+        const sourceFiles = new MemoryFileStore('google-drive');
+        const targetFiles = new MemoryFileStore('dropbox');
+        const sourceManifest = new CloudManifestManager({ fileStore: sourceFiles });
+        const targetManifest = new CloudManifestManager({ fileStore: targetFiles });
+        const initialSnapshot = createSnapshot('Before target hosted identity link');
+        const mergedSnapshot = createSnapshot(
+            'Before target hosted identity link',
+            'Changed on the target during hosted identity link',
+        );
+        await seedSource(sourceManifest, initialSnapshot.documents[0].update);
+        const harness = createHarness(
+            createLifecycle('google-drive', 'dropbox'),
+            initialSnapshot,
+        );
+        const operationIds: string[] = [];
+        harness.store.mergeCloudTransferUpdates.mockImplementation(async () => {
+            harness.store.createCloudTransferSnapshot.mockResolvedValue(mergedSnapshot);
+        });
+        const linkHostedServiceIdentity = vi.fn(async ({ operationId }: { operationId: string }) => {
+            operationIds.push(operationId);
+            if (operationIds.length !== 1) return;
+
+            await replaceCoreState(
+                new CloudManifestManager({ fileStore: targetFiles }),
+                mergedSnapshot.documents[0].update,
+                2,
+            );
+        });
+
+        await harness.coordinator.run({
+            ownerId: OWNER_ID,
+            sourceManifest,
+            targetManifest,
+            linkHostedServiceIdentity,
+        });
+
+        expect(linkHostedServiceIdentity).toHaveBeenCalledTimes(2);
+        expect(operationIds).toEqual([operationIds[0], operationIds[0]]);
+        expect(harness.store.mergeCloudTransferUpdates).toHaveBeenCalled();
+        expect(harness.store.forceCloudSync).toHaveBeenCalledWith(
+            { allowPull: false, forceFullState: true },
+            expect.any(Object),
+        );
+        const targetStateId = await targetManifest.getFileIdWithFallback('tasktime-yjs-core.bin');
+        expect(targetStateId).not.toBeNull();
+        const transferred = await targetManifest.downloadFileAsArrayBuffer(targetStateId!);
+        expect(new Uint8Array(transferred)).toEqual(mergedSnapshot.documents[0].update);
+        expect((await sourceManifest.readCloudBindingMarker())).toMatchObject({ state: 'moved' });
+    });
+
+    it('merges same-lineage target changes that arrive after the source is marked moved', async () => {
+        const sourceFiles = new MemoryFileStore('google-drive');
+        const targetFiles = new MemoryFileStore('dropbox');
+        const sourceManifest = new CloudManifestManager({ fileStore: sourceFiles });
+        const targetManifest = new CloudManifestManager({ fileStore: targetFiles });
+        const initialSnapshot = createSnapshot('Before source move');
+        const mergedSnapshot = createSnapshot(
+            'Before source move',
+            'Changed on the target after source move',
+        );
+        await seedSource(sourceManifest, initialSnapshot.documents[0].update);
+        const harness = createHarness(
+            createLifecycle('google-drive', 'dropbox'),
+            initialSnapshot,
+        );
+        harness.store.mergeCloudTransferUpdates.mockImplementation(async () => {
+            harness.store.createCloudTransferSnapshot.mockResolvedValue(mergedSnapshot);
+        });
+        const originalWriteSourceMarker = sourceManifest.writeCloudBindingMarker.bind(sourceManifest);
+        let targetChanged = false;
+        vi.spyOn(sourceManifest, 'writeCloudBindingMarker').mockImplementation(async marker => {
+            await originalWriteSourceMarker(marker);
+            if (marker.state !== 'moved' || targetChanged) return;
+            targetChanged = true;
+            await replaceCoreState(
+                new CloudManifestManager({ fileStore: targetFiles }),
+                mergedSnapshot.documents[0].update,
+                2,
+            );
+        });
+
+        await harness.coordinator.run({
+            ownerId: OWNER_ID,
+            sourceManifest,
+            targetManifest,
+            linkHostedServiceIdentity: vi.fn(async () => undefined),
+        });
+
+        expect(targetChanged).toBe(true);
+        expect(harness.store.mergeCloudTransferUpdates).toHaveBeenCalled();
+        expect(harness.getLifecycle().active).toMatchObject({
+            provider: 'dropbox',
+            generation: 3,
+        });
+        const targetStateId = await targetManifest.getFileIdWithFallback('tasktime-yjs-core.bin');
+        expect(targetStateId).not.toBeNull();
+        const transferred = await targetManifest.downloadFileAsArrayBuffer(targetStateId!);
+        expect(new Uint8Array(transferred)).toEqual(mergedSnapshot.documents[0].update);
+        expect((await targetManifest.readCloudBindingMarker())).toMatchObject({
+            state: 'active',
+            activeProvider: 'dropbox',
+        });
     });
 
     it('refuses a foreign target without changing lifecycle ownership', async () => {
@@ -471,7 +743,9 @@ describe('CloudProviderTransferCoordinator', () => {
             targetManifest,
         });
 
-        expect(harness.store.mergeCloudTransferUpdates).toHaveBeenCalledOnce();
+        // Initial same-lineage reconciliation plus the final post-source-fence
+        // convergence pass both merge idempotent Yjs updates.
+        expect(harness.store.mergeCloudTransferUpdates).toHaveBeenCalledTimes(2);
         expect(harness.getLifecycle().active?.provider).toBe('dropbox');
         expect((await targetManifest.readCloudBindingMarker())).toMatchObject({
             workspaceId: WORKSPACE_ID,

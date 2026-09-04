@@ -8,7 +8,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
-- **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. Dropbox's verified connected-account email is likewise read browser-to-provider and retained only in the origin-local auth record; the Worker keeps its existing pseudonymous subject. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
+- **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. Dropbox's verified connected-account email is read browser-to-provider and retained in the origin-local auth record; the Worker keeps its pseudonymous subject for identity and entitlement. Only when the user explicitly starts paid Checkout may the browser submit that verified email as a separate billing contact for the mapped Stripe Customer. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
@@ -22,15 +22,52 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   until the documented launch gates; no remote billing migration or live
   Stripe/deployment evidence is claimed, and billing state never becomes
   Yjs/product/provider data.
-- **Local billing sandbox:** An explicit Vite-development flag on a loopback
-  hostname keeps the normal Worker-backed billing client active against
-  Wrangler-local D1 and Stripe test mode. One root command prepares and runs the
-  app, local Worker, and Dockerized webhook listener as an attached Compose
-  stack. Product screens remain visually production-like without sandbox-only
+- **Production-like local stack:** In an operator checkout, the default
+  `make dev` command applies an explicit Vite-development flag on a loopback
+  hostname and runs the app, local Worker/D1, scheduled recovery runner, and
+  Dockerized Stripe test webhook listener as one attached Compose stack under a
+  dedicated Compose project, so
+  one-off Docker validation commands cannot join its lifecycle or stop it. The
+  local overlay cannot turn off a
+  Worker control enabled in tracked production configuration, while guarded
+  unreleased billing controls may be enabled against Stripe test mode. Product
+  screens remain visually production-like without sandbox-only
   banners or developer-facing notices. Hosted Send and email delivery-status
-  checks remain disabled behind neutral failure copy, production builds ignore
-  the flag, and product data remains in the ordinary real local Yjs workspace
-  with its configured sync mode.
+  checks exercise the normal Pro entitlement, quota, idempotency, and recovery
+  path against local D1 and the configured Resend account; startup fails before
+  opening the stack if that ignored local credential is absent, and delivery
+  still requires an explicit Send. `make dev-billing-sandbox` remains a compatible
+  alias, while a public checkout without private infrastructure retains an
+  explicit core-app fallback. Production builds ignore the sandbox flag, and
+  product data remains in the ordinary real local Yjs workspace with its
+  configured sync mode. The Vite development server does not install the
+  production service worker; PWA caching and Web Push use the production-preview
+  validation path. Startup read-only attests the applied local email ledger
+  against the canonical schema after migrations and fails closed on drift; it
+  never repairs or deletes preserved local data automatically. Before the
+  scheduled sidecar starts, preparation also applies the existing idempotent Web
+  Push schema to its isolated local database so an empty developer checkout does
+  not make the otherwise-independent recovery invocation fail.
+- **Hosted-email recovery:** The browser persists a privacy-minimized,
+  lifecycle-bound attempt before Send. A single byte-identical retry reuses the
+  same attempt and provider idempotency key; all later browser reconciliation is
+  D1-only and provider-free. Status may use bounded, privacy-minimized
+  coordination evidence to make a definitive missing-attempt result safe, but it
+  never changes an attempt, quota, or delivery outcome. Signed provider events
+  and the scheduled Worker reconciler may confirm an already-contacted part but
+  never resend it. An authenticated
+  `ATTEMPT_NOT_FOUND` releases only the exact local marker because no durable
+  Worker reservation exists. Reconciliation runs automatically on discovery and
+  after an entitled-send `5xx`; the modal stops loading after a short bounded
+  check while the list continues background recovery and suppresses duplicate
+  Send. Accepted metadata is written once only if the current document still
+  matches its send-time snapshot. If the provider result was marked applied but
+  the matching Yjs sent timestamp did not survive a crash or reload, the missing
+  timestamp opts that retained terminal marker back into owned, no-send status
+  proof and idempotent metadata application. This also covers a terminal partial
+  result where the customer copy was accepted and an optional forward copy was
+  rejected. An invoice that already has sent metadata does not poll again. There
+  is no manual status button.
 - **Local pricing review fallback:** Vite development on a loopback hostname can
   render the bundled `/pricing/` review catalog immediately inside Plan & Billing
   while the Worker catalog is unavailable. The Worker response replaces it when
@@ -88,9 +125,11 @@ The Yjs store is split into documents so current work stays loaded and historica
   static section-specific preview before mounting protected modules, history,
   calculations, rows, or export builders. Import/restore/sync never discards or
   auto-archives an over-limit client.
-- Local Pro preview exercises those same browser policy branches without a cloud
-  account or Stripe. Its state is non-persisted, visibly synthetic, and cannot
-  authorize provider-backed billing or hosted-email work or establish production
+- The guarded loopback development stack exercises the normal provider-bound
+  browser policy against local Worker/D1 state, Stripe test mode, and the
+  configured email provider. It has no synthetic billing-state selector and the
+  product UI is the same as production. Its local assertions, test-mode Stripe
+  state, and local D1 rows cannot authorize production or establish deployment
   evidence.
 - Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.

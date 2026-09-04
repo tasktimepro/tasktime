@@ -79,15 +79,29 @@ Public web build
   and report-scope policy; Worker-cost email rechecks canonical server state and
   quota independently. Only a verified lifecycle-bound assertion authorizes an
   unlimited-client transition or advanced Reports.
-- The local billing sandbox is an explicitly flagged Vite-development and
-  loopback-only input to `BillingContext`. It keeps the normal Worker-backed
+- The operator checkout's default `make dev` stack supplies an explicitly
+  flagged Vite-development and loopback-only input to `BillingContext`. It keeps
+  the normal Worker-backed
   catalog, status, trial, Checkout, webhook, reconciliation, license, return,
-  and Portal paths, while hosted Send and email delivery-status checks remain
-  disabled behind neutral failure copy. It does not inject sandbox-only banners
-  or developer-facing notices into product screens. `make dev-billing-sandbox`
-  prepares and runs the app, local Worker/D1, and Dockerized Stripe test listener
-  as one attached Compose stack. It is unavailable in production builds and is
-  not release evidence.
+  Portal, hosted Send, and email delivery-status paths. Hosted email uses the
+  same Pro entitlement, local quota/idempotency state, and configured Resend
+  adapter as the production design, while still requiring an explicit Send. A
+  local scheduler invokes the same bounded Worker reconciliation used by the
+  production cron; it can confirm previously contacted provider messages but
+  cannot send them. Its sibling billing/email jobs are settled independently so
+  one failure cannot abandon the other. Browser status checks remain D1-only
+  and automatically converge the invoice list without a manual recovery button,
+  including reapplying a retained terminal result when Yjs sent metadata was not
+  persisted before a crash. It
+  does not inject sandbox-only banners or developer-facing notices into product
+  screens. Startup requires the ignored local Resend credential rather than
+  allowing a partially configured hosted-email path to return 503 later. The
+  preparation step idempotently applies the existing isolated Web Push schema
+  before the scheduled sidecar begins. The
+  local overlay is regression-checked so it cannot disable a Worker control that
+  tracked production configuration enables. `make dev-billing-sandbox` remains
+  a compatible alias; `make dev-core` is the explicit public/diagnostic fallback.
+  The sandbox is unavailable in production builds and is not release evidence.
 - Implemented local license storage is origin-local and non-product: verified JWS
   records are subject-keyed and selected only through the exact active provider/
   generation/session-fingerprint binding plus trusted-time evidence. It never

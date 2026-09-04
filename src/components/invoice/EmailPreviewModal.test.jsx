@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EmailPreviewModal from './EmailPreviewModal';
@@ -12,6 +12,7 @@ const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
 
 const mockUpdateInvoice = vi.fn();
 const mockShowSuccess = vi.fn();
+const mockShowWarning = vi.fn();
 const mockOnClose = vi.fn();
 const mockGeneratePDFBase64 = vi.fn(async () => 'bW9ja3BkZg==');
 let mockHostedServiceSessionId = 'sess-abc';
@@ -21,11 +22,14 @@ let mockActiveStorageSessionId = 'sess-abc';
 let mockEmailEntitlementEnforcement = false;
 let mockBillingSandbox = false;
 let mockBillingResolution = { kind: 'unresolved', reason: 'lifecycle' };
+let mockBillingStatus = null;
 let mockEmailTemplates = [];
 const mockUpdateUrl = vi.fn();
 const mockCheckEmailAttemptStatus = vi.fn();
-const mockFindBoundUnreconciledEmailAttempt = vi.fn();
+const mockFindUnreconciledEmailAttemptForRecovery = vi.fn();
 const mockMarkEmailAttemptMetadataApplied = vi.fn();
+const mockValidateBoundEmailAttemptDocumentSnapshot = vi.fn();
+let mockCurrentInvoices = [];
 const mockGetByType = vi.fn((type) => mockEmailTemplates.filter((template) => template.type === type));
 const mockGetDefaultForType = vi.fn((type) => mockEmailTemplates.find((template) => template.type === type && template.isDefault) || null);
 const mockDefaultTemplate = {
@@ -94,7 +98,7 @@ vi.mock('@/contexts/YjsContext', () => ({
 }));
 
 vi.mock('@/contexts/BillingContext', () => ({
-    useBilling: () => ({ resolution: mockBillingResolution }),
+    useBilling: () => ({ resolution: mockBillingResolution, status: mockBillingStatus }),
 }));
 
 vi.mock('@/config/billingFeatures', () => ({
@@ -113,12 +117,13 @@ vi.mock('@/hooks/useUrlState', () => ({
 }));
 
 vi.mock('@/utils/emailAttemptStorage', () => ({
-    findBoundUnreconciledEmailAttempt: (...args) => mockFindBoundUnreconciledEmailAttempt(...args),
+    findUnreconciledEmailAttemptForRecovery: (...args) => mockFindUnreconciledEmailAttemptForRecovery(...args),
     markEmailAttemptMetadataApplied: (...args) => mockMarkEmailAttemptMetadataApplied(...args),
+    validateBoundEmailAttemptDocumentSnapshot: (...args) => mockValidateBoundEmailAttemptDocumentSnapshot(...args),
 }));
 
 vi.mock('@/hooks/useInvoices.ts', () => ({
-    useInvoices: () => ({ updateInvoice: mockUpdateInvoice }),
+    useInvoices: () => ({ invoices: mockCurrentInvoices, updateInvoice: mockUpdateInvoice }),
 }));
 
 vi.mock('@/hooks/useEmailTemplates.ts', () => ({
@@ -129,7 +134,7 @@ vi.mock('@/hooks/useEmailTemplates.ts', () => ({
 }));
 
 vi.mock('@/hooks/useToast.ts', () => ({
-    useToast: () => ({ showSuccess: mockShowSuccess }),
+    useToast: () => ({ showSuccess: mockShowSuccess, showWarning: mockShowWarning }),
 }));
 
 vi.mock('@/utils/debugbundle', () => ({
@@ -233,13 +238,17 @@ describe('EmailPreviewModal', () => {
         mockEmailEntitlementEnforcement = false;
         mockBillingSandbox = false;
         mockBillingResolution = { kind: 'unresolved', reason: 'lifecycle' };
+        mockBillingStatus = null;
         mockEmailTemplates = [];
         mockSendInvoiceEmail.mockReset();
         mockCheckEmailAttemptStatus.mockReset();
-        mockFindBoundUnreconciledEmailAttempt.mockReset();
-        mockFindBoundUnreconciledEmailAttempt.mockResolvedValue(null);
+        mockFindUnreconciledEmailAttemptForRecovery.mockReset();
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue(null);
         mockMarkEmailAttemptMetadataApplied.mockReset();
         mockMarkEmailAttemptMetadataApplied.mockResolvedValue(true);
+        mockValidateBoundEmailAttemptDocumentSnapshot.mockReset();
+        mockValidateBoundEmailAttemptDocumentSnapshot.mockResolvedValue('match');
+        mockCurrentInvoices = [invoice];
         mockGeneratePDFBase64.mockReset();
         mockGeneratePDFBase64.mockResolvedValue('bW9ja3BkZg==');
         mockGetByType.mockClear();
@@ -443,6 +452,7 @@ describe('EmailPreviewModal', () => {
         expect(call.replyTo).toBe('billing@acme.com');
         expect(call.pdfBase64).toBe('bW9ja3BkZg==');
         expect(call.attachmentTitle).toContain('invoice-INV-001');
+        expect(call.documentSnapshot).toEqual(invoice);
 
         // Should update invoice locally
         await waitFor(() => {
@@ -550,9 +560,10 @@ describe('EmailPreviewModal', () => {
             expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
         });
 
-        expect(mockShowSuccess).toHaveBeenCalledWith(
+        expect(mockShowWarning).toHaveBeenCalledWith(
             expect.stringContaining('The copy to billing@acme.com could not be sent')
         );
+        expect(mockShowSuccess).not.toHaveBeenCalled();
         expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', expect.objectContaining({
             sentToEmail: 'billing@acme.com',
         }));
@@ -703,6 +714,23 @@ describe('EmailPreviewModal', () => {
         expect(mockOnClose).not.toHaveBeenCalled();
     });
 
+    it('keeps the draft available with calm update guidance at hosted-email cutover', async () => {
+        const user = userEvent.setup();
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockRejectedValue({
+            type: 'client_upgrade_required',
+            message: 'Update TaskTime before using hosted email. Your draft and manual delivery options remain available.',
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+        await user.click(screen.getByRole('button', { name: 'Send Invoice' }));
+
+        expect(await screen.findByText(/Update TaskTime.*manual delivery options remain available/i))
+            .toBeInTheDocument();
+        expect(screen.getByLabelText('Message')).not.toBeDisabled();
+        expect(mockOnClose).not.toHaveBeenCalled();
+    });
+
     it('displays already_sent error with guidance', async () => {
 
         const user = userEvent.setup();
@@ -783,6 +811,26 @@ describe('EmailPreviewModal', () => {
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
     });
 
+    it('fails closed when the hosted-service session does not match the active storage lifecycle', async () => {
+        const user = userEvent.setup();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockHostedServiceSessionId = 'sess-hosted';
+        mockActiveStorageSessionId = 'sess-reconnected';
+
+        render(<EmailPreviewModal {...defaultProps} />);
+        await user.click(screen.getByRole('button', { name: 'Send Invoice' }));
+
+        expect(await screen.findByText(/reconnect cloud sync/i)).toBeInTheDocument();
+        expect(mockFindUnreconciledEmailAttemptForRecovery).not.toHaveBeenCalled();
+        expect(mockGeneratePDFBase64).not.toHaveBeenCalled();
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
     it('keeps draft and manual delivery controls available while hosted Send is locked on Free', async () => {
         const user = userEvent.setup();
         mockEmailEntitlementEnforcement = true;
@@ -818,7 +866,79 @@ describe('EmailPreviewModal', () => {
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
     });
 
-    it('keeps the local hosted-email safeguard out of the production-like UI', async () => {
+    it('shows canonical remaining usage and disables the optional copy when only one send remains', () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockBillingStatus = {
+            usage: {
+                invoiceEmail: {
+                    available: true,
+                    entitled: true,
+                    effectiveLimit: 25,
+                    effectiveRemaining: 1,
+                    window: {
+                        limit: 25,
+                        committed: 24,
+                        reserved: 0,
+                        remaining: 1,
+                        periodStart: '2026-09-01T00:00:00.000Z',
+                        periodEnd: '2026-10-01T00:00:00.000Z',
+                        quotaConfigVersion: 'quota-v1',
+                        quotaRevision: 1,
+                    },
+                },
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByText(/1 hosted email send remaining/i)).toBeInTheDocument();
+        expect(screen.getByText(/resets .*Oct.*1.*2026.*UTC/i)).toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: 'Forward this email to me' })).toBeDisabled();
+        expect(screen.getByText(/forwarding a copy requires two available sends/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Send Invoice' })).toBeEnabled();
+        expect(screen.queryByText(/committed|reserved/i)).not.toBeInTheDocument();
+    });
+
+    it('prevents hosted Send when the canonical allowance is exhausted', () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockBillingStatus = {
+            usage: {
+                invoiceEmail: {
+                    available: true,
+                    entitled: true,
+                    effectiveLimit: 25,
+                    effectiveRemaining: 0,
+                    window: {
+                        limit: 25,
+                        committed: 25,
+                        reserved: 0,
+                        remaining: 0,
+                        periodStart: '2026-09-01T00:00:00.000Z',
+                        periodEnd: '2026-10-01T00:00:00.000Z',
+                        quotaConfigVersion: 'quota-v1',
+                        quotaRevision: 1,
+                    },
+                },
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByText(/0 hosted email sends remaining/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Send Invoice' })).toBeDisabled();
+    });
+
+    it('uses the normal entitled send and recovery flow in the local billing sandbox', async () => {
         const user = userEvent.setup();
         mockEmailEntitlementEnforcement = true;
         mockBillingSandbox = true;
@@ -830,6 +950,12 @@ describe('EmailPreviewModal', () => {
             },
         };
         mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockResolvedValue({
+            success: true,
+            remaining: 99,
+            attemptId: 'sandbox-attempt',
+            attemptState: 'completed',
+        });
 
         render(<EmailPreviewModal {...defaultProps} />);
 
@@ -838,16 +964,19 @@ describe('EmailPreviewModal', () => {
         expect(sendButton).not.toBeDisabled();
         expect(screen.getByLabelText('Subject')).not.toBeDisabled();
         expect(screen.getByLabelText('Message')).not.toBeDisabled();
-        expect(mockFindBoundUnreconciledEmailAttempt).not.toHaveBeenCalled();
+        await waitFor(() => {
+            expect(mockFindUnreconciledEmailAttemptForRecovery).toHaveBeenCalledOnce();
+        });
 
         await user.click(sendButton);
 
-        expect(screen.getByText('Hosted Send is temporarily unavailable. Your draft and manual delivery options remain available.')).toBeInTheDocument();
-        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+        await waitFor(() => {
+            expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
+        });
+        expect(screen.queryByText('Hosted Send is temporarily unavailable. Your draft and manual delivery options remain available.')).not.toBeInTheDocument();
     });
 
     it('reconciles an ambiguous delivery without starting a second send', async () => {
-        const user = userEvent.setup();
         mockEmailEntitlementEnforcement = true;
         mockBillingResolution = {
             kind: 'canonical',
@@ -857,7 +986,10 @@ describe('EmailPreviewModal', () => {
             },
         };
         mockEmailTemplates = [mockDefaultTemplate];
-        mockFindBoundUnreconciledEmailAttempt.mockResolvedValue({ attemptId: 'attempt-existing' });
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-existing' },
+        });
         mockCheckEmailAttemptStatus.mockResolvedValue({
             state: 'completed',
             primary: { outcome: 'accepted', acceptedAt: '2026-08-30T08:00:00.000Z', reason: null },
@@ -872,13 +1004,9 @@ describe('EmailPreviewModal', () => {
 
         render(<EmailPreviewModal {...defaultProps} />);
 
-        await screen.findByText(/previous hosted send needs delivery confirmation/i);
-        await user.click(screen.getByRole('button', { name: 'Check status' }));
-
         await waitFor(() => {
             expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', {
-                sentAt: expect.any(Number),
-                sentToEmail: 'billing@acme.com',
+                sentAt: Date.parse('2026-08-30T08:00:00.000Z'),
             });
         });
         expect(mockCheckEmailAttemptStatus).toHaveBeenCalledWith({
@@ -894,8 +1022,643 @@ describe('EmailPreviewModal', () => {
             'attempt-existing',
             expect.objectContaining({ sessionId: 'sess-abc' }),
         );
+        expect(mockFindUnreconciledEmailAttemptForRecovery).toHaveBeenCalledWith(
+            expect.objectContaining({ sessionId: 'sess-abc' }),
+            'inv-1',
+            'invoice',
+            { includeAppliedCompletion: true },
+        );
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+        expect(screen.queryByRole('button', { name: 'Check status' })).not.toBeInTheDocument();
         expect(mockOnClose).toHaveBeenCalledOnce();
+    });
+
+    it('does not apply accepted delivery metadata to an invoice that changed after sending', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockCurrentInvoices = [{ ...invoice, total: 700 }];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-old-revision' },
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: {
+                entitled: true,
+                effectiveRemaining: 9,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 0,
+            },
+        });
+        mockValidateBoundEmailAttemptDocumentSnapshot.mockResolvedValue('mismatch');
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await waitFor(() => {
+            expect(mockShowWarning).toHaveBeenCalledWith(
+                'The email was delivered for an earlier version of this invoice. The current invoice was not marked as sent.',
+            );
+        });
+        expect(mockValidateBoundEmailAttemptDocumentSnapshot).toHaveBeenCalledWith(
+            'attempt-old-revision',
+            expect.objectContaining({ sessionId: 'sess-abc' }),
+            expect.objectContaining({ id: 'inv-1', total: 700 }),
+        );
+        expect(mockUpdateInvoice).not.toHaveBeenCalled();
+        expect(mockMarkEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-old-revision',
+            expect.objectContaining({ sessionId: 'sess-abc' }),
+        );
+        expect(mockOnClose).toHaveBeenCalledOnce();
+    });
+
+    it('recovers a same-provider reconnect through owned status proof without starting another send', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'same-provider-reconnect',
+            attempt: { attemptId: 'attempt-reconnect' },
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: {
+                entitled: true,
+                effectiveRemaining: 9,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 0,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await waitFor(() => {
+            expect(mockCheckEmailAttemptStatus).toHaveBeenCalledWith({
+                sessionId: 'sess-abc',
+                billingLifecycle: expect.objectContaining({ sessionId: 'sess-abc' }),
+                attemptId: 'attempt-reconnect',
+                recoveryBinding: {
+                    kind: 'same-provider-reconnect',
+                    documentId: 'inv-1',
+                    sendType: 'invoice',
+                },
+            });
+        });
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+        expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        });
+        expect(mockOnClose).toHaveBeenCalledOnce();
+    });
+
+    it('keeps a dormant attempt protected when the connected account cannot prove ownership', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'same-provider-reconnect',
+            attempt: { attemptId: 'attempt-other-account' },
+        });
+        mockCheckEmailAttemptStatus.mockRejectedValue({
+            type: 'attempt_dormant',
+            message: 'Reconnect the cloud account used for this delivery attempt.',
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(await screen.findAllByText('Delivery protected')).toHaveLength(2);
+        expect(screen.getByText(/Reconnect the cloud account used for this delivery attempt/i)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+        expect(mockMarkEmailAttemptMetadataApplied).not.toHaveBeenCalled();
+    });
+
+    it('keeps a cross-provider attempt protected when owned status cannot prove transfer', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'different-provider',
+            attempt: { attemptId: 'attempt-prior-provider' },
+        });
+        mockCheckEmailAttemptStatus.mockRejectedValue({
+            type: 'attempt_dormant',
+            message: 'Reconnect the cloud account used for this delivery attempt.',
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(await screen.findAllByText('Delivery protected')).toHaveLength(2);
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        expect(mockCheckEmailAttemptStatus).toHaveBeenCalledWith({
+            sessionId: 'sess-abc',
+            billingLifecycle: expect.objectContaining({ sessionId: 'sess-abc' }),
+            attemptId: 'attempt-prior-provider',
+            recoveryBinding: {
+                kind: 'cross-provider-status-proof',
+                documentId: 'inv-1',
+                sendType: 'invoice',
+            },
+        });
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it('automatically reconciles an uncertain send response without a second click or send', async () => {
+        const user = userEvent.setup();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockRejectedValue({
+            type: 'pending',
+            attemptId: 'attempt-from-send',
+            message: 'TaskTime is confirming whether delivery started.',
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: {
+                entitled: true,
+                effectiveRemaining: 9,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 0,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await user.click(screen.getByRole('button', { name: 'Send Invoice' }));
+
+        await waitFor(() => {
+            expect(mockCheckEmailAttemptStatus).toHaveBeenCalledWith({
+                sessionId: 'sess-abc',
+                billingLifecycle: {
+                    provider: 'google-drive',
+                    generation: 4,
+                    sessionId: 'sess-abc',
+                },
+                attemptId: 'attempt-from-send',
+            });
+        });
+        expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
+        expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+            sentToEmail: 'billing@acme.com',
+        });
+        expect(screen.queryByRole('button', { name: 'Check status' })).not.toBeInTheDocument();
+        expect(mockOnClose).toHaveBeenCalledOnce();
+    });
+
+    it('applies an accepted primary immediately while its requested forward copy remains pending', async () => {
+        const user = userEvent.setup();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockRejectedValue({
+            type: 'pending',
+            attemptId: 'attempt-from-send',
+            primaryAcceptedAt: '2026-09-03T14:00:00.000Z',
+            message: 'The requested forward copy is still being confirmed.',
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'partial',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: { outcome: 'pending', acceptedAt: null, reason: null },
+            quota: {
+                entitled: true,
+                effectiveRemaining: 8,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 1,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+        await user.click(screen.getByRole('checkbox', { name: 'Forward this email to me' }));
+        await user.click(screen.getByRole('button', { name: 'Send Invoice' }));
+
+        await waitFor(() => {
+            expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', {
+                sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+                sentToEmail: 'billing@acme.com',
+            });
+        });
+        expect(mockMarkEmailAttemptMetadataApplied).not.toHaveBeenCalled();
+        expect(await screen.findByText(/checking automatically/i)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        expect(mockOnClose).not.toHaveBeenCalled();
+    });
+
+    it('finishes primary delivery and warns when the requested forward copy is rejected during recovery', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-forward-rejected' },
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'partial',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: { outcome: 'rejected', acceptedAt: null, reason: 'provider_rejected' },
+            quota: {
+                entitled: true,
+                effectiveRemaining: 8,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 0,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await waitFor(() => {
+            expect(mockShowWarning).toHaveBeenCalledWith(
+                'Invoice emailed successfully, but the requested copy was not sent.',
+            );
+        });
+        expect(mockMarkEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-forward-rejected',
+            expect.objectContaining({ sessionId: 'sess-abc' }),
+        );
+        expect(mockShowSuccess).not.toHaveBeenCalled();
+        expect(mockOnClose).toHaveBeenCalledOnce();
+    });
+
+    it('silently returns an absent durable attempt to an explicit fresh Send action', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-missing' },
+        });
+        mockCheckEmailAttemptStatus.mockRejectedValue({
+            type: 'attempt_not_found',
+            message: 'No hosted send was started. You can send this email now.',
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Send Invoice' })).toBeEnabled();
+        });
+        expect(screen.queryByText('Ready to send')).not.toBeInTheDocument();
+        expect(screen.queryByText('No hosted send was started. You can send this email now.'))
+            .not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Check status' })).not.toBeInTheDocument();
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+        expect(mockOnClose).not.toHaveBeenCalled();
+    });
+
+    it('checks a genuinely pending delivery automatically without offering another send', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-pending' },
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'pending',
+            primary: { outcome: 'pending', acceptedAt: null, reason: null },
+            forward: null,
+            quota: {
+                entitled: true,
+                effectiveRemaining: 9,
+                periodEnd: '2026-09-01T00:00:00.000Z',
+                awaitingConfirmation: 1,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(await screen.findAllByText('Confirming delivery')).toHaveLength(2);
+        expect(screen.getByText(/TaskTime is checking automatically/i)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Check status' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        expect(mockCheckEmailAttemptStatus).toHaveBeenCalledOnce();
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it('keeps a partial attempt protected while the requested forward copy is pending', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-partial' },
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'partial',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: { outcome: 'pending', acceptedAt: null, reason: null },
+            quota: {
+                entitled: true,
+                effectiveRemaining: 8,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 1,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(await screen.findByText(/checking automatically/i)).toBeInTheDocument();
+        expect(mockUpdateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        });
+        expect(mockMarkEmailAttemptMetadataApplied).not.toHaveBeenCalled();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        expect(mockOnClose).not.toHaveBeenCalled();
+    });
+
+    it('stops automatic polling in a neutral protected state instead of spinning forever', async () => {
+        vi.useFakeTimers();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-pending' },
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'pending',
+            primary: { outcome: 'pending', acceptedAt: null, reason: null },
+            forward: null,
+            quota: {
+                entitled: true,
+                effectiveRemaining: 9,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 1,
+            },
+        });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_000);
+            await Promise.resolve();
+        });
+
+        expect(mockCheckEmailAttemptStatus).toHaveBeenCalledTimes(6);
+        expect(screen.getAllByText('Delivery pending')).toHaveLength(2);
+        expect(screen.getByRole('button', { name: 'Delivery pending' })).toBeDisabled();
+        expect(screen.queryByText('Confirming delivery')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        vi.useRealTimers();
+    });
+
+    it('ends the confirming spinner within the wall-clock budget when status requests hang', async () => {
+        vi.useFakeTimers();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-hung' },
+        });
+        mockCheckEmailAttemptStatus.mockImplementation(() => new Promise(() => {}));
+
+        render(<EmailPreviewModal {...defaultProps} />);
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+        expect(screen.getAllByText('Confirming delivery')).toHaveLength(2);
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(15_000);
+            await Promise.resolve();
+        });
+
+        expect(mockCheckEmailAttemptStatus).toHaveBeenCalledOnce();
+        expect(screen.getAllByText('Delivery pending')).toHaveLength(2);
+        expect(screen.getByRole('button', { name: 'Delivery pending' })).toBeDisabled();
+        expect(screen.queryByText('Confirming delivery')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        vi.useRealTimers();
+    });
+
+    it('ignores a stale status result after the modal closes and reopens', async () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery
+            .mockResolvedValueOnce({
+                binding: 'bound',
+                attempt: { attemptId: 'attempt-from-closed-modal' },
+            })
+            .mockResolvedValue(null);
+        let resolveOldStatus;
+        mockCheckEmailAttemptStatus.mockImplementationOnce(() => new Promise((resolve) => {
+            resolveOldStatus = resolve;
+        }));
+
+        const { rerender } = render(<EmailPreviewModal {...defaultProps} />);
+        expect(await screen.findAllByText('Confirming delivery')).toHaveLength(2);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(mockOnClose).toHaveBeenCalledOnce();
+        rerender(<EmailPreviewModal {...defaultProps} isOpen={false} />);
+        rerender(<EmailPreviewModal {...defaultProps} isOpen />);
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Send Invoice' })).toBeEnabled();
+        });
+
+        await act(async () => {
+            resolveOldStatus({
+                state: 'completed',
+                primary: {
+                    outcome: 'accepted',
+                    acceptedAt: '2026-09-03T14:00:00.000Z',
+                    reason: null,
+                },
+                forward: null,
+                quota: {
+                    entitled: true,
+                    effectiveRemaining: 9,
+                    periodEnd: '2026-10-01T00:00:00.000Z',
+                    awaitingConfirmation: 0,
+                },
+            });
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(mockUpdateInvoice).not.toHaveBeenCalled();
+        expect(mockMarkEmailAttemptMetadataApplied).not.toHaveBeenCalled();
+        expect(mockShowSuccess).not.toHaveBeenCalled();
+        expect(mockShowWarning).not.toHaveBeenCalled();
+        expect(mockOnClose).toHaveBeenCalledOnce();
+        expect(screen.getByRole('button', { name: 'Send Invoice' })).toBeEnabled();
+    });
+
+    it('ignores a stale send result after the modal closes and reopens for another invoice', async () => {
+        const user = userEvent.setup();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        const nextInvoice = {
+            ...invoice,
+            id: 'inv-2',
+            invoiceNumber: 'INV-002',
+        };
+        mockCurrentInvoices = [invoice, nextInvoice];
+        let resolveOldSend;
+        mockSendInvoiceEmail.mockImplementationOnce(() => new Promise((resolve) => {
+            resolveOldSend = resolve;
+        }));
+
+        const { rerender } = render(<EmailPreviewModal {...defaultProps} />);
+        await user.click(screen.getByRole('button', { name: 'Send Invoice' }));
+        await waitFor(() => {
+            expect(mockSendInvoiceEmail).toHaveBeenCalledOnce();
+        });
+
+        rerender(<EmailPreviewModal {...defaultProps} isOpen={false} />);
+        rerender(<EmailPreviewModal
+            {...defaultProps}
+            isOpen
+            invoice={nextInvoice}
+        />);
+        expect(screen.getByRole('dialog', { name: 'Send Invoice — INV-002' })).toBeInTheDocument();
+
+        await act(async () => {
+            resolveOldSend({
+                success: true,
+                remaining: 9,
+                attemptId: 'attempt-from-closed-send',
+                attemptState: 'completed',
+                primaryAcceptedAt: '2026-09-03T14:00:00.000Z',
+            });
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(mockUpdateInvoice).not.toHaveBeenCalled();
+        expect(mockMarkEmailAttemptMetadataApplied).not.toHaveBeenCalled();
+        expect(mockShowSuccess).not.toHaveBeenCalled();
+        expect(mockShowWarning).not.toHaveBeenCalled();
+        expect(mockOnClose).not.toHaveBeenCalled();
+        expect(screen.getByRole('dialog', { name: 'Send Invoice — INV-002' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Send Invoice' })).toBeEnabled();
+    });
+
+    it('ends terminal recovery safely when applying sent metadata fails locally', async () => {
+        vi.useFakeTimers();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', entitlements: ['invoice.email.send'] },
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockFindUnreconciledEmailAttemptForRecovery.mockResolvedValue({
+            binding: 'bound',
+            attempt: { attemptId: 'attempt-complete' },
+        });
+        mockCheckEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: {
+                entitled: true,
+                effectiveRemaining: 9,
+                periodEnd: '2026-10-01T00:00:00.000Z',
+                awaitingConfirmation: 0,
+            },
+        });
+        mockUpdateInvoice.mockImplementationOnce(() => { throw new Error('local apply failed'); });
+
+        render(<EmailPreviewModal {...defaultProps} />);
+        await act(async () => {
+            await Promise.resolve();
+            await vi.advanceTimersByTimeAsync(70_000);
+        });
+
+        expect(mockCheckEmailAttemptStatus).toHaveBeenCalledOnce();
+        expect(screen.getByText('Delivery confirmed')).toBeInTheDocument();
+        expect(screen.getByText(/TaskTime will keep applying it automatically from the invoice list/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delivery protected' })).toBeDisabled();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        expect(mockMarkEmailAttemptMetadataApplied).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    it('uses reminder-specific copy when a reminder operation was already started', async () => {
+        const user = userEvent.setup();
+        mockEmailTemplates = [mockDefaultTemplate];
+        mockSendInvoiceEmail.mockRejectedValue({
+            type: 'already_sent',
+            message: 'already sent',
+        });
+
+        render(
+            <EmailPreviewModal
+                {...defaultProps}
+                sendType="reminder"
+                invoice={{ ...invoice, status: 'overdue', sentAt: 1000 }}
+            />
+        );
+        await user.click(screen.getByRole('button', { name: 'Send Reminder' }));
+
+        expect(await screen.findByText('This reminder has already been sent.')).toBeInTheDocument();
+        expect(screen.queryByText(/Use "Send Reminder"/)).not.toBeInTheDocument();
     });
 
     it('shows clear error when sending with blank subject (no template selected)', async () => {

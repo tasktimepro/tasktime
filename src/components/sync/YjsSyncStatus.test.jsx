@@ -180,7 +180,7 @@ describe('YjsSyncStatus', () => {
 
         render(<YjsSyncStatus />)
 
-        await userEvent.click(screen.getByRole('button', { name: /(?:connect|reconnect) to cloud storage/i }))
+        await userEvent.click(screen.getByRole('button', { name: /(?:connect|reconnect) cloud storage/i }))
 
         expect(navigateToAccountMock).toHaveBeenCalledWith({ section: 'sync' })
         expect(signInMock).not.toHaveBeenCalled()

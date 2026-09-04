@@ -119,27 +119,52 @@ The planned Pro cutover adds a durable request idempotency key through an additi
 compatibility window and checks canonical `invoice.email.send` entitlement plus
 an atomic UTC-month allowance only when TaskTime-hosted Send is invoked. Email
 preview/template editing, PDF download, copy/manual delivery, and draft recovery
-remain Free. Each provider-accepted primary/forward part consumes one unit;
-ambiguous parts remain reserved and are never auto-replayed. New tracking uses
-domain-separated keyed hashes and stores no recipient, subject/body, PDF,
-filename, or invoice number.
+remain Free. Each provider-accepted primary/forward part consumes one unit.
+Acceptance-unknown parts remain reserved and can never be replayed as a new
+logical send. The browser may make one bounded retry of the byte-identical
+request with the same TaskTime attempt, request-idempotency, and provider-
+idempotency evidence; provider acceptance therefore remains exactly once. New
+tracking uses domain-separated keyed hashes and stores no recipient,
+subject/body, PDF, filename, or invoice number.
 
 An acceptance-unknown send returns versioned `202 DELIVERY_PENDING` with the
-same non-secret attempt reference; status reconciliation reuses its original
-idempotency evidence and never creates a new send. Allowance exhaustion retains
-the established `429` transport status with a distinct `QUOTA_EXCEEDED` code so
+same non-secret attempt reference. Signed provider webhooks and the bounded
+Worker reconciler can advance the durable outcome of an already-contacted part;
+neither creates or resends a message. Allowance exhaustion retains the
+established `429` transport status with a distinct `QUOTA_EXCEEDED` code so
 legacy clients remain safe while rate limiting uses `RATE_LIMITED`.
 
 `POST /email/attempt/status` accepts the closed body
 `{ version: 1, attemptId }` for the authenticated hosted principal and returns
 only TaskTime attempt, primary/forward outcome, accepted-time, and effective
-quota projections. It reads durable D1 state only: it never contacts the
-delivery provider, retries a message, or consumes/releases allowance. New Send
-and status responses never expose raw Resend/provider IDs, recipient/content,
-PDF, provider subject, or session data. A bounded legacy `resendId` field may
-survive only as an alias for the opaque TaskTime attempt ID when characterized
-consumers treat it as opaque; otherwise the Worker returns the documented safe
-client-update response.
+quota projections. It is provider-free and never retries a message or consumes
+or releases allowance. The Worker may take a short account-coordination claim
+and retain a bounded, privacy-minimized no-send marker before returning a
+definitive missing-attempt result; it does not mutate attempt or quota business
+state. New Send and status responses never expose raw Resend/provider IDs,
+recipient/content, PDF, provider subject, or session data. A bounded legacy
+`resendId` field may survive only as an alias for the opaque TaskTime attempt ID
+when characterized consumers treat it as opaque; otherwise the Worker returns
+the documented safe client-update response.
+
+An authenticated `404 ATTEMPT_NOT_FOUND` for the exact active-lifecycle local
+attempt proves that TaskTime has no durable reservation to reconcile. The client
+marks only that bound local marker rejected and silently returns to a fresh
+explicit Send action. Existing attempts and entitled-send `5xx` responses are
+reconciled automatically through status, without exposing a manual status
+button. The modal performs a short bounded check, then stops loading and leaves
+the attempt quietly protected; invoice lists continue bounded background
+reconciliation. A provider-accepted primary is applied to the current invoice
+only after lifecycle, document identity, and immutable send-time snapshot
+validation, which removes the original Send action and shows the sent state. If
+a crash or reload occurs after a terminal completion marker is retained but
+before the matching Yjs sent timestamp persists, only the missing timestamp opts
+that marker back into owned status proof and idempotent application. A terminal
+partial result is eligible only when the primary customer copy was accepted;
+the optional rejected forward remains a warning. Status recovery never starts or
+replays a send, and an invoice with sent metadata does not continue polling;
+disabled, unauthenticated, malformed, and unavailable responses remain
+fail-closed.
 
 The planned `GET /billing/catalog` and license JWKS are public, sanitized,
 credential-free, bounded-cache resources. Authenticated status and all billing/
@@ -200,9 +225,9 @@ cannot display old remaining units as currently usable.
 
 `POST /auth/access-token` accepts the existing opaque `X-Session-Id`, optional non-secret `X-TaskTime-App-Version`, and no credential in its URL. It accepts only an optional boolean `forceRefresh` body field, returns a short-lived bearer token, its absolute expiry, Worker time, and known grant scope. Every success and failure response is `no-store`.
 
-The `/auth/dropbox/*` family is provider-bound and accepts no Dropbox file path or file body. Dropbox authorization uses App Folder access with the approved content/metadata read/write scopes plus `account_info.read` solely for connected-account presentation. `POST /auth/dropbox/access-token` returns a short-lived memory-only token for direct browser-to-Dropbox requests. The browser calls Dropbox's current-account endpoint directly, validates the verified/non-disabled email, and may add it to the origin-local Dropbox auth-session record. The Worker never receives or persists that profile response; the email never enters Yjs, provider sync, backup/export/import, logs, or metrics. File-scope-only stored sessions remain valid and expose a null email until explicit reconnect.
+The `/auth/dropbox/*` family is provider-bound and accepts no Dropbox file path or file body. Dropbox authorization uses App Folder access with the approved content/metadata read/write scopes plus `account_info.read` solely for connected-account presentation. `POST /auth/dropbox/access-token` returns a short-lived memory-only token for direct browser-to-Dropbox requests. The browser calls Dropbox's current-account endpoint directly, validates the verified/non-disabled email, and may add it to the origin-local Dropbox auth-session record. The Worker never receives that profile response, and the email never enters Yjs, provider sync, backup/export/import, logs, or metrics. The narrow exception is an explicit paid Checkout request: the browser may submit the locally verified email as `billingContactEmail`, which the Worker stores only as the billing contact and supplies to the owned Stripe Customer. File-scope-only stored sessions remain valid and expose a null email until explicit reconnect.
 
-Billing status retains the stable opaque `accountReference` and provider-scoped `displayLabel` as compatibility/support contracts. Plan & Billing presents the connected provider email when locally available and otherwise uses neutral connected-provider copy; it never exposes the stable reference as customer identity, and trial/billing authority never derives from the email.
+Billing status retains the stable opaque `accountReference` and provider-scoped `displayLabel` as compatibility/support contracts. Plan & Billing presents the connected provider email when locally available and otherwise uses neutral connected-provider copy; it never exposes the stable reference as customer identity, and trial/billing authority never derives from the email. Checkout request version 1 accepts the optional normalized `billingContactEmail` in addition to `offerId`, `planConfigVersion`, and `idempotencyKey`. Old clients may omit it. The first accepted billing contact prefills a new or email-less mapped Stripe Customer; a pre-existing Stripe billing email is preserved rather than silently replaced after a provider reconnect or transfer.
 
 `POST /auth/hosted-identity/transfer` accepts two authenticated provider sessions,
 the additive UUID-v4 `X-TaskTime-Transfer-Id`, and no payload after target

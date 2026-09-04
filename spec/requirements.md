@@ -112,8 +112,10 @@ Requirement identifiers are stable references for acceptance criteria, design do
   Stripe IDs; a changed catalog requires fresh purchase confirmation.
 - **ENTL-7:** Hosted email uses a UTC calendar-month allowance and atomic,
   idempotent primary/forward reservations. Provider-accepted parts consume;
-  proven pre-acceptance failure releases; ambiguous outcomes remain reserved and
-  are not automatically resent.
+  proven pre-acceptance failure releases; acceptance-unknown outcomes remain
+  reserved. A single bounded byte-identical retry may reuse the same attempt and
+  provider idempotency evidence, but no recovery path may create a second logical
+  send.
 - **ENTL-8:** Provider transfer, trial, Checkout, webhook reconciliation, grants,
   deletion, and hosted-email reservations serialize or compare durable versions
   so retries/concurrency cannot duplicate a trial, customer, subscription,
@@ -132,8 +134,12 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **ENTL-12:** An acceptance-unknown hosted email has a privacy-minimized durable
   attempt and a caller-owned D1-only status operation. Status never contacts the
   provider, resends, changes allowance, or returns raw provider IDs; accepted
-  local sent metadata is applied idempotently only after current-record/lifecycle
-  revalidation.
+  local sent metadata is applied idempotently only after lifecycle, current-
+  record, and immutable send-time snapshot revalidation. Signed provider events
+  and a bounded scheduled Worker reconciliation may advance an already-contacted
+  part without sending it again. If a crash leaves a retained terminal result but
+  no matching invoice sent timestamp, owned status proof reapplies that result
+  without another provider send; already-sent invoices do not keep polling.
 - **ENTL-13:** Cross-database provider transfer uses a durable idempotent journal,
   EMAIL_DB prepare/apply record, direct aliases, and a hosted-action fence until
   both stores agree. Crashes/retries cannot expose a partial license/quota move,

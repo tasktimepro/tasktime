@@ -60,7 +60,12 @@ Let users understand exactly what will be billed, what changed after finalizatio
   the left and the rocket-led Get Pro action on the right, replaces the rocket
   with the shared loading spinner while Checkout opens, and places only the
   right-aligned tax qualifier below the actions. Hosted Checkout owns the final
-  recurring-subscription disclosure and confirmation.
+  recurring-subscription disclosure and confirmation. The explicit purchase
+  action passes the locally verified connected-account email as an optional
+  billing contact so Stripe can prefill it; this contact never becomes account,
+  trial, or entitlement identity. Checkout keeps automatic tax and business
+  tax-ID support, lets Stripe collect only the location detail it needs, and does
+  not force a full-address form or separate TaskTime Terms checkbox.
 - Cancellation defaults to period end and shows continued access plus the exact
   end date. A founder's confirmation explains that reversing before then
   preserves the founding base price, while terminal cancellation permanently

@@ -50,8 +50,9 @@ During local development, the public Astro pages are served through the same ori
 
 ```bash
 make install                         # install dependencies
-make dev                             # start the app on localhost:3101
-make dev-billing-sandbox             # use the real local Worker and Stripe test-mode billing
+make dev                             # start the complete production-like local stack
+make dev-core                        # start only the public core app for isolated diagnostics
+make dev-billing-sandbox             # explicit alias for the complete local stack
 make stop                            # stop local containers
 make lint                            # run ESLint
 make typecheck                       # run the repository-wide TypeScript check
@@ -64,23 +65,33 @@ make preview                         # build and preview production output
 make npm CMD="run build:agent-bridge" # build the agent bridge package
 ```
 
-`make dev-billing-sandbox` replaces the retired synthetic billing-state preview.
-It works only in Vite development mode on `localhost`/loopback, points the app at
-the local Worker, and exercises the normal catalog, account, trial, Checkout,
-webhook, reconciliation, license, and Portal clients against Stripe test mode
-and Wrangler-local D1. Product screens remain visually production-like, without
-sandbox-only banners or developer-facing notices. Hosted Send and delivery-status
-requests remain disabled behind neutral failure copy so billing tests cannot send
-customer messages. Production builds ignore the sandbox flag, and the tracked
-production Worker controls remain unchanged and off.
+In an operator checkout containing `tasktime-infra`, `make dev` is the default
+production-like development workflow. It replaces the retired synthetic billing-
+state preview, points the Vite app at the local Worker, and exercises the normal
+catalog, account, trial, Checkout, webhook, reconciliation, license, Portal,
+hosted Send, Google Drive, Dropbox, and enabled Worker-service paths against
+local state and Stripe test mode. `make dev-billing-sandbox` remains a compatible
+explicit alias. A public checkout without the private infrastructure repository
+falls back to the core app; `make dev-core` selects that path explicitly.
 
-Start the complete billing sandbox from the repository root. The command
-prepares local D1/configuration and starts the app, Worker, and Dockerized
-Stripe webhook listener together. Their logs remain attached, and `Ctrl+C`
-stops and removes the complete stack:
+Product screens remain visually production-like, without sandbox-only banners or
+developer-facing notices. Hosted Send and delivery-status requests use the normal
+Pro entitlement, quota, recovery, and configured Resend account. Startup requires
+`RESEND_API_KEY` in the ignored Worker `.dev.vars`, so a missing delivery provider
+fails clearly before the stack opens instead of producing a later 503. Send only
+to a test address you control. Production builds ignore the sandbox flag, and the
+tracked production Worker controls remain unchanged and off. Any Worker control
+enabled in tracked production configuration must not be disabled by the local
+overlay; a contract test enforces that one-way parity.
+
+Start the complete local stack from the repository root. The command
+prepares local D1/configuration and starts the app, Worker, scheduled recovery
+runner, and Dockerized Stripe webhook listener together. Their logs remain attached, and `Ctrl+C`
+stops and removes the complete stack. The long-running services use a dedicated
+Compose project, so ordinary one-off validation commands cannot stop them:
 
 ```bash
-make dev-billing-sandbox
+make dev
 ```
 
 Preparation accepts a current `STRIPE_SECRET_KEY=sk_test_...` or the authenticated
@@ -88,10 +99,14 @@ Stripe CLI profiles. When several accounts are configured, it safely selects the
 test credential that can read TaskTime's exact configured Price instead of
 assuming `[default]`. It writes only ignored mode-`0600` local files,
 applies the checked-in migrations to Wrangler-local D1, and seeds local-only
-rollout approvals. If the CLI temporary key expired, run `stripe login` or pass
-a current test secret key and rerun the same command. Stripe authentication is
-the only occasional host prerequisite. A previously prepared valid local test
-key is reused, and the recurring validation plus runtime services use the
+rollout approvals. It then read-only attests the applied email ledger against
+the canonical tables, constraints, indexes, and triggers. Schema drift stops
+startup without repairing or deleting local data. If the CLI temporary key
+expired, run `stripe login` or pass
+a current test secret key and rerun the same command. Stripe authentication and
+the ignored local service credentials are the only host prerequisites. A
+previously prepared valid local test key is reused, and the recurring validation
+plus runtime services use the
 pinned official Stripe CLI Docker image. The listener receives only its API key,
 not the Worker signing or HMAC configuration, and its attached output masks the
 local webhook signing secret. The lower-level private Worker
@@ -103,6 +118,11 @@ The public comparison remains available from the same server at
 bundled review prices while the live Worker catalog is unavailable. The billing
 sandbox deliberately disables that fallback so local Worker/configuration failures
 remain visible before any trial or test purchase.
+
+The Vite server intentionally does not install the production service worker, so
+installability, offline-cache updates, and Web Push still require the existing
+production-preview/PWA smoke workflow. That is a browser-runtime limitation, not
+a disabled product feature in the local Worker stack.
 
 ## Architecture
 

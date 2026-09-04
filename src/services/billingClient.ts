@@ -515,6 +515,7 @@ function parseBillingDeletionResponse(value: unknown): { version: 1; state: 'ano
 async function readBoundedJson(response: Response, maximumBytes: number): Promise<unknown> {
     const declared = response.headers.get('Content-Length');
     if (declared && (!/^\d+$/.test(declared) || Number(declared) > maximumBytes)) {
+        void response.body?.cancel().catch(() => undefined);
         throw new BillingClientError('RESPONSE_TOO_LARGE', response.status, false);
     }
     if (!response.body) return null;
@@ -633,9 +634,21 @@ export function createBillingClient(options: {
             path: '/billing/trial/start', method: 'POST', sessionId, timeoutMs: 10_000,
             body: { version: 1, idempotencyKey: key }, parser: parseBillingStatus,
         }),
-        createCheckout: (sessionId: string, offerId: string, planConfigVersion: string, key = idempotencyKey()) => privateRequest({
+        createCheckout: (
+            sessionId: string,
+            offerId: string,
+            planConfigVersion: string,
+            key = idempotencyKey(),
+            billingContactEmail?: string,
+        ) => privateRequest({
             path: '/billing/checkout', method: 'POST', sessionId, timeoutMs: 15_000,
-            body: { version: 1, offerId, planConfigVersion, idempotencyKey: key },
+            body: {
+                version: 1,
+                offerId,
+                planConfigVersion,
+                idempotencyKey: key,
+                ...(billingContactEmail ? { billingContactEmail } : {}),
+            },
             parser: parseCheckoutResponse,
         }),
         abandonCheckout: (sessionId: string, attemptId: string, key = idempotencyKey()) => privateRequest({

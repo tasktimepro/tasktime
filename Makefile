@@ -4,17 +4,26 @@
 APP_RUN_ENV ?=
 APP_RUN = docker compose run --rm $(APP_RUN_ENV) app
 
-.PHONY: help dev dev-billing-sandbox dev-push-local preview-push-local preview-push-cloud preview-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke release-gate blog-install blog-dev blog-build
+.PHONY: help dev dev-core dev-billing-sandbox dev-push-local preview-push-local preview-push-cloud preview-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke release-gate blog-install blog-dev blog-build
 
 PREVIEW_PORT ?= 3101
+PRIVATE_INFRA_MAKEFILE := tasktime-infra/Makefile
+TASKTIME_DEV_PROJECT ?= tasktime-dev
+
+ifneq ("$(wildcard $(PRIVATE_INFRA_MAKEFILE))","")
+DEV_COMPOSE = docker compose --project-name $(TASKTIME_DEV_PROJECT) -f docker-compose.yml -f docker-compose.billing-sandbox.yml
+else
+DEV_COMPOSE = docker compose
+endif
 
 # Default target - show help
 help:
 	@echo "TaskTime Pro Development Commands"
 	@echo "=============================="
 	@echo ""
-	@echo "  make dev      - Start development server (docker compose up)"
-	@echo "  make dev-billing-sandbox - Start loopback-only real Stripe test-mode billing against the local Worker"
+	@echo "  make dev      - Start the complete production-like local stack"
+	@echo "  make dev-core - Start only the public core app (diagnostic/public checkout fallback)"
+	@echo "  make dev-billing-sandbox - Explicit alias for the complete local stack"
 	@echo "  make dev-push-local - Start app dev server with Dropbox UI using local Worker at http://localhost:8787"
 	@echo "  make preview-push-local - Build production preview with Dropbox UI using local Worker at http://localhost:8787"
 	@echo "  make preview-push-cloud - Build production preview using deployed Worker at https://sync.tasktime.pro"
@@ -43,17 +52,28 @@ help:
 	@echo "  make release-gate - Run lint, typecheck, coverage, browser/PWA smoke, and build"
 	@echo ""
 
-# Start development server
-dev:
+# The operator checkout defaults to the complete local Worker, Stripe test-mode,
+# and app stack. A public checkout without the private infrastructure repository
+# keeps the core app usable through the explicit fallback below.
+ifneq ("$(wildcard $(PRIVATE_INFRA_MAKEFILE))","")
+dev: dev-billing-sandbox
+else
+dev: dev-core
+endif
+
+# Start only the public core development server. This is intentionally not the
+# default when the private production services are available locally.
+dev-core:
 	docker compose up -d
-	@echo "Development server running at http://localhost:3101"
+	@echo "Core development server running at http://localhost:3101"
 	@echo "Blog dev server is available through the same origin at http://localhost:3101/blog"
 
 # Prepare and start the app, local Worker, and Stripe test-webhook listener as
 # one attached Docker Compose stack. Ctrl+C stops the complete stack together.
 dev-billing-sandbox:
+	@test -f $(PRIVATE_INFRA_MAKEFILE) || { echo "Error: tasktime-infra is required for the complete local stack; use make dev-core in a public checkout"; exit 1; }
 	$(MAKE) -C tasktime-infra worker-billing-sandbox-prepare
-	sh ./scripts/run-billing-sandbox-stack.sh
+	TASKTIME_DEV_PROJECT=$(TASKTIME_DEV_PROJECT) sh ./scripts/run-billing-sandbox-stack.sh
 
 # Start local app dev server wired to local Wrangler Worker with Dropbox UI.
 dev-push-local:
@@ -90,7 +110,7 @@ preview-cloud: preview-push-cloud
 
 # Stop development server
 stop:
-	docker compose down
+	$(DEV_COMPOSE) down --remove-orphans
 
 # Build for production
 build:
@@ -189,7 +209,7 @@ release-gate:
 
 # View logs
 logs:
-	docker compose logs -f
+	$(DEV_COMPOSE) logs -f
 
 # Open shell in container
 shell:
@@ -197,7 +217,7 @@ shell:
 
 # Clean rebuild (removes containers and rebuilds image)
 clean:
-	docker compose down
+	$(MAKE) stop
 	docker compose build --no-cache
 	@echo "Clean rebuild complete. Run 'make dev' to start."
 

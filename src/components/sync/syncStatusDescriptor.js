@@ -85,7 +85,9 @@ export function getYjsSyncStatusDescriptor({
     if (!isDriveConnected && !isConnecting) {
         const reconnectText = providerName === 'Google Drive'
             ? 'Reconnect to Drive'
-            : `Reconnect to ${providerName}`;
+            : providerName === 'cloud storage'
+                ? 'Reconnect cloud storage'
+                : `Reconnect to ${providerName}`;
         const connectText = providerName === 'Google Drive'
             ? 'Connect Google Drive'
             : `Connect ${providerName}`;

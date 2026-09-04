@@ -29,7 +29,11 @@ type BillingContextValue = {
     connectedAccountReference: string | null;
     refresh: () => Promise<void>;
     startTrial: () => Promise<void>;
-    createCheckout: (offerId: string, planConfigVersion: string) => Promise<{ url: string; attemptId: string }>;
+    createCheckout: (
+        offerId: string,
+        planConfigVersion: string,
+        billingContactEmail?: string,
+    ) => Promise<{ url: string; attemptId: string }>;
     openPortal: () => Promise<string>;
     handleCheckoutReturn: (outcome: 'success' | 'cancel') => Promise<void>;
 };
@@ -117,26 +121,35 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         announceRefresh();
         await refresh();
     }, [announceRefresh, lifecycle, refresh, status]);
-    const createCheckout = useCallback(async (offerId: string, planConfigVersion: string) => {
+    const createCheckout = useCallback(async (
+        offerId: string,
+        planConfigVersion: string,
+        billingContactEmail?: string,
+    ) => {
         if (!BILLING_FEATURES.checkout
             || !lifecycle
             || !status?.actions.checkoutEnabled) throw new Error('BILLING_DISABLED');
-        let result;
-        try {
-            result = await billingClient.createCheckout(
+        const openCheckout = () => billingContactEmail
+            ? billingClient.createCheckout(
+                lifecycle.sessionId,
+                offerId,
+                planConfigVersion,
+                undefined,
+                billingContactEmail,
+            )
+            : billingClient.createCheckout(
                 lifecycle.sessionId,
                 offerId,
                 planConfigVersion,
             );
+        let result;
+        try {
+            result = await openCheckout();
         } catch (error) {
             if (error instanceof BillingClientError && error.code === 'CHECKOUT_EXPIRED') {
                 await refresh();
                 try {
-                    result = await billingClient.createCheckout(
-                        lifecycle.sessionId,
-                        offerId,
-                        planConfigVersion,
-                    );
+                    result = await openCheckout();
                 } catch (retryError) {
                     if (isChangedCheckoutOffer(retryError)) {
                         await refresh();

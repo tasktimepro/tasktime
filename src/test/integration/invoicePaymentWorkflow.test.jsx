@@ -69,6 +69,15 @@ vi.mock('../../hooks/usePreferences.ts', () => ({
     usePreferences: () => ({ preferences: { currency: 'EUR' } })
 }))
 
+vi.mock('../../contexts/YjsContext', () => ({
+    useYjs: () => ({
+        hostedServiceSessionId: null,
+        activeStorageProvider: null,
+        activeStorageGeneration: null,
+        activeStorageSessionId: null,
+    }),
+}))
+
 describe('Invoice payment workflow integration', () => {
 
     beforeEach(() => {

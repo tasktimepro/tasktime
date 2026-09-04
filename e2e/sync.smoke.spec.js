@@ -398,7 +398,7 @@ test.describe('Cloud sync smoke', () => {
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: originalTitle, exact: true })).toBeVisible();
-        await expect(page.getByRole('button', { name: /^(?:Connect|Reconnect to) cloud storage$/ })).toBeVisible();
+        await expect(page.getByRole('button', { name: /^(?:Connect|Reconnect) cloud storage$/ })).toBeVisible();
 
         await editProjectFromList(page, {
             currentTitle: originalTitle,
@@ -731,8 +731,8 @@ test.describe('Cloud sync smoke', () => {
 
         const connectedButton = page.getByRole('button', { name: 'In sync' });
         await expect(connectedButton).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Reconnect to cloud storage' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Connect cloud storage', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Reconnect cloud storage' })).toHaveCount(0);
 
         await connectedButton.click();
 
@@ -831,7 +831,7 @@ test.describe('Cloud sync smoke', () => {
         await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
         await expect(page.getByText('Not connected')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Connect Google Drive' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Reconnect to cloud storage' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Reconnect cloud storage' })).toBeVisible();
     });
 
     test('shows reconnect state when a previous Drive session is no longer valid', async ({ page }) => {
@@ -856,8 +856,8 @@ test.describe('Cloud sync smoke', () => {
         await page.reload();
 
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Reconnect to cloud storage' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect cloud storage' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Reconnect cloud storage' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Connect cloud storage', exact: true })).toHaveCount(0);
     });
 
     test('shows a sync service error when Google Drive auth init cannot be reached', async ({ page }) => {

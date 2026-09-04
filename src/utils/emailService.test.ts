@@ -29,6 +29,7 @@ const validParams: SendInvoiceEmailParams = {
     bodyText: 'Please find attached...',
     pdfBase64: 'JVBERi0=',
     sendType: 'invoice',
+    documentSnapshot: { id: 'inv-1', total: 100 },
 };
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -350,6 +351,19 @@ describe('sendInvoiceEmail', () => {
                 status: 502,
             }),
         }));
+    });
+
+    it('cancels an email response body rejected by its declared size', async () => {
+        const cancel = vi.fn();
+        fetchMock.mockResolvedValue(new Response(new ReadableStream({ cancel }), {
+            status: 200,
+            headers: { 'Content-Length': '65537' },
+        }));
+
+        await expect(sendInvoiceEmail(validParams)).rejects.toEqual(
+            expect.objectContaining({ type: 'network' }),
+        );
+        expect(cancel).toHaveBeenCalledOnce();
     });
 
     it('does not capture incidents for validation or already-sent business responses', async () => {

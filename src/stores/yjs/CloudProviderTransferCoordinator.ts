@@ -76,6 +76,7 @@ export interface CloudProviderTransferOptions {
     linkHostedServiceIdentity?: (providers: {
         source: CloudStorageSessionRef;
         target: CloudStorageSessionRef;
+        operationId: string;
     }) => Promise<void>;
     clearSourceSession?: () => Promise<void>;
     onStage?: (stage: CloudTransferStage) => void;
@@ -439,7 +440,17 @@ export class CloudProviderTransferCoordinator {
             journal = await this.setStage(journal.operationId, 'target-prepared', options, {
                 handoffBackupName,
             });
+            const preparedTargetFingerprint = await options.targetManifest.getRemoteManifestFingerprint();
             await this.verifyTarget(snapshot, options.targetManifest, handoffBackupName, journal);
+            const targetFingerprint = await options.targetManifest.getRemoteManifestFingerprint();
+            if (!equalFingerprint(preparedTargetFingerprint, targetFingerprint)) {
+                await this.mergePreparedTargetUpdates(journal, options.targetManifest);
+                await this.store.forceCloudSync(
+                    { allowPull: false, forceFullState: true },
+                    lockPermit,
+                );
+                continue;
+            }
 
             if (!this.store.isCloudTransferSnapshotCurrent(snapshot)) {
                 await this.store.forceCloudSync(
@@ -475,7 +486,30 @@ export class CloudProviderTransferCoordinator {
             await options.linkHostedServiceIdentity?.({
                 source: identityProviders.source,
                 target: identityProviders.target,
+                operationId: journal.operationId,
             });
+
+            // Hosted identity linking crosses the Worker boundary and may take
+            // long enough for another device to update either provider. Merge
+            // same-lineage target updates before restaging so an older client
+            // that does not understand transfer-prepared cannot lose its work.
+            const targetAfterHostedLink = await options.targetManifest.getRemoteManifestFingerprint();
+            const targetChanged = !equalFingerprint(targetFingerprint, targetAfterHostedLink);
+            if (targetChanged) {
+                await this.mergePreparedTargetUpdates(journal, options.targetManifest);
+            } else {
+                await this.assertPreparedTargetMarker(journal, options.targetManifest);
+            }
+            const localChanged = !this.store.isCloudTransferSnapshotCurrent(snapshot);
+            const sourceAfterHostedLink = await options.sourceManifest.getRemoteManifestFingerprint();
+            const sourceChanged = !equalFingerprint(sourceFingerprint, sourceAfterHostedLink);
+            if (targetChanged || localChanged || sourceChanged) {
+                await this.store.forceCloudSync(
+                    { allowPull: sourceChanged, forceFullState: true },
+                    lockPermit,
+                );
+                continue;
+            }
             await options.sourceManifest.writeCloudBindingMarker(
                 bindingMarker(journal, 'moved', journal.targetProvider),
             );
@@ -488,7 +522,6 @@ export class CloudProviderTransferCoordinator {
                 options,
                 lifecycle,
                 lockPermit,
-                snapshot,
             );
             return;
         }
@@ -647,16 +680,19 @@ export class CloudProviderTransferCoordinator {
         options: CloudProviderTransferOptions,
         lifecycle: CloudStorageLifecycleState,
         lockPermit: CloudSyncLockPermit,
-        knownSnapshot?: CloudTransferWorkspaceSnapshot,
     ): Promise<void> {
-        const snapshot = knownSnapshot ?? await this.store.createCloudTransferSnapshot();
         if (!stageAtOrAfter(journal.stage, 'activated')) {
             const handoffBackupName = journal.handoffBackupName
                 ?? this.createHandoffBackupName(journal.operationId);
-            if (!knownSnapshot) {
-                // Recovery after the source marker may include local edits made
-                // before the tab stopped. Re-stage and verify them on the target;
-                // never resume writes to the moved source.
+
+            let targetSettled = false;
+            for (let attempt = 0; attempt < MAX_VERIFICATION_ATTEMPTS; attempt += 1) {
+                // The source is irreversibly fenced now, so converge any target
+                // updates into local state and publish a fresh merged snapshot.
+                // This also preserves writes from older clients that do not yet
+                // treat transfer-prepared as a sync fence.
+                await this.mergePreparedTargetUpdates(journal, options.targetManifest);
+                const snapshot = await this.store.createCloudTransferSnapshot();
                 await this.uploadTarget(snapshot, options.targetManifest, handoffBackupName);
                 await options.targetManifest.writeCloudBindingMarker(
                     bindingMarker(journal, 'transfer-prepared', journal.targetProvider),
@@ -666,13 +702,27 @@ export class CloudProviderTransferCoordinator {
                         handoffBackupName,
                     });
                 }
+                const preparedFingerprint = await options.targetManifest.getRemoteManifestFingerprint();
+                await this.verifyTarget(
+                    snapshot,
+                    options.targetManifest,
+                    handoffBackupName,
+                    journal,
+                );
+                const verifiedFingerprint = await options.targetManifest.getRemoteManifestFingerprint();
+                if (!this.store.isCloudTransferSnapshotCurrent(snapshot)
+                    || !equalFingerprint(preparedFingerprint, verifiedFingerprint)) {
+                    continue;
+                }
+                targetSettled = true;
+                break;
             }
-            await this.verifyTarget(
-                snapshot,
-                options.targetManifest,
-                handoffBackupName,
-                journal,
-            );
+            if (!targetSettled) {
+                throw new CloudTransferError(
+                    'TARGET_VERIFICATION_FAILED',
+                    'The target changed during final transfer verification. Close TaskTime on your other devices and try again.',
+                );
+            }
             const alreadyActivated = lifecycle.active?.provider === journal.targetProvider
                 && lifecycle.active.generation === journal.targetGeneration
                 && lifecycle.stagedTarget === null;
@@ -716,6 +766,36 @@ export class CloudProviderTransferCoordinator {
             throw new CloudTransferError(
                 'TRANSFER_STATE_CHANGED',
                 'The completed transfer journal changed before cleanup.',
+            );
+        }
+    }
+
+    private async mergePreparedTargetUpdates(
+        journal: CloudTransferJournalV1,
+        target: CloudManifestManager,
+    ): Promise<void> {
+        await target.reload();
+        await this.assertPreparedTargetMarker(journal, target, true);
+        await this.store.mergeCloudTransferUpdates(await readManifestUpdates(target));
+    }
+
+    private async assertPreparedTargetMarker(
+        journal: CloudTransferJournalV1,
+        target: CloudManifestManager,
+        cached = false,
+    ): Promise<void> {
+        const marker = cached
+            ? await target.readCachedCloudBindingMarker()
+            : await target.readCloudBindingMarker();
+        if (!marker
+            || marker.workspaceId !== journal.workspaceId
+            || marker.operationId !== journal.operationId
+            || marker.generation !== journal.targetGeneration
+            || marker.activeProvider !== journal.targetProvider
+            || marker.state !== 'transfer-prepared') {
+            throw new CloudTransferError(
+                'TARGET_VERIFICATION_FAILED',
+                'The target transfer marker changed before the workspace could be activated.',
             );
         }
     }

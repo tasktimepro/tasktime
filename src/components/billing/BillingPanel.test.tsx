@@ -311,7 +311,35 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(screen.queryByText(/Usage is temporarily unavailable/)).toBeNull();
     });
 
-    it('uses the connected provider email as the customer-facing identity and keeps the stable reference hidden', () => {
+    it('uses the connected provider email for display and Checkout while keeping the stable reference hidden', async () => {
+        const value = billingValue();
+        const createCheckout = vi.fn(async () => ({
+            url: 'https://checkout.stripe.com/c/pay/cs_test_fixture',
+            attemptId: 'attempt-fixture',
+        }));
+        state.features.checkout = true;
+        state.value = billingValue({
+            createCheckout,
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    checkoutEnabled: true,
+                    checkoutOffer: {
+                        offerId: 'pro-founding-annual-eur',
+                        offerKind: 'founding',
+                        price: {
+                            currency: 'EUR',
+                            unitAmountMinor: 3900,
+                            interval: 'year',
+                            taxPresentation: 'calculated_at_checkout',
+                            renewal: 'automatic',
+                        },
+                    },
+                    checkoutOfferReason: 'founding_available',
+                },
+            },
+        });
         render(
             <BillingPanel
                 onOpenSync={vi.fn()}
@@ -325,6 +353,13 @@ describe('BillingPanel shadow-mode UX', () => {
             && element.textContent?.includes('Pro trial for owner@example.com') === true
         ))).toBeInTheDocument();
         expect(screen.queryByText(/TT-ABCD-EFGH/)).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Get Pro' }));
+        await waitFor(() => expect(createCheckout).toHaveBeenCalledWith(
+            'pro-founding-annual-eur',
+            'test-catalog-1',
+            'owner@example.com',
+        ));
     });
 
     it('marks Pro as the current plan and keeps billing management inside its card', () => {

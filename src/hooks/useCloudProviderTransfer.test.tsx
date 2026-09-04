@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useCloudProviderTransfer } from './useCloudProviderTransfer';
 
+const TRANSFER_OPERATION_ID = '10f447de-7f96-4c89-953a-21e504e339b2';
+
 const mocks = vi.hoisted(() => ({
     activeProvider: 'google-drive' as 'google-drive' | 'dropbox',
     cloudConnected: true,
@@ -155,7 +157,12 @@ describe('useCloudProviderTransfer', () => {
         mocks.isCloudConnected.mockReturnValue(true);
         mocks.lifecycleRefresh.mockResolvedValue(undefined);
         mocks.assertDropboxTransferEnabled.mockResolvedValue(undefined);
-        mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ success: true }), {
+        mocks.fetch.mockResolvedValue(new Response(JSON.stringify({
+            success: true,
+            version: 1,
+            transferred: true,
+            transferOperationId: TRANSFER_OPERATION_ID,
+        }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
         }));
@@ -168,6 +175,7 @@ describe('useCloudProviderTransfer', () => {
             await options.linkHostedServiceIdentity?.({
                 source: mocks.lifecycleState.active,
                 target: mocks.lifecycleState.stagedTarget,
+                operationId: TRANSFER_OPERATION_ID,
             });
             await options.clearSourceSession?.();
         });
@@ -218,6 +226,7 @@ describe('useCloudProviderTransfer', () => {
                 headers: expect.objectContaining({
                     'X-Session-Id': 'google-drive-session',
                     'X-Target-Session-Id': 'dropbox-session',
+                    'X-TaskTime-Transfer-Id': TRANSFER_OPERATION_ID,
                 }),
             }),
         );
@@ -258,6 +267,7 @@ describe('useCloudProviderTransfer', () => {
                 headers: expect.objectContaining({
                     'X-Session-Id': 'dropbox-session',
                     'X-Target-Session-Id': 'google-drive-session',
+                    'X-TaskTime-Transfer-Id': TRANSFER_OPERATION_ID,
                 }),
             }),
         );
@@ -287,6 +297,148 @@ describe('useCloudProviderTransfer', () => {
             targetProvider: 'dropbox',
             canResume: true,
         });
+    });
+
+    it('fails closed before the hosted request when the durable operation id is invalid', async () => {
+        mocks.coordinatorRun.mockImplementationOnce(async (options: any) => {
+            await options.linkHostedServiceIdentity({
+                source: mocks.lifecycleState.active,
+                target: mocks.lifecycleState.stagedTarget,
+                operationId: 'invalid-transfer-id',
+            });
+        });
+        const { result } = renderHook(() => useCloudProviderTransfer());
+        await waitFor(() => expect(mocks.readJournal).toHaveBeenCalled());
+
+        await act(async () => {
+            await expect(result.current.startTransfer('dropbox')).rejects.toThrow(
+                /saved provider transfer identity is invalid/i,
+            );
+        });
+
+        expect(mocks.fetch).not.toHaveBeenCalled();
+        expect(mocks.lifecycleRefresh).not.toHaveBeenCalled();
+        expect(result.current).toMatchObject({
+            status: 'error',
+            targetProvider: 'dropbox',
+            canResume: true,
+        });
+    });
+
+    it('keeps the source active when the hosted transfer response is bound to another operation', async () => {
+        mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({
+            success: true,
+            version: 1,
+            transferred: true,
+            transferOperationId: '5179a78b-e8c5-448b-b840-16a3b5e3bdc5',
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        }));
+        const { result } = renderHook(() => useCloudProviderTransfer());
+        await waitFor(() => expect(mocks.readJournal).toHaveBeenCalled());
+
+        await act(async () => {
+            await expect(result.current.startTransfer('dropbox')).rejects.toThrow(
+                /Hosted-service transfer could not be confirmed/i,
+            );
+        });
+
+        expect(mocks.lifecycleRefresh).not.toHaveBeenCalled();
+        expect(mocks.googleSignOut).not.toHaveBeenCalled();
+        expect(result.current).toMatchObject({ status: 'error', canResume: true });
+    });
+
+    it.each([
+        ['malformed JSON', '{not-json'],
+        ['an oversized response', JSON.stringify({
+            success: true,
+            version: 1,
+            transferred: true,
+            transferOperationId: TRANSFER_OPERATION_ID,
+            padding: 'x'.repeat(4_096),
+        })],
+    ])('keeps the source active for %s from the hosted transfer', async (_label, body) => {
+        mocks.fetch.mockResolvedValueOnce(new Response(body, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        }));
+        const { result } = renderHook(() => useCloudProviderTransfer());
+        await waitFor(() => expect(mocks.readJournal).toHaveBeenCalled());
+
+        await act(async () => {
+            await expect(result.current.startTransfer('dropbox')).rejects.toThrow(
+                /Hosted-service transfer could not be confirmed/i,
+            );
+        });
+
+        expect(mocks.lifecycleRefresh).not.toHaveBeenCalled();
+        expect(mocks.googleSignOut).not.toHaveBeenCalled();
+        expect(result.current).toMatchObject({ status: 'error', canResume: true });
+    });
+
+    it('aborts a hosted transfer whose response body never completes', async () => {
+        const { result } = renderHook(() => useCloudProviderTransfer());
+        await waitFor(() => expect(mocks.readJournal).toHaveBeenCalled());
+        vi.useFakeTimers();
+        try {
+            let requestSignal: AbortSignal | undefined;
+            mocks.fetch.mockImplementationOnce(async (_input, init) => {
+                requestSignal = init?.signal as AbortSignal | undefined;
+                const body = new ReadableStream({
+                    start(controller) {
+                        requestSignal?.addEventListener('abort', () => {
+                            controller.error(new DOMException('Aborted', 'AbortError'));
+                        }, { once: true });
+                    },
+                });
+                return new Response(body, {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            });
+
+            let transferError: unknown;
+            await act(async () => {
+                const transfer = result.current.startTransfer('dropbox').catch(error => {
+                    transferError = error;
+                });
+                await vi.advanceTimersByTimeAsync(15_000);
+                await transfer;
+            });
+
+            expect(transferError).toEqual(expect.objectContaining({
+                message: expect.stringMatching(/Hosted-service transfer could not be confirmed/i),
+            }));
+            expect(requestSignal?.aborted).toBe(true);
+            expect(mocks.lifecycleRefresh).not.toHaveBeenCalled();
+            expect(mocks.googleSignOut).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('cancels a hosted transfer body rejected by its declared size', async () => {
+        const cancel = vi.fn();
+        mocks.fetch.mockResolvedValueOnce(new Response(new ReadableStream({ cancel }), {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': '4097',
+            },
+        }));
+        const { result } = renderHook(() => useCloudProviderTransfer());
+        await waitFor(() => expect(mocks.readJournal).toHaveBeenCalled());
+
+        await act(async () => {
+            await expect(result.current.startTransfer('dropbox')).rejects.toThrow(
+                /Hosted-service transfer could not be confirmed/i,
+            );
+        });
+
+        expect(cancel).toHaveBeenCalledOnce();
+        expect(mocks.lifecycleRefresh).not.toHaveBeenCalled();
+        expect(mocks.googleSignOut).not.toHaveBeenCalled();
     });
 
     it('keeps the source active when the live transfer control is disabled', async () => {

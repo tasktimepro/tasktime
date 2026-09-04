@@ -27,6 +27,11 @@ make test-run
 make build
 ```
 
+An operator checkout with the private infrastructure repository uses `make dev`
+for the complete local Worker and Stripe test-mode stack. The public repository
+continues to start the core app when that private checkout is absent; use
+`make dev-core` when you deliberately need that isolated path.
+
 Use `make npm CMD="<command>"` for arbitrary npm commands. Do not run `npm` directly on the host.
 
 ## Pull Requests

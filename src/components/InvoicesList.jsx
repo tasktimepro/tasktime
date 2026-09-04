@@ -40,7 +40,20 @@ import InvoicePaymentDetailsModal from './invoice/InvoicePaymentDetailsModal';
 import EmailPreviewModal from './invoice/EmailPreviewModal';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { usePreferences } from '../hooks/usePreferences.ts';
+import { useYjs } from '../contexts/YjsContext';
+import { BILLING_FEATURES } from '../config/billingFeatures';
+import { checkEmailAttemptStatus, isEmailSendError } from '../utils/emailService';
+import {
+    EMAIL_ATTEMPTS_CHANGED_EVENT,
+    findUnreconciledEmailAttemptForRecovery,
+    markEmailAttemptMetadataApplied,
+    validateBoundEmailAttemptDocumentSnapshot,
+} from '../utils/emailAttemptStorage';
 import { cn } from '@/lib/utils';
+
+const MAX_BACKGROUND_DELIVERY_CHECKS = 6;
+const BACKGROUND_DELIVERY_CHECK_DELAY_MS = 10_000;
+const BACKGROUND_DELIVERY_WAKE_COOLDOWN_MS = 60_000;
 
 /**
  * Resolve the list bucket a paid invoice will enter after its payment is corrected.
@@ -90,11 +103,25 @@ const InvoicesList = ({
     const [cancellationReason, setCancellationReason] = useState('');
     const [cancellationConfirmationText, setCancellationConfirmationText] = useState('');
     const [isCancelingInvoice, setIsCancelingInvoice] = useState(false);
+    const [protectedEmailActions, setProtectedEmailActions] = useState({});
+    const [reconciledSentAt, setReconciledSentAt] = useState({});
+    const [emailRecoveryReady, setEmailRecoveryReady] = useState(
+        !BILLING_FEATURES.emailEntitlementEnforcement,
+    );
+    const [emailAttemptRevision, setEmailAttemptRevision] = useState(0);
+    const emailRecoveryWakeAtRef = useRef(0);
     const { updateUrl } = useUrlState();
+    const {
+        hostedServiceSessionId,
+        activeStorageProvider,
+        activeStorageGeneration,
+        activeStorageSessionId,
+    } = useYjs();
     
     // Yjs hook for invoice updates
     const {
         invoices: allActiveInvoices,
+        updateInvoice,
         markAsPaid,
         updatePaymentDetails,
         markAsUnpaid,
@@ -105,9 +132,242 @@ const InvoicesList = ({
     } = useInvoices();
     const { preferences } = usePreferences();
     const preferredCurrency = normalizeCurrencyCode(preferences.currency);
+    const billingLifecycle = useMemo(() => activeStorageProvider
+        && activeStorageGeneration !== null
+        && activeStorageSessionId
+        && hostedServiceSessionId === activeStorageSessionId
+        ? {
+            provider: activeStorageProvider,
+            generation: activeStorageGeneration,
+            sessionId: activeStorageSessionId,
+        }
+        : null, [activeStorageGeneration, activeStorageProvider, activeStorageSessionId, hostedServiceSessionId]);
 
     // Filter out soft-deleted invoices (projectInvoices already filtered by parent)
     const activeInvoices = useMemo(() => projectInvoices, [projectInvoices]);
+
+    useEffect(() => {
+        const handleAttemptChange = () => setEmailAttemptRevision(revision => revision + 1);
+        window.addEventListener(EMAIL_ATTEMPTS_CHANGED_EVENT, handleAttemptChange);
+        return () => window.removeEventListener(EMAIL_ATTEMPTS_CHANGED_EVENT, handleAttemptChange);
+    }, []);
+
+    useEffect(() => {
+        if (!BILLING_FEATURES.emailEntitlementEnforcement || !billingLifecycle) {
+            setProtectedEmailActions({});
+            setEmailRecoveryReady(true);
+            return undefined;
+        }
+
+        let current = true;
+        const pendingWaits = new Map();
+        emailRecoveryWakeAtRef.current = Date.now();
+        setEmailRecoveryReady(false);
+
+        const waitForNextCheck = () => new Promise((resolve) => {
+            const timeoutId = window.setTimeout(() => {
+                pendingWaits.delete(timeoutId);
+                resolve();
+            }, BACKGROUND_DELIVERY_CHECK_DELAY_MS);
+            pendingWaits.set(timeoutId, resolve);
+        });
+
+        const clearProtection = (actionKey) => {
+            if (!current) return;
+            setProtectedEmailActions(currentValue => {
+                const next = { ...currentValue };
+                delete next[actionKey];
+                return next;
+            });
+        };
+
+        const reconcile = async () => {
+            const candidates = activeInvoices.flatMap((invoice) => {
+                const documentId = invoice.id || invoice.projectId || invoice.invoiceNumber;
+                if (!documentId) return [];
+                const sends = [{ invoice, documentId, sendType: 'invoice' }];
+                if (invoice.sentAt && isInvoiceOverdue(invoice)) {
+                    sends.push({ invoice, documentId, sendType: 'reminder' });
+                }
+                return sends;
+            });
+            const discovered = (await Promise.all(candidates.map(async candidate => ({
+                ...candidate,
+                recovery: await findUnreconciledEmailAttemptForRecovery(
+                    billingLifecycle,
+                    candidate.documentId,
+                    candidate.sendType,
+                    {
+                        includeAppliedCompletion: candidate.sendType === 'invoice'
+                            && !candidate.invoice.sentAt,
+                    },
+                ),
+            })))).filter(item => item.recovery);
+
+            if (!current) return;
+            const initialProtection = Object.fromEntries(discovered.map(item => [
+                `${item.invoice.id}:${item.sendType}`,
+                item.recovery.attempt.attemptId,
+            ]));
+            setProtectedEmailActions(initialProtection);
+            setEmailRecoveryReady(true);
+
+            const reconcileCandidate = async (item) => {
+                const actionKey = `${item.invoice.id}:${item.sendType}`;
+                let primaryAppliedAt = null;
+
+                const recoveryBinding = item.recovery.binding === 'same-provider-reconnect'
+                    ? {
+                        kind: item.recovery.binding,
+                        documentId: item.documentId,
+                        sendType: item.sendType,
+                    }
+                    : item.recovery.binding === 'different-provider'
+                        ? {
+                            kind: 'cross-provider-status-proof',
+                            documentId: item.documentId,
+                            sendType: item.sendType,
+                        }
+                        : null;
+
+                for (let checkIndex = 0;
+                    current && checkIndex < MAX_BACKGROUND_DELIVERY_CHECKS;
+                    checkIndex += 1) {
+                    let shouldRetry = false;
+                    try {
+                        const attempt = await checkEmailAttemptStatus({
+                            sessionId: hostedServiceSessionId,
+                            billingLifecycle,
+                            attemptId: item.recovery.attempt.attemptId,
+                            ...(recoveryBinding ? { recoveryBinding } : {}),
+                        });
+                        if (!current) return;
+
+                        const hasPendingPart = attempt.primary.outcome === 'pending'
+                            || attempt.forward?.outcome === 'pending';
+                        let primaryApplication = 'not-accepted';
+                        if (attempt.primary.outcome === 'accepted') {
+                            const acceptedAt = Date.parse(attempt.primary.acceptedAt);
+                            if (!Number.isFinite(acceptedAt)) {
+                                shouldRetry = true;
+                            } else {
+                                const currentInvoice = allActiveInvoices.find(invoice => invoice.id === item.invoice.id);
+                                if (!currentInvoice || isInvoiceCanceled(currentInvoice)) {
+                                    primaryApplication = 'mismatch';
+                                } else {
+                                    const validation = await validateBoundEmailAttemptDocumentSnapshot(
+                                        item.recovery.attempt.attemptId,
+                                        billingLifecycle,
+                                        currentInvoice,
+                                    );
+                                    if (validation === 'mismatch') {
+                                        primaryApplication = 'mismatch';
+                                    } else if (validation !== 'match') {
+                                        shouldRetry = true;
+                                    } else {
+                                        primaryApplication = 'applied';
+                                    }
+                                }
+                                if (primaryApplication === 'applied') {
+                                    if (currentInvoice.sentAt !== acceptedAt && primaryAppliedAt !== acceptedAt) {
+                                        await Promise.resolve(updateInvoice(item.invoice.id, { sentAt: acceptedAt }));
+                                        primaryAppliedAt = acceptedAt;
+                                    }
+                                    if (current) {
+                                        setReconciledSentAt(currentValue => ({
+                                            ...currentValue,
+                                            [item.invoice.id]: acceptedAt,
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+
+                        if (attempt.state === 'pending' || hasPendingPart) {
+                            shouldRetry = true;
+                        } else if (attempt.primary.outcome === 'accepted'
+                            && primaryApplication !== 'applied'
+                            && primaryApplication !== 'mismatch') {
+                            shouldRetry = true;
+                        } else if (attempt.primary.outcome !== 'accepted') {
+                            const finalized = attempt.state === 'rejected'
+                                || await markEmailAttemptMetadataApplied(
+                                    item.recovery.attempt.attemptId,
+                                    billingLifecycle,
+                                );
+                            if (finalized) {
+                                clearProtection(actionKey);
+                                return;
+                            }
+                            shouldRetry = true;
+                        } else {
+                            const applied = await markEmailAttemptMetadataApplied(
+                                item.recovery.attempt.attemptId,
+                                billingLifecycle,
+                            );
+                            if (current && applied) {
+                                clearProtection(actionKey);
+                                return;
+                            }
+                            shouldRetry = true;
+                        }
+                    } catch (error) {
+                        if (current && isEmailSendError(error) && error.type === 'attempt_not_found') {
+                            clearProtection(actionKey);
+                            return;
+                        }
+                        if (current && isEmailSendError(error) && error.type === 'attempt_dormant') {
+                            return;
+                        }
+                        shouldRetry = true;
+                    }
+
+                    if (current
+                        && shouldRetry
+                        && checkIndex + 1 < MAX_BACKGROUND_DELIVERY_CHECKS) {
+                        await waitForNextCheck();
+                    }
+                }
+            };
+
+            void Promise.all(discovered.map(reconcileCandidate));
+        };
+
+        void reconcile();
+        return () => {
+            current = false;
+            for (const [timeoutId, resolve] of pendingWaits) {
+                window.clearTimeout(timeoutId);
+                resolve();
+            }
+            pendingWaits.clear();
+        };
+    }, [activeInvoices, allActiveInvoices, billingLifecycle, emailAttemptRevision, hostedServiceSessionId, updateInvoice]);
+
+    useEffect(() => {
+        if (!BILLING_FEATURES.emailEntitlementEnforcement
+            || !billingLifecycle
+            || Object.keys(protectedEmailActions).length === 0) {
+            return undefined;
+        }
+
+        const resumeRecovery = () => {
+            if (document.visibilityState !== 'visible') return;
+
+            const now = Date.now();
+            if (now - emailRecoveryWakeAtRef.current < BACKGROUND_DELIVERY_WAKE_COOLDOWN_MS) return;
+
+            emailRecoveryWakeAtRef.current = now;
+            setEmailAttemptRevision(revision => revision + 1);
+        };
+
+        window.addEventListener('focus', resumeRecovery);
+        document.addEventListener('visibilitychange', resumeRecovery);
+        return () => {
+            window.removeEventListener('focus', resumeRecovery);
+            document.removeEventListener('visibilitychange', resumeRecovery);
+        };
+    }, [billingLifecycle, protectedEmailActions]);
 
     // Keep tabs mutually exclusive: overdue invoices are not also listed as outstanding.
     const outstandingInvoices = useMemo(() =>
@@ -667,6 +927,9 @@ const InvoicesList = ({
                         const invoiceCanBeUndone = !invoiceIsCanceled && canUndoInvoice(invoice);
                         const invoiceCanBeCanceled = isInvoiceOutstanding(invoice);
                         const invoiceHasEditablePaymentDetails = invoiceNeedsPaymentDetails(invoice);
+                        const effectiveSentAt = invoice.sentAt || reconciledSentAt[invoice.id] || null;
+                        const invoiceSendProtected = Boolean(protectedEmailActions[`${invoice.id}:invoice`]);
+                        const reminderSendProtected = Boolean(protectedEmailActions[`${invoice.id}:reminder`]);
 
                         return (
                             <Card
@@ -708,7 +971,7 @@ const InvoicesList = ({
                                                 </Badge>
                                             )}
 
-                                            {invoice.sentAt && (
+                                            {effectiveSentAt && (
                                                 <Badge variant="outline" className="text-xs">
                                                     <Send className="h-3 w-3 mr-1" />
                                                     Sent
@@ -838,7 +1101,11 @@ const InvoicesList = ({
                                         )}
 
                                         {/* Email actions: Send Invoice or Send Reminder */}
-                                        {!invoiceIsPaid && !invoiceIsCanceled && !invoice.sentAt && (
+                                        {emailRecoveryReady
+                                            && !invoiceIsPaid
+                                            && !invoiceIsCanceled
+                                            && !effectiveSentAt
+                                            && !invoiceSendProtected && (
                                             <Button
                                                 onClick={() => handleOpenEmailModal(invoice, 'invoice')}
                                                 variant="ghost"
@@ -848,7 +1115,11 @@ const InvoicesList = ({
                                                 <Send className="h-5 w-5" />
                                             </Button>
                                         )}
-                                        {!invoiceIsPaid && invoice.sentAt && invoiceIsOverdue && (
+                                        {emailRecoveryReady
+                                            && !invoiceIsPaid
+                                            && effectiveSentAt
+                                            && invoiceIsOverdue
+                                            && !reminderSendProtected && (
                                             <Button
                                                 onClick={() => handleOpenEmailModal(invoice, 'reminder')}
                                                 variant="ghost"

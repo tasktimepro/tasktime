@@ -26,10 +26,12 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   browser/agent policy. Fresh real-local D1 execution covers ordered migrations,
   one-time trial contention, 251-way founding capacity, atomic email quota,
   one-sided and compatible same-Stripe-owner provider transfers, conflicting
-  dual ownership, cross-D1 recovery, and alternate-binding restore. The private
-  Worker gate passes 27 files / 177 tests plus typecheck; the public release gate
-  passes 260 files / 2,332 tests, coverage thresholds, 39 Chromium smokes, four
-  PWA smokes, and the 49-page merged build; changed agent artifacts pass their
+  dual ownership, fresh-account transfers in both directions, target-side
+  mutation races, cross-D1 recovery, and alternate-binding restore. The private
+  Worker gate passes 33 files / 307 tests plus typecheck and both migration/schema
+  verifiers; the public release gate passes 259 files / 2,437 tests, coverage
+  thresholds, 39 Chromium smokes, four PWA smokes, and the 50-page merged build;
+  changed agent artifacts pass their
   local release smoke. The bounded main-account Stripe test-mode rehearsal now
   passes founding/standard Checkout, Portal, webhook ordering, renewal and
   failure recovery, pause, matched dispute, cancellation, reconciliation, and
@@ -44,18 +46,40 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   additional-tax presentation, both live Stripe mappings, remaining payment/
   refund/Portal/support policy, Dropbox broad-public access, the
   app-origin migration, homepage work, and live release approval remain gates.
-  Local green evidence is not release approval. The code candidate is complete.
+  Local green evidence is not release approval. The Phase 1 code candidate is
+  complete.
   The synthetic billing-state preview has been retired in favor of a guarded
   loopback-development pre-production sandbox. It runs the normal app against
-  local Worker/D1 and real Stripe test-mode Checkout/webhooks, keeps hosted email
-  off, keeps the visible product UI production-like without sandbox-only notices,
-  and leaves every tracked production control unchanged. The supported app
-  command is `make dev-billing-sandbox`; it now prepares and starts the app,
-  local Worker, and Dockerized Stripe listener as one attached Compose stack.
+  local Worker/D1 and real Stripe test-mode Checkout/webhooks. Hosted email now
+  uses the normal Pro entitlement, local quota/idempotency, recovery, and
+  configured Resend delivery path, while the visible product UI stays
+  production-like without sandbox-only notices and every tracked production
+  control remains unchanged. The supported app
+  command is now the ordinary `make dev`; in the operator checkout it prepares and starts the app,
+  local Worker, Dockerized Stripe listener, and bounded scheduled recovery runner
+  as one attached Compose stack.
+  It fails early when hosted email lacks its ignored local Resend credential and
+  regression-checks that no production-enabled Worker control is disabled by the
+  local overlay. `make dev-billing-sandbox` remains a compatible alias and
+  `make dev-core` remains the explicit public/diagnostic fallback.
   The private per-service commands remain diagnostic escape hatches rather than
   the normal workflow. Program Phase 1 is
-  complete locally; the next owner-driven browser Checkout remains test evidence,
-  not launch approval, and requires a current exportable Stripe test secret.
+  complete locally. An owner-driven browser Checkout has also completed in
+  Stripe test mode and converged to canonical Pro locally; this remains test
+  evidence, not launch approval, and requires a current exportable Stripe test
+  secret whenever it is repeated.
+  Checkout now prefills the locally verified connected-account email as optional
+  billing contact data and lets Stripe collect only the address detail it needs;
+  it does not force a full address or separate TaskTime Terms checkbox. Existing
+  Stripe billing email wins, and the contact never becomes identity or entitlement
+  authority. Final live tax and consent treatment remains a Phase 4 approval.
+  Hosted-email recovery is fully automatic and no-send after initial provider
+  contact: it survives a crash between the retained terminal marker and Yjs sent
+  metadata, hides Send as soon as the customer copy is confirmed, and bounds the
+  modal spinner while list/focus recovery continues. Scheduled billing recovery
+  also terminalizes a matching missed Checkout event and its founding allocation
+  idempotently. Canonical local D1 schemas were adopted from preserved backups
+  with row-equivalence, integrity, foreign-key, and strict schema attestation.
   Its sanitized test-mode evidence and cleanup result are recorded in
   `tasktime-infra/docs/todo/subscription-phase-1-local-evidence.md`. Owner-only
   live configuration, deployment, and launch inputs remain separate Program
@@ -90,7 +114,8 @@ The repository now has a zero-diagnostic TypeScript baseline enforced by the rel
 - See `spec/ambiguities.md`. Remaining decisions concern future product work or compatibility-policy evolution; none blocks the completed assurance slice.
 - Subscription launch-only allowance/grace/tax/legal/Stripe/Portal/support and
   remote-operation decisions remain explicitly unapproved and fail closed; see
-  the private launch-decision packet. They do not block synthetic local Phase 1.
+  the private launch-decision packet. They do not block the completed local
+  Phase 1 candidate.
 - Provider-neutral sync is promoted as core app `1.5.0`; the compatible Worker/app rollout and focused production canary are complete. Agent bridge `1.1.0` is public on npm and MCP Registry, OpenClaw `1.1.0` is public on npm and ClawHub, and the repository-backed Claude `1.1.0` / marketplace `1.3.0` artifacts ship from `main`. The unchanged ClawHub skill stays at `1.2.1` and did not require republication. Broad Dropbox availability has one external two-part follow-up: obtain App Console production access, then pass the non-destructive post-approval sign-in/token/direct-file canary. This does not change the shipped code or direct-data privacy boundary.
 
 ## Quality gate

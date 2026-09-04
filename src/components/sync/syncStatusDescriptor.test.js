@@ -198,6 +198,17 @@ describe('getYjsSyncStatusDescriptor', () => {
         expect(result.kind).toBe(SYNC_STATUS_KIND.DISCONNECTED)
     })
 
+    it('uses the concise provider-neutral reconnect label', () => {
+        const result = getYjsSyncStatusDescriptor({
+            ...baseArgs,
+            isDriveConnected: false,
+            isConnecting: false,
+            providerName: 'cloud storage',
+        })
+
+        expect(result.text).toBe('Reconnect cloud storage')
+    })
+
     it('routes a moved source to cloud options instead of reconnecting it', () => {
         const result = getYjsSyncStatusDescriptor({
             ...baseArgs,

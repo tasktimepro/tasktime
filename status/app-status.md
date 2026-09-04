@@ -13,20 +13,44 @@
   pre-production sandbox. The app now uses the normal local Worker-backed
   catalog/status/license/trial/Stripe test Checkout/webhook/reconciliation/Portal
   flow, disables the bundled catalog fallback, waits for a matching connected
-  cloud lifecycle before consuming a Checkout return, and keeps hosted Send plus
-  delivery-status checks disabled without adding sandbox-only banners or
-  developer-facing notices to product screens. The local Worker has exact
-  localhost return validation, ignored mode-0600 secret/signing material
-  preparation, repeatable local D1 migrations and rollout approvals, and a bounded Stripe webhook
-  listener command. Production controls/configuration remain unchanged and off.
-- [x] Collapse the recurring billing-sandbox workflow into the single root
-  `make dev-billing-sandbox` entrypoint. It prepares local configuration/D1 and
-  starts the app, Worker, and Dockerized Stripe webhook listener as one attached
-  Compose stack with shared shutdown; an expired Stripe test login is the only
-  occasional external prerequisite. Lower-level private commands remain for
-  diagnosis rather than normal use. Multi-profile Stripe CLI discovery validates
+  cloud lifecycle before consuming a Checkout return, and exercises hosted Send
+  plus delivery-status through the normal Pro entitlement, local quota,
+  idempotency, recovery, and configured Resend path without adding sandbox-only
+  banners or developer-facing notices to product screens. The local Worker has
+  exact localhost return validation, ignored mode-0600 secret/signing material
+  preparation, repeatable local D1 migrations and rollout approvals, and a
+  bounded Stripe webhook listener command. Production controls/configuration
+  remain unchanged and off.
+- [x] Collapse the recurring billing-sandbox workflow into the default root
+  `make dev` entrypoint. In the operator checkout it prepares local
+  configuration/D1 and starts the app, Worker, and Dockerized Stripe webhook
+  listener as one attached Compose stack with shared shutdown; an expired Stripe
+  test login or missing ignored service credential is reported before startup.
+  Lower-level private commands remain for diagnosis rather than normal use.
+  Multi-profile Stripe CLI discovery validates
   the exact TaskTime Price instead of assuming `[default]`; attached logs redact
   the local webhook secret, and normal startup installs Worker dependencies once.
+  `make dev-billing-sandbox` remains a compatibility alias and `make dev-core`
+  retains an isolated public/diagnostic fallback. A local parity regression
+  prevents the overlay from disabling production-enabled Worker controls, and
+  preparation rejects a missing Resend credential before the UI can encounter a
+  hosted-email 503. The attached services run in a dedicated Compose project so
+  one-off Docker validation cannot join their lifecycle and stop the stack. The
+  same preparation now applies the existing idempotent local Web Push schema
+  before the shared scheduled sidecar starts, preventing an empty Push D1 from
+  reporting a failure while billing/email recovery succeeds.
+- [x] Recover a lifecycle-bound browser email marker whose earlier request was
+  rejected before the Worker created a durable attempt. An authenticated
+  `ATTEMPT_NOT_FOUND` marks only that local marker rejected and silently restores
+  the explicit Send action. Existing attempts and entitled-send `5xx` responses
+  are checked automatically, with bounded polling while the modal remains open
+  and no manual status button. A genuinely unknown delivery stays visible and
+  blocked from duplicate Send; checking never sends, replays, clears unrelated
+  attempts, or treats other 404s as safe recovery. Completed and terminal-partial
+  markers are also rediscovered when a crash leaves the unchanged invoice
+  without its Yjs sent timestamp. Owned status proof reapplies the accepted
+  customer delivery once, removes Send, preserves any forward-copy warning, and
+  already-sent invoices stop polling.
 - [x] Keep the public Free/Pro catalog visible in Plan & Billing before cloud
   setup, defer the Google Drive or Dropbox prerequisite to trial and purchase
   actions with nearby guidance, and distinguish missing cloud identity from a
@@ -64,20 +88,30 @@
   Stripe test Checkout without entering payment details or completing a
   purchase; Checkout return, webhook, and subscription convergence remain
   separate owner-entered evidence.
+- [x] Simplify hosted Checkout after the first browser review. The explicit Get
+  Pro action passes the locally verified provider email as optional billing
+  contact data only, prefilling new and email-less mapped Stripe Customers while
+  preserving an existing Stripe billing email. Checkout keeps automatic tax,
+  business tax-ID support, and address/name propagation but no longer forces a
+  full billing address or separate TaskTime Terms checkbox. Old clients may omit
+  the additive field, and email remains non-authoritative for account, trial,
+  transfer, or entitlement decisions. Final production tax and consent approval
+  remains open. The final complete candidate evidence is recorded below.
 - [x] Pass the local subscription candidate gates. The pre-production sandbox
-  candidate now passes 259 app files / 2,345 tests, lint, repository typecheck,
-  the production app build, and the private Worker test/typecheck gates. The finalized
-  sandbox orchestration passes 27 Worker files / 177 tests, Worker typecheck,
-  and its focused public workflow test. A fresh authenticated multi-profile
+  candidate now passes 259 app files / 2,437 tests, coverage, lint, repository
+  typecheck, 39 Chromium smokes, four PWA smokes, and the 50-page merged
+  production app/site build. The finalized private Worker candidate passes 33
+  files / 307 tests, Worker typecheck, both migration verifiers, and strict
+  current-schema attestation. A fresh authenticated multi-profile
   startup selected the TaskTime account by exact Price, reached the attached
   app/healthy Worker/listener stack, and shut down cleanly with `Ctrl+C`. The earlier
-  bounded Stripe lifecycle rehearsal remains separate evidence; the next manual
-  browser Checkout now requires only owner-entered test card/customer values.
-  The prior broader gate had
-  260 files / 2,332 tests with coverage thresholds, lint/typecheck, 39 Chromium
-  smokes, four PWA smokes, and
-  the 49-page merged app/site build. The separately recorded real Stripe
-  test-mode lifecycle rehearsal also passed, closing Program Phase 1 locally;
+  bounded Stripe lifecycle rehearsal remains separate evidence. A later
+  owner-entered browser Checkout completed in Stripe test mode; the scheduled
+  reconciler recovered its missed local event, terminalized the attempt and
+  founding slot, and the app rendered subscription-backed Pro. A repeated
+  scheduler pass made no additional database change.
+  The separately recorded real Stripe test-mode lifecycle rehearsal also passed,
+  closing Program Phase 1 locally;
   this remains distinct from production deployment or release approval.
 - [x] Prepare core app `1.4.1`: correct invoice custom/preset billing ranges so the full local end date is eligible in browser and agent composition, preserve historical snapshot-less invoice matching, and normalize exported custom-report timestamps to inclusive day boundaries. No agent artifact, backup schema, or Worker release is required.
 - [x] Make direct Drive sync more responsive without weakening mode boundaries: Backup and Sync modes debounce note edits for 1.5 seconds, pending local work retries with bounded backoff after active-sync/Web Lock contention, Sync mode checks every five minutes only while visible, and Manual mode remains explicit-only.

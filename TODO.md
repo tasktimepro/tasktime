@@ -4,8 +4,6 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
-[x] Reduce founding limit to 250 not 1000
-
 [ ] Double check that the current telemetry data/analysis that we have includes the latest dropbox integration as well
 
 [ ] When I import data I should see a success toast notification

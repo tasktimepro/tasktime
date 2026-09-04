@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InvoicesList from './InvoicesList'
 
@@ -14,6 +14,7 @@ const toastMocks = vi.hoisted(() => ({
 const invoiceHookMocks = vi.hoisted(() => ({
 
     invoices: [],
+    updateInvoice: vi.fn(),
     markAsPaid: vi.fn(),
     updatePaymentDetails: vi.fn(),
     markAsUnpaid: vi.fn(),
@@ -21,6 +22,24 @@ const invoiceHookMocks = vi.hoisted(() => ({
     canUndoInvoice: vi.fn(() => false),
     cancelInvoice: vi.fn(),
     getInvoiceCancellationBlockReason: vi.fn(() => null),
+}))
+
+const emailRecoveryMocks = vi.hoisted(() => ({
+
+    findBoundUnreconciledEmailAttempt: vi.fn(),
+    findUnreconciledEmailAttemptForRecovery: vi.fn(),
+    checkEmailAttemptStatus: vi.fn(),
+    markEmailAttemptMetadataApplied: vi.fn(),
+    validateBoundEmailAttemptDocumentSnapshot: vi.fn(),
+}))
+
+const hostedEmailMocks = vi.hoisted(() => ({
+
+    enabled: false,
+    hostedServiceSessionId: 'session-1',
+    activeStorageProvider: 'google-drive',
+    activeStorageGeneration: 2,
+    activeStorageSessionId: 'session-1',
 }))
 
 const currencyUtilsMocks = vi.hoisted(() => ({
@@ -60,6 +79,7 @@ vi.mock('../hooks/useInvoices.ts', () => ({
 
     useInvoices: () => ({
         invoices: invoiceHookMocks.invoices,
+        updateInvoice: invoiceHookMocks.updateInvoice,
         markAsPaid: invoiceHookMocks.markAsPaid,
         updatePaymentDetails: invoiceHookMocks.updatePaymentDetails,
         markAsUnpaid: invoiceHookMocks.markAsUnpaid,
@@ -68,6 +88,36 @@ vi.mock('../hooks/useInvoices.ts', () => ({
         cancelInvoice: invoiceHookMocks.cancelInvoice,
         getInvoiceCancellationBlockReason: invoiceHookMocks.getInvoiceCancellationBlockReason,
     })
+}))
+
+vi.mock('../contexts/YjsContext', () => ({
+    useYjs: () => ({
+        hostedServiceSessionId: hostedEmailMocks.hostedServiceSessionId,
+        activeStorageProvider: hostedEmailMocks.activeStorageProvider,
+        activeStorageGeneration: hostedEmailMocks.activeStorageGeneration,
+        activeStorageSessionId: hostedEmailMocks.activeStorageSessionId,
+    }),
+}))
+
+vi.mock('../config/billingFeatures', () => ({
+    BILLING_FEATURES: {
+        get emailEntitlementEnforcement() {
+            return hostedEmailMocks.enabled
+        },
+    },
+}))
+
+vi.mock('../utils/emailAttemptStorage', () => ({
+    EMAIL_ATTEMPTS_CHANGED_EVENT: 'tasktime:email-attempts-changed',
+    findBoundUnreconciledEmailAttempt: (...args) => emailRecoveryMocks.findBoundUnreconciledEmailAttempt(...args),
+    findUnreconciledEmailAttemptForRecovery: (...args) => emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery(...args),
+    markEmailAttemptMetadataApplied: (...args) => emailRecoveryMocks.markEmailAttemptMetadataApplied(...args),
+    validateBoundEmailAttemptDocumentSnapshot: (...args) => emailRecoveryMocks.validateBoundEmailAttemptDocumentSnapshot(...args),
+}))
+
+vi.mock('../utils/emailService', () => ({
+    checkEmailAttemptStatus: (...args) => emailRecoveryMocks.checkEmailAttemptStatus(...args),
+    isEmailSendError: (error) => Boolean(error && typeof error === 'object' && 'type' in error),
 }))
 
 vi.mock('../utils/currencyUtils.ts', async () => {
@@ -125,6 +175,22 @@ describe('InvoicesList', () => {
         invoiceHookMocks.markAsUnpaid.mockReset()
         invoiceHookMocks.markAsUnpaid.mockResolvedValue({ id: 'inv-paid', status: 'sent' })
         invoiceHookMocks.invoices = []
+        invoiceHookMocks.updateInvoice.mockReset()
+        invoiceHookMocks.updateInvoice.mockResolvedValue(undefined)
+        hostedEmailMocks.enabled = false
+        hostedEmailMocks.hostedServiceSessionId = 'session-1'
+        hostedEmailMocks.activeStorageProvider = 'google-drive'
+        hostedEmailMocks.activeStorageGeneration = 2
+        hostedEmailMocks.activeStorageSessionId = 'session-1'
+        emailRecoveryMocks.findBoundUnreconciledEmailAttempt.mockReset()
+        emailRecoveryMocks.findBoundUnreconciledEmailAttempt.mockResolvedValue(null)
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockReset()
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockResolvedValue(null)
+        emailRecoveryMocks.checkEmailAttemptStatus.mockReset()
+        emailRecoveryMocks.markEmailAttemptMetadataApplied.mockReset()
+        emailRecoveryMocks.markEmailAttemptMetadataApplied.mockResolvedValue(true)
+        emailRecoveryMocks.validateBoundEmailAttemptDocumentSnapshot.mockReset()
+        emailRecoveryMocks.validateBoundEmailAttemptDocumentSnapshot.mockResolvedValue('match')
         invoiceHookMocks.undoLatestInvoice.mockReset()
         invoiceHookMocks.undoLatestInvoice.mockResolvedValue({
             invoiceNumber: 'INV-001',
@@ -661,6 +727,581 @@ describe('InvoicesList', () => {
 
         expect(screen.getByText('Sent')).toBeInTheDocument()
         expect(screen.queryByText('Emailed')).not.toBeInTheDocument()
+    })
+
+    it('hides the send action while a lifecycle-bound delivery is unresolved', async () => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'bound', attempt: { attemptId: 'attempt-pending' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue({
+            state: 'pending',
+            primary: { outcome: 'pending', acceptedAt: null, reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 1 },
+        })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await waitFor(() => {
+            expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+        })
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledOnce()
+        expect(invoiceHookMocks.updateInvoice).not.toHaveBeenCalled()
+    })
+
+    it('recovers a dormant same-provider attempt after owned status proof without exposing Send', async () => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'same-provider-reconnect', attempt: { attemptId: 'attempt-reconnect' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+        })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        expect(await screen.findByText('Sent')).toBeInTheDocument()
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledWith({
+            sessionId: 'session-1',
+            billingLifecycle: expect.objectContaining({ sessionId: 'session-1' }),
+            attemptId: 'attempt-reconnect',
+            recoveryBinding: {
+                kind: 'same-provider-reconnect',
+                documentId: 'inv-1',
+                sendType: 'invoice',
+            },
+        })
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+    })
+
+    it('keeps a dormant attempt protected when a different account cannot prove ownership', async () => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'same-provider-reconnect', attempt: { attemptId: 'attempt-other-account' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockRejectedValue({
+            type: 'attempt_dormant',
+            message: 'Reconnect the cloud account used for this delivery attempt.',
+        })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await waitFor(() => {
+            expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledOnce()
+        })
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+        expect(emailRecoveryMocks.markEmailAttemptMetadataApplied).not.toHaveBeenCalled()
+    })
+
+    it('keeps cross-provider dormant evidence protected when current-account status cannot prove ownership', async () => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'different-provider', attempt: { attemptId: 'attempt-other-provider' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockRejectedValue({
+            type: 'attempt_dormant',
+            message: 'Reconnect the cloud account used for this delivery attempt.',
+        })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await waitFor(() => {
+            expect(emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery).toHaveBeenCalled()
+        })
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledWith({
+            sessionId: 'session-1',
+            billingLifecycle: expect.objectContaining({ sessionId: 'session-1' }),
+            attemptId: 'attempt-other-provider',
+            recoveryBinding: {
+                kind: 'cross-provider-status-proof',
+                documentId: 'inv-1',
+                sendType: 'invoice',
+            },
+        })
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+    })
+
+    it('reconciles a cross-provider attempt after current-account status proves transfer ownership', async () => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'different-provider', attempt: { attemptId: 'attempt-transferred' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+        })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        expect(await screen.findByText('Sent')).toBeInTheDocument()
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledWith(expect.objectContaining({
+            attemptId: 'attempt-transferred',
+            recoveryBinding: expect.objectContaining({ kind: 'cross-provider-status-proof' }),
+        }))
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        })
+        expect(emailRecoveryMocks.markEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-transferred',
+            expect.objectContaining({ sessionId: 'session-1' })
+        )
+    })
+
+    it('applies provider acceptance in the list and renders Sent without opening the modal', async () => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'bound', attempt: { attemptId: 'attempt-complete' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+        })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        expect(await screen.findByText('Sent')).toBeInTheDocument()
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        })
+        expect(emailRecoveryMocks.markEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-complete',
+            expect.objectContaining({ sessionId: 'session-1' })
+        )
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+    })
+
+    it('recovers a completed applied marker after invoice persistence loss and stops once sentAt is present', async () => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType, options) => Promise.resolve(
+                sendType === 'invoice' && options?.includeAppliedCompletion
+                    ? {
+                        binding: 'bound',
+                        attempt: {
+                            attemptId: 'attempt-applied-before-yjs-persisted',
+                            state: 'completed',
+                            metadataAppliedAt: 1,
+                        },
+                    }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+        })
+
+        const { rerender } = render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        expect(await screen.findByText('Sent')).toBeInTheDocument()
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        })
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledOnce()
+
+        const persistedInvoice = {
+            ...unsentInvoice,
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        }
+        invoiceHookMocks.invoices = [persistedInvoice]
+        rerender(
+            <InvoicesList
+                projectInvoices={[persistedInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+        await waitFor(() => {
+            expect(emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery).toHaveBeenCalledWith(
+                expect.anything(),
+                'inv-1',
+                'invoice',
+                { includeAppliedCompletion: false },
+            )
+        })
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledOnce()
+    })
+
+    it.each([
+        ['changed', [{ ...baseInvoice, sentAt: null, total: 200 }], 'mismatch'],
+        ['deleted', [], null],
+        ['canceled', [{ ...baseInvoice, sentAt: null, status: 'canceled' }], null],
+    ])('does not apply accepted delivery metadata to a %s current invoice', async (_state, currentInvoices, validation) => {
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = currentInvoices
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'bound', attempt: { attemptId: `attempt-${_state}` } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+        })
+        if (validation) {
+            emailRecoveryMocks.validateBoundEmailAttemptDocumentSnapshot.mockResolvedValue(validation)
+        }
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await waitFor(() => {
+            expect(emailRecoveryMocks.markEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+                `attempt-${_state}`,
+                expect.objectContaining({ sessionId: 'session-1' })
+            )
+        })
+        expect(invoiceHookMocks.updateInvoice).not.toHaveBeenCalled()
+        if (validation) {
+            expect(emailRecoveryMocks.validateBoundEmailAttemptDocumentSnapshot).toHaveBeenCalledWith(
+                `attempt-${_state}`,
+                expect.objectContaining({ sessionId: 'session-1' }),
+                expect.objectContaining({ id: 'inv-1', total: 200 })
+            )
+        } else {
+            expect(emailRecoveryMocks.validateBoundEmailAttemptDocumentSnapshot).not.toHaveBeenCalled()
+        }
+    })
+
+    it('applies an accepted primary while keeping a pending forward copy protected until terminal', async () => {
+        vi.useFakeTimers()
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'bound', attempt: { attemptId: 'attempt-partial' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus
+            .mockResolvedValueOnce({
+                state: 'partial',
+                primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+                forward: { outcome: 'pending', acceptedAt: null, reason: null },
+                quota: { entitled: true, effectiveRemaining: 8, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 1 },
+            })
+            .mockResolvedValueOnce({
+                state: 'completed',
+                primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+                forward: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:01.000Z', reason: null },
+                quota: { entitled: true, effectiveRemaining: 8, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+            })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+
+        await act(async () => {
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        })
+        expect(screen.getByText('Sent')).toBeInTheDocument()
+        expect(emailRecoveryMocks.markEmailAttemptMetadataApplied).not.toHaveBeenCalled()
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_000)
+            await Promise.resolve()
+        })
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledTimes(2)
+        expect(emailRecoveryMocks.markEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-partial',
+            expect.objectContaining({ sessionId: 'session-1' })
+        )
+        vi.useRealTimers()
+    })
+
+    it('rechecks a temporary background status failure and converges without opening the modal', async () => {
+        vi.useFakeTimers()
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'bound', attempt: { attemptId: 'attempt-retry' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus
+            .mockRejectedValueOnce({ type: 'network', message: 'offline' })
+            .mockResolvedValueOnce({
+                state: 'completed',
+                primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+                forward: null,
+                quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+            })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+        await act(async () => {
+            await Promise.resolve()
+            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(10_000)
+            await Promise.resolve()
+        })
+
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledTimes(2)
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        })
+        expect(screen.getByText('Sent')).toBeInTheDocument()
+        vi.useRealTimers()
+    })
+
+    it('bounds background checks while an attempt remains unresolved', async () => {
+        vi.useFakeTimers()
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'bound', attempt: { attemptId: 'attempt-pending' } }
+                    : null
+            )
+        )
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue({
+            state: 'pending',
+            primary: { outcome: 'pending', acceptedAt: null, reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 1 },
+        })
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+        await act(async () => {
+            await Promise.resolve()
+            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(120_000)
+            await Promise.resolve()
+        })
+
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledTimes(6)
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+        vi.useRealTimers()
+    })
+
+    it('quietly resumes bounded recovery on a later focus and converges without exposing Send', async () => {
+        vi.useFakeTimers()
+        hostedEmailMocks.enabled = true
+        const unsentInvoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [unsentInvoice]
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(
+            (_lifecycle, _documentId, sendType) => Promise.resolve(
+                sendType === 'invoice'
+                    ? { binding: 'bound', attempt: { attemptId: 'attempt-later-focus' } }
+                    : null
+            )
+        )
+        const pendingProjection = {
+            state: 'pending',
+            primary: { outcome: 'pending', acceptedAt: null, reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 1 },
+        }
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValue(pendingProjection)
+
+        render(
+            <InvoicesList
+                projectInvoices={[unsentInvoice]}
+                onEditInvoice={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoiceTemplates={[]}
+            />
+        )
+        await act(async () => {
+            await Promise.resolve()
+            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(120_000)
+            await Promise.resolve()
+        })
+
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledTimes(6)
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(300_000)
+            await Promise.resolve()
+        })
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledTimes(6)
+
+        emailRecoveryMocks.checkEmailAttemptStatus.mockResolvedValueOnce({
+            state: 'completed',
+            primary: { outcome: 'accepted', acceptedAt: '2026-09-03T14:00:00.000Z', reason: null },
+            forward: null,
+            quota: { entitled: true, effectiveRemaining: 9, periodEnd: '2026-10-01T00:00:00.000Z', awaitingConfirmation: 0 },
+        })
+        await act(async () => {
+            window.dispatchEvent(new Event('focus'))
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledTimes(7)
+        expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledWith('inv-1', {
+            sentAt: Date.parse('2026-09-03T14:00:00.000Z'),
+        })
+        expect(screen.getByText('Sent')).toBeInTheDocument()
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+        vi.useRealTimers()
     })
 
     it('marks a same-currency invoice paid without corrupting the list', async () => {

@@ -494,6 +494,7 @@ export function BillingPanel({
                                                             const checkout = await billing.createCheckout(
                                                                 currentOffer.offerId,
                                                                 status.planConfigVersion,
+                                                                accountEmail ?? undefined,
                                                             );
                                                             window.location.assign(checkout.url);
                                                         })}

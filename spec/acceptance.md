@@ -49,18 +49,26 @@
   retains the return marker until that lifecycle exists. The local Worker accepts
   only the exact `http://localhost:3101/account?section=billing` return base;
   production retains only the exact HTTPS app return. Hosted Send and delivery-
-  status requests remain disabled behind neutral failure copy in the sandbox. A
-  production build or non-loopback hostname ignores the flag, tracked production
-  controls remain off,
+  status requests exercise the normal Pro entitlement, quota, idempotency, and
+  recovery path against local D1 and the configured Resend account. Actual
+  delivery requires the ignored local `RESEND_API_KEY` and an explicit Send to a
+  test recipient controlled by the developer. A production build or non-loopback
+  hostname ignores the flag, tracked production controls remain off,
   and test-mode state is never launch or production evidence. Product-data
   mutations remain ordinary real local-workspace operations and retain the
   configured sync-mode behavior; billing sandbox mode is not a disposable data
   sandbox.
-- The supported developer entrypoint is one root command. It prepares the
+- In an operator checkout, the supported developer entrypoint is `make dev`. It prepares the
   ignored local test configuration and migrations, then runs the app, local
   Worker, and Stripe test-webhook listener as one attached Docker Compose
-  stack. Stopping that command stops the complete stack; only an expired or
-  missing owner-controlled Stripe test login requires separate intervention.
+  stack. Every Worker control enabled in tracked production configuration stays
+  enabled locally, while guarded unreleased billing behavior may be enabled only
+  against local state and Stripe test mode. Preparation fails with a sanitized,
+  actionable error when the ignored local Resend credential is absent. Stopping
+  that command stops the complete stack. The billing-specific target remains a
+  compatibility alias; a public checkout without private infrastructure retains
+  an explicit core-app fallback. An expired or missing owner-controlled Stripe
+  test login and locally stored service credentials remain external prerequisites.
 - A Free user can open `/reports` and use Overview for the current local calendar
   month. It shows exactly **Received**, **Expenses**, and **Tracked time** under
   the canonical date, duration, legacy-payment, and currency semantics, with no
@@ -122,6 +130,14 @@
   refresh canonical status, and retry once only for the unchanged offer and plan
   revision. Any changed offer returns to explicit confirmation, and product copy
   never exposes an internal billing error code.
+- Starting paid Checkout sends the locally verified connected-account email only
+  as an optional billing contact. Stripe Checkout prefills it for a new or
+  email-less mapped Customer, while an existing Stripe billing email remains
+  authoritative. The email never identifies an entitlement or trial. Checkout
+  uses automatic tax and optional business tax-ID collection without forcing a
+  full billing address or a separate TaskTime Terms checkbox; Stripe may still
+  request the minimum location fields required for the applicable tax/payment
+  flow. The final production consent and tax treatment remains a launch approval.
 - On a loopback Vite development origin, Plan & Billing may use the same bundled
   review values as `/pricing/` while the public Worker catalog is unavailable.
   The Worker catalog replaces that display when available. Production builds do
@@ -175,9 +191,19 @@
   responses. Status and the signed license share one canonical entitlement
   revision; a mismatch is unavailable/retryable and never a repurchase prompt.
   Pending provider acceptance is written before Send to a privacy-minimized,
-  lifecycle-bound non-Yjs attempt store and returns a D1-only status-check path,
-  not an automatic send. Reload/account switch/transfer never queries the wrong
-  owner or exposes/resends content; terminal sent metadata converges once.
+  lifecycle-bound non-Yjs attempt store and returns a D1-only automatic status-
+  check path. The modal stops its loading state after a bounded interval, the
+  list suppresses duplicate Send while the attempt is unresolved, and a later
+  accepted result removes Send and shows Sent without user intervention. One
+  byte-identical same-attempt retry remains provider-idempotent; no recovery path
+  creates a second logical send. Reload/account switch/transfer never exposes or
+  resends content, and only owned status proof can rebind lifecycle evidence.
+  A crash between marking the terminal attempt applied and persisting Yjs sent
+  metadata is recovered from that retained terminal result only while the
+  matching invoice still lacks its sent timestamp. This includes primary-
+  accepted/optional-forward-rejected partial completion. Terminal sent metadata
+  converges once, an already-sent invoice stops polling, and a changed, deleted,
+  or canceled current document is never mutated.
 - Provider loss does not prevent a subscriber obtaining invoices or canceling
   through the approved Stripe-hosted login or audited support route. Provider,
   product-data, billing, cancellation, and billing-profile deletion remain

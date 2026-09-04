@@ -47,6 +47,50 @@ const INITIAL_STATE: CloudProviderTransferState = {
     canResume: false,
 };
 
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const MAX_HOSTED_IDENTITY_TRANSFER_RESPONSE_BYTES = 4 * 1024;
+const HOSTED_IDENTITY_TRANSFER_TIMEOUT_MS = 15_000;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function readBoundedJson(response: Response): Promise<unknown> {
+    const declared = response.headers.get('Content-Length');
+    if (declared && (!/^\d+$/.test(declared)
+        || Number(declared) > MAX_HOSTED_IDENTITY_TRANSFER_RESPONSE_BYTES)) {
+        void response.body?.cancel().catch(() => undefined);
+        throw new Error('Hosted-service transfer returned an oversized response.');
+    }
+    if (!response.body) throw new Error('Hosted-service transfer returned an empty response.');
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            length += value.byteLength;
+            if (length > MAX_HOSTED_IDENTITY_TRANSFER_RESPONSE_BYTES) {
+                void reader.cancel().catch(() => undefined);
+                throw new Error('Hosted-service transfer returned an oversized response.');
+            }
+            chunks.push(value);
+        }
+    } finally {
+        reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+}
+
 function providerLabel(provider: CloudProviderId): string {
     return provider === 'dropbox' ? 'Dropbox' : 'Google Drive';
 }
@@ -59,36 +103,72 @@ function transferErrorMessage(error: unknown): string {
 async function linkHostedServiceIdentity(
     sourceSessionId: string,
     targetSessionId: string,
+    operationId: string,
 ): Promise<void> {
     if (!SYNC_WORKER_CONFIG.isEnabled) {
         throw new Error(
             'Hosted-service transfer is unavailable. Your source provider remains active.',
         );
     }
-
-    let response: Response;
-    try {
-        response = await fetch(SYNC_WORKER_CONFIG.endpoints.hostedIdentityTransfer, {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'X-Session-Id': sourceSessionId,
-                'X-Target-Session-Id': targetSessionId,
-            },
-            cache: 'no-store',
-            credentials: 'omit',
-            referrerPolicy: 'no-referrer',
-        });
-    } catch {
+    if (!UUID_V4_PATTERN.test(operationId)) {
         throw new Error(
-            'Hosted-service transfer could not be reached. Your source provider remains active.',
+            'The saved provider transfer identity is invalid. Your source provider remains active.',
         );
     }
 
-    if (!response.ok) {
-        throw new Error(
-            'Hosted-service transfer could not be completed. Your source provider remains active.',
-        );
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+        () => controller.abort(),
+        HOSTED_IDENTITY_TRANSFER_TIMEOUT_MS,
+    );
+    try {
+        let response: Response;
+        try {
+            response = await fetch(SYNC_WORKER_CONFIG.endpoints.hostedIdentityTransfer, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Session-Id': sourceSessionId,
+                    'X-Target-Session-Id': targetSessionId,
+                    'X-TaskTime-Transfer-Id': operationId,
+                },
+                cache: 'no-store',
+                credentials: 'omit',
+                referrerPolicy: 'no-referrer',
+                signal: controller.signal,
+            });
+        } catch {
+            throw new Error(
+                'Hosted-service transfer could not be reached. Your source provider remains active.',
+            );
+        }
+
+        if (!response.ok) {
+            void response.body?.cancel().catch(() => undefined);
+            throw new Error(
+                'Hosted-service transfer could not be completed. Your source provider remains active.',
+            );
+        }
+
+        let confirmation: unknown;
+        try {
+            confirmation = await readBoundedJson(response);
+        } catch {
+            throw new Error(
+                'Hosted-service transfer could not be confirmed. Your source provider remains active.',
+            );
+        }
+        if (!isRecord(confirmation)
+            || confirmation.success !== true
+            || confirmation.version !== 1
+            || confirmation.transferred !== true
+            || confirmation.transferOperationId !== operationId) {
+            throw new Error(
+                'Hosted-service transfer could not be confirmed. Your source provider remains active.',
+            );
+        }
+    } finally {
+        window.clearTimeout(timeout);
     }
 }
 
@@ -192,8 +272,16 @@ export function useCloudProviderTransfer() {
             ownerId,
             sourceManifest,
             targetManifest,
-            linkHostedServiceIdentity: async ({ source: sourceRef, target: targetRef }) => {
-                await linkHostedServiceIdentity(sourceRef.sessionId, targetRef.sessionId);
+            linkHostedServiceIdentity: async ({
+                source: sourceRef,
+                target: targetRef,
+                operationId,
+            }) => {
+                await linkHostedServiceIdentity(
+                    sourceRef.sessionId,
+                    targetRef.sessionId,
+                    operationId,
+                );
             },
             clearSourceSession: async () => {
                 if (source.provider === 'dropbox') {

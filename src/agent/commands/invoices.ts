@@ -4,6 +4,7 @@ import type { BusinessBrandAsset, BusinessInfo, Client, EmailTemplate, Expense, 
 import { getProjectInvoicePreview, type ProjectInvoicePreview } from '@/utils/invoicePreviewUtils';
 import { toStorageDate } from '@/utils/dateUtils';
 import type { EmailSendType } from '@/utils/emailTemplateUtils';
+import type { EmailSendError } from '@/utils/emailService';
 import {
     createInvoicePaymentCurrencySnapshot,
     getInvoiceSequenceRollback,
@@ -95,15 +96,86 @@ function assertAgentHostedEmailEntitlement(context: AgentCommandContext): void {
 }
 
 function billingLifecycleForAgent(context: AgentCommandContext) {
+    const hostedSessionId = typeof context.hostedServiceSessionId === 'string'
+        ? context.hostedServiceSessionId.trim()
+        : (typeof context.driveSessionId === 'string' ? context.driveSessionId.trim() : '');
     if (!context.activeStorageProvider
         || context.activeStorageGeneration === null
         || context.activeStorageGeneration === undefined
-        || !context.activeStorageSessionId) return undefined;
+        || !context.activeStorageSessionId
+        || context.activeStorageSessionId !== hostedSessionId) return undefined;
     return {
         provider: context.activeStorageProvider,
         generation: context.activeStorageGeneration,
         sessionId: context.activeStorageSessionId,
     };
+}
+
+function mapHostedEmailErrorForAgent(error: EmailSendError): AgentCommandError {
+    switch (error.type) {
+        case 'quota_exceeded':
+            return new AgentCommandError('RATE_LIMITED', error.message, {
+                remaining: error.remaining,
+            });
+        case 'rate_limited':
+            return new AgentCommandError('RATE_LIMITED', error.message);
+        case 'already_sent':
+            return new AgentCommandError('CONFLICT', error.message);
+        case 'validation':
+            return new AgentCommandError('INVALID_INPUT', error.message);
+        case 'entitlement_required':
+            return new AgentCommandError('ENTITLEMENT_REQUIRED', error.message);
+        case 'billing_suspended':
+            return new AgentCommandError('BILLING_SUSPENDED', error.message, {
+                recoveryRoute: '/account?section=billing',
+            });
+        case 'client_upgrade_required':
+            return new AgentCommandError('UNAVAILABLE', error.message, {
+                recoveryAction: 'update_client',
+                manualDeliveryAvailable: true,
+            });
+        case 'pending':
+            return new AgentCommandError('UNAVAILABLE', error.message, {
+                attemptId: error.attemptId,
+                recoveryCommand: 'get_email_send_status',
+                retrySafe: true,
+            });
+        case 'auth':
+            return new AgentCommandError('UNAVAILABLE', error.message, {
+                recoveryRoute: '/account?section=sync',
+            });
+        case 'provider':
+        case 'attempt_capacity':
+        case 'attempt_conflict':
+        case 'attempt_not_found':
+        case 'network':
+            return new AgentCommandError('UNAVAILABLE', error.message);
+        case 'attempt_dormant':
+            return new AgentCommandError('UNAVAILABLE', error.message, {
+                attemptId: error.attemptId,
+                recoveryRoute: '/account?section=sync',
+            });
+    }
+}
+
+function parseHostedEmailAcceptedAt(value: string | undefined, required: boolean): number | null {
+    if (value === undefined) {
+        if (required) {
+            throw new AgentCommandError(
+                'UNAVAILABLE',
+                'Hosted email delivery did not return its acceptance time.',
+            );
+        }
+        return null;
+    }
+    const acceptedAt = Date.parse(value);
+    if (!Number.isFinite(acceptedAt)) {
+        throw new AgentCommandError(
+            'UNAVAILABLE',
+            'Hosted email delivery returned an invalid acceptance time.',
+        );
+    }
+    return acceptedAt;
 }
 
 export interface ListInvoicesCommandInput {
@@ -1548,25 +1620,49 @@ export function sendProjectQuoteEmailCommand(
             )
             : [];
         const { getCurrentInvoiceHtmlContent, generatePDFBase64 } = await import('@/utils/pdfUtils');
-        const { sendInvoiceEmail } = await import('@/utils/emailService');
+        const { isEmailSendError, sendInvoiceEmail } = await import('@/utils/emailService');
+        const billingLifecycle = billingLifecycleForAgent(context);
         const htmlContent = getCurrentInvoiceHtmlContent(quote as any, clients as any, businessBrandAssets as any);
         const pdfBase64 = await generatePDFBase64(htmlContent);
-        const result = await sendInvoiceEmail({
-            sessionId,
-            invoiceId: quote.id,
-            invoiceNumber: quote.invoiceNumber,
-            to: draft.to,
-            forwardTo: draft.forwardTo || undefined,
-            fromName: draft.fromName || undefined,
-            subject: draft.subject,
-            bodyText: draft.body,
-            replyTo: draft.replyTo || undefined,
-            pdfBase64,
-            sendType: 'quote',
-            attachmentTitle: draft.attachmentTitle,
-            billingLifecycle: billingLifecycleForAgent(context),
-            idempotencyKey: input.idempotencyKey,
-        });
+        let result;
+        try {
+            result = await sendInvoiceEmail({
+                sessionId,
+                invoiceId: quote.id,
+                invoiceNumber: quote.invoiceNumber,
+                to: draft.to,
+                forwardTo: draft.forwardTo || undefined,
+                fromName: draft.fromName || undefined,
+                subject: draft.subject,
+                bodyText: draft.body,
+                replyTo: draft.replyTo || undefined,
+                pdfBase64,
+                sendType: 'quote',
+                attachmentTitle: draft.attachmentTitle,
+                documentSnapshot: quote,
+                billingLifecycle,
+                idempotencyKey: input.idempotencyKey,
+            });
+        } catch (error) {
+            if (!isEmailSendError(error)) throw error;
+            throw mapHostedEmailErrorForAgent(error);
+        }
+
+        if (result.attemptId && billingLifecycle) {
+            const { markEmailAttemptMetadataApplied } = await import('@/utils/emailAttemptStorage');
+            const applied = await markEmailAttemptMetadataApplied(result.attemptId, billingLifecycle);
+            if (!applied) {
+                throw new AgentCommandError(
+                    'UNAVAILABLE',
+                    'Delivery was accepted, but TaskTime could not finish saving its local confirmation.',
+                    {
+                        attemptId: result.attemptId,
+                        recoveryCommand: 'get_email_send_status',
+                        retrySafe: true,
+                    },
+                );
+            }
+        }
 
         return {
             projectId: quote.projectId,
@@ -1642,6 +1738,11 @@ export function sendInvoiceEmailCommand(
 
         const invoiceId = requireString(input.invoiceId, 'invoiceId');
         const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, invoiceId, 'Invoice');
+        if (isInvoiceCanceled(invoice)) {
+            throw new AgentCommandError('CONFLICT', 'Canceled invoices cannot be sent by email.', {
+                invoiceId,
+            });
+        }
         const draft = buildInvoiceEmailDraft(context, invoice, input);
 
         if (draft.sendType !== 'quote' && invoice.status === 'draft') {
@@ -1671,43 +1772,134 @@ export function sendInvoiceEmailCommand(
             )
             : [];
         const { getCurrentInvoiceHtmlContent, generatePDFBase64 } = await import('@/utils/pdfUtils');
-        const { sendInvoiceEmail } = await import('@/utils/emailService');
+        const { isEmailSendError, sendInvoiceEmail } = await import('@/utils/emailService');
+        const billingLifecycle = billingLifecycleForAgent(context);
         const htmlContent = getCurrentInvoiceHtmlContent(invoice as any, clients as any, businessBrandAssets as any);
         const pdfBase64 = await generatePDFBase64(htmlContent);
-        const result = await sendInvoiceEmail({
-            sessionId,
-            invoiceId: invoice.id || invoice.projectId || invoice.invoiceNumber,
-            invoiceNumber: invoice.invoiceNumber,
-            to: draft.to,
-            forwardTo: draft.forwardTo || undefined,
-            fromName: draft.fromName || undefined,
-            subject: draft.subject,
-            bodyText: draft.body,
-            replyTo: draft.replyTo || undefined,
-            pdfBase64,
-            sendType: draft.sendType,
-            attachmentTitle: draft.attachmentTitle,
-            billingLifecycle: billingLifecycleForAgent(context),
-            idempotencyKey: input.idempotencyKey,
-        });
-        const sentAt = getNow(context);
+        let result;
+        try {
+            result = await sendInvoiceEmail({
+                sessionId,
+                invoiceId: invoice.id || invoice.projectId || invoice.invoiceNumber,
+                invoiceNumber: invoice.invoiceNumber,
+                to: draft.to,
+                forwardTo: draft.forwardTo || undefined,
+                fromName: draft.fromName || undefined,
+                subject: draft.subject,
+                bodyText: draft.body,
+                replyTo: draft.replyTo || undefined,
+                pdfBase64,
+                sendType: draft.sendType,
+                attachmentTitle: draft.attachmentTitle,
+                documentSnapshot: invoice,
+                billingLifecycle,
+                idempotencyKey: input.idempotencyKey,
+            });
+        } catch (error) {
+            if (!isEmailSendError(error)) throw error;
+            if (error.type === 'pending' && error.primaryAcceptedAt && draft.sendType !== 'quote') {
+                const acceptedAt = Date.parse(error.primaryAcceptedAt);
+                const currentInvoice = readEntity<Invoice>(context.store.invoices.get(invoice.id));
+                if (Number.isFinite(acceptedAt) && currentInvoice && !isInvoiceCanceled(currentInvoice)) {
+                    try {
+                        const validation = billingLifecycle
+                            ? await (await import('@/utils/emailAttemptStorage'))
+                                .validateBoundEmailAttemptDocumentSnapshot(
+                                    error.attemptId,
+                                    billingLifecycle,
+                                    currentInvoice,
+                                )
+                            : 'unverifiable';
+                        if (validation === 'match') {
+                            updateValidatedEntity<Invoice>(
+                                context.store.invoices as any,
+                                'invoices',
+                                invoice.id,
+                                { sentAt: acceptedAt, sentToEmail: draft.to },
+                                'agent reconcile pending invoice email',
+                            );
+                        }
+                    } catch {
+                        // The lifecycle-bound attempt remains unreconciled for a later safe status pass.
+                    }
+                }
+            }
+            throw mapHostedEmailErrorForAgent(error);
+        }
+        const providerAcceptedAt = parseHostedEmailAcceptedAt(
+            result.primaryAcceptedAt,
+            BILLING_FEATURES.emailEntitlementEnforcement,
+        );
+        const sentAt = providerAcceptedAt ?? getNow(context);
         let updatedInvoice = false;
         let status = invoice.status;
+        let invoiceApplication = 'not-required';
 
         if (draft.sendType !== 'quote') {
-            const updates: Partial<Invoice> = {
-                sentAt,
-                sentToEmail: draft.to,
-            };
+            const currentInvoice = readEntity<Invoice>(context.store.invoices.get(invoice.id));
+            if (currentInvoice && !isInvoiceCanceled(currentInvoice)) {
+                if (result.attemptId && billingLifecycle) {
+                    const { validateBoundEmailAttemptDocumentSnapshot } = await import('@/utils/emailAttemptStorage');
+                    invoiceApplication = await validateBoundEmailAttemptDocumentSnapshot(
+                        result.attemptId,
+                        billingLifecycle,
+                        currentInvoice,
+                    );
+                } else {
+                    invoiceApplication = BILLING_FEATURES.emailEntitlementEnforcement
+                        ? 'unverifiable'
+                        : 'match';
+                }
+                if (invoiceApplication === 'missing' || invoiceApplication === 'unverifiable') {
+                    throw new AgentCommandError(
+                        'UNAVAILABLE',
+                        'Delivery was accepted, but TaskTime could not safely match it to the current invoice.',
+                        {
+                            ...(result.attemptId ? { attemptId: result.attemptId } : {}),
+                            recoveryCommand: 'get_email_send_status',
+                            retrySafe: true,
+                        },
+                    );
+                }
+                if (invoiceApplication !== 'match') {
+                    status = currentInvoice.status;
+                } else {
+                    const updates: Partial<Invoice> = {
+                        sentAt,
+                        sentToEmail: draft.to,
+                    };
 
-            updateValidatedEntity<Invoice>(
-                context.store.invoices as any,
-                'invoices',
-                invoice.id,
-                updates,
-                'agent send invoice email'
-            );
-            updatedInvoice = true;
+                    updateValidatedEntity<Invoice>(
+                        context.store.invoices as any,
+                        'invoices',
+                        invoice.id,
+                        updates,
+                        'agent send invoice email'
+                    );
+                    updatedInvoice = true;
+                }
+            } else if (currentInvoice) {
+                status = currentInvoice.status;
+                invoiceApplication = 'mismatch';
+            } else {
+                invoiceApplication = 'mismatch';
+            }
+        }
+
+        if (result.attemptId && billingLifecycle) {
+            const { markEmailAttemptMetadataApplied } = await import('@/utils/emailAttemptStorage');
+            const applied = await markEmailAttemptMetadataApplied(result.attemptId, billingLifecycle);
+            if (!applied) {
+                throw new AgentCommandError(
+                    'UNAVAILABLE',
+                    'Delivery was accepted, but TaskTime could not finish saving its local confirmation.',
+                    {
+                        attemptId: result.attemptId,
+                        recoveryCommand: 'get_email_send_status',
+                        retrySafe: true,
+                    },
+                );
+            }
         }
 
         const latestInvoice = readEntity<Invoice>(context.store.invoices.get(invoice.id));

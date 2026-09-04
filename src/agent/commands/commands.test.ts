@@ -156,6 +156,11 @@ const emailMocks = vi.hoisted(() => ({
     sendInvoiceEmail: vi.fn(async () => ({ success: true, remaining: 9, forwarded: true })),
 }));
 
+const emailAttemptMocks = vi.hoisted(() => ({
+    markEmailAttemptMetadataApplied: vi.fn(async () => true),
+    validateBoundEmailAttemptDocumentSnapshot: vi.fn(async () => 'match'),
+}));
+
 const csvMocks = vi.hoisted(() => ({
     buildCsvContent: vi.fn(() => 'mock,csv'),
     downloadCsvFile: vi.fn(),
@@ -195,6 +200,11 @@ vi.mock('@/utils/pdfUtils', () => ({
 vi.mock('@/utils/emailService', () => ({
     sendInvoiceEmail: (...args: unknown[]) => emailMocks.sendInvoiceEmail(...args),
     isEmailSendError: (error: unknown) => typeof error === 'object' && error !== null && 'type' in error,
+}));
+
+vi.mock('@/utils/emailAttemptStorage', () => ({
+    markEmailAttemptMetadataApplied: (...args: unknown[]) => emailAttemptMocks.markEmailAttemptMetadataApplied(...args),
+    validateBoundEmailAttemptDocumentSnapshot: (...args: unknown[]) => emailAttemptMocks.validateBoundEmailAttemptDocumentSnapshot(...args),
 }));
 
 vi.mock('@/utils/reportCsvUtils', () => ({
@@ -651,7 +661,16 @@ describe('agent commands', () => {
         pdfMocks.generatePDFBase64.mockResolvedValue('mock-pdf-base64');
         pdfMocks.generatePDFBlob.mockResolvedValue(new Blob(['mock-pdf']));
         pdfMocks.getCurrentInvoiceHtmlContent.mockReturnValue('<div>Invoice HTML</div>');
-        emailMocks.sendInvoiceEmail.mockResolvedValue({ success: true, remaining: 9, forwarded: true });
+        emailMocks.sendInvoiceEmail.mockResolvedValue({
+            success: true,
+            remaining: 9,
+            forwarded: true,
+            primaryAcceptedAt: '2026-06-25T15:00:00.000Z',
+        });
+        emailAttemptMocks.markEmailAttemptMetadataApplied.mockReset();
+        emailAttemptMocks.markEmailAttemptMetadataApplied.mockResolvedValue(true);
+        emailAttemptMocks.validateBoundEmailAttemptDocumentSnapshot.mockReset();
+        emailAttemptMocks.validateBoundEmailAttemptDocumentSnapshot.mockResolvedValue('match');
         csvMocks.buildCsvContent.mockReturnValue('mock,csv');
         zipMocks.downloadZipFile.mockResolvedValue(undefined);
         reportPdfMocks.buildMonthlyReportHtml.mockReturnValue('<div>Monthly Report HTML</div>');
@@ -7528,7 +7547,17 @@ describe('agent commands', () => {
         const context = createContext();
         context.permissions = new Set(['read', 'write', 'email']);
         context.hostedServiceSessionId = 'dropbox-hosted-session-1';
+        context.activeStorageProvider = 'dropbox';
+        context.activeStorageGeneration = 3;
+        context.activeStorageSessionId = 'dropbox-hosted-session-1';
         context.now = () => Date.parse('2026-06-25T15:00:00Z');
+        emailMocks.sendInvoiceEmail.mockResolvedValue({
+            success: true,
+            remaining: 9,
+            forwarded: true,
+            attemptId: 'attempt-agent-success',
+            primaryAcceptedAt: '2026-06-25T14:58:00.000Z',
+        });
         context.maps.clients.set('client-1', objectToYMap({
             id: 'client-1',
             title: 'Client One',
@@ -7612,6 +7641,12 @@ describe('agent commands', () => {
             pdfBase64: 'mock-pdf-base64',
             sendType: 'invoice',
             attachmentTitle: 'invoice-INV-EMAIL',
+            documentSnapshot: expect.objectContaining({ id: 'invoice-email', total: 125 }),
+            billingLifecycle: {
+                provider: 'dropbox',
+                generation: 3,
+                sessionId: 'dropbox-hosted-session-1',
+            },
         }));
         expect(result).toEqual(expect.objectContaining({
             invoiceId: 'invoice-email',
@@ -7622,12 +7657,138 @@ describe('agent commands', () => {
             remaining: 9,
             updatedInvoice: true,
             status: 'sent',
-            sentAt: Date.parse('2026-06-25T15:00:00Z'),
+            sentAt: Date.parse('2026-06-25T14:58:00Z'),
         }));
         expect(readStored<any>(context.maps.invoices, 'invoice-email')).toEqual(expect.objectContaining({
             status: 'sent',
             sentToEmail: 'billing@example.com',
-            sentAt: Date.parse('2026-06-25T15:00:00Z'),
+            sentAt: Date.parse('2026-06-25T14:58:00Z'),
+        }));
+        expect(emailAttemptMocks.markEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-agent-success',
+            {
+                provider: 'dropbox',
+                generation: 3,
+                sessionId: 'dropbox-hosted-session-1',
+            },
+        );
+
+        context.maps.invoices.set('invoice-email', objectToYMap({
+            ...readStored<any>(context.maps.invoices, 'invoice-email'),
+            sentAt: undefined,
+            sentToEmail: undefined,
+            total: 125,
+        }));
+        emailAttemptMocks.markEmailAttemptMetadataApplied.mockClear();
+        emailAttemptMocks.validateBoundEmailAttemptDocumentSnapshot.mockResolvedValueOnce('mismatch');
+        emailMocks.sendInvoiceEmail.mockImplementationOnce(async () => {
+            context.maps.invoices.set('invoice-email', objectToYMap({
+                ...readStored<any>(context.maps.invoices, 'invoice-email'),
+                total: 175,
+                updatedAt: Date.parse('2026-06-25T14:57:00.000Z'),
+            }));
+            return {
+                success: true,
+                remaining: 8,
+                forwarded: false,
+                attemptId: 'attempt-agent-changed',
+                primaryAcceptedAt: '2026-06-25T14:59:30.000Z',
+            };
+        });
+
+        const changedWhileSending = await sendInvoiceEmailCommand(context, {
+            invoiceId: 'invoice-email',
+            confirmSend: true,
+            idempotencyKey: 'invoice-changed-during-send',
+        });
+
+        expect(changedWhileSending).toEqual(expect.objectContaining({
+            updatedInvoice: false,
+            sentAt: null,
+        }));
+        const changedInvoice = readStored<any>(context.maps.invoices, 'invoice-email');
+        expect(changedInvoice).toEqual(expect.objectContaining({ total: 175 }));
+        expect(changedInvoice).not.toHaveProperty('sentAt');
+        expect(changedInvoice).not.toHaveProperty('sentToEmail');
+        expect(emailAttemptMocks.markEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-agent-changed',
+            expect.objectContaining({ sessionId: 'dropbox-hosted-session-1' }),
+        );
+        emailAttemptMocks.validateBoundEmailAttemptDocumentSnapshot.mockResolvedValue('match');
+
+        emailAttemptMocks.markEmailAttemptMetadataApplied.mockClear();
+        emailMocks.sendInvoiceEmail.mockRejectedValueOnce({
+            type: 'pending',
+            attemptId: 'attempt-agent-pending',
+            primaryAcceptedAt: '2026-06-25T14:59:00.000Z',
+            message: 'Delivery confirmation is pending.',
+        });
+        await expect(executeAgentCommand(context, 'send_invoice_email', {
+            invoiceId: 'invoice-email',
+            sendType: 'reminder',
+            confirmSend: true,
+        })).resolves.toEqual(expect.objectContaining({
+            ok: false,
+            command: 'send_invoice_email',
+            error: expect.objectContaining({
+                code: 'UNAVAILABLE',
+                details: {
+                    attemptId: 'attempt-agent-pending',
+                    recoveryCommand: 'get_email_send_status',
+                    retrySafe: true,
+                },
+            }),
+        }));
+        expect(readStored<any>(context.maps.invoices, 'invoice-email')).toEqual(expect.objectContaining({
+            sentToEmail: 'billing@example.com',
+            sentAt: Date.parse('2026-06-25T14:59:00.000Z'),
+        }));
+        expect(emailAttemptMocks.markEmailAttemptMetadataApplied).not.toHaveBeenCalled();
+
+        emailMocks.sendInvoiceEmail.mockRejectedValueOnce({
+            type: 'quota_exceeded',
+            remaining: 0,
+            message: 'Monthly email limit reached.',
+        });
+        await expect(executeAgentCommand(context, 'send_invoice_email', {
+            invoiceId: 'invoice-email',
+            confirmSend: true,
+        })).resolves.toEqual(expect.objectContaining({
+            ok: false,
+            error: expect.objectContaining({
+                code: 'RATE_LIMITED',
+                details: { remaining: 0 },
+            }),
+        }));
+
+        emailMocks.sendInvoiceEmail.mockRejectedValueOnce({
+            type: 'rate_limited',
+            message: 'Too many hosted email requests. Wait a moment before trying again.',
+        });
+        await expect(executeAgentCommand(context, 'send_invoice_email', {
+            invoiceId: 'invoice-email',
+            confirmSend: true,
+        })).resolves.toEqual(expect.objectContaining({
+            ok: false,
+            error: expect.objectContaining({ code: 'RATE_LIMITED' }),
+        }));
+
+        emailMocks.sendInvoiceEmail.mockRejectedValueOnce({
+            type: 'client_upgrade_required',
+            message: 'Update TaskTime before using hosted email. Your draft and manual delivery options remain available.',
+        });
+        await expect(executeAgentCommand(context, 'send_invoice_email', {
+            invoiceId: 'invoice-email',
+            confirmSend: true,
+        })).resolves.toEqual(expect.objectContaining({
+            ok: false,
+            error: expect.objectContaining({
+                code: 'UNAVAILABLE',
+                details: {
+                    recoveryAction: 'update_client',
+                    manualDeliveryAvailable: true,
+                },
+            }),
         }));
 
         await expect(executeAgentCommand(context, 'send_invoice_email', {
@@ -7648,6 +7809,29 @@ describe('agent commands', () => {
             }),
         }));
 
+        context.maps.invoices.set('invoice-email-canceled', objectToYMap({
+            id: 'invoice-email-canceled',
+            projectId: 'project-1',
+            clientId: 'client-1',
+            businessInfoId: 'business-1',
+            invoiceNumber: 'INV-EMAIL-CANCELED',
+            date: '2026-06-25',
+            dueDate: '2026-07-09',
+            status: 'canceled',
+            canceledAt: Date.parse('2026-06-25T14:30:00Z'),
+            cancellationReason: 'Duplicate',
+            currency: 'USD',
+            items: [],
+            subtotal: 125,
+            total: 125,
+        }));
+        emailMocks.sendInvoiceEmail.mockClear();
+        await expect(sendInvoiceEmailCommand(context, {
+            invoiceId: 'invoice-email-canceled',
+            confirmSend: true,
+        })).rejects.toMatchObject({ code: 'CONFLICT' });
+        expect(emailMocks.sendInvoiceEmail).not.toHaveBeenCalled();
+
         context.permissions = new Set(['read', 'write']);
         await expect(executeAgentCommand(context, 'send_invoice_email', {
             invoiceId: 'invoice-email',
@@ -7666,7 +7850,17 @@ describe('agent commands', () => {
         const context = createContext();
         context.permissions = new Set(['read', 'export', 'email']);
         context.hostedServiceSessionId = 'dropbox-hosted-session-quote';
+        context.activeStorageProvider = 'dropbox';
+        context.activeStorageGeneration = 4;
+        context.activeStorageSessionId = 'dropbox-hosted-session-quote';
         context.now = () => Date.parse('2026-06-26T09:10:11Z');
+        emailMocks.sendInvoiceEmail.mockResolvedValue({
+            success: true,
+            remaining: 9,
+            forwarded: true,
+            attemptId: 'attempt-agent-quote-success',
+            primaryAcceptedAt: '2026-06-26T09:10:10.000Z',
+        });
         context.maps.clients.set('client-1', objectToYMap({
             id: 'client-1',
             title: 'Client One',
@@ -7825,6 +8019,10 @@ describe('agent commands', () => {
             pdfBase64: 'mock-pdf-base64',
             sendType: 'quote',
             attachmentTitle: 'quote-26091011',
+            documentSnapshot: expect.objectContaining({
+                id: 'QUOTE-project-1-26091011',
+                documentMode: 'quote',
+            }),
         }));
         expect(sent).toEqual({
             projectId: 'project-1',
@@ -7837,7 +8035,39 @@ describe('agent commands', () => {
             updatedInvoice: false,
             sentAt: null,
         });
+        expect(emailAttemptMocks.markEmailAttemptMetadataApplied).toHaveBeenCalledWith(
+            'attempt-agent-quote-success',
+            {
+                provider: 'dropbox',
+                generation: 4,
+                sessionId: 'dropbox-hosted-session-quote',
+            },
+        );
         expect(context.maps.invoices.size).toBe(0);
+
+        emailMocks.sendInvoiceEmail.mockRejectedValueOnce({
+            type: 'pending',
+            attemptId: 'attempt-agent-quote-pending',
+            message: 'Delivery confirmation is pending.',
+        });
+        await expect(executeAgentCommand(context, 'send_project_quote_email', {
+            projectId: 'project-1',
+            quoteDate: '2026-06-26',
+            quoteTimestamp: '26091012',
+            confirmSend: true,
+            idempotencyKey: 'quote-send-pending',
+        })).resolves.toEqual(expect.objectContaining({
+            ok: false,
+            command: 'send_project_quote_email',
+            error: expect.objectContaining({
+                code: 'UNAVAILABLE',
+                details: {
+                    attemptId: 'attempt-agent-quote-pending',
+                    recoveryCommand: 'get_email_send_status',
+                    retrySafe: true,
+                },
+            }),
+        }));
 
         await expect(executeAgentCommand(context, 'preview_project_quote', {
             projectId: 'project-1',

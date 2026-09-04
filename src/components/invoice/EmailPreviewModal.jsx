@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Modal from '../Modal';
 import EmailTemplateModal from '../modals/EmailTemplateModal.jsx';
 import { Button } from '@/components/ui/button';
@@ -42,9 +42,26 @@ import { evaluateEntitlementFeature } from '@/domain/entitlements/entitlementPol
 import { EntitlementNotice } from '@/components/billing/EntitlementNotice';
 import { useUrlState } from '@/hooks/useUrlState';
 import {
-    findBoundUnreconciledEmailAttempt,
+    findUnreconciledEmailAttemptForRecovery,
     markEmailAttemptMetadataApplied,
+    validateBoundEmailAttemptDocumentSnapshot,
 } from '@/utils/emailAttemptStorage';
+
+const MAX_AUTOMATIC_DELIVERY_CHECKS = 6;
+const AUTOMATIC_DELIVERY_CHECK_DELAY_MS = 2_000;
+const AUTOMATIC_DELIVERY_SPINNER_BUDGET_MS = 12_000;
+const AUTOMATIC_DELIVERY_BUDGET_EXCEEDED = Symbol('automatic-delivery-budget-exceeded');
+
+function formatEmailUsageReset(periodEnd) {
+    const timestamp = Date.parse(periodEnd || '');
+    if (!Number.isFinite(timestamp)) return null;
+    return new Intl.DateTimeFormat('en', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+    }).format(timestamp);
+}
 
 /**
  * EmailPreviewModal — shows the user what will be emailed before sending.
@@ -69,17 +86,40 @@ const EmailPreviewModal = ({
         activeStorageGeneration,
         activeStorageSessionId,
     } = useYjs();
-    const { resolution } = useBilling();
+    const { resolution, status } = useBilling();
     const { updateUrl } = useUrlState();
     const { businessBrandAssets } = useBusinessBrandAssets();
-    const { updateInvoice } = useInvoices();
+    const { invoices: currentInvoices = [], updateInvoice } = useInvoices();
     const { getByType, getDefaultForType } = useEmailTemplates();
-    const { showSuccess } = useToast();
+    const { showSuccess, showWarning } = useToast();
     const { preferences } = usePreferences();
 
     const [sending, setSending] = useState(false);
     const [error, setError] = useState(null);
     const [pendingAttemptId, setPendingAttemptId] = useState(null);
+    const [pendingMessage, setPendingMessage] = useState(null);
+    const [deliveryProtection, setDeliveryProtection] = useState(null);
+    const [automaticChecksStopped, setAutomaticChecksStopped] = useState(false);
+    const checkingAttemptRef = useRef(null);
+    const automaticCheckCountRef = useRef(0);
+    const automaticRecoveryStartedAtRef = useRef(null);
+    const pendingRecipientRef = useRef('');
+    const primaryApplicationRef = useRef(null);
+    const statusTimerRef = useRef(null);
+    const recoveryGenerationRef = useRef(0);
+    const recoveryLifecycleKeyRef = useRef(null);
+    const modalIsOpenRef = useRef(isOpen);
+    const currentInvoicesRef = useRef(currentInvoices);
+    const recoveryLifecycleKey = isOpen && invoice
+        ? `${sendType}:${invoice.id || invoice.projectId || invoice.invoiceNumber}`
+        : null;
+    if (recoveryLifecycleKeyRef.current !== recoveryLifecycleKey) {
+        recoveryLifecycleKeyRef.current = recoveryLifecycleKey;
+        recoveryGenerationRef.current += 1;
+        checkingAttemptRef.current = null;
+    }
+    modalIsOpenRef.current = isOpen;
+    currentInvoicesRef.current = currentInvoices;
 
     // Editable fields (initialised from selected template)
     const [to, setTo] = useState('');
@@ -109,15 +149,26 @@ const EmailPreviewModal = ({
     const entitlementActionRequired = BILLING_FEATURES.emailEntitlementEnforcement
         && !emailAccess.allowed
         && !pendingAttemptId;
+    const canonicalEmailUsage = resolution.kind === 'canonical'
+        && status?.usage?.invoiceEmail?.available === true
+        && status.usage.invoiceEmail.entitled === true
+        && Number.isSafeInteger(status.usage.invoiceEmail.effectiveRemaining)
+        ? status.usage.invoiceEmail
+        : null;
+    const emailUsageRemaining = canonicalEmailUsage?.effectiveRemaining ?? null;
+    const emailUsageReset = formatEmailUsageReset(canonicalEmailUsage?.window?.periodEnd);
+    const forwardingUnavailable = emailUsageRemaining !== null && emailUsageRemaining < 2;
+    const hostedSendUnavailable = emailUsageRemaining === 0;
     const billingLifecycle = useMemo(() => activeStorageProvider
         && activeStorageGeneration !== null
         && activeStorageSessionId
+        && hostedServiceSessionId === activeStorageSessionId
         ? {
             provider: activeStorageProvider,
             generation: activeStorageGeneration,
             sessionId: activeStorageSessionId,
         }
-        : null, [activeStorageGeneration, activeStorageProvider, activeStorageSessionId]);
+        : null, [activeStorageGeneration, activeStorageProvider, activeStorageSessionId, hostedServiceSessionId]);
 
     const templateValues = useMemo(() => ({
         invoiceNumber: invoice?.invoiceNumber || '',
@@ -130,6 +181,10 @@ const EmailPreviewModal = ({
     }), [invoice, client, invoiceTotal, currencySymbol, businessName]);
 
     const senderForwardAddress = (replyTo || defaultReplyToEmail).trim();
+
+    useEffect(() => {
+        if (forwardToSelf && forwardingUnavailable) setForwardToSelf(false);
+    }, [forwardToSelf, forwardingUnavailable]);
 
     const defaultSubjectTemplate = isQuoteSend ? DEFAULT_QUOTE_SUBJECT : DEFAULT_SUBJECT;
     const defaultBodyTemplate = isQuoteSend
@@ -186,6 +241,13 @@ const EmailPreviewModal = ({
         setError(null);
         setSending(false);
         setPendingAttemptId(null);
+        setPendingMessage(null);
+        setDeliveryProtection(null);
+        setAutomaticChecksStopped(false);
+        automaticCheckCountRef.current = 0;
+        automaticRecoveryStartedAtRef.current = null;
+        pendingRecipientRef.current = '';
+        primaryApplicationRef.current = null;
 
         const tpl = availableTemplates.find((template) => template.id === preferredTemplateId)
             || defaultTemplate
@@ -207,27 +269,330 @@ const EmailPreviewModal = ({
         setForwardToSelf(false);
     }, [isOpen]);
 
+    const protectConfirmedDelivery = useCallback((attemptId) => {
+        if (statusTimerRef.current !== null) {
+            window.clearTimeout(statusTimerRef.current);
+            statusTimerRef.current = null;
+        }
+        setPendingAttemptId(attemptId);
+        setDeliveryProtection('confirmed');
+        setAutomaticChecksStopped(true);
+        setPendingMessage('Delivery was confirmed, but TaskTime could not finish saving the confirmation locally. You can safely close this window; TaskTime will keep applying it automatically from the invoice list.');
+        setError(null);
+    }, []);
+
+    const applyAcceptedDelivery = useCallback(async ({
+        attemptId,
+        acceptedAt,
+        recipient = '',
+        isCurrent = () => true,
+    }) => {
+        if (!isCurrent()) return 'stale';
+        const acceptedAtMs = acceptedAt ? Date.parse(acceptedAt) : NaN;
+        const sentAt = Number.isFinite(acceptedAtMs)
+            ? acceptedAtMs
+            : BILLING_FEATURES.emailEntitlementEnforcement
+                ? null
+                : Date.now();
+
+        if (sentAt === null) {
+            if (!isCurrent()) return 'stale';
+            protectConfirmedDelivery(attemptId);
+            return 'protected';
+        }
+
+        try {
+            const primaryApplicationKey = `${attemptId || 'legacy'}:${sentAt}:${recipient}`;
+            if (isQuoteSend) return 'applied';
+
+            const currentInvoice = BILLING_FEATURES.emailEntitlementEnforcement
+                ? currentInvoicesRef.current.find(candidate => candidate.id === invoice.id)
+                : invoice;
+            if (!currentInvoice || isInvoiceCanceled(currentInvoice)) return 'mismatch';
+
+            if (BILLING_FEATURES.emailEntitlementEnforcement) {
+                if (!attemptId || !billingLifecycle) {
+                    protectConfirmedDelivery(attemptId);
+                    return 'protected';
+                }
+                const validation = await validateBoundEmailAttemptDocumentSnapshot(
+                    attemptId,
+                    billingLifecycle,
+                    currentInvoice,
+                );
+                if (!isCurrent()) return 'stale';
+                if (validation === 'mismatch') return 'mismatch';
+                if (validation !== 'match') {
+                    protectConfirmedDelivery(attemptId);
+                    return 'protected';
+                }
+            }
+
+            if (primaryApplicationRef.current !== primaryApplicationKey) {
+                if (!isCurrent()) return 'stale';
+                await Promise.resolve(updateInvoice(currentInvoice.id, {
+                    sentAt,
+                    ...(recipient ? { sentToEmail: recipient } : {}),
+                }));
+                if (!isCurrent()) return 'stale';
+                primaryApplicationRef.current = primaryApplicationKey;
+            }
+            return 'applied';
+        } catch {
+            if (!isCurrent()) return 'stale';
+            if (attemptId) {
+                protectConfirmedDelivery(attemptId);
+                return 'protected';
+            }
+            throw new Error('Local delivery confirmation could not be applied.');
+        }
+    }, [billingLifecycle, invoice, isQuoteSend, protectConfirmedDelivery, updateInvoice]);
+
+    const finishAttemptReconciliation = useCallback(async (attemptId, isCurrent = () => true) => {
+        if (!isCurrent()) return false;
+        if (!attemptId || !billingLifecycle) return true;
+        const applied = await markEmailAttemptMetadataApplied(attemptId, billingLifecycle);
+        if (!isCurrent()) return false;
+        if (!applied) {
+            protectConfirmedDelivery(attemptId);
+            return false;
+        }
+        return true;
+    }, [billingLifecycle, protectConfirmedDelivery]);
+
+    const reconcilePendingAttempt = useCallback(async (
+        attemptId,
+        recipient = '',
+        recoveryBinding = null,
+    ) => {
+        if (!attemptId
+            || !hostedServiceSessionId
+            || !billingLifecycle
+            || !modalIsOpenRef.current
+            || checkingAttemptRef.current !== null
+            || automaticChecksStopped) return;
+
+        const recoveryGeneration = recoveryGenerationRef.current;
+        const isCurrentRecovery = () => modalIsOpenRef.current
+            && recoveryGenerationRef.current === recoveryGeneration;
+        const statusCheckToken = Symbol('hosted-email-status-check');
+
+        if (automaticRecoveryStartedAtRef.current === null) {
+            automaticRecoveryStartedAtRef.current = Date.now();
+        }
+        const stopWithCalmProtection = (message = 'Delivery could not be confirmed yet. TaskTime has protected this email from being sent again. You can safely close this window.') => {
+            if (!isCurrentRecovery()) return;
+            setAutomaticChecksStopped(true);
+            setDeliveryProtection('pending');
+            setPendingMessage(message);
+            setError(null);
+        };
+        const spinnerDeadline = automaticRecoveryStartedAtRef.current
+            + AUTOMATIC_DELIVERY_SPINNER_BUDGET_MS;
+        const remainingSpinnerBudget = spinnerDeadline - Date.now();
+        if (remainingSpinnerBudget <= 0) {
+            stopWithCalmProtection();
+            return;
+        }
+
+        if (automaticCheckCountRef.current >= MAX_AUTOMATIC_DELIVERY_CHECKS) {
+            stopWithCalmProtection('Delivery is still being confirmed. TaskTime has protected this email from being sent again. You can safely close this window.');
+            return;
+        }
+
+        checkingAttemptRef.current = statusCheckToken;
+        automaticCheckCountRef.current += 1;
+        let shouldScheduleNextCheck = false;
+        let spinnerBudgetTimer = null;
+        if (recipient) pendingRecipientRef.current = recipient;
+        setPendingAttemptId(attemptId);
+        setDeliveryProtection('pending');
+        setPendingMessage('TaskTime is checking automatically. You can safely close this window.');
+        setError(null);
+
+        try {
+            const attempt = await Promise.race([
+                checkEmailAttemptStatus({
+                    sessionId: hostedServiceSessionId,
+                    billingLifecycle,
+                    attemptId,
+                    ...(recoveryBinding ? { recoveryBinding } : {}),
+                }),
+                new Promise((_, reject) => {
+                    spinnerBudgetTimer = window.setTimeout(
+                        () => reject(AUTOMATIC_DELIVERY_BUDGET_EXCEEDED),
+                        remainingSpinnerBudget,
+                    );
+                }),
+            ]);
+            if (!isCurrentRecovery()) return;
+            const hasPendingPart = attempt.primary.outcome === 'pending'
+                || attempt.forward?.outcome === 'pending';
+            let primaryApplication = 'applied';
+            if (attempt.primary.outcome === 'accepted') {
+                primaryApplication = await applyAcceptedDelivery({
+                    attemptId,
+                    acceptedAt: attempt.primary.acceptedAt,
+                    recipient: pendingRecipientRef.current,
+                    isCurrent: isCurrentRecovery,
+                });
+                if (primaryApplication === 'protected' || primaryApplication === 'stale') return;
+            }
+            if (!isCurrentRecovery()) return;
+            if (attempt.state === 'pending' || hasPendingPart) {
+                if (automaticCheckCountRef.current >= MAX_AUTOMATIC_DELIVERY_CHECKS) {
+                    setAutomaticChecksStopped(true);
+                    setPendingMessage(primaryApplication === 'mismatch'
+                        ? 'The primary email was delivered for an earlier version. The requested copy is still being confirmed, and TaskTime has protected this email from being sent again.'
+                        : 'Delivery is still being confirmed. TaskTime has protected this email from being sent again. You can safely close this window.');
+                } else {
+                    setPendingMessage(primaryApplication === 'mismatch'
+                        ? 'The primary email was delivered for an earlier version. TaskTime is checking the requested copy automatically.'
+                        : 'TaskTime is checking automatically. You can safely close this window.');
+                    shouldScheduleNextCheck = true;
+                }
+                return;
+            }
+            if (attempt.primary.outcome !== 'accepted') {
+                if (attempt.state !== 'rejected') {
+                    const finalized = await finishAttemptReconciliation(
+                        attemptId,
+                        isCurrentRecovery,
+                    );
+                    if (!finalized) return;
+                }
+                if (!isCurrentRecovery()) return;
+                setPendingAttemptId(null);
+                setPendingMessage(null);
+                setDeliveryProtection(null);
+                setError('The email was not accepted. Review the draft before sending again.');
+                return;
+            }
+            const finalized = await finishAttemptReconciliation(
+                attemptId,
+                isCurrentRecovery,
+            );
+            if (!finalized) return;
+            if (!isCurrentRecovery()) return;
+            if (primaryApplication === 'mismatch') {
+                showWarning('The email was delivered for an earlier version of this invoice. The current invoice was not marked as sent.');
+                setPendingAttemptId(null);
+                setPendingMessage(null);
+                setDeliveryProtection(null);
+                onClose();
+                return;
+            }
+            const forwardWasNotSent = attempt.forward?.outcome === 'rejected';
+            if (forwardWasNotSent) {
+                const deliveryLabel = isQuoteSend
+                    ? 'Quote'
+                    : isReminderSend
+                        ? 'Reminder'
+                        : 'Invoice';
+                showWarning(`${deliveryLabel} emailed successfully, but the requested copy was not sent.`);
+                setPendingAttemptId(null);
+                setPendingMessage(null);
+                setDeliveryProtection(null);
+                onClose();
+                return;
+            }
+            const confirmedRecipient = pendingRecipientRef.current;
+            showSuccess(confirmedRecipient
+                ? `Delivery confirmed for ${confirmedRecipient}.`
+                : 'Delivery confirmed.');
+            setPendingAttemptId(null);
+            setPendingMessage(null);
+            setDeliveryProtection(null);
+            onClose();
+        } catch (statusError) {
+            if (!isCurrentRecovery()) return;
+            if (statusError === AUTOMATIC_DELIVERY_BUDGET_EXCEEDED) {
+                stopWithCalmProtection();
+                return;
+            }
+            if (isEmailSendError(statusError) && statusError.type === 'attempt_dormant') {
+                setPendingAttemptId(attemptId);
+                setDeliveryProtection('protected');
+                setAutomaticChecksStopped(true);
+                setPendingMessage(statusError.message);
+                setError(null);
+                return;
+            }
+            if (isEmailSendError(statusError) && statusError.type === 'attempt_not_found') {
+                setPendingAttemptId(null);
+                setPendingMessage(null);
+                setDeliveryProtection(null);
+                setError(null);
+                return;
+            }
+            if (automaticCheckCountRef.current >= MAX_AUTOMATIC_DELIVERY_CHECKS) {
+                setAutomaticChecksStopped(true);
+                setPendingMessage('Delivery could not be confirmed yet. TaskTime has protected this email from being sent again. You can safely close this window.');
+            } else {
+                setPendingMessage('Delivery could not be confirmed yet. TaskTime will check again automatically.');
+                shouldScheduleNextCheck = true;
+            }
+        } finally {
+            if (spinnerBudgetTimer !== null) {
+                window.clearTimeout(spinnerBudgetTimer);
+            }
+            if (checkingAttemptRef.current === statusCheckToken) {
+                checkingAttemptRef.current = null;
+            }
+            if (isCurrentRecovery()
+                && shouldScheduleNextCheck
+                && automaticCheckCountRef.current < MAX_AUTOMATIC_DELIVERY_CHECKS) {
+                const remainingBudgetAfterCheck = spinnerDeadline - Date.now();
+                if (remainingBudgetAfterCheck <= 0) {
+                    stopWithCalmProtection();
+                } else {
+                    statusTimerRef.current = window.setTimeout(() => {
+                        statusTimerRef.current = null;
+                        if (!isCurrentRecovery()) return;
+                        void reconcilePendingAttempt(attemptId, '', recoveryBinding);
+                    }, Math.min(AUTOMATIC_DELIVERY_CHECK_DELAY_MS, remainingBudgetAfterCheck));
+                }
+            }
+        }
+    }, [applyAcceptedDelivery, automaticChecksStopped, billingLifecycle, finishAttemptReconciliation, hostedServiceSessionId, isQuoteSend, isReminderSend, onClose, showSuccess, showWarning]);
+
     useEffect(() => {
         if (!isOpen
             || !invoice
             || !billingLifecycle
-            || BILLING_FEATURES.sandbox
             || !BILLING_FEATURES.emailEntitlementEnforcement) return undefined;
         let current = true;
         const documentId = invoice.id || invoice.projectId || invoice.invoiceNumber;
-        void findBoundUnreconciledEmailAttempt(
+        const currentInvoice = currentInvoices.find(candidate => candidate.id === invoice.id) ?? invoice;
+        void findUnreconciledEmailAttemptForRecovery(
             billingLifecycle,
             documentId,
             sendType,
-        ).then((attempt) => {
-            if (!current || !attempt) return;
-            setPendingAttemptId(attempt.attemptId);
-            setError('A previous hosted send needs delivery confirmation before another send can start.');
+            {
+                includeAppliedCompletion: sendType === 'invoice' && !currentInvoice.sentAt,
+            },
+        ).then((candidate) => {
+            if (!current || !candidate) return;
+            const recoveryBinding = candidate.binding === 'same-provider-reconnect'
+                ? { kind: candidate.binding, documentId, sendType }
+                : candidate.binding === 'different-provider'
+                    ? { kind: 'cross-provider-status-proof', documentId, sendType }
+                    : null;
+            void reconcilePendingAttempt(candidate.attempt.attemptId, '', recoveryBinding);
         });
         return () => {
             current = false;
         };
-    }, [billingLifecycle, invoice, isOpen, sendType]);
+    }, [billingLifecycle, currentInvoices, invoice, isOpen, reconcilePendingAttempt, sendType]);
+
+    useEffect(() => () => {
+        modalIsOpenRef.current = false;
+        recoveryGenerationRef.current += 1;
+        checkingAttemptRef.current = null;
+        if (statusTimerRef.current !== null) {
+            window.clearTimeout(statusTimerRef.current);
+        }
+    }, []);
 
     // When the user switches template, re-apply
     const handleTemplateChange = useCallback((templateId) => {
@@ -252,11 +617,7 @@ const EmailPreviewModal = ({
     }, [applyTemplate]);
 
     const handleSend = useCallback(async () => {
-
-        if (BILLING_FEATURES.sandbox) {
-            setError('Hosted Send is temporarily unavailable. Your draft and manual delivery options remain available.');
-            return;
-        }
+        setPendingMessage(null);
 
         if (!emailAccess.allowed) {
             setError(emailAccess.reason === 'status_unavailable'
@@ -267,6 +628,22 @@ const EmailPreviewModal = ({
 
         if (!hostedServiceSessionId) {
             setError(`Connect a cloud provider to enable ${documentLabel} emailing.`);
+            return;
+        }
+
+        if (BILLING_FEATURES.emailEntitlementEnforcement && !billingLifecycle) {
+            setError('Reconnect cloud sync before sending so TaskTime can confirm the active account.');
+            return;
+        }
+
+        if (hostedSendUnavailable) {
+            setError('No hosted email sends remain in the current allowance. The reset date is shown below.');
+            return;
+        }
+
+        if (forwardToSelf && forwardingUnavailable) {
+            setForwardToSelf(false);
+            setError('Forwarding a copy requires two available sends. The primary email remains ready to send.');
             return;
         }
 
@@ -295,8 +672,15 @@ const EmailPreviewModal = ({
             return;
         }
 
+        automaticCheckCountRef.current = 0;
+        automaticRecoveryStartedAtRef.current = null;
+        setAutomaticChecksStopped(false);
         setSending(true);
         setError(null);
+
+        const sendGeneration = recoveryGenerationRef.current;
+        const isCurrentSend = () => modalIsOpenRef.current
+            && recoveryGenerationRef.current === sendGeneration;
 
         let failureStage = 'prepare';
 
@@ -304,6 +688,7 @@ const EmailPreviewModal = ({
             const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets);
             failureStage = 'pdf';
             const pdfBase64 = await generatePDFBase64(htmlContent);
+            if (!isCurrentSend()) return;
             const documentId = invoice.id || invoice.projectId || invoice.invoiceNumber;
 
             failureStage = 'send';
@@ -321,20 +706,30 @@ const EmailPreviewModal = ({
                 sendType,
                 attachmentTitle: normalizeAttachmentTitle(attachmentTitle),
                 billingLifecycle: billingLifecycle || undefined,
+                documentSnapshot: invoice,
             });
+            if (!isCurrentSend()) return;
 
             if (result.success) {
                 failureStage = 'post-send';
-                if (!isQuoteSend) {
-                    const updates = {
-                        sentAt: Date.now(),
-                        sentToEmail: to,
-                    };
+                const application = await applyAcceptedDelivery({
+                    attemptId: result.attemptId || null,
+                    acceptedAt: result.primaryAcceptedAt || null,
+                    recipient: to,
+                    isCurrent: isCurrentSend,
+                });
+                if (application === 'protected' || application === 'stale') return;
+                const finalized = await finishAttemptReconciliation(
+                    result.attemptId || null,
+                    isCurrentSend,
+                );
+                if (!finalized) return;
+                if (!isCurrentSend()) return;
 
-                    updateInvoice(invoice.id, updates);
-                }
-                if (result.attemptId && billingLifecycle) {
-                    await markEmailAttemptMetadataApplied(result.attemptId, billingLifecycle);
+                if (application === 'mismatch') {
+                    showWarning('The email was delivered for an earlier version of this invoice. The current invoice was not marked as sent.');
+                    onClose();
+                    return;
                 }
 
                 const remaining = result.remaining != null ? ` (${result.remaining} emails remaining this month)` : '';
@@ -346,16 +741,20 @@ const EmailPreviewModal = ({
                             ? `. The copy to ${senderForwardAddress} could not be sent`
                             : '';
 
-                showSuccess(
-                    isQuoteSend
-                        ? `Quote emailed to ${to}${forwardedCopyMessage}${remaining}`
-                        : sendType === 'reminder'
+                const deliveryMessage = isQuoteSend
+                    ? `Quote emailed to ${to}${forwardedCopyMessage}${remaining}`
+                    : sendType === 'reminder'
                         ? `Reminder sent to ${to}${forwardedCopyMessage}${remaining}`
-                        : `Invoice emailed to ${to}${forwardedCopyMessage}${remaining}`
-                );
+                        : `Invoice emailed to ${to}${forwardedCopyMessage}${remaining}`;
+                if (forwardToSelf && result.forwarded === false) {
+                    showWarning(deliveryMessage);
+                } else {
+                    showSuccess(deliveryMessage);
+                }
                 onClose();
             }
         } catch (err) {
+            if (!isCurrentSend()) return;
 
             if (isEmailSendError(err)) {
                 switch (err.type) {
@@ -365,8 +764,13 @@ const EmailPreviewModal = ({
                     case 'quota_exceeded':
                         setError(`${err.message} (${err.remaining} remaining).`);
                         break;
+                    case 'rate_limited':
+                        setError(err.message);
+                        break;
                     case 'already_sent':
-                        setError('This invoice has already been emailed. Use "Send Reminder" for overdue invoices.');
+                        setError(sendType === 'reminder'
+                            ? 'This reminder has already been sent.'
+                            : 'This invoice has already been emailed. Use "Send Reminder" for overdue invoices.');
                         break;
                     case 'validation':
                         setError(err.message);
@@ -380,9 +784,31 @@ const EmailPreviewModal = ({
                     case 'billing_suspended':
                         setError('Resolve billing before starting a new hosted email send. Your draft remains available.');
                         break;
-                    case 'pending':
+                    case 'client_upgrade_required':
+                        setError(err.message);
+                        break;
+                    case 'attempt_capacity':
+                    case 'attempt_conflict':
+                        setError(err.message);
+                        break;
+                    case 'attempt_dormant':
                         setPendingAttemptId(err.attemptId);
-                        setError(`${err.message} Attempt ${err.attemptId}.`);
+                        setDeliveryProtection('protected');
+                        setAutomaticChecksStopped(true);
+                        setPendingMessage(err.message);
+                        break;
+                    case 'pending':
+                        if (err.primaryAcceptedAt) {
+                            const primaryApplication = await applyAcceptedDelivery({
+                                attemptId: err.attemptId,
+                                acceptedAt: err.primaryAcceptedAt,
+                                recipient: to,
+                                isCurrent: isCurrentSend,
+                            });
+                            if (primaryApplication === 'protected' || primaryApplication === 'stale') break;
+                        }
+                        if (!isCurrentSend()) break;
+                        await reconcilePendingAttempt(err.attemptId, to);
                         break;
                     default:
                         setError(err.message || 'Failed to send email');
@@ -408,52 +834,26 @@ const EmailPreviewModal = ({
                 setError(`Unexpected error: ${msg}`);
             }
         } finally {
-            setSending(false);
+            if (isCurrentSend()) setSending(false);
         }
-    }, [attachmentTitle, billingLifecycle, body, businessBrandAssets, clients, documentLabel, emailAccess.allowed, emailAccess.reason, hostedServiceSessionId, forwardToSelf, fromName, invoice, isQuoteSend, onClose, replyTo, sendType, senderForwardAddress, showSuccess, subject, to, updateInvoice]);
-
-    const handleCheckStatus = useCallback(async () => {
-        if (BILLING_FEATURES.sandbox) {
-            setError('Delivery status is temporarily unavailable.');
-            return;
-        }
-        if (!pendingAttemptId || !hostedServiceSessionId || !billingLifecycle) return;
-        setSending(true);
-        setError(null);
-        try {
-            const attempt = await checkEmailAttemptStatus({
-                sessionId: hostedServiceSessionId,
-                billingLifecycle,
-                attemptId: pendingAttemptId,
-            });
-            if (attempt.state === 'pending') {
-                setError(`Delivery confirmation is still pending. Attempt ${pendingAttemptId}.`);
-                return;
-            }
-            if (attempt.primary.outcome !== 'accepted') {
-                setPendingAttemptId(null);
-                setError('The email was not accepted. Review the draft before starting a fresh send.');
-                return;
-            }
-            if (!isQuoteSend) {
-                updateInvoice(invoice.id, { sentAt: Date.now(), sentToEmail: to });
-            }
-            await markEmailAttemptMetadataApplied(pendingAttemptId, billingLifecycle);
-            showSuccess(`Delivery confirmed for ${to}.`);
-            setPendingAttemptId(null);
-            onClose();
-        } catch (statusError) {
-            setError(isEmailSendError(statusError)
-                ? statusError.message
-                : 'Delivery status could not be confirmed.');
-        } finally {
-            setSending(false);
-        }
-    }, [billingLifecycle, hostedServiceSessionId, invoice?.id, isQuoteSend, onClose, pendingAttemptId, showSuccess, to, updateInvoice]);
+    }, [applyAcceptedDelivery, attachmentTitle, billingLifecycle, body, businessBrandAssets, clients, documentLabel, emailAccess.allowed, emailAccess.reason, finishAttemptReconciliation, forwardingUnavailable, hostedSendUnavailable, hostedServiceSessionId, forwardToSelf, fromName, invoice, isQuoteSend, onClose, reconcilePendingAttempt, replyTo, sendType, senderForwardAddress, showSuccess, showWarning, subject, to]);
 
     const handleClose = useCallback(() => {
+        modalIsOpenRef.current = false;
+        recoveryGenerationRef.current += 1;
+        checkingAttemptRef.current = null;
         setError(null);
+        setPendingMessage(null);
+        setPendingAttemptId(null);
+        setDeliveryProtection(null);
+        setAutomaticChecksStopped(false);
+        automaticCheckCountRef.current = 0;
+        primaryApplicationRef.current = null;
         setSending(false);
+        if (statusTimerRef.current !== null) {
+            window.clearTimeout(statusTimerRef.current);
+            statusTimerRef.current = null;
+        }
         setIsTemplateModalOpen(false);
         onClose();
     }, [onClose]);
@@ -478,14 +878,25 @@ const EmailPreviewModal = ({
 
     const footer = (
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
-            <div className="flex items-center">
+            <div className="flex flex-col gap-1">
                 <CustomCheckbox
                     checked={forwardToSelf}
                     onChange={setForwardToSelf}
-                    disabled={sending}
+                    disabled={sending || Boolean(pendingAttemptId) || forwardingUnavailable}
                     label="Forward this email to me"
                     labelClassName="block text-sm text-foreground"
                 />
+                {emailUsageRemaining !== null && (
+                    <p className="text-xs text-muted-foreground">
+                        {emailUsageRemaining} hosted email {emailUsageRemaining === 1 ? 'send' : 'sends'} remaining
+                        {emailUsageReset ? ` · resets ${emailUsageReset} (UTC)` : ''}.
+                    </p>
+                )}
+                {forwardingUnavailable && emailUsageRemaining === 1 && (
+                    <p className="text-xs text-muted-foreground">
+                        Forwarding a copy requires two available sends.
+                    </p>
+                )}
             </div>
 
             <div className="flex flex-row flex-wrap justify-end gap-2">
@@ -500,18 +911,29 @@ const EmailPreviewModal = ({
                         {emailAccess.reason === 'status_unavailable' ? 'Check cloud account' : 'View Pro options'}
                     </Button>
                 ) : (
-                    <Button
-                        onClick={pendingAttemptId ? handleCheckStatus : handleSend}
-                        disabled={sending
-                            || (!pendingAttemptId && (!to || !emailAccess.allowed))}
-                        leadingIcon={Send}
-                    >
-                        {sending
-                            ? (pendingAttemptId ? 'Checking...' : 'Sending...')
-                            : pendingAttemptId
-                                ? 'Check status'
-                                : (isQuoteSend ? 'Send Quote' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice'))}
-                    </Button>
+                    pendingAttemptId ? (
+                        automaticChecksStopped ? (
+                            <Button disabled variant="secondary">
+                                {deliveryProtection === 'confirmed' || deliveryProtection === 'protected'
+                                    ? 'Delivery protected'
+                                    : 'Delivery pending'}
+                            </Button>
+                        ) : (
+                            <Button loading loadingText="Confirming delivery">
+                                Confirming delivery
+                            </Button>
+                        )
+                    ) : (
+                        <Button
+                            onClick={handleSend}
+                            disabled={sending || !to || !emailAccess.allowed || hostedSendUnavailable}
+                            loading={sending}
+                            loadingText="Sending..."
+                            leadingIcon={Send}
+                        >
+                            {isQuoteSend ? 'Send Quote' : (sendType === 'reminder' ? 'Send Reminder' : 'Send Invoice')}
+                        </Button>
+                    )
                 )}
             </div>
         </div>
@@ -545,12 +967,21 @@ const EmailPreviewModal = ({
                     </EntitlementNotice>
                 )}
 
+                {pendingAttemptId && pendingMessage && (
+                    <Notice title={automaticChecksStopped
+                        ? (deliveryProtection === 'confirmed'
+                            ? 'Delivery confirmed'
+                            : deliveryProtection === 'protected'
+                                ? 'Delivery protected'
+                                : 'Delivery pending')
+                        : 'Confirming delivery'}>
+                        {pendingMessage}
+                    </Notice>
+                )}
+
                 {/* Error display */}
                 {error && (
-                    <Notice
-                        variant={pendingAttemptId ? 'warning' : 'error'}
-                        title={pendingAttemptId ? 'Delivery confirmation needed' : 'Send failed'}
-                    >
+                    <Notice variant="error" title="Send failed">
                         {error}
                     </Notice>
                 )}

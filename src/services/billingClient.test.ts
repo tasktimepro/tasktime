@@ -206,7 +206,15 @@ describe('billing client contract', () => {
             'pro-founding-annual-eur',
             'test-catalog-1',
             'idempotency-key-fixture',
+            'owner@example.com',
         )).resolves.toEqual({ version: 1, url: checkoutUrl, attemptId });
+        expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+            version: 1,
+            offerId: 'pro-founding-annual-eur',
+            planConfigVersion: 'test-catalog-1',
+            idempotencyKey: 'idempotency-key-fixture',
+            billingContactEmail: 'owner@example.com',
+        });
     });
 
     it('refuses a non-Stripe Checkout redirect even on a successful response', async () => {
@@ -248,7 +256,9 @@ describe('billing client contract', () => {
     });
 
     it('bounds successful private response bodies before parsing them', async () => {
-        const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response('x', {
+        const cancel = vi.fn();
+        const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(
+            new ReadableStream({ cancel }), {
             status: 200,
             headers: { 'Content-Length': '131073' },
         }));
@@ -257,5 +267,6 @@ describe('billing client contract', () => {
         await expect(client.getStatus('session-fixture')).rejects.toEqual(
             expect.objectContaining({ code: 'RESPONSE_TOO_LARGE' }),
         );
+        expect(cancel).toHaveBeenCalledOnce();
     });
 });
