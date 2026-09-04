@@ -131,8 +131,8 @@ const Modal = ({
                     )
                 )}
                 
-                {/* Scrollable Content */}
-                <div ref={contentRef} className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-3.5 sm:px-6 sm:py-4">
+                {/* Scrollable content; the header owns the vertical spacing above it. */}
+                <div ref={contentRef} className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-3.5 pt-0 sm:px-6 sm:pb-4 sm:pt-0">
                     {children}
                 </div>
 

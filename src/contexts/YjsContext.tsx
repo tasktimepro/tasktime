@@ -76,6 +76,8 @@ export interface YjsContextValue {
     activeStorageGeneration: number | null;
     /** Active provider session used for hosted email, metrics, and future entitlements */
     hostedServiceSessionId: string | null;
+    /** Whether the persisted provider lifecycle or its selected auth session is still loading */
+    isCloudIdentityLoading: boolean;
     /** Whether a Drive connection is in progress */
     isConnecting: boolean;
     /** Whether at least one sync completed */
@@ -234,6 +236,12 @@ export function YjsProvider({ children }: YjsProviderProps) {
         && activeStorageSessionId === dropboxSessionId
         && activeStorageGeneration === dropboxStorageGeneration,
     );
+    const isCloudIdentityLoading = storageLifecycleLoading
+        || (activeStorageProvider === 'dropbox'
+            ? dropboxAuthLoading
+            : activeStorageProvider === 'google-drive'
+                ? authLoading
+                : authLoading || dropboxAuthLoading);
     const isDriveConnected = isCloudConnected && activeStorageProvider === 'google-drive';
 
     // Only an absent or already-Google storage binding may be claimed here; a
@@ -1112,6 +1120,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         activeStorageSessionId,
         activeStorageGeneration,
         hostedServiceSessionId,
+        isCloudIdentityLoading,
         driveSessionId: sessionId,
         isConnecting,
         hasSynced,
@@ -1152,6 +1161,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         activeStorageSessionId,
         activeStorageGeneration,
         hostedServiceSessionId,
+        isCloudIdentityLoading,
         sessionId,
         isConnecting,
         hasSynced,

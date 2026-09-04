@@ -136,11 +136,15 @@ function billingValue(overrides: Record<string, unknown> = {}) {
         error: null,
         catalogError: null,
         hasActiveCloudAccount: true,
+        isCloudAccountLoading: false,
+        isBillingConnectionReady: true,
+        isBillingReconnecting: false,
         refresh: vi.fn(async () => undefined),
         startTrial: vi.fn(async () => undefined),
         createCheckout: vi.fn(),
         openPortal: vi.fn(),
         handleCheckoutReturn: vi.fn(async () => undefined),
+        handlePortalReturn: vi.fn(async () => undefined),
         ...overrides,
     };
 }
@@ -362,9 +366,14 @@ describe('BillingPanel shadow-mode UX', () => {
         ));
     });
 
-    it('marks Pro as the current plan and keeps billing management inside its card', () => {
+    it('marks Pro as current, hides purchase tax copy, and shows progress while billing opens', async () => {
+        let rejectPortal: ((reason?: unknown) => void) | null = null;
+        const openPortal = vi.fn(() => new Promise<string>((_, reject) => {
+            rejectPortal = reject;
+        }));
         const value = billingValue();
         state.value = billingValue({
+            openPortal,
             resolution: {
                 kind: 'canonical',
                 snapshot: {
@@ -405,7 +414,20 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(within(proCard).getByText('Current plan')).toBeInTheDocument();
         expect(within(proCard).getByRole('button', { name: 'Manage billing' })).toBeInTheDocument();
         expect(within(proCard).queryByRole('button', { name: 'Start free trial' })).toBeNull();
+        expect(within(proCard).queryByText('Tax calculated at checkout')).toBeNull();
         expect(screen.queryByText('Hosted invoice email')).toBeNull();
+
+        fireEvent.click(within(proCard).getByRole('button', { name: 'Manage billing' }));
+
+        const loadingButton = await within(proCard).findByRole('button', { name: 'Opening billing…' });
+        expect(loadingButton).toBeDisabled();
+        expect(loadingButton.querySelector('svg')).toHaveClass('animate-spin', 'lucide-loader-circle');
+        expect(loadingButton.querySelector('svg')).not.toHaveClass('lucide-credit-card');
+
+        rejectPortal?.(new Error('Portal test stop'));
+        await waitFor(() => expect(
+            within(proCard).getByRole('button', { name: 'Manage billing' }),
+        ).toBeEnabled());
     });
 
     it('does not invite repurchase while cached Pro waits for canonical status', () => {
@@ -429,7 +451,9 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(within(proCard).getByText('Current plan')).toBeInTheDocument();
         expect(within(proCard).queryByRole('button', { name: 'Start free trial' })).toBeNull();
         expect(within(proCard).queryByRole('button', { name: 'Get Pro' })).toBeNull();
-        expect(within(proCard).getByRole('button', { name: 'Refresh billing status' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Refresh status' })).toBeInTheDocument();
+        expect(screen.getByText(/verified Pro plan remains available on this device/)).toBeInTheDocument();
+        expect(screen.queryByText(/Compare plans without connecting/)).toBeNull();
     });
 
     it('marks the available founding Checkout price and explains its capacity and retention', () => {
@@ -604,6 +628,7 @@ describe('BillingPanel shadow-mode UX', () => {
         state.value = billingValue({
             status: null,
             hasActiveCloudAccount: false,
+            isBillingConnectionReady: false,
             handleCheckoutReturn,
         });
         window.history.replaceState({}, '', '/account?section=billing&checkout=success');
@@ -613,11 +638,153 @@ describe('BillingPanel shadow-mode UX', () => {
         expect(handleCheckoutReturn).not.toHaveBeenCalled();
         expect(window.location.search).toBe('?section=billing&checkout=success');
 
-        state.value = billingValue({ hasActiveCloudAccount: true, handleCheckoutReturn });
+        state.value = billingValue({
+            hasActiveCloudAccount: true,
+            isBillingConnectionReady: true,
+            handleCheckoutReturn,
+        });
         view.rerender(<BillingPanel onOpenSync={vi.fn()} />);
 
         await waitFor(() => expect(handleCheckoutReturn).toHaveBeenCalledWith('success'));
         await waitFor(() => expect(window.location.search).toBe('?section=billing'));
+    });
+
+    it('canonically reconciles a Stripe Portal return before removing its URL marker', async () => {
+        const handlePortalReturn = vi.fn(async () => undefined);
+        state.value = billingValue({ handlePortalReturn });
+        window.history.replaceState({}, '', '/account?section=billing&portal=return');
+
+        render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        await waitFor(() => expect(handlePortalReturn).toHaveBeenCalledOnce());
+        await waitFor(() => expect(window.location.search).toBe('?section=billing'));
+    });
+
+    it('keeps verified Pro visible and Portal return pending while cloud reconnects', async () => {
+        const handlePortalReturn = vi.fn(async () => undefined);
+        const value = billingValue();
+        state.value = billingValue({
+            resolution: {
+                kind: 'canonical',
+                snapshot: {
+                    ...freeSnapshot,
+                    accessStatus: 'active',
+                    source: 'subscription',
+                    limits: { activeClients: null },
+                },
+            },
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    portalAvailable: true,
+                },
+                subscription: {
+                    ...value.status.subscription,
+                    billingStatus: 'active',
+                },
+            },
+            hasActiveCloudAccount: true,
+            isBillingConnectionReady: false,
+            isBillingReconnecting: true,
+            handlePortalReturn,
+        });
+        window.history.replaceState({}, '', '/account?section=billing&portal=return');
+
+        const view = render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        expect(handlePortalReturn).not.toHaveBeenCalled();
+        const proCard = screen.getByRole('region', { name: 'Pro' });
+        expect(within(proCard).getByText('Current plan')).toBeInTheDocument();
+        expect(within(proCard).queryByRole('button', { name: 'Get Pro' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'Reconnecting…' })).toBeDisabled();
+        expect(screen.queryByText('Billing action was not completed')).toBeNull();
+        expect(window.location.search).toBe('?section=billing&portal=return');
+
+        state.value = billingValue({
+            ...state.value,
+            isBillingConnectionReady: true,
+            isBillingReconnecting: false,
+            handlePortalReturn,
+        });
+        view.rerender(<BillingPanel onOpenSync={vi.fn()} />);
+
+        await waitFor(() => expect(handlePortalReturn).toHaveBeenCalledOnce());
+        await waitFor(() => expect(window.location.search).toBe('?section=billing'));
+    });
+
+    it('clears a transient Portal-return failure when canonical billing status recovers', async () => {
+        const handlePortalReturn = vi.fn()
+            .mockRejectedValueOnce(new BillingClientError('NETWORK_ERROR', null, true))
+            .mockResolvedValueOnce(undefined);
+        state.value = billingValue({ handlePortalReturn });
+        window.history.replaceState({}, '', '/account?section=billing&portal=return');
+
+        const view = render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        expect(await screen.findByText('Billing action was not completed')).toBeInTheDocument();
+
+        state.value = billingValue({
+            handlePortalReturn,
+            status: {
+                ...billingValue().status,
+                entitlementRevision: 2,
+            },
+        });
+        view.rerender(<BillingPanel onOpenSync={vi.fn()} />);
+
+        await waitFor(() => expect(handlePortalReturn).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(
+            screen.queryByText('Billing action was not completed'),
+        ).toBeNull());
+        expect(window.location.search).toBe('?section=billing');
+    });
+
+    it('shows a scheduled-cancellation notice from canonical subscription state', () => {
+        const value = billingValue();
+        state.value = billingValue({
+            resolution: {
+                kind: 'canonical',
+                snapshot: {
+                    ...freeSnapshot,
+                    accessStatus: 'active',
+                    source: 'subscription',
+                    subscriptionCurrentPeriodEnd: '2027-08-01T00:00:00.000Z',
+                    cancelAtPeriodEnd: true,
+                    limits: { activeClients: null },
+                },
+            },
+            status: {
+                ...value.status,
+                actions: {
+                    ...value.status.actions,
+                    portalAvailable: true,
+                },
+                subscription: {
+                    ...value.status.subscription,
+                    offerId: 'pro-founding-annual-eur',
+                    offerKind: 'founding',
+                    billingStatus: 'active',
+                    currentPeriodEnd: '2027-08-01T00:00:00.000Z',
+                    cancelAtPeriodEnd: true,
+                    price: {
+                        currency: 'EUR',
+                        unitAmountMinor: 3900,
+                        interval: 'year',
+                        taxPresentation: 'calculated_at_checkout',
+                        renewal: 'automatic',
+                    },
+                },
+            },
+        });
+
+        render(<BillingPanel onOpenSync={vi.fn()} />);
+
+        const noticeTitle = screen.getByText('Subscription set to end');
+        const notice = noticeTitle.closest('.rounded-md');
+        expect(notice).toHaveClass('bg-muted', 'border-border');
+        expect(notice).not.toHaveClass('status-warning-surface');
+        expect(screen.getByText(/Your subscription is set to end on .+ You can keep using Pro until then\./)).toBeInTheDocument();
     });
 
     it('shows trial-used, offline, ended-subscription, and over-limit state without hiding data', () => {

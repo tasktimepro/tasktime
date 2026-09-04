@@ -65,6 +65,20 @@ describe('Modal', () => {
         expect(dialog.className.includes('rounded-lg')).toBe(true)
     })
 
+    it('uses the header spacing without adding top padding to the scrollable body', () => {
+
+        render(
+            <Modal isOpen onClose={vi.fn()} title="Edit Task">
+                <div>Content</div>
+            </Modal>
+        )
+
+        const body = screen.getByText('Content').parentElement
+
+        expect(body).toHaveClass('pt-0', 'pb-3.5', 'sm:pt-0', 'sm:pb-4')
+        expect(body).not.toHaveClass('py-3.5', 'sm:py-4')
+    })
+
     it('focuses the first form field instead of the close button on open', () => {
 
         render(

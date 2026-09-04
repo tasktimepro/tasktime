@@ -112,6 +112,13 @@ The Yjs store is split into documents so current work stays loaded and historica
 ## Reliability and security model
 
 - Local data remains usable offline; cloud features are optional.
+- Hosted billing actions wait for the lifecycle-selected cloud connection to
+  finish its foreground reconnection. Portal-return reconciliation retries after
+  canonical status recovery, while browser-offline billing UI derives from the
+  browser network state rather than a generic retryable service/session failure.
+  The exact origin-local lifecycle continues selecting its bounded signed plan
+  during startup, reconnect, and offline use; transport readiness gates network
+  work without downgrading or deleting that verified device state.
 - Schema changes are additive or explicitly migrated and tested against historical data.
 - UI badges, invoice composition, and agent invoice commands share the same read-only eligibility operation. Current billing ranges include the complete selected end date and assign cross-midnight entries by their local start date; finalized legacy invoices with markerless source entries retain conservative historical period matching.
 - Browser and agent cancellation adapters share one journaled source-release operation. Cancellation revalidates current eligibility before the first journal write; retains the invoice number, original snapshots, and project links; releases only sources still owned by that invoice across active/historical/archive documents; never rewinds numbering; and conditionally converges late-arriving same-invoice claims after partial failure or stale Drive/archive replay without overwriting later billing.

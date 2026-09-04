@@ -659,7 +659,7 @@ export function createBillingClient(options: {
             path: '/billing/portal', method: 'POST', sessionId, timeoutMs: 15_000,
             body: { version: 1, idempotencyKey: key }, parser: parsePortalResponse,
         }),
-        refresh: (sessionId: string, reason: 'checkout_return' | 'user_retry' | 'support_recovery', key = idempotencyKey()) => privateRequest({
+        refresh: (sessionId: string, reason: 'checkout_return' | 'portal_return' | 'user_retry' | 'support_recovery', key = idempotencyKey()) => privateRequest({
             path: '/billing/refresh', method: 'POST', sessionId, timeoutMs: 15_000,
             body: { version: 1, reason, idempotencyKey: key }, parser: parseBillingStatus,
         }),

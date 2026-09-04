@@ -213,7 +213,21 @@ eligibility consequence. Reversal before period end preserves the same Price;
 terminal cancellation cannot be reactivated as a founding purchase and a later
 new subscription uses the current standard offer. The status-level Portal signal
 does not by itself make billing management a Free-plan action: the browser shows
-**Manage billing** only while canonical Pro is backed by a subscription.
+**Manage billing** only while canonical Pro is backed by a subscription. The
+fixed Portal return includes an app-owned marker that triggers authenticated
+canonical reconciliation before removal, but only after the lifecycle-selected
+provider connection has finished reconnecting. Provider transport readiness is
+not billing identity: the browser selects a still-valid signed assertion through
+the persisted exact provider/generation/session-fingerprint binding during
+startup, reconnect, and offline operation without issuing a status request or
+clearing that binding. Only online status refresh and Stripe actions require the
+settled provider connection. A transient return failure may
+retry after a newer canonical billing-status projection arrives and must not
+remain latched merely until tab navigation. The marker is only a refresh trigger,
+never cancellation evidence; signed status derived from Stripe reconciliation
+and subscription webhooks remains authoritative. Browser-offline presentation
+requires the browser network state to be offline rather than any retryable
+billing transport or session error.
 
 The authenticated billing-status envelope is itself versioned. Every successful
 canonical Free response includes a signed Free JWS that definitively deselects

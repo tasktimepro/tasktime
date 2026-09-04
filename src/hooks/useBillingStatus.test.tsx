@@ -116,6 +116,76 @@ describe('useBillingStatus', () => {
         expect(client.getStatus).not.toHaveBeenCalled();
     });
 
+    it('does not erase the device binding while cloud identity is still loading', async () => {
+        const client = { getStatus: vi.fn(), getJwks: vi.fn(), getCatalog: vi.fn() };
+        const hook = renderHook(
+            ({ lifecycleLoading }) => useBillingStatus({
+                enabled: true,
+                catalogEnabled: false,
+                lifecycle: null,
+                lifecycleLoading,
+                onlineRefreshEnabled: false,
+                client: client as never,
+            }),
+            { initialProps: { lifecycleLoading: true } },
+        );
+
+        await act(async () => Promise.resolve());
+        expect(storage.clearActiveBillingBinding).not.toHaveBeenCalled();
+
+        hook.rerender({ lifecycleLoading: false });
+        await waitFor(() => expect(storage.clearActiveBillingBinding).toHaveBeenCalledOnce());
+    });
+
+    it('publishes exact cached Pro while online refresh waits for cloud reconnection', async () => {
+        const cachedPayload = {
+            ...entitlement('principal-1', 'active'),
+            ver: 1,
+            iss: 'https://sync.tasktime.pro',
+            aud: 'urn:tasktime:pro:web',
+            sub: 'principal-1',
+            iat: 1_787_140_800,
+            nbf: 1_787_140_500,
+            exp: 1_787_227_200,
+            jti: 'license-1',
+        };
+        storage.readBoundBillingCache.mockResolvedValue({
+            kind: 'hit',
+            trustedTime: 1_787_140_810_000,
+            license: { token: 'cached', payload: cachedPayload },
+            binding: {},
+        });
+        verify.mockResolvedValue({ ok: true, payload: cachedPayload, keyId: 'key-1' });
+        const client = {
+            getStatus: vi.fn(() => Promise.resolve(status('principal-1', 'active'))),
+            getJwks: vi.fn(),
+            getCatalog: vi.fn(),
+        };
+        const hook = renderHook(
+            ({ onlineRefreshEnabled }) => useBillingStatus({
+                enabled: true,
+                catalogEnabled: false,
+                lifecycle,
+                lifecycleLoading: false,
+                onlineRefreshEnabled,
+                client: client as never,
+            }),
+            { initialProps: { onlineRefreshEnabled: false } },
+        );
+
+        await waitFor(() => expect(hook.result.current.resolution).toMatchObject({
+            kind: 'canonical',
+            snapshot: { accessStatus: 'active', plan: 'pro' },
+        }));
+        expect(client.getStatus).not.toHaveBeenCalled();
+        expect(storage.clearActiveBillingBinding).not.toHaveBeenCalled();
+
+        hook.rerender({ onlineRefreshEnabled: true });
+
+        await waitFor(() => expect(client.getStatus).toHaveBeenCalledOnce());
+        await waitFor(() => expect(hook.result.current.status).not.toBeNull());
+    });
+
     it('publishes a verified canonical response and binds it to the exact lifecycle', async () => {
         const response = status('principal-1');
         const client = {
@@ -289,6 +359,7 @@ describe('useBillingStatus', () => {
     });
 
     it('keeps a still-valid exact-bound cache on a transient failure but fails closed on rollback', async () => {
+        const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
         const cachedPayload = {
             ...entitlement('principal-1', 'active'),
             ver: 1,
@@ -333,6 +404,30 @@ describe('useBillingStatus', () => {
         }));
         await waitFor(() => expect(rollback.result.current.clockUntrusted).toBe(true));
         expect(rollback.result.current.resolution).toEqual({ kind: 'unresolved', reason: 'lifecycle' });
+        online.mockRestore();
+    });
+
+    it('does not call an online transient billing failure an offline browser', async () => {
+        const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(true);
+        const client = {
+            getStatus: vi.fn(() => Promise.reject(
+                new BillingClientError('NETWORK_ERROR', null, true),
+            )),
+            getJwks: vi.fn(),
+            getCatalog: vi.fn(),
+        };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true,
+            catalogEnabled: false,
+            lifecycle,
+            client: client as never,
+        }));
+
+        await waitFor(() => expect(hook.result.current.error).toBe('NETWORK_ERROR'));
+        expect(hook.result.current.offline).toBe(false);
+
+        hook.unmount();
+        online.mockRestore();
     });
 
     it('fences a late response after the lifecycle changes', async () => {

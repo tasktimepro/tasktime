@@ -58,16 +58,29 @@ Let users understand exactly what will be billed, what changed after finalizatio
   same-subscription retention terms directly below the displayed price; the
   standard amount has no founding footnote. The action footer keeps trial on
   the left and the rocket-led Get Pro action on the right, replaces the rocket
-  with the shared loading spinner while Checkout opens, and places only the
-  right-aligned tax qualifier below the actions. Hosted Checkout owns the final
-  recurring-subscription disclosure and confirmation. The explicit purchase
-  action passes the locally verified connected-account email as an optional
-  billing contact so Stripe can prefill it; this contact never becomes account,
-  trial, or entitlement identity. Checkout keeps automatic tax and business
+  with the shared loading spinner while Checkout opens, and places the
+  right-aligned tax qualifier below the actions only while Get Pro is present.
+  Manage billing uses the same loading treatment while the Stripe Portal opens;
+  a completed purchase never leaves Checkout tax copy on the Pro card. Hosted
+  Checkout owns the final recurring-subscription disclosure and confirmation.
+  The explicit purchase action passes the locally verified connected-account
+  email as an optional billing contact so Stripe can prefill it; this contact
+  never becomes account, trial, or entitlement identity. Checkout keeps automatic tax and business
   tax-ID support, lets Stripe collect only the location detail it needs, and does
   not force a full-address form or separate TaskTime Terms checkbox.
 - Cancellation defaults to period end and shows continued access plus the exact
-  end date. A founder's confirmation explains that reversing before then
+  end date in a neutral **Subscription set to end** notice; it never describes
+  the end as "soon." Returning from the Stripe Portal waits for the selected
+  provider's foreground reconnection to settle before triggering canonical
+  Stripe reconciliation. The exact-bound signed device assertion keeps the
+  known Free or Pro plan selected throughout this period and while offline;
+  transport readiness gates the Portal/Checkout/status calls, not the local plan
+  display or offline entitlement. A transient return failure clears and retries when
+  canonical status recovers instead of remaining until navigation, and online
+  service/session failures are not labelled as browser offline. The subscription
+  webhook remains the source-of-truth fallback if the user closes the Portal or
+  does not return. A founder's
+  confirmation explains that reversing before then
   preserves the founding base price, while terminal cancellation permanently
   ends founding eligibility and a later new subscription uses the current
   standard offer (`EUR 59/year` under the approved launch catalog). A standard

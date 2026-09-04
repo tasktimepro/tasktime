@@ -73,14 +73,28 @@
 - [x] Refine the Plan & Billing purchase footer and Dropbox identity fallback.
   Start trial remains on the left; the rocket-led Get Pro action and the
   tax qualifier align right, with the shared loading spinner shown while
-  Checkout opens. Renewal disclosure remains in hosted Checkout. **Manage
-  billing** appears only for verified subscription-backed Pro, even when an
+  Checkout opens. The qualifier disappears with Get Pro after purchase, and
+  **Manage billing** uses the same spinner while Stripe Portal navigation is
+  opening. Renewal disclosure remains in hosted Checkout. **Manage billing**
+  appears only for verified subscription-backed Pro, even when an
   otherwise-Free account retains a Stripe customer record. Dropbox shows the
   connected email when available and stays quiet for a legacy session without
   one instead of prompting for identity-only reconnection. An expired prior
   Checkout is now retired and retried once from the same explicit Get Pro click
   when the offer remains unchanged; changed offers still require reconfirmation,
   and failed actions never expose internal billing codes.
+- [x] Reconcile Stripe Portal returns before presenting subscription changes.
+  The fixed return marker triggers a canonical Stripe refresh but is never
+  treated as cancellation proof; webhook and scheduled reconciliation remain
+  authoritative fallbacks. A verified period-end cancellation displays the
+  neutral **Subscription set to end** notice with its effective date and confirms
+  continued Pro access without describing the end as "soon." Return handling now
+  preserves the exact-bound signed device plan while the selected provider
+  reconnects, gates only online status/Stripe work on connection readiness,
+  retries a transient failure after canonical status recovery without a tab
+  change, and reserves the **You are offline** notice for a browser-reported
+  offline state. A known Pro browser never falls back to trial or **Get Pro**
+  presentation during that reconnect.
 - [x] Correct the local Stripe Checkout redirect boundary after the real hosted
   URL exposed opaque fragment state. The browser and Worker now preserve that
   fragment only for the exact credential-free HTTPS Stripe Checkout host, with

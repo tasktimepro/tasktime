@@ -124,7 +124,7 @@ Public web build
 | Agent command | command registry/handler, scopes/approvals, bridge tool schema, public generated docs, smoke tests |
 | Public page/build | `blog/`, build scripts, public manifests, route denylist, preview/build smoke |
 | Sync behavior | store dirty-doc tracking, provider/manifest, auth hook, mode UI, offline/reconnect tests, historical Drive data |
-| Subscription/entitlement | private Worker/D1/Stripe plan, catalog/status/JWKS/error contracts, provider lifecycle binding, active-client transition/import-sync compatibility, Reports shell/Free Overview/lazy advanced modules, founding-slot concurrency/continuity and automatic standard-offer selection, report-agent scope compatibility, hosted-email policy, agent registry/artifacts, Privacy/Terms, offline/concurrency/recovery tests |
+| Subscription/entitlement | private Worker/D1/Stripe plan, catalog/status/JWKS/error contracts, exact persisted lifecycle versus online provider-readiness separation, signed offline selection, Portal-return recovery, active-client transition/import-sync compatibility, Reports shell/Free Overview/lazy advanced modules, founding-slot concurrency/continuity and automatic standard-offer selection, report-agent scope compatibility, hosted-email policy, agent registry/artifacts, Privacy/Terms, offline/concurrency/recovery tests |
 
 ## Authoritative references
 

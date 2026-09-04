@@ -4,8 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
     refresh: vi.fn(async () => undefined),
+    billingRefresh: vi.fn(async () => undefined),
     createCheckout: vi.fn(),
     writePending: vi.fn(async () => undefined),
+    isCloudConnected: true,
+    isConnecting: false,
+    isCloudIdentityLoading: false,
+    billingStatusOptions: null as Record<string, unknown> | null,
 }));
 
 vi.mock('@/config/billingFeatures', () => ({
@@ -22,27 +27,33 @@ vi.mock('./YjsContext', () => ({
         activeStorageSessionId: 'session-fixture',
         activeStorageGeneration: 3,
         hostedServiceSessionId: 'session-fixture',
+        isCloudConnected: state.isCloudConnected,
+        isConnecting: state.isConnecting,
+        isCloudIdentityLoading: state.isCloudIdentityLoading,
     }),
 }));
 vi.mock('@/hooks/useBillingStatus', () => ({
-    useBillingStatus: () => ({
-        resolution: { kind: 'canonical', snapshot: { accessStatus: 'free' } },
-        status: {
-            account: { accountReference: 'TT-TEST-0001' },
-            actions: {
-                checkoutEnabled: true,
-                trialActivationEnabled: false,
-                portalAvailable: false,
+    useBillingStatus: (options: Record<string, unknown>) => {
+        state.billingStatusOptions = options;
+        return {
+            resolution: { kind: 'canonical', snapshot: { accessStatus: 'free' } },
+            status: {
+                account: { accountReference: 'TT-TEST-0001' },
+                actions: {
+                    checkoutEnabled: true,
+                    trialActivationEnabled: false,
+                    portalAvailable: false,
+                },
             },
-        },
-        catalog: null,
-        isLoading: false,
-        offline: false,
-        clockUntrusted: false,
-        error: null,
-        catalogError: null,
-        refresh: state.refresh,
-    }),
+            catalog: null,
+            isLoading: false,
+            offline: false,
+            clockUntrusted: false,
+            error: null,
+            catalogError: null,
+            refresh: state.refresh,
+        };
+    },
 }));
 vi.mock('@/services/billingClient', async () => {
     const actual = await vi.importActual<typeof import('@/services/billingClient')>('@/services/billingClient');
@@ -50,6 +61,7 @@ vi.mock('@/services/billingClient', async () => {
         ...actual,
         billingClient: {
             createCheckout: state.createCheckout,
+            refresh: state.billingRefresh,
         },
     };
 });
@@ -79,13 +91,27 @@ function CheckoutProbe({ billingContactEmail }: { billingContactEmail?: string }
             </button>
             <p>{message}</p>
             <p data-testid="cloud-account">{String(billing.hasActiveCloudAccount)}</p>
+            <p data-testid="billing-ready">{String(billing.isBillingConnectionReady)}</p>
         </>
+    );
+}
+
+function PortalReturnProbe() {
+    const billing = useBilling();
+    return (
+        <button type="button" onClick={() => void billing.handlePortalReturn()}>
+            Reconcile Portal return
+        </button>
     );
 }
 
 describe('BillingProvider Checkout continuity', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        state.isCloudConnected = true;
+        state.isConnecting = false;
+        state.isCloudIdentityLoading = false;
+        state.billingStatusOptions = null;
     });
 
     it('refreshes a stale founding offer and requires a fresh explicit confirmation', async () => {
@@ -197,5 +223,49 @@ describe('BillingProvider Checkout continuity', () => {
             'test-catalog-1',
         );
         expect(state.writePending).not.toHaveBeenCalled();
+    });
+
+    it('reconciles canonical Stripe state after returning from the Portal', async () => {
+        render(<BillingProvider><PortalReturnProbe /></BillingProvider>);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Reconcile Portal return' }));
+
+        await waitFor(() => expect(state.billingRefresh).toHaveBeenCalledWith(
+            'session-fixture',
+            'portal_return',
+        ));
+        expect(state.refresh).toHaveBeenCalled();
+    });
+
+    it('keeps the exact local billing lifecycle while cloud reconnection gates online actions', async () => {
+        state.isCloudConnected = false;
+        state.isConnecting = true;
+        const view = render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+
+        expect(screen.getByTestId('cloud-account')).toHaveTextContent('true');
+        expect(screen.getByTestId('billing-ready')).toHaveTextContent('false');
+        expect(state.billingStatusOptions).toMatchObject({
+            lifecycle: {
+                provider: 'dropbox',
+                generation: 3,
+                sessionId: 'session-fixture',
+            },
+            onlineRefreshEnabled: false,
+        });
+
+        state.isCloudConnected = true;
+        state.isConnecting = false;
+        view.rerender(<BillingProvider><CheckoutProbe /></BillingProvider>);
+
+        expect(screen.getByTestId('cloud-account')).toHaveTextContent('true');
+        expect(screen.getByTestId('billing-ready')).toHaveTextContent('true');
+        expect(state.billingStatusOptions).toMatchObject({ onlineRefreshEnabled: true });
+    });
+
+    it('keeps the billing cache intact while provider identity is still loading', () => {
+        state.isCloudIdentityLoading = true;
+        render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+
+        expect(state.billingStatusOptions).toMatchObject({ lifecycleLoading: true });
     });
 });

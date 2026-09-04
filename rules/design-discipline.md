@@ -19,6 +19,7 @@ Choose patterns for the user's task, not implementation convenience. A novel int
 - Use tables for comparison, lists for scanning, cards for heterogeneous previews, modals for short focused work, and full pages for complex workflows.
 - Start mobile-first, then adapt density and composition for larger screens instead of merely stretching the mobile layout.
 - Reuse the existing spacing, color, typography, radius, shadow, motion, breakpoint, and z-index systems. Do not introduce arbitrary one-off values.
+- In the shared modal shell, the header owns the vertical separation above the scrollable body; keep the body top padding at zero while preserving its horizontal and bottom padding.
 
 ## Complete states
 

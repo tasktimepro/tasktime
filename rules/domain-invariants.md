@@ -93,6 +93,12 @@ These invariants summarize critical production contracts. They supplement the de
   lifecycle-subject binding, strict signature/time validation, and bounded
   expiry. Worker-cost services always use canonical server-side entitlement and
   atomic idempotent quota enforcement.
+- The exact origin-local billing lifecycle and its signed entitlement remain
+  distinct from provider transport readiness. Startup, foreground reconnect,
+  and offline transport do not clear or downgrade a still-valid exact-bound
+  assertion; they gate only online refresh and hosted billing actions. A
+  definitive lifecycle removal, account mismatch, conflict, invalid signature,
+  unsafe clock, or expiry still fails closed.
 - The founding offer permits at most 250 lifetime paid canonical-principal
   allocations. Atomic bounded reservations may not oversell; paid allocations
   never recycle after cancellation/refund/dispute/deletion. No public response

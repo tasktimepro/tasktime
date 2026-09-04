@@ -26,6 +26,9 @@ type BillingContextValue = {
     error: string | null;
     catalogError: string | null;
     hasActiveCloudAccount: boolean;
+    isCloudAccountLoading: boolean;
+    isBillingConnectionReady: boolean;
+    isBillingReconnecting: boolean;
     connectedAccountReference: string | null;
     refresh: () => Promise<void>;
     startTrial: () => Promise<void>;
@@ -36,6 +39,7 @@ type BillingContextValue = {
     ) => Promise<{ url: string; attemptId: string }>;
     openPortal: () => Promise<string>;
     handleCheckoutReturn: (outcome: 'success' | 'cancel') => Promise<void>;
+    handlePortalReturn: () => Promise<void>;
 };
 
 const DISABLED_VALUE: BillingContextValue = {
@@ -48,12 +52,16 @@ const DISABLED_VALUE: BillingContextValue = {
     error: null,
     catalogError: null,
     hasActiveCloudAccount: false,
+    isCloudAccountLoading: false,
+    isBillingConnectionReady: false,
+    isBillingReconnecting: false,
     connectedAccountReference: null,
     refresh: async () => undefined,
     startTrial: async () => { throw new Error('BILLING_DISABLED'); },
     createCheckout: async () => { throw new Error('BILLING_DISABLED'); },
     openPortal: async () => { throw new Error('BILLING_DISABLED'); },
     handleCheckoutReturn: async () => { throw new Error('BILLING_DISABLED'); },
+    handlePortalReturn: async () => { throw new Error('BILLING_DISABLED'); },
 };
 
 const BillingContext = createContext<BillingContextValue>(DISABLED_VALUE);
@@ -69,8 +77,13 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         activeStorageSessionId,
         activeStorageGeneration,
         hostedServiceSessionId,
+        isCloudConnected,
+        isConnecting,
+        isCloudIdentityLoading,
     } = useYjs();
     const lifecycle = useMemo(() => {
+        // The exact persisted account binding remains usable for signed offline
+        // entitlement selection while its provider connection is starting.
         if (!activeStorageProvider
             || !activeStorageSessionId
             || activeStorageGeneration === null
@@ -86,6 +99,16 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         activeStorageGeneration,
         hostedServiceSessionId,
     ]);
+    const isBillingConnectionReady = Boolean(
+        lifecycle
+        && isCloudConnected
+        && !isConnecting
+        && !isCloudIdentityLoading,
+    );
+    const isBillingReconnecting = Boolean(
+        lifecycle
+        && (isConnecting || isCloudIdentityLoading),
+    );
     const localCatalogFallback = useMemo<BillingCatalogV1 | null>(() => (
         BILLING_FEATURES.localCatalogFallback
             ? buildLocalReviewBillingCatalog() as BillingCatalogV1
@@ -95,6 +118,8 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         enabled: BILLING_FEATURES.status,
         catalogEnabled: BILLING_FEATURES.ui,
         lifecycle,
+        lifecycleLoading: isCloudIdentityLoading,
+        onlineRefreshEnabled: isBillingConnectionReady,
         fallbackCatalog: localCatalogFallback,
     });
     const billing = liveBilling;
@@ -116,11 +141,12 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
     const startTrial = useCallback(async () => {
         if (!BILLING_FEATURES.trialActivation
             || !lifecycle
+            || !isBillingConnectionReady
             || !status?.actions.trialActivationEnabled) throw new Error('BILLING_DISABLED');
         await billingClient.startTrial(lifecycle.sessionId);
         announceRefresh();
         await refresh();
-    }, [announceRefresh, lifecycle, refresh, status]);
+    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh, status]);
     const createCheckout = useCallback(async (
         offerId: string,
         planConfigVersion: string,
@@ -128,6 +154,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
     ) => {
         if (!BILLING_FEATURES.checkout
             || !lifecycle
+            || !isBillingConnectionReady
             || !status?.actions.checkoutEnabled) throw new Error('BILLING_DISABLED');
         const openCheckout = () => billingContactEmail
             ? billingClient.createCheckout(
@@ -170,14 +197,16 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         await writePendingBillingCheckout({ lifecycle, attemptId: result.attemptId });
         announceRefresh();
         return result;
-    }, [announceRefresh, lifecycle, refresh, status]);
+    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh, status]);
     const openPortal = useCallback(async () => {
-        if (!lifecycle || !status?.actions.portalAvailable) throw new Error('BILLING_DISABLED');
+        if (!lifecycle
+            || !isBillingConnectionReady
+            || !status?.actions.portalAvailable) throw new Error('BILLING_DISABLED');
         const result = await billingClient.createPortal(lifecycle.sessionId);
         return result.url;
-    }, [lifecycle, status]);
+    }, [isBillingConnectionReady, lifecycle, status]);
     const handleCheckoutReturn = useCallback(async (outcome: 'success' | 'cancel') => {
-        if (!lifecycle) throw new Error('BILLING_DISABLED');
+        if (!lifecycle || !isBillingConnectionReady) throw new Error('BILLING_DISABLED');
         const pending = await readPendingBillingCheckout(lifecycle);
         if (outcome === 'cancel' && pending) {
             await billingClient.abandonCheckout(lifecycle.sessionId, pending.attemptId);
@@ -187,16 +216,37 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         await clearPendingBillingCheckout();
         announceRefresh();
         await refresh();
-    }, [announceRefresh, lifecycle, refresh]);
+    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh]);
+    const handlePortalReturn = useCallback(async () => {
+        if (!lifecycle || !isBillingConnectionReady) throw new Error('BILLING_DISABLED');
+        await billingClient.refresh(lifecycle.sessionId, 'portal_return');
+        announceRefresh();
+        await refresh();
+    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh]);
     const value = useMemo<BillingContextValue>(() => ({
         ...billing,
         hasActiveCloudAccount: Boolean(lifecycle),
+        isCloudAccountLoading: isCloudIdentityLoading,
+        isBillingConnectionReady,
+        isBillingReconnecting,
         connectedAccountReference: billing.status?.account.accountReference ?? null,
         startTrial,
         createCheckout,
         openPortal,
         handleCheckoutReturn,
-    }), [billing, lifecycle, startTrial, createCheckout, openPortal, handleCheckoutReturn]);
+        handlePortalReturn,
+    }), [
+        billing,
+        lifecycle,
+        isCloudIdentityLoading,
+        isBillingConnectionReady,
+        isBillingReconnecting,
+        startTrial,
+        createCheckout,
+        openPortal,
+        handleCheckoutReturn,
+        handlePortalReturn,
+    ]);
     return <BillingContext.Provider value={value}>{children}</BillingContext.Provider>;
 }
 

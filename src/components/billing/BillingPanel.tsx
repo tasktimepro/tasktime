@@ -57,12 +57,13 @@ export function BillingPanel({
     connectedAccountEmail?: string | null;
 }) {
     const billing = useBilling();
-    const { handleCheckoutReturn } = billing;
+    const { handleCheckoutReturn, handlePortalReturn } = billing;
     const { clients } = useClients();
     const [busyAction, setBusyAction] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const [deferredAction, setDeferredAction] = useState<DeferredBillingAction | null>(null);
     const checkoutReturnHandled = useRef<string | null>(null);
+    const portalReturnHandled = useRef(false);
     const status = billing.status;
     const snapshot = billing.resolution.kind === 'canonical'
         ? billing.resolution.snapshot
@@ -85,8 +86,10 @@ export function BillingPanel({
         setActionError(null);
         try {
             await action();
+            return true;
         } catch (error) {
             setActionError(billingActionErrorMessage(error));
+            return false;
         } finally {
             setBusyAction(null);
         }
@@ -94,7 +97,7 @@ export function BillingPanel({
 
     useEffect(() => {
         if (!BILLING_FEATURES.ui
-            || !billing.hasActiveCloudAccount
+            || !billing.isBillingConnectionReady
             || typeof window === 'undefined') return;
         const params = new URLSearchParams(window.location.search);
         const outcome = params.get('checkout');
@@ -110,11 +113,42 @@ export function BillingPanel({
                 '',
                 `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`,
             );
+        }).then(completed => {
+            if (!completed && checkoutReturnHandled.current === outcome) {
+                checkoutReturnHandled.current = null;
+            }
         });
-    }, [billing.hasActiveCloudAccount, handleCheckoutReturn, run]);
+    }, [billing.isBillingConnectionReady, billing.status?.entitlementRevision, handleCheckoutReturn, run]);
 
     useEffect(() => {
-        if (billing.status) setDeferredAction(null);
+        if (!BILLING_FEATURES.ui
+            || !billing.isBillingConnectionReady
+            || typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('portal') !== 'return' || portalReturnHandled.current) return;
+        portalReturnHandled.current = true;
+        void run('portal-return', async () => {
+            await handlePortalReturn();
+            params.delete('portal');
+            const nextSearch = params.toString();
+            window.history.replaceState(
+                {},
+                '',
+                `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`,
+            );
+        }).then(completed => {
+            if (!completed) portalReturnHandled.current = false;
+        });
+    }, [billing.isBillingConnectionReady, billing.status?.entitlementRevision, handlePortalReturn, run]);
+
+    useEffect(() => {
+        if (!billing.isBillingConnectionReady) setActionError(null);
+    }, [billing.isBillingConnectionReady]);
+
+    useEffect(() => {
+        if (!billing.status) return;
+        setDeferredAction(null);
+        setActionError(null);
     }, [billing.status]);
 
     const actionPhrase = deferredAction ? deferredActionPhrase(deferredAction) : null;
@@ -178,6 +212,8 @@ export function BillingPanel({
                     <p className="mt-1 text-sm text-muted-foreground">
                         {status
                             ? accountDisplayLabel
+                            : currentPlan && billing.hasActiveCloudAccount
+                                ? `Your verified ${currentPlan === 'pro' ? 'Pro' : 'Free'} plan remains available on this device while the connected account refreshes.`
                             : 'Compare plans without connecting. TaskTime checks your cloud account only when you start a trial, subscribe, or manage existing billing.'}
                     </p>
                 </div>
@@ -185,10 +221,16 @@ export function BillingPanel({
                     <Button
                         variant="secondary"
                         leadingIcon={RefreshCw}
-                        disabled={billing.isLoading || busyAction !== null}
+                        loading={billing.isBillingReconnecting
+                            || billing.isLoading
+                            || busyAction === 'refresh'}
+                        loadingText={billing.isBillingReconnecting ? 'Reconnecting…' : 'Refreshing…'}
+                        disabled={!billing.isBillingConnectionReady
+                            || billing.isLoading
+                            || busyAction !== null}
                         onClick={() => void run('refresh', billing.refresh)}
                     >
-                        {billing.isLoading || busyAction === 'refresh' ? 'Refreshing…' : 'Refresh status'}
+                        Refresh status
                     </Button>
                 ) : null}
             </div>
@@ -302,19 +344,17 @@ export function BillingPanel({
                                         {currentPlan === 'pro' ? (
                                             <>
                                                 <p className="text-sm text-muted-foreground">
-                                                    This device has a last verified Pro plan. Refresh the connected account before managing billing;
-                                                    TaskTime will not invite you to purchase Pro again while status is being confirmed.
+                                                    This device has a verified Pro plan. Pro remains available while TaskTime reconnects;
+                                                    online billing controls return after the connected account is ready.
                                                 </p>
-                                                <Button
-                                                    variant="secondary"
-                                                    leadingIcon={RefreshCw}
-                                                    disabled={busyAction !== null}
-                                                    onClick={() => void run('refresh', billing.refresh)}
-                                                >
-                                                    {busyAction === 'refresh' ? 'Refreshing…' : 'Refresh billing status'}
-                                                </Button>
                                             </>
-                                        ) : (
+                                        ) : billing.isCloudAccountLoading
+                                            || (billing.hasActiveCloudAccount
+                                                && !billing.isBillingConnectionReady) ? (
+                                                <p className="text-sm text-muted-foreground" aria-live="polite">
+                                                    Reconnecting your TaskTime cloud account and confirming its plan. Nothing has changed on this device.
+                                                </p>
+                                            ) : (
                                             <>
                                                 <p className="text-sm text-muted-foreground">
                                                     Trial eligibility and the exact offer are confirmed for your connected TaskTime cloud account when you continue.
@@ -432,10 +472,10 @@ export function BillingPanel({
                                             </Notice>
                                         ) : null}
                                         {snapshot?.cancelAtPeriodEnd ? (
-                                            <Notice title="Cancellation scheduled" variant="warning" compact>
-                                                Pro remains available through {snapshot.subscriptionCurrentPeriodEnd
-                                                    ? new Date(snapshot.subscriptionCurrentPeriodEnd).toLocaleDateString()
-                                                    : 'the current billing period'}.
+                                            <Notice title="Subscription set to end" compact>
+                                                {snapshot.subscriptionCurrentPeriodEnd
+                                                    ? `Your subscription is set to end on ${new Date(snapshot.subscriptionCurrentPeriodEnd).toLocaleDateString()}. You can keep using Pro until then.`
+                                                    : 'Your subscription is set to end at the end of your current paid period. You can keep using Pro until then.'}
                                             </Notice>
                                         ) : null}
                                         {snapshot?.accessStatus === 'grace' ? (
@@ -459,6 +499,7 @@ export function BillingPanel({
                                                     leadingIcon={Check}
                                                     disabled={!BILLING_FEATURES.trialActivation
                                                         || !status.actions.trialActivationEnabled
+                                                        || !billing.isBillingConnectionReady
                                                         || busyAction !== null}
                                                     onClick={() => void run('trial', billing.startTrial)}
                                                 >
@@ -473,7 +514,10 @@ export function BillingPanel({
                                                     <Button
                                                         variant="secondary"
                                                         leadingIcon={CreditCard}
-                                                        disabled={busyAction !== null}
+                                                        loading={busyAction === 'portal'}
+                                                        loadingText="Opening billing…"
+                                                        disabled={!billing.isBillingConnectionReady
+                                                            || busyAction !== null}
                                                         onClick={() => void run('portal', async () => {
                                                             const url = await billing.openPortal();
                                                             window.location.assign(url);
@@ -489,6 +533,7 @@ export function BillingPanel({
                                                         loadingText="Opening Checkout…"
                                                         disabled={!BILLING_FEATURES.checkout
                                                             || !status.actions.checkoutEnabled
+                                                            || !billing.isBillingConnectionReady
                                                             || busyAction !== null}
                                                         onClick={() => void run('checkout', async () => {
                                                             const checkout = await billing.createCheckout(
@@ -504,9 +549,9 @@ export function BillingPanel({
                                                 ) : null}
                                             </div>
                                         </div>
-                                        {displayedOffer?.source !== 'catalog' ? (
+                                        {checkoutAvailable && currentOffer ? (
                                             <p className="w-full text-right text-sm text-muted-foreground">
-                                                {billingTaxQualifier(displayedOffer.price.taxPresentation)}
+                                                {billingTaxQualifier(currentOffer.price.taxPresentation)}
                                             </p>
                                         ) : null}
                                     </>
@@ -544,7 +589,9 @@ export function BillingPanel({
                     Cached Pro access is paused because this device clock moved backwards. Reconnect and refresh billing status.
                 </Notice>
             ) : null}
-            {billing.hasActiveCloudAccount && billing.error ? (
+            {billing.hasActiveCloudAccount
+                && billing.isBillingConnectionReady
+                && billing.error ? (
                 <Notice title="Billing status is not available" variant="warning">
                     Your data and existing core features remain available. Refresh the active cloud account before a billing action.
                 </Notice>

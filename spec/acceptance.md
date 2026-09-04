@@ -119,7 +119,11 @@
   status renders Free; unresolved lifecycle, unsupported response version, or
   transient/unsafe status failure renders eligibility unknown/unavailable with
   retry/update/repair guidance, never a misleading **Get Pro** prompt. Stale
-  responses are ignored rather than converted into a plan decision.
+  responses are ignored rather than converted into a plan decision. Initial
+  provider-state loading and foreground reconnection preserve the exact-bound
+  signed Free/Pro selection and never erase it merely because transport is not
+  ready. Online status refresh and Stripe actions wait separately for the
+  provider connection to settle.
 - A provider-disconnected user can inspect the current catalog without implying
   a separate TaskTime login. Trial eligibility remains unknown until a selected
   Google Drive or Dropbox session resolves canonical status. Checkout displays the exact
@@ -150,8 +154,23 @@
   inside the Pro card instead of replacing the comparison with a second billing
   layout. **Manage billing** appears only for a verified subscription-backed Pro
   state; a Free, trial, or grant state does not expose it merely because a Stripe
-  customer record exists. The purchase footer keeps the applicable tax qualifier
-  but leaves renewal disclosure and confirmation to hosted Checkout. Hosted-email
+  customer record exists, and it shows the shared loading spinner until the
+  Stripe Portal navigation begins. A fixed Portal return waits until the
+  selected cloud provider has finished reconnecting, then triggers canonical
+  reconciliation before its URL marker is removed; the UI trusts the reconciled
+  `cancelAtPeriodEnd` value, not the return itself. During that reconnect the
+  still-valid device-bound plan remains selected, Pro is never replaced with a
+  purchase prompt, and online billing controls show a reconnecting state. A
+  transient return failure is
+  retried after canonical status recovers without requiring a tab change. The
+  billing UI says the browser is offline only when the browser reports an
+  offline network state; a transient online Worker or session failure remains a
+  billing-status error. A pending period-end
+  cancellation uses neutral **Subscription set to end** copy, names the effective
+  date, and confirms that Pro remains usable until then without saying "soon."
+  The purchase footer keeps the applicable tax
+  qualifier only while **Get Pro** is present and leaves renewal disclosure and
+  confirmation to hosted Checkout. Hosted-email
   quota authority remains at the hosted Send action and is not presented as a
   standalone billing-dashboard card.
 - The catalog contains exactly Free and Pro, with annual `EUR 39` founding and

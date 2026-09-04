@@ -64,6 +64,8 @@ export function useBillingStatus(options: {
     enabled: boolean;
     catalogEnabled: boolean;
     lifecycle: BillingLifecycle | null;
+    lifecycleLoading?: boolean;
+    onlineRefreshEnabled?: boolean;
     client?: BillingClientPort;
     fallbackCatalog?: BillingCatalogV1 | null;
 }) {
@@ -86,8 +88,12 @@ export function useBillingStatus(options: {
     const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastRefreshAt = useRef(0);
     const foregroundTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hydratedLifecycle = useRef('none');
+    const previousOnlineRefreshEnabled = useRef(options.onlineRefreshEnabled ?? true);
     const currentLifecycle = useRef(options.lifecycle);
+    const currentOnlineRefreshEnabled = useRef(options.onlineRefreshEnabled ?? true);
     currentLifecycle.current = options.lifecycle;
+    currentOnlineRefreshEnabled.current = options.onlineRefreshEnabled ?? true;
 
     const publishVerifiedStatus = useCallback(async (
         response: BillingStatusResponseV1,
@@ -138,7 +144,8 @@ export function useBillingStatus(options: {
             || Math.abs((verification.payload.iat * 1000) - response.serverTime) > 300_000) {
             throw new Error('BILLING_STATUS_LICENSE_MISMATCH');
         }
-        if (epoch !== requestEpoch.current
+        if (!currentOnlineRefreshEnabled.current
+            || epoch !== requestEpoch.current
             || lifecycleKey(currentLifecycle.current) !== lifecycleKey(lifecycle)) return;
         await writeVerifiedBillingCache({
             lifecycle,
@@ -150,7 +157,8 @@ export function useBillingStatus(options: {
             wallTime: Date.now(),
             authoritativeOnlineRebase: true,
         });
-        if (epoch !== requestEpoch.current
+        if (!currentOnlineRefreshEnabled.current
+            || epoch !== requestEpoch.current
             || lifecycleKey(currentLifecycle.current) !== lifecycleKey(lifecycle)) return;
         setStatus(response);
         setResolution({ kind: 'canonical', snapshot: signedSnapshot });
@@ -162,7 +170,7 @@ export function useBillingStatus(options: {
 
     const refresh = useCallback(async (force = false) => {
         const lifecycle = currentLifecycle.current;
-        if (!options.enabled || !lifecycle) return;
+        if (!options.enabled || !lifecycle || !currentOnlineRefreshEnabled.current) return;
         const now = Date.now();
         if (!force && now - lastRefreshAt.current < FOREGROUND_COOLDOWN_MS) return;
         lastRefreshAt.current = now;
@@ -170,12 +178,15 @@ export function useBillingStatus(options: {
         setIsLoading(true);
         try {
             const response = await client.getStatus(lifecycle.sessionId);
+            if (!currentOnlineRefreshEnabled.current) return;
             await publishVerifiedStatus(response, lifecycle, epoch);
         } catch (caught) {
-            if (epoch !== requestEpoch.current) return;
+            if (epoch !== requestEpoch.current || !currentOnlineRefreshEnabled.current) return;
             const transient = caught instanceof BillingClientError && caught.retryable;
             if (transient) {
-                setOffline(true);
+                // A reachable browser can still meet a transient Worker/session
+                // failure. Only the browser's network state justifies offline UI.
+                setOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
                 setError(caught.code);
                 if (retryCount.current < MAX_TRANSIENT_RETRIES) {
                     const delay = 2_000 * (2 ** retryCount.current);
@@ -205,16 +216,18 @@ export function useBillingStatus(options: {
         const epoch = ++requestEpoch.current;
         retryCount.current = 0;
         if (retryTimer.current) clearTimeout(retryTimer.current);
+        setIsLoading(false);
         setStatus(null);
         setOffline(false);
         setClockUntrusted(false);
         setError(null);
         setResolution({ kind: 'unresolved', reason: 'lifecycle' });
+        hydratedLifecycle.current = 'none';
         const lifecycle = options.lifecycle;
         if (!options.enabled || !lifecycle) {
-            void clearActiveBillingBinding();
             return;
         }
+        setIsLoading(true);
         void (async () => {
             const cached = await readBoundBillingCache(lifecycle);
             if (epoch !== requestEpoch.current) return;
@@ -237,13 +250,44 @@ export function useBillingStatus(options: {
                     }
                 }
             }
+            if (epoch !== requestEpoch.current) return;
+            hydratedLifecycle.current = lifecycleKey(lifecycle);
             lastRefreshAt.current = 0;
-            await refresh(true);
+            if (currentOnlineRefreshEnabled.current) {
+                await refresh(true);
+            } else {
+                setIsLoading(false);
+            }
         })();
         return () => {
             requestEpoch.current += 1;
         };
     }, [options.enabled, options.lifecycle, refresh]);
+
+    useEffect(() => {
+        if (!options.enabled || options.lifecycle || options.lifecycleLoading) return;
+        void clearActiveBillingBinding();
+    }, [options.enabled, options.lifecycle, options.lifecycleLoading]);
+
+    useEffect(() => {
+        const onlineRefreshEnabled = options.onlineRefreshEnabled ?? true;
+        const wasOnlineRefreshEnabled = previousOnlineRefreshEnabled.current;
+        previousOnlineRefreshEnabled.current = onlineRefreshEnabled;
+        if (!onlineRefreshEnabled) {
+            if (retryTimer.current) clearTimeout(retryTimer.current);
+            retryCount.current = 0;
+            setIsLoading(false);
+            setOffline(false);
+            setError(null);
+            return;
+        }
+        if (!options.enabled
+            || !options.lifecycle
+            || wasOnlineRefreshEnabled
+            || hydratedLifecycle.current !== lifecycleKey(options.lifecycle)) return;
+        lastRefreshAt.current = 0;
+        void refresh(true);
+    }, [options.enabled, options.lifecycle, options.onlineRefreshEnabled, refresh]);
 
     useEffect(() => {
         if (!options.catalogEnabled) {
@@ -266,7 +310,9 @@ export function useBillingStatus(options: {
     }, [client, options.catalogEnabled, options.fallbackCatalog]);
 
     useEffect(() => {
-        if (!options.enabled || !options.lifecycle) return;
+        if (!options.enabled
+            || !options.lifecycle
+            || !(options.onlineRefreshEnabled ?? true)) return;
         const schedule = () => {
             if (foregroundTimer.current) return;
             foregroundTimer.current = setTimeout(() => {
@@ -277,15 +323,19 @@ export function useBillingStatus(options: {
         const onVisibility = () => {
             if (document.visibilityState === 'visible') schedule();
         };
-        window.addEventListener('online', schedule);
+        const onOnline = () => {
+            setOffline(false);
+            schedule();
+        };
+        window.addEventListener('online', onOnline);
         document.addEventListener('visibilitychange', onVisibility);
         return () => {
-            window.removeEventListener('online', schedule);
+            window.removeEventListener('online', onOnline);
             document.removeEventListener('visibilitychange', onVisibility);
             if (foregroundTimer.current) clearTimeout(foregroundTimer.current);
             if (retryTimer.current) clearTimeout(retryTimer.current);
         };
-    }, [options.enabled, options.lifecycle, refresh]);
+    }, [options.enabled, options.lifecycle, options.onlineRefreshEnabled, refresh]);
 
     const forceRefresh = useCallback(() => refresh(true), [refresh]);
 
