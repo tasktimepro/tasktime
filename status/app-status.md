@@ -2,6 +2,7 @@
 
 ## Current focus
 
+- [x] Keep production telemetry provider-neutral by passing the lifecycle-selected Google Drive or Dropbox hosted-service session into the existing privacy-safe active-person dedupe path; reconcile the internal analysis wording without adding provider identity to metric rows. Also confirm successful portable-backup restores with a toast and replace the Dashboard Time Entries widget's hidden 30-day cutoff with a newest-first 10-entry limit while retaining its visible project filter and the separate expense window; when no active entries remain, load the newest available archived year so stale-but-latest work is still shown.
 - [x] Implement the Program Phase 1 subscription client locally with every
   production build control false: lifecycle-bound ES256 cache/status, Account
   billing shadow UI and Checkout-return recovery, forward-only one-active-client

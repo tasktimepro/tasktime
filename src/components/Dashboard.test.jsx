@@ -11,6 +11,8 @@ const {
     mockUseCurrencyConversion,
     mockUseTasks,
     mockTimeEntries,
+    mockLoadTimeEntriesYear,
+    mockGetAvailableTimeEntryYears,
     mockExpenses,
     mockRecurrences,
     mockPreferences,
@@ -20,6 +22,8 @@ const {
     mockMetricsCards: vi.fn(() => <div data-testid="metrics-cards">Metrics cards</div>),
     mockUseCurrencyConversion: vi.fn(),
     mockTimeEntries: [],
+    mockLoadTimeEntriesYear: vi.fn(),
+    mockGetAvailableTimeEntryYears: vi.fn(),
     mockExpenses: [],
     mockRecurrences: [],
     mockPreferences: { currency: 'USD' },
@@ -74,6 +78,8 @@ vi.mock('../hooks/useTimeEntries', () => ({
         entries: mockTimeEntries,
         createEntry: vi.fn(),
         deleteEntry: vi.fn(),
+        loadYear: mockLoadTimeEntriesYear,
+        getAvailableYears: mockGetAvailableTimeEntryYears,
     }),
 }));
 
@@ -170,6 +176,10 @@ describe('Dashboard', () => {
         mockMetricsCards.mockClear();
         mockUseTasks.mockClear();
         mockTimeEntries.length = 0;
+        mockLoadTimeEntriesYear.mockReset();
+        mockLoadTimeEntriesYear.mockResolvedValue(undefined);
+        mockGetAvailableTimeEntryYears.mockReset();
+        mockGetAvailableTimeEntryYears.mockResolvedValue([]);
         mockExpenses.length = 0;
         mockRecurrences.length = 0;
         Object.keys(mockPreferences).forEach((key) => {
@@ -211,6 +221,18 @@ describe('Dashboard', () => {
 
         expect(todo.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(metrics.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('loads the newest archived year when no active time entries remain', async () => {
+        mockGetAvailableTimeEntryYears.mockResolvedValue([2024, 2022]);
+
+        renderDashboard();
+
+        await waitFor(() => {
+            expect(mockGetAvailableTimeEntryYears).toHaveBeenCalledOnce();
+        });
+        expect(mockLoadTimeEntriesYear).toHaveBeenCalledOnce();
+        expect(mockLoadTimeEntriesYear).toHaveBeenCalledWith(2024);
     });
 
     it('does not persist automatic recurring-skip cleanup during dashboard startup', () => {
@@ -341,10 +363,10 @@ describe('Dashboard', () => {
         expect(screen.getByTestId('recent-tasks').textContent).toContain('recent');
         expect(screen.getByTestId('projects-overview').textContent).toContain('recent');
         expect(screen.getByText('No paid expenses in the last 30 days')).toBeInTheDocument();
-        expect(screen.getByText('No time entries in the last 30 days')).toBeInTheDocument();
+        expect(screen.getByText('No time entries yet')).toBeInTheDocument();
     });
 
-    it('shows only items inside the 30-day dashboard window by default', () => {
+    it('keeps older time entries visible while expenses retain their 30-day window', () => {
         mockUseTasks.mockReturnValue({
             activeTasks: [
                 { id: 'task-1', title: 'Design sprint', projectId: 'project-1' },
@@ -421,9 +443,51 @@ describe('Dashboard', () => {
         expect(screen.getByText('Invoice follow-up')).toBeInTheDocument();
         expect(screen.getByText('Hosting')).toBeInTheDocument();
         expect(screen.getByText('Email delivery')).toBeInTheDocument();
-        expect(screen.queryByText('Old discovery')).not.toBeInTheDocument();
+        expect(screen.getByText('Old discovery')).toBeInTheDocument();
         expect(screen.queryByText('Legacy software')).not.toBeInTheDocument();
         expect(screen.queryByText('Office rent')).not.toBeInTheDocument();
+    });
+
+    it('shows only the ten most recent time entries', () => {
+        const tasks = Array.from({ length: 11 }, (_, index) => ({
+            id: `task-${index + 1}`,
+            title: `Time entry ${index + 1}`,
+            completed: false,
+        }));
+        mockUseTasks.mockReturnValue({
+            activeTasks: tasks,
+            archivedTasks: [],
+            updateTask: vi.fn(),
+            deleteTask: vi.fn(),
+            archiveTask: vi.fn(),
+            getOverdueTasks: vi.fn(() => []),
+            getTasksForToday: vi.fn(() => []),
+            getUpcomingTasks: vi.fn(() => []),
+            toggleRecurringCompletion: vi.fn(),
+            isCompletedOnDate: vi.fn(() => false),
+            resetExpiredSkips: vi.fn(),
+            isLoading: false,
+            archivedLoading: false,
+            archivedLoaded: true,
+            getRecurringStatus: vi.fn(() => ({
+                effectiveDateStr: null,
+                isDueToday: false,
+                isOverdue: false,
+                lastDueDateStr: null,
+            })),
+        });
+        mockTimeEntries.push(...tasks.map((task, index) => ({
+            id: `entry-${index + 1}`,
+            taskId: task.id,
+            start: Date.parse(`2026-03-${String(index + 1).padStart(2, '0')}T09:00:00.000Z`),
+            end: Date.parse(`2026-03-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`),
+        })));
+
+        renderDashboard();
+
+        expect(screen.getByText('Time entry 11')).toBeInTheDocument();
+        expect(screen.getByText('Time entry 2')).toBeInTheDocument();
+        expect(screen.queryByText('Time entry 1')).not.toBeInTheDocument();
     });
 
     it('uses frozen expense payment snapshots for paid expense totals', () => {

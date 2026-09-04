@@ -9,6 +9,22 @@ vi.mock('../../hooks/useIsMobileLayout', () => ({
 }));
 
 describe('TimeEntriesOverview', () => {
+    it('does not describe the empty state as a hidden date filter', () => {
+        render(
+            <TimeEntriesOverview
+                entries={[]}
+                projects={[]}
+                projectFilter={DEFAULT_TIME_ENTRIES_PROJECT_FILTER}
+                setProjectFilter={vi.fn()}
+                onTaskClick={vi.fn()}
+                onProjectClick={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('No time entries yet')).toBeInTheDocument();
+        expect(screen.queryByText(/last 30 days/i)).not.toBeInTheDocument();
+    });
+
     it('shows entry durations with the same seconds-aware formatting as tasks', () => {
         const start = Date.parse('2026-07-13T10:00:00.000Z');
         const task = { id: 'task-1', title: 'Evaluation & analysis' };

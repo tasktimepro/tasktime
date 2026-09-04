@@ -15,8 +15,8 @@ const TimeEntriesOverview = ({
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const emptyStateMessage = projectFilter === DEFAULT_TIME_ENTRIES_PROJECT_FILTER
-        ? 'No time entries in the last 30 days'
-        : 'No time entries for this project in the last 30 days';
+        ? 'No time entries yet'
+        : 'No time entries for this project yet';
 
     return (
         <Card>

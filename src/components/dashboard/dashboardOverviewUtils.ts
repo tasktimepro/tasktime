@@ -27,6 +27,7 @@ type DashboardProject = Project & {
 
 export const DEFAULT_TASK_FILTER = 'recent';
 export const DEFAULT_PROJECT_FILTER = 'recent';
+export const DASHBOARD_RECENT_ITEM_LIMIT = 10;
 
 export const TASK_FILTER_OPTIONS = [
     { value: 'recent', label: 'Recent' },
@@ -171,7 +172,7 @@ export const buildDashboardTasks = ({
         .sort(compareTasksByActivity);
 
     if (taskFilter === 'recent') {
-        return filteredTasks.slice(0, 10);
+        return filteredTasks.slice(0, DASHBOARD_RECENT_ITEM_LIMIT);
     }
 
     return filteredTasks;
@@ -264,7 +265,7 @@ export const buildDashboardProjects = ({
         .filter((project) => !query || project.title.toLowerCase().includes(query));
 
     if (projectFilter === 'recent') {
-        return filteredProjects.slice(0, 10);
+        return filteredProjects.slice(0, DASHBOARD_RECENT_ITEM_LIMIT);
     }
 
     return filteredProjects;

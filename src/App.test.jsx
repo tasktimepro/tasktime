@@ -88,6 +88,11 @@ const accountComponentState = vi.hoisted(() => ({
     props: null,
 }))
 
+const usageMetricsState = vi.hoisted(() => ({
+    setSessionId: vi.fn(),
+    start: vi.fn(() => vi.fn()),
+}))
+
 const onboardingModalMock = vi.hoisted(() => vi.fn(({ isOpen, onComplete }) => (
     isOpen ? (
         <div data-testid="onboarding-modal">
@@ -102,6 +107,9 @@ const yjsHookState = vi.hoisted(() => ({
     syncState: 'idle',
     syncPhase: 'idle',
     isDriveConnected: false,
+    isCloudConnected: undefined,
+    activeStorageProvider: null,
+    activeStorageSessionId: null,
     isConnecting: false,
     hasSynced: false,
     manualSyncInProgress: false,
@@ -318,6 +326,11 @@ vi.mock('./hooks/useGoogleAuth.ts', () => ({
     }),
 }))
 
+vi.mock('./utils/usageMetrics.ts', () => ({
+    setUsageMetricsSessionId: usageMetricsState.setSessionId,
+    startUsageMetrics: usageMetricsState.start,
+}))
+
 // Mock child components
 vi.mock('./components/ProjectList', () => ({ default: () => <div data-testid="project-list" /> }))
 vi.mock('./components/ProjectDashboard', () => ({ default: () => <div data-testid="project-dashboard" /> }))
@@ -417,6 +430,9 @@ describe('App component', () => {
         yjsHookState.syncState = 'idle'
         yjsHookState.syncPhase = 'idle'
         yjsHookState.isDriveConnected = false
+        yjsHookState.isCloudConnected = undefined
+        yjsHookState.activeStorageProvider = null
+        yjsHookState.activeStorageSessionId = null
         yjsHookState.isConnecting = false
         yjsHookState.hasSynced = false
         yjsHookState.manualSyncInProgress = false
@@ -435,6 +451,8 @@ describe('App component', () => {
         yjsHookState.restoreBackupData.mockReset()
         yjsHookState.driveSessionId = null
         yjsHookState.hostedServiceSessionId = null
+        usageMetricsState.setSessionId.mockReset()
+        usageMetricsState.start.mockClear()
         localStorage.getItem.mockImplementation((key) => {
             if (key === 'tasktime-onboarding-completed') {
                 return 'true'
@@ -480,6 +498,18 @@ describe('App component', () => {
     it('renders the dashboard view by default', async () => {
         render(<App />)
         expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
+    })
+
+    it('uses the lifecycle-selected Dropbox session for usage metrics', async () => {
+        yjsHookState.isCloudConnected = true
+        yjsHookState.activeStorageProvider = 'dropbox'
+        yjsHookState.activeStorageSessionId = 'dropbox-session'
+        yjsHookState.hostedServiceSessionId = 'dropbox-session'
+
+        render(<App />)
+
+        expect(await screen.findByTestId('dashboard')).toBeInTheDocument()
+        expect(usageMetricsState.setSessionId).toHaveBeenCalledWith('dropbox-session')
     })
 
     it('keeps the page-level reports loader visible until the reports view signals ready', async () => {

@@ -11,6 +11,10 @@ const mockExpenses = [];
 const mockExportBackupData = vi.fn();
 const mockExpenseCategories = [];
 const mockTaxReturnPeriods = [];
+const { mockShowError, mockShowSuccess } = vi.hoisted(() => ({
+    mockShowError: vi.fn(),
+    mockShowSuccess: vi.fn(),
+}));
 
 vi.mock('../../hooks/useTimers.ts', () => ({
     useTimers: () => ({ timers: mockTimers })
@@ -30,7 +34,8 @@ vi.mock('../../contexts/YjsContext.tsx', () => ({
 
 vi.mock('../../hooks/useToast.ts', () => ({
     useToast: () => ({
-        showError: vi.fn(),
+        showError: mockShowError,
+        showSuccess: mockShowSuccess,
     }),
 }));
 
@@ -57,6 +62,8 @@ describe('Import/Export integration', () => {
         mockExpenses.length = 0
         mockExpenseCategories.length = 0
         mockTaxReturnPeriods.length = 0
+        mockShowError.mockReset()
+        mockShowSuccess.mockReset()
         mockExportBackupData.mockReset()
         mockExportBackupData.mockResolvedValue({
             version: BACKUP_VERSION,
@@ -286,6 +293,8 @@ describe('Import/Export integration', () => {
         await waitFor(() => {
             expect(screen.queryByRole('dialog', { name: 'Import Data' })).not.toBeInTheDocument()
         })
+        expect(mockShowSuccess).toHaveBeenCalledOnce()
+        expect(mockShowSuccess).toHaveBeenCalledWith('Backup restored successfully')
     })
 
     it('keeps the import dialog busy until async restore finishes', async () => {

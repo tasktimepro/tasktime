@@ -6,6 +6,7 @@ Minimize the distance from identifying work to tracking it accurately.
 
 - Dashboard surfaces current priorities, metrics, recent work, and timer state.
 - Project detail groups project context, notes, task list/kanban, estimates, and time actions.
+- The Dashboard Time Entries widget has no hidden date window. It shows the 10 newest available entries, loads the newest archived entry year when the active document is empty, and applies only the project filter exposed in the widget.
 - Task hierarchy remains scannable; subtask actions do not imply unsupported recurrence.
 - Planner organizes references by week/day and supports desktop columns plus mobile day navigation.
 - Global timers show project/task identity, elapsed state, and clear pause/resume/stop actions.

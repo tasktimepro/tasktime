@@ -5,7 +5,7 @@ import {
     parseStoredDate,
     toStorageDate
 } from '../utils/dateUtils';
-import { addDays, endOfDay, endOfMonth, startOfMonth, subDays, subMonths } from 'date-fns';
+import { addDays, endOfMonth, startOfMonth, subDays, subMonths } from 'date-fns';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
@@ -26,6 +26,7 @@ import ToDoToday from './dashboard/ToDoToday';
 import {
     buildDashboardProjects,
     buildDashboardTasks,
+    DASHBOARD_RECENT_ITEM_LIMIT,
     DEFAULT_PROJECT_FILTER,
     DEFAULT_TASK_FILTER,
 } from './dashboard/dashboardOverviewUtils.ts';
@@ -156,7 +157,12 @@ const Dashboard = ({
         archivedLoading,
         archivedLoaded,
     } = useTasks({ includeArchived: true });
-    const { entries: timeEntries, deleteEntry } = useTimeEntries();
+    const {
+        entries: timeEntries,
+        deleteEntry,
+        loadYear: loadTimeEntriesYear,
+        getAvailableYears: getAvailableTimeEntryYears,
+    } = useTimeEntries();
     const { timers, stopTimer, clearTimer } = useTimers();
     const { expenses } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
@@ -176,6 +182,49 @@ const Dashboard = ({
     // priority sections (ToDoToday + MetricsCards) appear instantly.
     const [deferredReady, setDeferredReady] = useState(false);
     useEffect(() => { setDeferredReady(true); }, []);
+    const historicalTimeEntriesLoadStartedRef = useRef(false);
+
+    useEffect(() => {
+        if (!deferredReady || historicalTimeEntriesLoadStartedRef.current) {
+            return undefined;
+        }
+
+        // The active document normally contains the newest work. If it does not,
+        // load only the newest archived year rather than every historical document.
+        historicalTimeEntriesLoadStartedRef.current = true;
+        let cancelled = false;
+
+        const loadMostRecentHistoricalEntries = async () => {
+            try {
+                const availableYears = await getAvailableTimeEntryYears();
+                const mostRecentYear = [...availableYears].sort((left, right) => right - left)[0];
+                const mostRecentVisibleYear = timeEntries.reduce((latestYear, entry) => {
+                    const entryTimestamp = typeof entry.end === 'number' ? entry.end : entry.start;
+
+                    return Math.max(latestYear, new Date(entryTimestamp).getFullYear());
+                }, Number.NEGATIVE_INFINITY);
+
+                if (!cancelled && mostRecentYear !== undefined && mostRecentYear > mostRecentVisibleYear) {
+                    await loadTimeEntriesYear(mostRecentYear);
+                }
+            } catch {
+                if (!cancelled) {
+                    historicalTimeEntriesLoadStartedRef.current = false;
+                }
+            }
+        };
+
+        void loadMostRecentHistoricalEntries();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        deferredReady,
+        getAvailableTimeEntryYears,
+        loadTimeEntriesYear,
+        timeEntries,
+    ]);
 
     const resolveRecurringActionDate = useCallback((task) => {
         if (!task?.recurring || !todayStr) return null;
@@ -581,10 +630,6 @@ const Dashboard = ({
     }, [expenses, recurrences, todayStr]);
 
     const dashboardTimeEntries = useMemo(() => {
-        const todayDate = parseStoredDate(todayStr);
-        const rangeStart = todayDate ? subDays(todayDate, 29) : null;
-        const rangeEnd = todayDate ? endOfDay(todayDate) : null;
-
         return timeEntries
             .map((entry) => {
                 const task = tasksById.get(entry.taskId) || null;
@@ -597,38 +642,15 @@ const Dashboard = ({
                     project,
                 };
             })
-            .filter((entry) => {
-                if (timeEntriesProjectFilter === DEFAULT_TIME_ENTRIES_PROJECT_FILTER) {
-                    const entryDateValue = typeof entry.end === 'number' ? entry.end : entry.start;
-                    const entryDate = new Date(entryDateValue);
-
-                    if (rangeStart && rangeEnd) {
-                        return entryDate >= rangeStart && entryDate <= rangeEnd;
-                    }
-
-                    return true;
-                }
-
-                const entryDateValue = typeof entry.end === 'number' ? entry.end : entry.start;
-                const entryDate = new Date(entryDateValue);
-                const matchesProject = entry.project?.id === timeEntriesProjectFilter;
-
-                if (!matchesProject) {
-                    return false;
-                }
-
-                if (rangeStart && rangeEnd) {
-                    return entryDate >= rangeStart && entryDate <= rangeEnd;
-                }
-
-                return true;
-            })
+            .filter((entry) => timeEntriesProjectFilter === DEFAULT_TIME_ENTRIES_PROJECT_FILTER
+                || entry.project?.id === timeEntriesProjectFilter)
             .sort((left, right) => {
                 const leftDate = left.end || left.start || 0;
                 const rightDate = right.end || right.start || 0;
                 return rightDate - leftDate;
-            });
-    }, [timeEntries, tasksById, projectsById, timeEntriesProjectFilter, todayStr]);
+            })
+            .slice(0, DASHBOARD_RECENT_ITEM_LIMIT);
+    }, [timeEntries, tasksById, projectsById, timeEntriesProjectFilter]);
 
     const dashboardExpenses = useMemo(() => {
         const todayDate = parseStoredDate(todayStr);

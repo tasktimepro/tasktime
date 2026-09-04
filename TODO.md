@@ -2,12 +2,6 @@
 
 ## Priority
 
-[ ] Double check that the current telemetry data/analysis that we have includes the latest dropbox integration as well
-
-[ ] When I import data I should see a success toast notification
-
-[ ] I think time entries widget is filtering with last 30 days? Because I would leave it that it always shows the most recent time entries no matter when they were last added
-
 [ ] Check about indexing blog issues - ONGOING
 
 [x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository

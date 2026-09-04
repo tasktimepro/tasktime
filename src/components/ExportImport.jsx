@@ -49,7 +49,7 @@ function ExportImport({
     const cloudProviderName = activeStorageProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
     const { timers } = useTimers();
     const { expenses: allExpenses } = useExpenses({ includeArchived: true });
-    const { showError } = useToast();
+    const { showError, showSuccess } = useToast();
     const isTimerActive = timers.length > 0;
     const [showImportModal, setShowImportModal] = useState(false);
     const [importData, setImportData] = useState('');
@@ -115,7 +115,7 @@ function ExportImport({
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
-            markMeaningfulActivity();
+            markMeaningfulActivity('export_import');
         } catch (error) {
             showError(error instanceof Error ? error.message : 'Unable to export backup data.');
         } finally {
@@ -148,7 +148,9 @@ function ExportImport({
 
             setIsImporting(true);
             await onImport(backupImportData);
+            markMeaningfulActivity('export_import');
             resetImportState();
+            showSuccess('Backup restored successfully');
             
         } catch (error) {
             setImportError(error instanceof Error ? error.message : 'Import failed.');
