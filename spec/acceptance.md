@@ -44,8 +44,8 @@
   developer-facing notices to product screens, disables the bundled catalog
   fallback, and exercises the normal provider-bound catalog,
   status/JWKS/license, trial, Stripe test Checkout, webhook, reconciliation,
-  Checkout-return, and Portal paths against the local Worker and Wrangler-local
-  D1. Checkout return handling waits for the matching active cloud lifecycle and
+  Checkout-return, and Portal paths against the local Worker and isolated local
+  service state. Checkout return handling waits for the matching active cloud lifecycle and
   retains the return marker until that lifecycle exists. The local Worker accepts
   only the exact `http://localhost:3101/account?section=billing` return base;
   production retains only the exact HTTPS app return. Hosted Send and delivery-
@@ -167,7 +167,9 @@
   retried after canonical status recovers without requiring a tab change. The
   billing UI says the browser is offline only when the browser reports an
   offline network state; a transient online Worker or session failure remains a
-  billing-status error. A pending period-end
+  billing-status error. **Refresh status** performs authenticated canonical
+  reconciliation and then forces a fresh signed status read even inside the
+  foreground-refresh cooldown. A pending period-end
   cancellation uses neutral **Subscription set to end** copy, names the effective
   date, and confirms that Pro remains usable until then without saying "soon."
   The purchase footer keeps the applicable tax
@@ -180,14 +182,17 @@
   Checkout-tax, **Get Pro**, or **Manage billing** controls. It remains a normal
   canonical Pro entitlement online and through the existing bounded signed
   offline assertion, without mutating Stripe, founding capacity, or one-time
-  trial eligibility. An owner-only private-infrastructure CLI resolves only the
-  exact opaque account reference, previews state before mutation, writes one
+  trial eligibility. An owner-only private operation resolves only the exact
+  opaque account reference, previews state before mutation, writes one
   active grant and one audit event idempotently, lists retained history, and
   revokes without deleting that history. A missing/ambiguous reference, active
   identity transfer, malformed input, missing confirmation, or partial database
   operation fails without granting or revoking access. Explicit billing-profile
   deletion revokes an active complimentary grant in the same transaction and
-  retains a distinct self-service revocation audit event.
+  retains a distinct self-service revocation audit event. Local visual validation
+  uses the same domain operations while remaining isolated from production.
+  Issue, refresh, UI presentation, retained-history review, revoke, and canonical
+  refresh back to Free are repeatable without production effects.
 - The catalog contains exactly Free and Pro, with annual `EUR 39` founding and
   `EUR 59` standard offers under Pro. Founding applies to the first 250
   successfully paid canonical principals. A 251-way concurrent

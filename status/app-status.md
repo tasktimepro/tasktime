@@ -95,16 +95,22 @@
   retries a transient failure after canonical status recovery without a tab
   change, and reserves the **You are offline** notice for a browser-reported
   offline state. A known Pro browser never falls back to trial or **Get Pro**
-  presentation during that reconnect.
+  presentation during that reconnect. The explicit **Refresh status** action now
+  requests canonical `user_retry` reconciliation and forces the following signed
+  status read so the ordinary foreground cooldown cannot hide a provider change.
 - [x] Add the locally verified permanent complimentary-Pro path. Plan & Billing
   shows the opaque account reference after the provider email and renders a
   grant-backed plan as **Complimentary Pro** with no paid pricing, tax, purchase,
-  or Portal controls. The private infra repo contains the additive grant table,
-  entitlement/transfer integration, owner-only preview/issue/list/revoke CLI,
-  retained audit trail, atomic billing-profile-deletion revocation, and
-  regression coverage proving that trial eligibility, founding capacity, and
-  Stripe state are untouched. Production migration,
+  or Portal controls. The private owner operation supports preview, issue,
+  retained-history review, and revoke with an audit trail and atomic billing-
+  profile-deletion revocation. Regression coverage proves trial eligibility,
+  founding capacity, and Stripe state are untouched. Production migration,
   Worker/app release, and real grants remain explicit release operations.
+- [x] Add an isolated local complimentary-Pro rehearsal that reuses the
+  transactional production domain operations and supports the full preview/
+  issue/UI refresh/history/revoke loop without access to production state.
+  Persistence and simultaneous local-runtime access are regression-covered;
+  this local evidence does not authorize release.
 - [x] Correct the local Stripe Checkout redirect boundary after the real hosted
   URL exposed opaque fragment state. The browser and Worker now preserve that
   fragment only for the exact credential-free HTTPS Stripe Checkout host, with
@@ -139,7 +145,13 @@
   this remains distinct from production deployment or release approval.
 - [x] Prepare core app `1.4.1`: correct invoice custom/preset billing ranges so the full local end date is eligible in browser and agent composition, preserve historical snapshot-less invoice matching, and normalize exported custom-report timestamps to inclusive day boundaries. No agent artifact, backup schema, or Worker release is required.
 - [x] Make direct Drive sync more responsive without weakening mode boundaries: Backup and Sync modes debounce note edits for 1.5 seconds, pending local work retries with bounded backoff after active-sync/Web Lock contention, Sync mode checks every five minutes only while visible, and Manual mode remains explicit-only.
-- [x] Retire the Drive data proxy and temporary staging environment. Active Worker version `37` serves direct Drive control-plane sessions only, denies old `/drive/*` browser preflight without CORS permission, and permits the exact local production-preview origin. The isolated staging Worker, KV namespace, D1 databases, secret file, config, tests, and runbook are removed. Current privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary.
+- [x] Retire the Drive data proxy and temporary staging environment. The active
+  edge service now provides direct Drive control-plane sessions only, denies old
+  `/drive/*` browser preflight without CORS permission, and permits the exact
+  local production-preview origin. The isolated staging resources, local secret
+  material, configuration, tests, and runbook are removed. Current privacy,
+  terms, contracts, specifications, architecture, contributor guidance, and
+  public copy state the direct browser-to-Google Drive boundary.
 - [x] Complete the provider-neutral cloud-sync and Dropbox production rollout for approved/current accounts recorded in `status/cloud-sync-provider-expansion.md`. Google Drive and Dropbox now share the direct browser-to-provider data plane, active-provider hosted identity, backup and destructive lifecycles, and explicit transfer flow. The promoted moved-source recovery offers the recorded destination first and permits source reuse only through verified source-only deletion plus a complete push-only seed. The existing production Google Drive session survived the upgrade and returned to In sync; transfer initialization and UI exposure are live, while full two-provider move coverage comes from the real-account local production-preview canaries. Broad new-user Dropbox availability remains gated on App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary.
 - [x] Align connected-account presentation across providers. New/reconnected
   Dropbox grants add only `account_info.read`; the browser reads the verified

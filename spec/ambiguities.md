@@ -88,7 +88,7 @@ The recurring-subscription architecture has been reconciled against the current 
 
 - **BILL-DEC-14 — Owner-issued complimentary Pro:** The owner may permanently
   grant Pro to individually selected canonical hosted accounts through the
-  private infrastructure CLI and may later revoke it. The input is the stable
+  private administrative operation and may later revoke it. The input is the stable
   opaque TaskTime account reference shown after the provider email in Plan &
   Billing, not an email or raw provider principal. These grants are audited,
   idempotent, preserved through verified provider transfer and history/backup

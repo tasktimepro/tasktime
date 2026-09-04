@@ -43,5 +43,4 @@ agent-kit/
 
 # DebugBundle (managed by debugbundle setup)
 .debugbundle/local/*
-!.debugbundle/local/connection.json
 .debugbundle/bundles/

@@ -116,7 +116,8 @@ These invariants summarize critical production contracts. They supplement the de
   private, audited, idempotent, transaction-safe operations; one grant may be
   active per canonical principal, transfer preserves it, revocation retains its
   history, explicit billing-profile deletion revokes it in the same transaction,
-  and cached access never outlives the normal signed assertion.
+  and cached access never outlives the normal signed assertion. Local grant
+  rehearsal reuses the same operations but cannot address production state.
 - Acceptance-unknown email attempts remain durably reserved and are reconciled
   through a caller-owned D1-only status operation that can never resend or expose
   raw provider identifiers. Browser recovery state is privacy-minimized,

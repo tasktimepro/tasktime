@@ -140,8 +140,8 @@ Requirement identifiers are stable references for acceptance criteria, design do
   part without sending it again. If a crash leaves a retained terminal result but
   no matching invoice sent timestamp, owned status proof reapplies that result
   without another provider send; already-sent invoices do not keep polling.
-- **ENTL-13:** Cross-database provider transfer uses a durable idempotent journal,
-  EMAIL_DB prepare/apply record, direct aliases, and a hosted-action fence until
+- **ENTL-13:** Cross-store provider transfer uses a durable idempotent journal,
+  prepare/apply record, direct aliases, and a hosted-action fence until
   both stores agree. Crashes/retries cannot expose a partial license/quota move,
   reset allowance/trial, or activate the target early.
 - **ENTL-14:** Launch packaging has exactly Free and Pro. Trial is an entitlement
@@ -162,16 +162,17 @@ Requirement identifiers are stable references for acceptance criteria, design do
   confirmation before Stripe creation; it is never silently repriced. No exact
   remaining count is exposed.
 - **ENTL-15:** An owner may issue permanent complimentary Pro to one canonical
-  hosted account through a private infrastructure CLI using the opaque account
-  reference shown in Plan & Billing. Standalone preview, issue, list, and owner
-  revoke remain outside the public Worker HTTP surface; issue/revoke require an
-  exact production confirmation and append retained audit evidence. A complimentary
+  hosted account through a private administrative operation using the opaque
+  account reference shown in Plan & Billing. Preview, issue, retained-history
+  review, and owner revoke remain outside the public HTTP surface; mutations
+  require explicit confirmation and append retained audit evidence. A complimentary
   grant never creates or changes Stripe state, consumes trial eligibility, or
   reserves/commits a founding allocation. At most one may be active per account;
   retries are idempotent, provider transfer preserves ownership, revocation
   retains history, explicit billing-profile deletion atomically revokes an
   active grant while retaining that evidence, and cached offline access remains
-  bounded by the normal signed-license lifetime.
+  bounded by the normal signed-license lifetime. A separate local rehearsal must
+  reuse these operations without being able to address production state.
 
 ## Sync and offline behavior
 

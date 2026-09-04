@@ -109,10 +109,11 @@ The Yjs store is split into documents so current work stays loaded and historica
    canonical principals, after which new acquisition automatically uses the
    `EUR 59/year` standard offer. Existing continuous/recoverable founding
    subscriptions remain on their founding Price. Permanent complimentary grants
-   are owner-administered only through the audited private infra CLI, consume no
+   are owner-administered through a private audited operation, consume no
    founding place or trial eligibility, and create no Stripe state. Explicit
    billing-profile deletion transactionally revokes an active grant while
-   retaining its audit history.
+   retaining its audit history. An isolated rehearsal validates the same
+   lifecycle without production effects.
 
 ## Reliability and security model
 

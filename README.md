@@ -98,8 +98,8 @@ Preparation accepts a current `STRIPE_SECRET_KEY=sk_test_...` or the authenticat
 Stripe CLI profiles. When several accounts are configured, it safely selects the
 test credential that can read TaskTime's exact configured Price instead of
 assuming `[default]`. It writes only ignored mode-`0600` local files,
-applies the checked-in migrations to Wrangler-local D1, and seeds local-only
-rollout approvals. It then read-only attests the applied email ledger against
+applies the private service's checked-in migrations to isolated local state, and
+seeds local-only rollout approvals. It then read-only attests the applied email ledger against
 the canonical tables, constraints, indexes, and triggers. Schema drift stops
 startup without repairing or deleting local data. If the CLI temporary key
 expired, run `stripe login` or pass
@@ -109,7 +109,9 @@ previously prepared valid local test key is reused, and the recurring validation
 plus runtime services use the
 pinned official Stripe CLI Docker image. The listener receives only its API key,
 not the Worker signing or HMAC configuration, and its attached output masks the
-local webhook signing secret. The lower-level private Worker
+local webhook signing secret. The Worker waits for signing material emitted by
+that same attached listener session, preventing a separate temporary listener
+from leaving webhook verification out of sync. The lower-level private Worker
 commands remain available for diagnosing an individual service. Use only Stripe
 test cards and fictional customer details; never enter a real card or identity.
 

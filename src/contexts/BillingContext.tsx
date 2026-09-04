@@ -138,6 +138,12 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         };
         return () => channel.close();
     }, [refresh]);
+    const refreshCanonicalStatus = useCallback(async () => {
+        if (!lifecycle || !isBillingConnectionReady) throw new Error('BILLING_DISABLED');
+        await billingClient.refresh(lifecycle.sessionId, 'user_retry');
+        announceRefresh();
+        await refresh();
+    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh]);
     const startTrial = useCallback(async () => {
         if (!BILLING_FEATURES.trialActivation
             || !lifecycle
@@ -225,6 +231,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
     }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh]);
     const value = useMemo<BillingContextValue>(() => ({
         ...billing,
+        refresh: refreshCanonicalStatus,
         hasActiveCloudAccount: Boolean(lifecycle),
         isCloudAccountLoading: isCloudIdentityLoading,
         isBillingConnectionReady,
@@ -237,6 +244,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         handlePortalReturn,
     }), [
         billing,
+        refreshCanonicalStatus,
         lifecycle,
         isCloudIdentityLoading,
         isBillingConnectionReady,

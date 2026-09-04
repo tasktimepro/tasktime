@@ -10,12 +10,12 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Subscription/license Program Phase 1 locally complete; release-gated follow-through**
 
-- Direct browser-to-Google Drive sync is deployed. Active Worker version `37` retains only OAuth/token control-plane duties, rejects the retired `/drive/*` route without CORS permission, and permits the exact `http://localhost:3101` production-equivalent preview origin. The temporary staging Worker, KV namespace, D1 databases, local secrets/configuration, tests, and runbook have been removed. Privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary; the latest Pages production deployment is `fe29474d-f608-4a31-abe6-1840ad27c4bf`.
+- Direct browser-to-Google Drive sync is deployed. The active Worker retains only OAuth/token control-plane duties, rejects the retired `/drive/*` route without CORS permission, and permits the exact `http://localhost:3101` production-equivalent preview origin. The temporary staging resources, local secrets/configuration, tests, and runbook have been removed. Privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary.
 - Offline lazy-document navigation now short-circuits before any remote Drive work and subscribes locally; a red/green provider regression covers the cached-manifest case that previously produced failed offline requests. Focused provider tests, app typecheck, lint, and diff checks are green.
 - Direct Drive auto-sync now batches project-note typing after a 1.5-second quiet period, retries genuine pending work after active-sync/Web Lock contention with bounded backoff, and checks for remote changes every five minutes only while Sync mode is visible.
 - The browser retest confirms offline navigation now produces neither Drive requests nor upload errors.
 - Provider-neutral cloud sync is deployed with direct Google Drive and Dropbox data planes, active-provider hosted identity, and explicit user-initiated transfer in either direction. The moved-source recovery is provider-symmetric: it offers the recorded destination first and permits source reuse only after verified source-only deletion and a complete local push-only seed, without touching the recorded destination.
-- Core app `1.5.0` passed GitHub CI at `5d4d02c`, was deployed to Pages as `90399a2d`, and serves the Dropbox announcement, RSS entry, and sitemap route. The existing production Google Drive session survived the upgrade and returned to In sync after an explicit Sync Now with no new app, Yjs, or sync errors. Worker version `8b237e4f-0a75-45c2-a2ad-efabbbc66b07` passed typecheck and 13 files / 105 tests, enables transfers, and returned a valid provider-specific transfer authorization URL without starting an automatic move. The full real-account transfer and moved-source replacement journeys remain proven by the local production-preview canaries.
+- Core app `1.5.0` passed GitHub CI and serves the Dropbox announcement, RSS entry, and sitemap route. The existing production Google Drive session survived the upgrade and returned to In sync after an explicit Sync Now with no new app, Yjs, or sync errors. The compatible Worker passed typecheck and its complete focused test suite, enables transfers, and returned a valid provider-specific transfer authorization URL without starting an automatic move. The full real-account transfer and moved-source replacement journeys remain proven by local production-preview canaries.
 - Gradual TypeScript and testing-infrastructure improvements
 - Installed OpenClaw validation and remaining agent-directory publication checks
 - OpenClaw durability implementation and automated release evidence are complete: credentials/contracts are reconciled, status/logging are hardened, browser refresh and same-profile reopen continuity are covered, and the native plugin owns one Gateway-lifecycle bridge while generic MCP/Claude stdio remain supported. CLI/Gateway alignment and disposable-profile migration/rollback now pass on `2026.7.1-2`; the final installed plugin/browser multi-turn acceptance remains pending.
@@ -80,8 +80,8 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   also terminalizes a matching missed Checkout event and its founding allocation
   idempotently. Canonical local D1 schemas were adopted from preserved backups
   with row-equivalence, integrity, foreign-key, and strict schema attestation.
-  Its sanitized test-mode evidence and cleanup result are recorded in
-  `tasktime-infra/docs/todo/subscription-phase-1-local-evidence.md`. Owner-only
+  Its sanitized test-mode evidence and cleanup result are retained in the
+  private operational record. Owner-only
   live configuration, deployment, and launch inputs remain separate Program
   Phase 4 gates.
 

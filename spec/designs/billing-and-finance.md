@@ -71,7 +71,7 @@ Let users understand exactly what will be billed, what changed after finalizatio
 - Owner-selected complimentary Pro is a separate permanent, revocable grant
   source. The Pro card replaces paid pricing with **Complimentary**, explains
   that there is no charge or renewal and that access remains until revoked, and
-  omits trial/purchase/Portal controls. The private infra CLI operates on the
+  omits trial/purchase/Portal controls. The private owner operation uses the
   opaque account reference, retains issue/revoke audit history, and never calls
   Stripe or changes founding/trial accounting. Subscription-backed Pro keeps
   precedence when both sources exist, so the ordinary paid lifecycle and Portal
@@ -85,7 +85,9 @@ Let users understand exactly what will be billed, what changed after finalizatio
   transport readiness gates the Portal/Checkout/status calls, not the local plan
   display or offline entitlement. A transient return failure clears and retries when
   canonical status recovers instead of remaining until navigation, and online
-  service/session failures are not labelled as browser offline. The subscription
+  service/session failures are not labelled as browser offline. The explicit
+  **Refresh status** control asks the service to reconcile canonical billing and
+  then forces a new signed status read; it is not only a cached status reload. The subscription
   webhook remains the source-of-truth fallback if the user closes the Portal or
   does not return. A founder's
   confirmation explains that reversing before then

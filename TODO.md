@@ -2,24 +2,26 @@
 
 ## Priority
 
-[ ] Check about indexing blog issues - ONGOING
-
 [ ] Double check that the current telemetry data/analysis that we have includes the latest dropbox integration as well
 
 [ ] When I import data I should see a success toast notification
 
-[ ] Please be careful and make sure that important infra data about payments and stripe and other details are not made publically available in the core repo
+[ ] I think time entries widget is filtering with last 30 days? Because I would leave it that it always shows the most recent time entries no matter when they were last added
+
+[ ] Check about indexing blog issues - ONGOING
+
+[x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository
 
 [ ] Coordinated license, app-origin migration, homepage, and production-launch program
     - Dependency rule: complete and locally verify Program Phase 1 before implementing Program Phase 2. Phase 1 may prepare origin-neutral contracts and configuration seams, but neither phase publishes or changes production by itself.
-    - Source plans: `tasktime-infra/docs/todo/client_edge_license_flow.md` and `tasktime-infra/docs/todo/app_subdomain_migration_implementation_plan.md`
+    - Detailed implementation and operations remain in the private infrastructure repository.
     [x] Program Phase 1 — Complete and test the license flow locally
         [x] Freeze the complete implementation/security contract: Free supports one active client and the current-local-month Reports Overview; Trial/Pro unlock unlimited active clients, advanced Reports/exports, and hosted email; all advanced tabs, including To Invoice, remain visible as lazy section-specific previews; founding Pro is `EUR 39/year` for the first 250 paid canonical principals; and new acquisition then uses the `EUR 59/year` standard offer
         [x] Assign an owner, required evidence, approval deadline, and fail-closed live behavior for each launch-only tax presentation/live Stripe mapping for both approved offers, allowance, grace, seller/tax/legal, support, retention, and payment/refund/Portal decision; final approval belongs to Program Phase 4, and synthetic open-policy fixtures must not leak into live mode
         [x] Implement the provider-neutral Worker, client, UI, and agent entitlement flow with production billing/trial/Checkout/enforcement controls disabled
         [x] Pass Worker tests/typecheck, the core release gate, and the synthetic/local license acceptance matrix
         [x] Reconcile specifications, contracts, status, public-copy requirements, and rollback evidence without deploying
-        [x] Record the formal Program Phase 1 local Definition of Done: the real Stripe test-mode Product/Price, Checkout/webhook/test-clock/Portal lifecycle passed and is recorded in `tasktime-infra/docs/todo/subscription-phase-1-local-evidence.md`. All production controls remain off, and no live migration/deployment/domain/homepage/payment action occurred.
+        [x] Record the formal Program Phase 1 local Definition of Done in the private operational evidence. All production controls remain off, and no live migration/deployment/domain/homepage/payment action occurred.
     [ ] Program Phase 2 — Prepare and test the `app.tasktime.pro` migration locally
         [ ] Split the app and public-site build/deployment outputs without changing live domains
         [ ] Implement a verified old-origin workspace transfer with portable-backup fallback; never copy OAuth sessions, tokens, licenses, Push subscriptions, or agent pairing credentials
@@ -45,12 +47,10 @@
         [ ] With general Checkout still off, complete separately approved live `EUR 39/year` founding and `EUR 59/year` standard canaries; verify the founding purchase consumes exactly one permanent allocation and the standard purchase consumes none
         [ ] Enable approved billing UI, trial, Checkout, active-client enforcement, advanced-Reports enforcement, and hosted-email enforcement as separate reversible steps with live canaries
 
-[ ] I think time entries widget is filtering with last 30 days? Because I would leave it that it always shows the most recent time entries no matter when they were last added
-
 [x] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
-    [x] Fix: tasktime-infra/docs/todo/openclaw-agent-bridge-lifecycle-and-pairing-ux-plan.md
+    [x] Fix and verify the private OpenClaw lifecycle plan
     [x] Then publish version 1 once we see that it's stable
     [ ] Perform one more manual test
 

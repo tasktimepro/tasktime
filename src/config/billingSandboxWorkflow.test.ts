@@ -35,6 +35,8 @@ describe('billing sandbox development workflow', () => {
         expect(compose).toContain('VITE_DROPBOX_CLOUD_UI_ENABLED: "true"');
         expect(compose).toContain('VITE_PUSH_NOTIFICATIONS_ENABLED: "true"');
         expect(compose).toContain('billing-worker:');
+        expect(compose).toContain('run-local-billing-worker.sh');
+        expect(compose).toContain('.billing-sandbox-runtime');
         expect(compose).toContain('--test-scheduled');
         expect(compose).toContain('billing-scheduler:');
         expect(compose).toContain('run-local-worker-scheduler.mjs');
@@ -46,6 +48,13 @@ describe('billing sandbox development workflow', () => {
         const webhookService = compose.split('\n  billing-webhooks:\n')[1];
         expect(webhookService).toContain('.dev.vars.billing-sandbox-stripe.local');
         expect(webhookService).toContain('run-stripe-billing-listener.sh');
+        expect(webhookService).toContain('STRIPE_WEBHOOK_SECRET_FILE');
+        expect(webhookService).toContain('healthcheck:');
+        const workerService = compose
+            .split('\n  billing-worker:\n')[1]
+            .split('\n  billing-scheduler:\n')[0];
+        expect(workerService).toContain('billing-webhooks:');
+        expect(workerService).toContain('condition: service_healthy');
         expect(webhookService).not.toContain(
             './tasktime-infra/cloudflare/.dev.vars.billing-sandbox.local',
         );

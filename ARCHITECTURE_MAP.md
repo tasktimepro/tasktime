@@ -101,6 +101,8 @@ Public web build
   local overlay is regression-checked so it cannot disable a Worker control that
   tracked production configuration enables. `make dev-billing-sandbox` remains
   a compatible alias; `make dev-core` is the explicit public/diagnostic fallback.
+  Complimentary-access rehearsal reuses the production domain behavior while
+  remaining isolated from production state.
   The sandbox is unavailable in production builds and is not release evidence.
 - Implemented local license storage is origin-local and non-product: verified JWS
   records are subject-keyed and selected only through the exact active provider/
@@ -124,7 +126,7 @@ Public web build
 | Agent command | command registry/handler, scopes/approvals, bridge tool schema, public generated docs, smoke tests |
 | Public page/build | `blog/`, build scripts, public manifests, route denylist, preview/build smoke |
 | Sync behavior | store dirty-doc tracking, provider/manifest, auth hook, mode UI, offline/reconnect tests, historical Drive data |
-| Subscription/entitlement | private Worker/D1/Stripe plan, catalog/status/JWKS/error contracts, opaque account-reference display, audited permanent complimentary-grant CLI/storage/transfer/revocation, exact persisted lifecycle versus online provider-readiness separation, signed offline selection, Portal-return recovery, active-client transition/import-sync compatibility, Reports shell/Free Overview/lazy advanced modules, founding-slot concurrency/continuity and automatic standard-offer selection, report-agent scope compatibility, hosted-email policy, agent registry/artifacts, Privacy/Terms, offline/concurrency/recovery tests |
+| Subscription/entitlement | public plan/status/license contracts, opaque account-reference display, owner-issued complimentary-access lifecycle, exact persisted lifecycle versus online provider-readiness separation, signed offline selection, Portal-return recovery, active-client transition/import-sync compatibility, Reports shell/Free Overview/lazy advanced modules, founding continuity and automatic standard-offer selection, report-agent scope compatibility, hosted-email policy, agent registry/artifacts, Privacy/Terms, offline/concurrency/recovery tests |
 
 ## Authoritative references
 

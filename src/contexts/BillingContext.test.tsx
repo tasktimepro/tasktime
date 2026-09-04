@@ -105,6 +105,15 @@ function PortalReturnProbe() {
     );
 }
 
+function UserRefreshProbe() {
+    const billing = useBilling();
+    return (
+        <button type="button" onClick={() => void billing.refresh()}>
+            Refresh billing status
+        </button>
+    );
+}
+
 describe('BillingProvider Checkout continuity', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -233,6 +242,18 @@ describe('BillingProvider Checkout continuity', () => {
         await waitFor(() => expect(state.billingRefresh).toHaveBeenCalledWith(
             'session-fixture',
             'portal_return',
+        ));
+        expect(state.refresh).toHaveBeenCalled();
+    });
+
+    it('reconciles canonical Stripe state for an explicit user refresh', async () => {
+        render(<BillingProvider><UserRefreshProbe /></BillingProvider>);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh billing status' }));
+
+        await waitFor(() => expect(state.billingRefresh).toHaveBeenCalledWith(
+            'session-fixture',
+            'user_retry',
         ));
         expect(state.refresh).toHaveBeenCalled();
     });
