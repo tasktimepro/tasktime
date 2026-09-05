@@ -60,7 +60,7 @@ make test-run                        # run Vitest once
 make test-coverage                   # run Vitest with coverage
 make test-e2e-smoke                  # run Playwright smoke tests in Chromium
 make test-e2e-drive-browsers         # run direct Drive smoke in Chromium, Firefox, and WebKit
-make build                           # build the app and public site
+make build                           # build isolated app/site plus combined compatibility outputs
 make preview                         # build and preview production output
 make npm CMD="run build:agent-bridge" # build the agent bridge package
 ```
@@ -73,6 +73,11 @@ hosted Send, Google Drive, Dropbox, and enabled Worker-service paths against
 local state and Stripe test mode. `make dev-billing-sandbox` remains a compatible
 explicit alias. A public checkout without the private infrastructure repository
 falls back to the core app; `make dev-core` selects that path explicitly.
+
+`make build` produces `dist-app` for the React PWA/SPA, `dist-site` for Astro
+public pages and discovery, and `dist` as the unchanged combined compatibility
+surface used by current release automation. The split outputs are local release
+inputs only until the app-subdomain cutover is separately approved.
 
 Product screens remain visually production-like, without sandbox-only banners or
 developer-facing notices. Hosted Send and delivery-status requests use the normal

@@ -5,7 +5,7 @@
       "args": [
         "./scripts/run-tasktime-agent-bridge.mjs",
         "--app-url",
-        "https://tasktime.pro",
+        "https://app.tasktime.pro",
         "--agent-id",
         "tasktime.agent.openclaw",
         "--agent-label",

@@ -6,6 +6,36 @@ These interfaces are durable boundaries. Implementation types, validation, gener
 
 The stable route surface is defined in `spec/routes.md`. Navigation uses History API state through `useUrlState`; route changes must preserve reload and back/forward behavior and must not capture public Astro routes.
 
+## Build artifacts
+
+`make build` emits three deterministic, ignored release inputs:
+
+- `dist-app` contains the React application entry point, PWA manifest/service
+  worker, icons/assets, and the exact SPA fallback. It excludes Astro routes,
+  robots/sitemap, and public discovery manifests.
+- `dist-site` contains Astro public pages/assets, robots/sitemap/`llms.txt`,
+  brand assets, and both canonical and compatibility copies of `.well-known`
+  discovery. It excludes the application manifest, service worker, and SPA
+  fallback.
+- `dist` remains the production-compatible combined surface. It retains the
+  application root and legacy redirects while merging all non-root public-site
+  paths. A future Astro root can exist in `dist-site` without replacing this
+  compatibility root.
+
+Assembly rejects unequal file collisions, missing required outputs, an invalid
+product canonical URL, or missing root-relative site assets. Byte-identical
+shared brand assets are permitted. Release automation must name the intended
+artifact explicitly once the live origins are split; the current deployment
+continues to use only the combined compatibility artifact.
+
+At the approved production split, routine application deployment selects only
+`dist-app` for the app Pages project and routine public-site deployment selects
+only `dist-site` for the existing root Pages project. `dist` is retained as an
+explicit, immutable root rollback input and must not remain the routine
+post-cutover production artifact. Each project has one deployment authority so
+an app release cannot replace the site and a site release cannot replace the
+app.
+
 ## React data APIs
 
 Components obtain product state and mutations through entity hooks under `src/hooks/`, including projects, clients, tasks, time entries, timers, invoices, expenses/recurrences/categories, tax periods, business information/assets, payment/invoice/email templates, preferences, notes, planner attachments, goals, and sync/auth behavior.
@@ -72,6 +102,33 @@ Replacement restore is journaled outside the managed Yjs databases before any
 destructive mutation. The journal includes the prior workspace and active
 timers, is cleared only after a persistence barrier, and is recovered on the
 next startup if the restore was interrupted.
+
+## Application-origin configuration
+
+`src/config/origins.ts` owns the browser and agent distinction between the
+marketing/documentation origin, application origin, optional Worker origin,
+and agent documentation URLs. Production origins must
+be credential-free exact HTTPS origins with no path, query, or fragment;
+explicit loopback HTTP origins are accepted only for local development. Wildcard,
+suffix, or inferred-subdomain authority is forbidden.
+
+During the bounded migration overlap, the exact application-origin allowlist is
+`https://tasktime.pro` plus `https://app.tasktime.pro`. Worker OAuth callbacks,
+billing returns, browser CORS, metrics eligibility, and the local agent bridge
+remain independently validated exact-origin/return-URL boundaries. The signed
+license audience remains the origin-independent logical value
+`urn:tasktime:pro:web`.
+
+The overlap uses one shared Worker and its existing stateful bindings. Origin
+migration does not create a second Worker, copy D1/KV data, or clone email,
+Push, rate-limit, provider, or hosted-identity services. After the rollback
+window, obsolete old-origin and callback authority is removed through a
+separately approved cleanup while shared stateful services remain intact.
+
+There is no app-to-app migration payload protocol. The supervised two-user
+cutover uses the existing validated portable backup/import boundary or the
+existing provider bootstrap path, while origin-scoped credentials are
+re-established at the new origin.
 
 ## Sync Worker HTTP boundary
 

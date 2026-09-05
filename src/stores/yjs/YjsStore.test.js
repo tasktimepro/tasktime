@@ -1483,18 +1483,30 @@ describe('YjsStore reconnect sync tracking', () => {
         store.destroy()
     })
 
-    it('bootstraps a pristine manual-mode device with a remote pull check on connect', async () => {
-        const store = new YjsStore()
-        await store.initialize()
+    it.each(['google-drive', 'dropbox'])(
+        'bootstraps a pristine manual-mode %s device through the shared provider lifecycle',
+        async (providerId) => {
+            const store = new YjsStore()
+            await store.initialize()
 
-        await store.connectDrive('worker-placeholder', 'session-1')
+            if (providerId === 'google-drive') {
+                await store.connectDrive('worker-placeholder', 'session-1')
+            } else {
+                await store.connectCloud({
+                    provider: 'dropbox',
+                    generation: 1,
+                    manifest: { getProviderId: () => 'dropbox' },
+                })
+            }
 
-        const provider = providerInstances[0]
+            const provider = providerInstances[0]
 
-        expect(provider.connect).toHaveBeenCalledWith('manual', { bootstrapPullIfPristine: true })
+            expect(provider.connect).toHaveBeenCalledWith('manual', { bootstrapPullIfPristine: true })
+            expect(store.getActiveCloudProviderId()).toBe(providerId)
 
-        store.destroy()
-    })
+            store.destroy()
+        },
+    )
 
     it('skips manual-mode bootstrap pull when local entity data already exists', async () => {
         const store = new YjsStore()

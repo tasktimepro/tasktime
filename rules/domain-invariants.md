@@ -41,6 +41,11 @@ These invariants summarize critical production contracts. They supplement the de
   sequence succeeds; a selected but unreachable provider blocks local-only
   deletion until reconnection.
 - Every persisted user-data collection must be represented in complete backup/export paths and in equivalent UI/agent reads where that capability is advertised.
+- App-origin cutover reuses only the validated portable-backup/crash-safe
+  replacement boundary or the existing selected-provider bootstrap. It never
+  copies OAuth/provider sessions or tokens, billing/license state, Push
+  subscriptions, metrics identifiers, or agent pairing credentials. The source
+  remains available until the supervised restore and service checks pass.
 
 ## Time and tasks
 

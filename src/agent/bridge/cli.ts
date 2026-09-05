@@ -7,6 +7,11 @@ import { McpBridgeJsonRpcServer, startMcpLineDelimitedStdioTransport } from './m
 import type { BridgePairingChallenge } from './pairing';
 import type { AgentPermissionScope } from '@/agent/types';
 import type { BridgeAuditEvent } from './auditLog';
+import {
+    DEFAULT_AGENT_DOCUMENTATION_URLS,
+    parseExactWebOrigin,
+    PRODUCTION_APP_ORIGIN,
+} from '@/config/origins';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 0;
@@ -119,7 +124,7 @@ export function parseTaskTimeAgentBridgeCliOptions(
         port: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_PORT, DEFAULT_PORT, 'TASKTIME_AGENT_BRIDGE_PORT'),
         path: env.TASKTIME_AGENT_BRIDGE_PATH || DEFAULT_PATH,
         scopes: parseScopes(env.TASKTIME_AGENT_BRIDGE_SCOPES) ?? DEFAULT_SCOPES,
-        allowedOrigins: parseList(env.TASKTIME_AGENT_BRIDGE_ORIGINS),
+        allowedOrigins: parseAllowedOrigins(env.TASKTIME_AGENT_BRIDGE_ORIGINS, 'TASKTIME_AGENT_BRIDGE_ORIGINS'),
         agentId: parseRequiredString(env.TASKTIME_AGENT_ID, DEFAULT_AGENT_ID, 'TASKTIME_AGENT_ID'),
         agentLabel: parseRequiredString(env.TASKTIME_AGENT_LABEL, DEFAULT_AGENT_LABEL, 'TASKTIME_AGENT_LABEL'),
         pairingTtlMs: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS, DEFAULT_PAIRING_TTL_MS, 'TASKTIME_AGENT_BRIDGE_PAIRING_TTL_MS'),
@@ -127,7 +132,10 @@ export function parseTaskTimeAgentBridgeCliOptions(
         commandTimeoutMs: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS, DEFAULT_COMMAND_TIMEOUT_MS, 'TASKTIME_AGENT_BRIDGE_COMMAND_TIMEOUT_MS'),
         toolCallRateLimit: parseIntegerOption(env.TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT, DEFAULT_TOOL_CALL_RATE_LIMIT, 'TASKTIME_AGENT_BRIDGE_TOOL_RATE_LIMIT'),
         toolCallRateWindowMs: parsePositiveIntegerOption(env.TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS, DEFAULT_TOOL_CALL_RATE_WINDOW_MS, 'TASKTIME_AGENT_BRIDGE_TOOL_RATE_WINDOW_MS'),
-        appUrl: parseOptionalAppUrl(env.TASKTIME_APP_URL, 'TASKTIME_APP_URL'),
+        appUrl: parseOptionalAppUrl(
+            env.TASKTIME_APP_URL ?? PRODUCTION_APP_ORIGIN,
+            'TASKTIME_APP_URL'
+        ),
         statusFile: parseOptionalString(env.TASKTIME_AGENT_BRIDGE_STATUS_FILE, 'TASKTIME_AGENT_BRIDGE_STATUS_FILE'),
         help: false,
         manifest: false,
@@ -170,7 +178,7 @@ export function parseTaskTimeAgentBridgeCliOptions(
                 break;
 
             case '--origin':
-                cliOrigins.push(readOptionValue(args, ++index, arg));
+                cliOrigins.push(parseAgentOrigin(readOptionValue(args, ++index, arg), arg));
                 break;
 
             case '--agent-id':
@@ -282,16 +290,7 @@ export function getTaskTimeAgentBridgeManifest(): Record<string, unknown> {
             sourcePath: 'integrations/openclaw/tasktime/skills/tasktime',
         },
         docs: {
-            llmsTxt: 'https://tasktime.pro/llms.txt',
-            agentDocs: 'https://tasktime.pro/agents/',
-            quickstart: 'https://tasktime.pro/agents/quickstart/',
-            security: 'https://tasktime.pro/agents/security/',
-            tools: 'https://tasktime.pro/agents/tools/',
-            mcpToolsJson: 'https://tasktime.pro/agents/mcp-tools.json',
-            skill: 'https://tasktime.pro/agents/skill.md',
-            claude: 'https://tasktime.pro/agents/claude/',
-            openClaw: 'https://tasktime.pro/agents/openclaw/',
-            debugging: 'https://tasktime.pro/agents/debugging/',
+            ...DEFAULT_AGENT_DOCUMENTATION_URLS,
         },
         bridge: {
             packageName: '@tasktimepro/agent-bridge',
@@ -754,6 +753,20 @@ function parseOptionalAppUrl(value: string | undefined, label: string): string |
     }
 
     return parseAppUrl(value, label);
+}
+
+function parseAgentOrigin(value: string, label: string): string {
+    try {
+        return parseExactWebOrigin(value, 'agent bridge');
+    } catch {
+        throw new Error(`${label} must be an exact HTTPS or loopback HTTP origin.`);
+    }
+}
+
+function parseAllowedOrigins(value: string | undefined, label: string): string[] | undefined {
+    const origins = parseList(value);
+
+    return origins?.map(origin => parseAgentOrigin(origin, label));
 }
 
 function parseOptionalString(value: string | undefined, label: string): string | undefined {

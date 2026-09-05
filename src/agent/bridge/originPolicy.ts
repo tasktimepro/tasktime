@@ -1,8 +1,10 @@
 import { AgentCommandError } from '@/agent/types';
+import { parseExactWebOrigin, PRODUCTION_APP_ORIGIN, PRODUCTION_MARKETING_ORIGIN } from '@/config/origins';
 
 export const DEFAULT_ALLOWED_TASKTIME_ORIGINS = [
-    'https://tasktime.pro',
+    PRODUCTION_MARKETING_ORIGIN,
     'https://www.tasktime.pro',
+    PRODUCTION_APP_ORIGIN,
     'http://localhost:3101',
     'http://127.0.0.1:3101',
     'http://localhost:5173',
@@ -51,8 +53,7 @@ export function assertLoopbackHost(host: string): void {
 
 export function normalizeOrigin(origin: string): string | null {
     try {
-        const parsed = new URL(origin);
-        return parsed.origin;
+        return parseExactWebOrigin(origin, 'agent bridge');
     } catch {
         return null;
     }

@@ -7,6 +7,14 @@
 - Offline use allows local work; unavailable cloud actions fail visibly without corrupting local state.
 - Reconnecting never silently replaces unsynced valid local work with an older remote snapshot.
 - Core use does not require a TaskTime account or cloud sync, and public discovery metadata states that work records use browser-local storage.
+- The production build emits an app-only artifact, a public-site-only artifact,
+  and the existing combined compatibility artifact. Only the app artifact owns
+  the PWA manifest, service worker, and SPA fallback; only the site artifact owns
+  Astro routes, robots/sitemap/`llms.txt`, and public discovery. The combined
+  artifact retains the application root until the separately approved cutover.
+- Build assembly fails on unequal path collisions, missing required outputs,
+  an incorrect `/product/` canonical URL, or a missing referenced site asset;
+  byte-identical shared brand assets remain valid.
 
 ## Work and time
 
@@ -36,6 +44,39 @@
 - Backup export excludes auth/session secrets.
 - Import preview reports validation issues before mutation.
 - Accepted import preserves supported records and relationships; rejected input leaves current data unchanged.
+- The supervised app-origin cutover restores a user through the existing
+  provider bootstrap or validated complete portable backup/import boundary.
+  The source stays available until record counts, historical data, and selected
+  records are verified at the new origin; rejected import leaves the target
+  unchanged and interrupted replacement remains recoverable.
+- OAuth/session state, access or refresh tokens, billing/license state, Push
+  subscriptions, agent pairing credentials, and metrics identifiers are not
+  exported or copied. The user reconnects, opts in, or pairs again at the new
+  origin.
+- Marketing, application, Worker, and agent-documentation
+  origins are explicit validated configuration. The exact old and new HTTPS app
+  origins and explicit loopback HTTP origins are accepted; credentials,
+  wildcard/suffix matches, arbitrary subdomains, non-loopback HTTP, unexpected
+  ports, paths, queries, fragments, and non-exact OAuth return URLs fail closed.
+  Google Drive and Dropbox callbacks pass the same old/new-origin matrix, while
+  the signed license audience remains independent of hostname.
+- Worker regressions authorize `app.tasktime.pro` for Google Drive and Dropbox
+  OAuth/token paths, hosted email, Push, metrics, and private billing while
+  continuing to reject inferred or malformed origins.
+- Production origin-cutover evidence identifies the exact pre-cutover Pages,
+  Worker, DNS, OAuth, email, Push, and deployment-authority state. The existing
+  root Pages project remains unchanged while one new permanent app project is
+  tested; the single shared Worker accepts both exact origins without cloning
+  D1/KV, email, Push, rate-limit, or provider-data services. The exact combined
+  root artifact and deployment are retained durably and proven usable for
+  rollback before the public-site switch.
+- The root project receives only the public-site artifact after every known user
+  and active device is verified at the new origin and old root Push/PWA/service-
+  worker registrations are retired without clearing old IndexedDB. Post-window
+  cleanup removes obsolete old-origin/callback/temporary-preview authority,
+  leaves one deployment authority per Pages project, and proves the final state
+  contains exactly the intended app and site projects, one shared Worker, and no
+  orphan migration resource.
 
 ## Subscription and Pro boundary (implemented locally; production controls remain off)
 

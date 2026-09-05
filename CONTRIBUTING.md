@@ -34,6 +34,12 @@ continues to start the core app when that private checkout is absent; use
 
 Use `make npm CMD="<command>"` for arbitrary npm commands. Do not run `npm` directly on the host.
 
+The production build writes three ignored outputs: `dist-app` contains the app
+shell, PWA, and SPA fallback; `dist-site` contains Astro pages, public discovery,
+and robots/sitemap files; `dist` remains the combined compatibility output.
+Run `make npm CMD="run test:build-artifacts"` for the focused collision,
+ownership, canonical-link, fallback, and referenced-asset contract.
+
 ## Pull Requests
 
 Good pull requests usually include:

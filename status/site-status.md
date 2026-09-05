@@ -2,6 +2,13 @@
 
 ## Current focus
 
+- [x] Prepare the approval-gated Phase 4 hosting transition: keep the existing
+  root Pages project on combined `dist` while one permanent `dist-app` project
+  is canaried, then deploy `dist-site` to the existing root only after both users
+  and active devices are verified. The private execution template also requires
+  legacy root service-worker retirement, exact rollback artifacts, one
+  deployment authority per project, and final no-orphan resource inventory. No
+  live Pages, DNS, OAuth, Worker, or user action occurred.
 - [x] Refine the static `/product/` overview around “From task to paid. Without an account.”, a single primary hero action, compact trust signals, explicit solo-professional positioning, and a later focused local-first section. Responsive screenshot placeholders remain pending owner review and final captures.
 - [x] Prepare an unpublished `/pricing/` review candidate with exactly Free and Pro, the approved `EUR 39/year` founding and `EUR 59/year` standard offers, an accessible comparison, local-first/downgrade reassurance, FAQ copy, public navigation, sitemap output, and static-route/PWA protection. Publication remains launch-gated.
 - [ ] Continue investigating blog indexing visibility.

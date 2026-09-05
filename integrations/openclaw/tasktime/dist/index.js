@@ -2649,7 +2649,7 @@ function normalizePluginConfig(value) {
   const scopes = Array.isArray(config.scopes) ? VALID_SCOPES.filter((scope) => config.scopes.includes(scope)) : DEFAULT_SCOPES;
   const allowedOrigins = Array.isArray(config.allowedOrigins) ? config.allowedOrigins.filter((origin) => typeof origin === "string") : [];
   return {
-    appUrl: typeof config.appUrl === "string" ? config.appUrl : "https://tasktime.pro",
+    appUrl: typeof config.appUrl === "string" ? config.appUrl : "https://app.tasktime.pro",
     scopes: scopes.length > 0 ? scopes : DEFAULT_SCOPES,
     allowedOrigins,
     sessionTtlMs: readBoundedInteger(config.sessionTtlMs, 864e5, 6e4, 864e5),

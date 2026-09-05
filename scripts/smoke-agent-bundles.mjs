@@ -84,7 +84,7 @@ async function assertOpenClawNativePlugin() {
     const first = await pairingTool.execute('native-status-1', {})
     const second = await pairingTool.execute('native-status-2', {})
     assert(first.isError === false, 'OpenClaw native setup tool failed before browser pairing')
-    assert(first.details?.data?.launchUrl?.includes('https://tasktime.pro/account?'), 'OpenClaw native setup tool did not return an ephemeral launch URL')
+    assert(first.details?.data?.launchUrl?.includes('https://app.tasktime.pro/account?'), 'OpenClaw native setup tool did not return an ephemeral launch URL')
     assert(first.details?.data?.pid === second.details?.data?.pid, 'OpenClaw native plugin replaced the bridge child between tool calls')
     assert(first.details?.data?.bridgeInstanceId === second.details?.data?.bridgeInstanceId, 'OpenClaw native plugin replaced the bridge instance between tool calls')
     assert(!logged.some((message) => /agentBridgePairingCode|Pairing code:/i.test(message)), 'OpenClaw native plugin copied pairing credentials into Gateway logs')
@@ -178,7 +178,7 @@ async function assertBundleStartsManagedBridge(bundle) {
     const pairingStatus = pairingStatusResponse.result?.structuredContent?.data
 
     assert(pairingStatus?.agent?.id === bundle.expectedAgentId, `${bundle.name} get_pairing_status reported wrong agent id`)
-    assert(pairingStatus?.launchUrl?.includes('https://tasktime.pro/account?'), `${bundle.name} get_pairing_status did not include an ephemeral launch URL`)
+    assert(pairingStatus?.launchUrl?.includes('https://app.tasktime.pro/account?'), `${bundle.name} get_pairing_status did not include an ephemeral launch URL`)
     const launchUrl = new URL(pairingStatus.launchUrl)
     assert(launchUrl.searchParams.get('agentBridgeAgentId') === bundle.expectedAgentId, `${bundle.name} launch URL did not include stable agent id`)
     assert(launchUrl.searchParams.get('agentBridgeAgentLabel') === bundle.expectedAgentLabel, `${bundle.name} launch URL did not include stable agent label`)

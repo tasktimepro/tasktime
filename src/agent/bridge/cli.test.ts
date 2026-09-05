@@ -35,7 +35,7 @@ describe('TaskTime Pro agent bridge CLI', () => {
             commandTimeoutMs: 120000,
             toolCallRateLimit: 120,
             toolCallRateWindowMs: 60000,
-            appUrl: undefined,
+            appUrl: 'https://app.tasktime.pro/',
             statusFile: undefined,
             help: false,
             manifest: false,
@@ -104,6 +104,11 @@ describe('TaskTime Pro agent bridge CLI', () => {
         expect(() => parseTaskTimeAgentBridgeCliOptions(['--port', '-1'], {})).toThrow(/non-negative integer/);
         expect(() => parseTaskTimeAgentBridgeCliOptions(['--tool-rate-window-ms', '0'], {})).toThrow(/positive integer/);
         expect(() => parseTaskTimeAgentBridgeCliOptions(['--app-url', 'file:///tmp/tasktime'], {})).toThrow(/http:\/\/ or https:\/\//);
+        expect(() => parseTaskTimeAgentBridgeCliOptions(['--origin', 'https://tasktime.pro/path'], {})).toThrow(/exact HTTPS/);
+        expect(() => parseTaskTimeAgentBridgeCliOptions(['--origin', 'https://user:secret@tasktime.pro'], {})).toThrow(/exact HTTPS/);
+        expect(() => parseTaskTimeAgentBridgeCliOptions([], {
+            TASKTIME_AGENT_BRIDGE_ORIGINS: 'https://*.tasktime.pro',
+        })).toThrow(/exact HTTPS/);
         expect(() => parseTaskTimeAgentBridgeCliOptions(['--missing'], {})).toThrow(/Unsupported option/);
     });
 

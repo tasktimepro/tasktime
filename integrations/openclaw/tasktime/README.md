@@ -49,7 +49,7 @@ For the standalone ClawHub skill, always use the owner-qualified TaskTime Pro re
 openclaw skills install @tasktimepro/tasktime-agent
 ```
 
-The standalone ClawHub skill is the portable/advanced path. If you install only that skill, install `@tasktimepro/agent-bridge` separately and expose it to your MCP client as `tasktime-agent-bridge --app-url https://tasktime.pro`.
+The standalone ClawHub skill is the portable/advanced path. If you install only that skill, install `@tasktimepro/agent-bridge` separately and expose it to your MCP client as `tasktime-agent-bridge --app-url https://app.tasktime.pro`.
 
 Useful references:
 

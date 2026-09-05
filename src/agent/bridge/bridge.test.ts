@@ -264,7 +264,10 @@ describe('agent bridge origin policy', () => {
 
     it('validates browser origins against the configured allowlist', () => {
         expect(isAllowedTaskTimeOrigin('http://localhost:3101')).toBe(true);
-        expect(isAllowedTaskTimeOrigin('https://tasktime.pro/some/path')).toBe(true);
+        expect(isAllowedTaskTimeOrigin('https://tasktime.pro')).toBe(true);
+        expect(isAllowedTaskTimeOrigin('https://app.tasktime.pro')).toBe(true);
+        expect(isAllowedTaskTimeOrigin('https://tasktime.pro/some/path')).toBe(false);
+        expect(isAllowedTaskTimeOrigin('https://user:secret@tasktime.pro')).toBe(false);
         expect(isAllowedTaskTimeOrigin('https://evil.example')).toBe(false);
         expect(isAllowedTaskTimeOrigin('not a url')).toBe(false);
         expect(() => assertAllowedTaskTimeOrigin('https://evil.example')).toThrow(AgentCommandError);

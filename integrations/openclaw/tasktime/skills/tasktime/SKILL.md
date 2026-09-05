@@ -45,7 +45,7 @@ Prefer the MCP server when the client exposes it. For a standalone install, the 
   "mcpServers": {
     "tasktime": {
       "command": "tasktime-agent-bridge",
-      "args": ["--app-url", "https://tasktime.pro"]
+      "args": ["--app-url", "https://app.tasktime.pro"]
     }
   }
 }

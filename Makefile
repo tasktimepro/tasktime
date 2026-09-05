@@ -29,7 +29,7 @@ help:
 	@echo "  make preview-push-cloud - Build production preview using deployed Worker at https://sync.tasktime.pro"
 	@echo "  make preview-cloud - Build production preview using the deployed production Worker"
 	@echo "  make stop     - Stop development server"
-	@echo "  make build    - Build for production"
+	@echo "  make build    - Build isolated app/site artifacts plus the production-compatible combined output"
 	@echo "  make preview  - Stop current dev containers, build merged app+blog output, and serve it locally on PREVIEW_PORT ($(PREVIEW_PORT))"
 	@echo "  make preview-build - Build merged app+blog output and serve it locally on PREVIEW_PORT ($(PREVIEW_PORT)); stop make dev first if needed"
 	@echo "  make blog-install - Install blog dependencies"

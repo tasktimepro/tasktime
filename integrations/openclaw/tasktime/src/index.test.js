@@ -72,6 +72,8 @@ describe('TaskTime native OpenClaw plugin', () => {
             '127.0.0.1',
             '--port',
             '0',
+            '--app-url',
+            'https://app.tasktime.pro',
             '--agent-id',
             'tasktime.agent.openclaw',
         ]));

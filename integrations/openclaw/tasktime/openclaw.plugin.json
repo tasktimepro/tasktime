@@ -166,7 +166,7 @@
       "appUrl": {
         "type": "string",
         "format": "uri",
-        "default": "https://tasktime.pro"
+        "default": "https://app.tasktime.pro"
       },
       "scopes": {
         "type": "array",

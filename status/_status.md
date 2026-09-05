@@ -8,7 +8,7 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
-**Subscription/license Program Phase 1 locally complete; release-gated follow-through**
+**Program Phase 2 app-origin migration preparation complete locally**
 
 - Direct browser-to-Google Drive sync is deployed. The active Worker retains only OAuth/token control-plane duties, rejects the retired `/drive/*` route without CORS permission, and permits the exact `http://localhost:3101` production-equivalent preview origin. The temporary staging resources, local secrets/configuration, tests, and runbook have been removed. Privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary.
 - Offline lazy-document navigation now short-circuits before any remote Drive work and subscribes locally; a red/green provider regression covers the cached-manifest case that previously produced failed offline requests. Focused provider tests, app typecheck, lint, and diff checks are green.
@@ -18,6 +18,19 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 - Core app `1.5.0` passed GitHub CI and serves the Dropbox announcement, RSS entry, and sitemap route. The existing production Google Drive session survived the upgrade and returned to In sync after an explicit Sync Now with no new app, Yjs, or sync errors. The compatible Worker passed typecheck and its complete focused test suite, enables transfers, and returned a valid provider-specific transfer authorization URL without starting an automatic move. The full real-account transfer and moved-source replacement journeys remain proven by local production-preview canaries.
 - Gradual TypeScript and testing-infrastructure improvements
 - Installed OpenClaw validation and remaining agent-directory publication checks
+- Program Phase 2 has been narrowed to a supervised two-user cutover. There is
+  no general-purpose migration protocol or permanent migration UI: each user
+  reconnects the same provider on the pristine new origin, with the existing
+  complete validated backup/import as fallback, and keeps the old origin intact
+  until verification. Exact app/marketing/Worker/agent origin handling and
+  isolated `dist-app`/`dist-site` outputs are prepared locally. Focused app and
+  provider tests, lint, typecheck, the real 50-page production build, agent
+  bundle smokes, and the complete Worker test/typecheck gate pass. The private
+  supervised cutover/rollback checklist covers PWA, Push, email, billing,
+  metrics, agent re-pairing, the minimal two-Pages-project/one-Worker topology,
+  an immutable root rollback artifact, single deployment authority per project,
+  and a post-window inventory/cleanup gate. No live domain, configuration,
+  deployment, or user-data action occurred.
 - OpenClaw durability implementation and automated release evidence are complete: credentials/contracts are reconciled, status/logging are hardened, browser refresh and same-profile reopen continuity are covered, and the native plugin owns one Gateway-lifecycle bridge while generic MCP/Claude stdio remain supported. CLI/Gateway alignment and disposable-profile migration/rollback now pass on `2026.7.1-2`; the final installed plugin/browser multi-turn acceptance remains pending.
 - Approved product backlog after its recorded ambiguities are resolved
 - The subscription/license implementation is present locally across Worker/D1,

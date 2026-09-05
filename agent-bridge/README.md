@@ -13,14 +13,14 @@ The paired app also owns subscription policy. Free supports one active client an
 Install and run:
 
 ```bash
-npx @tasktimepro/agent-bridge --app-url https://tasktime.pro
+npx @tasktimepro/agent-bridge --app-url https://app.tasktime.pro
 ```
 
 Useful commands:
 
 ```bash
 tasktime-agent-bridge --manifest
-tasktime-agent-bridge --app-url https://tasktime.pro
+tasktime-agent-bridge --app-url https://app.tasktime.pro
 ```
 
 Use `--status-file` only for non-secret process/endpoint discovery. Pairing IDs, pairing codes, and launch URLs remain available through interactive stderr and the `get_pairing_status`/`refresh_pairing` setup tools; the persisted status file intentionally excludes them and is removed on clean shutdown.

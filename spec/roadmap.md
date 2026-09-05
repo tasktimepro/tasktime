@@ -120,13 +120,31 @@ The detailed finding-by-finding execution checklist and validation state live in
 - Deliver through the checklist in `status/cloud-sync-provider-expansion.md`: contract/baseline, Drive characterization, Google-compatible seams, Worker capacity/session foundation, Dropbox direct vertical, provider lifecycle, hidden parity, verified transfer, product/agent parity, and staged release.
 - Success evidence requires Google non-regression, both-provider contract/mode/request-count tests, both transfer directions with failure injection and lazy data, token/privacy/cache proof, Worker tests/typecheck, the full app release gate, supported-browser credential canaries, Dropbox production approval, capacity evidence, rollback proof, and explicit release/deployment approval.
 
-## Coordinated delivery program — License, app origin, homepage, and launch (planned)
+## Coordinated delivery program — License, app origin, homepage, and launch (Phase 2 complete locally; Phase 3 next)
 
 This delivery sequence spans existing roadmap phases; its Program Phase numbers are release-order labels rather than replacements for the product roadmap above.
 
 1. Complete the provider-neutral subscription/license flow and its Worker, client, UI, agent, compatibility, rollback, and local release evidence with every production billing/trial/Checkout/enforcement control disabled.
-2. Prepare the move of the application from `https://tasktime.pro` to `https://app.tasktime.pro` locally. The migration must explicitly transfer existing origin-local workspace data, leave source data untouched until verified, use the same reconnect/bootstrap lifecycle for Google Drive and Dropbox, and re-establish rather than copy origin-scoped credentials, licenses, Push subscriptions, and agent pairing state.
+2. Prepare the move of the application from `https://tasktime.pro` to `https://app.tasktime.pro` locally. For the two known users, use a supervised same-provider reconnect/bootstrap with a complete portable backup/import fallback, leave source data untouched until verified, and re-establish rather than copy origin-scoped credentials, licenses, Push subscriptions, and agent pairing state.
 3. Complete the public homepage and related UX/UI adjustments so `https://tasktime.pro` is the marketing/documentation origin and all app-entry flows target `https://app.tasktime.pro`.
-4. Launch through separately approved, observable, and reversible Worker, app, user-migration, homepage, agent-artifact, and billing-enforcement steps.
+4. Launch through separately approved, observable, and reversible Worker, app,
+   user-migration, homepage, agent-artifact, billing-enforcement, and final
+   resource-cleanup steps. Keep the existing root Pages project unchanged while
+   one permanent app project is canaried, share the single Worker and its
+   stateful services across the exact-origin overlap, retain the exact combined
+   root artifact for rollback, then prove the intended two-project/one-Worker
+   inventory after old-origin and temporary authority is retired.
 
 Program Phase 1 is the implementation dependency. It freezes a stable logical license audience and configurable exact-origin/return-URL seams before Program Phase 2, but the domain migration does not need to precede local license completion. Detailed implementation and operational evidence remain in the private infrastructure repository; the checklist in `TODO.md` tracks progression across all four phases.
+
+Program Phase 2 is intentionally narrow for the two known users. It adds no
+general-purpose migration protocol or permanent migration UI. The existing
+validated complete backup/import and provider-neutral pristine-device bootstrap
+are the only data paths. The build emits isolated app and public-site artifacts
+plus the unchanged-root combined compatibility artifact, with fail-closed
+ownership, collision, canonical-link, and asset validation. Browser, agent,
+Google/Dropbox OAuth, email, Push, metrics, billing, and private Worker
+regressions cover the exact old/new overlap and explicit loopback development
+while rejecting malformed or inferred authority. No split artifact is deployed,
+and no live configuration, domain, provider, or production-data change is
+implied by this local preparation.

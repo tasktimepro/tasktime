@@ -45,7 +45,7 @@ A typical configuration looks like this:
 ```toml
 [mcp_servers.tasktime]
 command = "npx"
-args = ["-y", "@tasktimepro/agent-bridge", "--app-url", "https://tasktime.pro"]
+args = ["-y", "@tasktimepro/agent-bridge", "--app-url", "https://app.tasktime.pro"]
 ```
 
 After configuration, start Codex, open TaskTime Pro, and pair the local bridge from Account > Agent Access. The bridge cannot read or mutate data until the browser app is running and explicitly paired.
@@ -53,7 +53,7 @@ After configuration, start Codex, open TaskTime Pro, and pair the local bridge f
 The same package is also runnable directly:
 
 ```bash
-npx @tasktimepro/agent-bridge --app-url https://tasktime.pro
+npx @tasktimepro/agent-bridge --app-url https://app.tasktime.pro
 ```
 
 For bridge behavior, scopes, and safety boundaries, start with the [TaskTime Pro agent docs](/agents/) and [MCP tools reference](/agents/tools/).

@@ -349,7 +349,7 @@ function normalizePluginConfig(value) {
         : [];
 
     return {
-        appUrl: typeof config.appUrl === 'string' ? config.appUrl : 'https://tasktime.pro',
+        appUrl: typeof config.appUrl === 'string' ? config.appUrl : 'https://app.tasktime.pro',
         scopes: scopes.length > 0 ? scopes : DEFAULT_SCOPES,
         allowedOrigins,
         sessionTtlMs: readBoundedInteger(config.sessionTtlMs, 86_400_000, 60_000, 86_400_000),

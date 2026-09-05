@@ -23,6 +23,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:build-artifacts": "node --test ./scripts/build-artifacts.test.mjs",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test --project=chromium",

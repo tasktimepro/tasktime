@@ -5,12 +5,8 @@ afterEach(() => {
 });
 
 describe('isMetricsOriginAllowed', () => {
-    it('allows the production app hostname', async () => {
-        vi.stubGlobal('window', {
-            location: {
-                hostname: 'tasktime.pro',
-            },
-        });
+    it.each(['tasktime.pro', 'app.tasktime.pro'])('allows exact cutover-window app hostname %s', async (hostname) => {
+        vi.stubGlobal('window', { location: { hostname } });
 
         const { isMetricsOriginAllowed } = await import('./google.ts');
 

@@ -5,7 +5,19 @@
  * derives identity from an email address or a browser origin.
  */
 
-const METRICS_ALLOWED_HOSTNAME = 'tasktime.pro';
+import { createTaskTimeOriginConfig } from './origins';
+
+export const TASKTIME_ORIGIN_CONFIG = createTaskTimeOriginConfig({
+    marketingOrigin: import.meta.env.VITE_MARKETING_ORIGIN as string | undefined,
+    appOrigin: import.meta.env.VITE_APP_ORIGIN as string | undefined,
+    workerOrigin: import.meta.env.VITE_SYNC_WORKER_URL as string | undefined,
+    agentDocsOrigin: import.meta.env.VITE_AGENT_DOCS_ORIGIN as string | undefined,
+});
+
+const METRICS_ALLOWED_HOSTNAMES = new Set([
+    new URL(TASKTIME_ORIGIN_CONFIG.marketingOrigin).hostname,
+    new URL(TASKTIME_ORIGIN_CONFIG.appOrigin).hostname,
+]);
 
 function getBrowserHostname(): string | null {
     if (typeof window === 'undefined' || !window.location) return null;
@@ -13,11 +25,11 @@ function getBrowserHostname(): string | null {
 }
 
 export function isMetricsOriginAllowed(hostname = getBrowserHostname()): boolean {
-    return hostname === METRICS_ALLOWED_HOSTNAME;
+    return hostname !== null && METRICS_ALLOWED_HOSTNAMES.has(hostname);
 }
 
 export const SYNC_WORKER_CONFIG = {
-    workerUrl: import.meta.env.VITE_SYNC_WORKER_URL as string | undefined,
+    workerUrl: TASKTIME_ORIGIN_CONFIG.workerOrigin ?? undefined,
 
     get isEnabled(): boolean {
         return Boolean(this.workerUrl);

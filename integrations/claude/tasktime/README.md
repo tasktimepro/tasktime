@@ -49,7 +49,7 @@ Claude clients that support MCP but not Claude Code plugins can use the standalo
   "mcpServers": {
     "tasktime": {
       "command": "npx",
-      "args": ["-y", "@tasktimepro/agent-bridge", "--app-url", "https://tasktime.pro"]
+      "args": ["-y", "@tasktimepro/agent-bridge", "--app-url", "https://app.tasktime.pro"]
     }
   }
 }

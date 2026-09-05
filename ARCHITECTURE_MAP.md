@@ -7,6 +7,7 @@ Browser / PWA
 ├── src/domain/                            Pure/central business operations
 │   └── entitlements/                      Implemented shared semantic UI/agent policy (production-disabled)
 ├── src/config/billingFeatures.ts          Production-off flags + guarded loopback sandbox mode
+├── src/config/origins.ts                  Exact marketing/app/migration/Worker/agent origin roles
 ├── src/contexts/BillingContext.tsx        Normal Worker-backed billing client and lifecycle
 ├── src/config/localReviewPricing.ts       Shared loopback app + public pricing review values
 ├── src/stores/yjs/
@@ -42,9 +43,15 @@ Managed OpenClaw Gateway
 
 Public web build
 └── blog/ + scripts/build-pages.mjs
-    ├── product overview, Free/Pro pricing comparison, blog, and legal pages
-    ├── /agents documentation and generated tool catalogs
-    └── discovery manifests, sitemap, RSS, and llms.txt
+    ├── dist-app: React HTML/assets, manifest, service worker, SPA fallback
+    ├── dist-site: product/pricing/blog/legal/agents, discovery, sitemap, RSS, llms.txt
+    └── dist: current combined compatibility surface with app root preserved
+
+Approval-gated Phase 4 production target
+├── existing root Pages project → dist-site → tasktime.pro
+├── one permanent app Pages project → dist-app → app.tasktime.pro
+├── one shared Worker + existing stateful bindings → both origins during overlap
+└── pinned dist artifact → root rollback only
 ```
 
 ## Dependency direction
@@ -124,7 +131,8 @@ Public web build
 | Invoice or expense | domain operation, billing journal/Yjs collection, active/archive/history ownership, UI, reports, export/PDF/email, backup/restore, agent parity, replay/idempotency tests |
 | Route/navigation | `useUrlState.ts`, App rendering, mobile/desktop navigation, service-worker route exclusions, agent navigation |
 | Agent command | command registry/handler, scopes/approvals, bridge tool schema, public generated docs, smoke tests |
-| Public page/build | `blog/`, build scripts, public manifests, route denylist, preview/build smoke |
+| Public page/build | `blog/`, `scripts/build-artifacts.mjs`, app/site/combined ownership and collision tests, public manifests, route denylist, preview/build smoke |
+| Application origin | `src/config/origins.ts`, Worker exact CORS/OAuth/return configuration, metrics eligibility, PWA/Push scope, agent bridge defaults, supervised reconnect/import runbook, two-origin tests |
 | Sync behavior | store dirty-doc tracking, provider/manifest, auth hook, mode UI, offline/reconnect tests, historical Drive data |
 | Subscription/entitlement | public plan/status/license contracts, opaque account-reference display, owner-issued complimentary-access lifecycle, exact persisted lifecycle versus online provider-readiness separation, signed offline selection, Portal-return recovery, active-client transition/import-sync compatibility, Reports shell/Free Overview/lazy advanced modules, founding continuity and automatic standard-offer selection, report-agent scope compatibility, hosted-email policy, agent registry/artifacts, Privacy/Terms, offline/concurrency/recovery tests |
 

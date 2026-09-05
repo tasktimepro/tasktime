@@ -2,6 +2,37 @@
 
 ## Current focus
 
+- [x] Complete the simplified Program Phase 2 local gate. The focused origin,
+  provider-bootstrap, backup/restore, metrics, and agent tests pass alongside
+  lint, app and Worker typechecks, the full Worker suite, the real split 50-page
+  production build, and agent bridge/bundle smokes. The private runbook now
+  contains the supervised per-user reconnect/import, hosted-service verification,
+  PWA/Push transition, exact two-Pages-project/one-Worker topology, immutable
+  root rollback artifact, deployment-authority checks, ordered stop/go stages,
+  reusable private execution-record template, and final Cloudflare/OAuth/DNS
+  cleanup inventory. No live change occurred.
+- [x] Complete Program Phase 2 Slice 2 locally: emit deterministic `dist-app`
+  and `dist-site` release inputs while retaining the existing combined `dist`
+  surface and application root. App-only PWA/SPA ownership and site-only Astro/
+  discovery/robots ownership are enforced; unequal collisions, missing outputs,
+  wrong product canonical links, and missing referenced assets fail the build.
+  Five focused red/green tests, the real 50-page build, lint, and typecheck pass.
+  No split artifact has been deployed and no live route or domain changed.
+- [x] Complete Program Phase 2 origin preparation locally: centralize exact validated
+  marketing, application, Worker, and agent-documentation
+  origins; add `app.tasktime.pro` compatibility to browser metrics, agent bridge,
+  and both Google Drive and Dropbox Worker OAuth paths; and reject malformed,
+  credential-bearing, wildcard/suffix, path-bearing, and non-HTTPS non-loopback
+  authority while preserving the exact production-preview loopback origin.
+  Focused app tests, lint, app/Worker typechecks, the combined build,
+  and the complete Worker suite passed at this checkpoint. No live configuration, OAuth-console, domain,
+  deployment, or agent-publication change occurred.
+- [x] Simplify Program Phase 2 to the supervised two-user path: use the same
+  provider's existing pristine-device bootstrap first and the complete validated,
+  crash-safe portable backup/import only as fallback. Do not build or retain a
+  cross-window migrator, and never copy origin-scoped OAuth, license, Push,
+  metrics, or agent-pairing state. Keep the old workspace available until the
+  new origin is verified.
 - [x] Keep production telemetry provider-neutral by passing the lifecycle-selected Google Drive or Dropbox hosted-service session into the existing privacy-safe active-person dedupe path; reconcile the internal analysis wording without adding provider identity to metric rows. Also confirm successful portable-backup restores with a toast and replace the Dashboard Time Entries widget's hidden 30-day cutoff with a newest-first 10-entry limit while retaining its visible project filter and the separate expense window; when no active entries remain, load the newest available archived year so stale-but-latest work is still shown.
 - [x] Implement the Program Phase 1 subscription client locally with every
   production build control false: lifecycle-bound ES256 cache/status, Account

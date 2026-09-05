@@ -12,7 +12,27 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
-- **Public site:** Astro content under `blog/` builds the product overview, local-review pricing comparison, blog, legal pages, agent documentation, discovery metadata, and generated tool references. The pricing route uses the approved Free/Pro boundary but remains unpublished until the subscription launch gates are approved.
+- **Public site and build outputs:** Astro content under `blog/` builds the
+  product overview, local-review pricing comparison, blog, legal pages, agent
+  documentation, discovery metadata, and generated tool references. `make build`
+  now produces isolated `dist-app` and `dist-site` release inputs plus the
+  current `dist` compatibility surface, which deliberately retains the app at
+  `/`. The pricing route and split deployment remain unpublished until their
+  launch gates are approved. The Phase 4 target reuses the existing root Pages
+  project for `dist-site`, adds one permanent Pages project for `dist-app`, and
+  shares the single Worker and its stateful services; combined `dist` becomes a
+  pinned root rollback artifact rather than a routine deployment.
+- **Origin roles:** `src/config/origins.ts` explicitly distinguishes the
+  marketing/documentation, application, optional
+  Worker, and agent-documentation origins. Production values are exact HTTPS
+  origins and local exceptions are explicit loopback HTTP origins. The app and
+  Worker sources accept the exact old and new application origins during the
+  cutover overlap. The supervised two-user move reuses complete portable backup
+  import or the selected provider's existing pristine-device bootstrap; it does
+  not add a permanent migration subsystem or change live configuration locally.
+  Final cutover cleanup removes obsolete old-origin/callback/temporary authority
+  but never clones or deletes the shared Worker, D1/KV, provider, email, or Push
+  services.
 - **Operational evidence:** DebugBundle captures opted-in runtime incident evidence; local tests remain the first tool for deterministic failures.
 - **Locally implemented subscription control plane:** Private Worker/D1/Stripe
   modules and the browser client now implement a sanitized catalog, canonical
