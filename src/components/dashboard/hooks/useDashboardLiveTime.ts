@@ -1,5 +1,6 @@
+import { getBillableTaskIds } from '@/domain/time/taskBillability';
 import { useEffect, useMemo, useState } from 'react';
-import type { MultiTimerState, Task, TimeEntry } from '@/stores/yjs/types';
+import type { Client, MultiTimerState, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { findStoppedTimerEntry } from '@/domain/time/timerOperations';
 import { toStorageDate } from '@/utils/dateUtils';
 import type { DashboardDay } from '../dashboardMetrics';
@@ -7,7 +8,7 @@ import type { DashboardDay } from '../dashboardMetrics';
 const MINUTE = 60000;
 
 /** Display-only elapsed time. Never creates entries or applies billing rounding. */
-export default function useDashboardLiveTime(timers: MultiTimerState[], entries: TimeEntry[], tasks: Task[]) {
+export default function useDashboardLiveTime(timers: MultiTimerState[], entries: TimeEntry[], tasks: Task[], projects: Project[], clients: Client[]) {
     // useTimers refreshes elapsedTime every second. Only lifecycle fields should
     // refresh these dashboard totals between minute ticks.
     const signature = JSON.stringify(timers.map(timer => ({
@@ -41,7 +42,7 @@ export default function useDashboardLiveTime(timers: MultiTimerState[], entries:
     const now = Math.max(snapshot.sampledAt, tick);
     return useMemo(() => {
         const days = new Map<string, DashboardDay>();
-        const taskMap = new Map(tasks.map(task => [task.id, task]));
+        const billableTaskIds = getBillableTaskIds(tasks, projects, clients);
         for (const timer of snapshot.timers) {
             // Entry and timer documents can notify separately during a stop or sync.
             if (findStoppedTimerEntry({ timerKey: timer.projectId, timer, entries })) continue;
@@ -50,11 +51,11 @@ export default function useDashboardLiveTime(timers: MultiTimerState[], entries:
             if (!date || !Number.isFinite(duration) || duration <= 0) continue;
             // Match saved-entry semantics, including resumed and cross-midnight sessions.
             const day = days.get(date) || { date, billable: 0, nonBillable: 0, total: 0 };
-            if (taskMap.get(timer.taskId)?.billable === true) day.billable += duration;
+            if (billableTaskIds.has(timer.taskId)) day.billable += duration;
             else day.nonBillable += duration;
             day.total += duration;
             days.set(date, day);
         }
         return days;
-    }, [snapshot, now, entries, tasks]);
+    }, [snapshot, now, entries, tasks, projects, clients]);
 }

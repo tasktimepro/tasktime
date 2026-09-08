@@ -1,3 +1,5 @@
+import { getInvoiceEligibleTimeEntries } from '@/domain/invoices/invoiceEligibility';
+import { isBillableTask } from '@/domain/time/taskBillability';
 import { useEffect, useMemo, useState } from 'react';
 import { endOfDay, startOfDay } from 'date-fns';
 import { useUrlState } from '@/hooks/useUrlState.ts';
@@ -529,14 +531,26 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
         missingExchangeRates,
     } = useCurrencyConversion({ projects, invoices, clients });
 
+    const billingSourceRange = useMemo(() => {
+        let startDate = startOfDay(parseStoredDate(resolvedRange.startDate) || new Date()).getTime();
+        let endDate = endOfDay(parseStoredDate(resolvedRange.endDate) || new Date()).getTime();
+        invoices.forEach(invoice => {
+            if (invoice.status === 'draft' || invoice.status === 'canceled' || invoice.billingSelectionSnapshot) return;
+            const start = parseStoredDate(invoice.billingPeriodStart);
+            const end = parseStoredDate(invoice.billingPeriodEnd);
+            if (start && end) {
+                startDate = Math.min(startDate, startOfDay(start).getTime());
+                endDate = Math.max(endDate, endOfDay(end).getTime());
+            }
+        });
+        return { startDate, endDate };
+    }, [invoices, resolvedRange.startDate, resolvedRange.endDate]);
+
     const {
         entries: timeEntries,
         isLoading: loadingTimeEntries,
         isLoadingMore: loadingHistoricalEntries,
-    } = useTimeEntries({
-        startDate: startOfDay(parseStoredDate(resolvedRange.startDate) || new Date()).getTime(),
-        endDate: endOfDay(parseStoredDate(resolvedRange.endDate) || new Date()).getTime(),
-    });
+    } = useTimeEntries(billingSourceRange);
     const loadingReportData = loadingInvoices
         || loadingExpenses
         || loadingTasks
@@ -988,6 +1002,10 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
         return filteredTimeEntries.filter((entry) => entry.project?.id === selectedWorkSummaryProjectId);
     }, [filteredTimeEntries, selectedWorkSummaryProjectId]);
 
+    const eligibleEntryIds = useMemo(() => new Set(getInvoiceEligibleTimeEntries({
+        tasks: allTasks, timeEntries, invoices,
+    }).map(entry => entry.id)), [allTasks, timeEntries, invoices]);
+
     const hoursRows = useMemo(() => {
         const grouped = new Map();
 
@@ -1004,8 +1022,8 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
             };
 
             const actualMs = Math.max(0, (entry.end || 0) - entry.start);
-            const billableMs = entry.task.billable ? getBillableDurationMs(entry) : 0;
-            const unbilledBillableMs = entry.task.billable && !entry.billedInvoiceId ? billableMs : 0;
+            const billableMs = isBillableTask(entry.task, entry.project, entry.client) ? getBillableDurationMs(entry) : 0;
+            const unbilledBillableMs = eligibleEntryIds.has(entry.id) ? billableMs : 0;
 
             existing.totalMs += actualMs;
             existing.billableMs += billableMs;
@@ -1016,7 +1034,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
         });
 
         return Array.from(grouped.values()).sort((rowA, rowB) => rowB.totalMs - rowA.totalMs);
-    }, [filteredTimeEntries]);
+    }, [filteredTimeEntries, eligibleEntryIds]);
 
     const unbilledExpenseRows = useMemo(() => {
         return filteredExpenses.filter((expense) => expense.billable && expense.billingStatus === 'unbilled');
@@ -1144,7 +1162,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
     }, [filteredExpenses, preferredCurrency]);
 
     const totalHoursMs = useMemo(() => filteredTimeEntries.reduce((sum, entry) => sum + Math.max(0, (entry.end || 0) - entry.start), 0), [filteredTimeEntries]);
-    const billableHoursMs = useMemo(() => filteredTimeEntries.reduce((sum, entry) => sum + (entry.task?.billable ? getBillableDurationMs(entry) : 0), 0), [filteredTimeEntries]);
+    const billableHoursMs = useMemo(() => filteredTimeEntries.reduce((sum, entry) => sum + (isBillableTask(entry.task, entry.project, entry.client) ? getBillableDurationMs(entry) : 0), 0), [filteredTimeEntries]);
     const totalUninvoicedHoursMs = useMemo(() => toInvoiceRows.reduce((sum, row) => sum + row.uninvoicedHoursMs, 0), [toInvoiceRows]);
     const totalUninvoicedExpenseByCurrency = useMemo(() => {
         return addCurrencyTotals(...toInvoiceRows.map((row) => row.expenseAmountsByCurrency));
@@ -1498,7 +1516,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
         return filteredTimeEntries.map((entry) => {
             const billedInvoice = entry.billedInvoiceId ? invoicesById.get(entry.billedInvoiceId) : null;
             const actualMs = Math.max(0, (entry.end || 0) - entry.start);
-            const billableMs = entry.task?.billable ? getBillableDurationMs(entry) : 0;
+            const billableMs = isBillableTask(entry.task, entry.project, entry.client) ? getBillableDurationMs(entry) : 0;
 
             return {
                 date: toStorageDate(entry.start) || '',
@@ -1519,7 +1537,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                 task: entry.task?.title || '',
                 project: entry.project?.title || EMPTY_PROJECT,
                 client: entry.client?.title || EMPTY_CLIENT,
-                billable: entry.task?.billable ? 'yes' : 'no',
+                billable: isBillableTask(entry.task, entry.project, entry.client) ? 'yes' : 'no',
                 durationHours: (actualMs / (1000 * 60 * 60)).toFixed(2),
                 billableHours: (billableMs / (1000 * 60 * 60)).toFixed(2),
                 billedInvoiceNumber: billedInvoice?.invoiceNumber || '',

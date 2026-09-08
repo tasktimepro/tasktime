@@ -317,3 +317,30 @@ describe('TaskItem subtask creation', () => {
         ]);
     });
 });
+
+describe('automatic task billability', () => {
+    it.each([
+        ['standalone', null, []],
+        ['personal', 'p', [{ id: 'p', title: 'Internal', isPersonal: true, preferredClientId: 'client' }]],
+        ['no client', 'p', [{ id: 'p', title: 'Internal', hourlyRate: 100 }]],
+    ])('does not automatically mark %s work billable', (_label, projectId, projects) => {
+        hookState.updateTask.mockClear();
+        hookState.tasks = [];
+        hookState.projects = projects;
+        hookState.entries = [{ id: 'entry', taskId: 'task', start: 1000, end: 61000 }];
+        render(<TaskItem task={{ id: 'task', title: 'Work', projectId, billable: false }} />);
+        expect(hookState.updateTask).not.toHaveBeenCalled();
+    });
+
+    it('still automatically marks eligible client work and respects an explicit non-billable choice', () => {
+        hookState.updateTask.mockClear();
+        hookState.projects = [{ id: 'p', title: 'Client work', preferredClientId: 'client' }];
+        hookState.entries = [{ id: 'entry', taskId: 'task', start: 1000, end: 61000 }];
+        const task = { id: 'task', title: 'Work', projectId: 'p', billable: false };
+        const { rerender } = render(<TaskItem task={task} />);
+        expect(hookState.updateTask).toHaveBeenCalledWith('task', expect.objectContaining({ billable: true }));
+        hookState.updateTask.mockClear();
+        rerender(<TaskItem task={{ ...task, billableSetByUser: true }} />);
+        expect(hookState.updateTask).not.toHaveBeenCalled();
+    });
+});

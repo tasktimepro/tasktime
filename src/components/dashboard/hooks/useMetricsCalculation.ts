@@ -32,7 +32,7 @@ export default function useMetricsCalculation(input: Parameters<typeof buildDash
         } });
         return { report, previous, comparison, currentMonth, recent };
     }, [input]);
-    const live = useDashboardLiveTime(timers, input.entries, input.tasks);
+    const live = useDashboardLiveTime(timers, input.entries, input.tasks, input.projects, input.clients);
     return useMemo(() => {
         const report = withLiveTime(saved.report, live);
         const previous = withLiveTime(saved.previous, live);

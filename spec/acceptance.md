@@ -40,6 +40,22 @@
 - Daily billable plus non-billable actual duration equals the selected-period
   tracked total, including zero days and archived work; billed snapshots do not
   inflate actual hours. Current summary timeframes survive report-period changes.
+- A standalone task moved into a no-client/personal project remains non-billable
+  in saved/live dashboard time, report hours/exports, and unbilled summaries even
+  with a retained `billable: true` flag. Removing/reassigning a client refreshes
+  classification immediately without changing actual duration or saved records;
+  archived client work and explicitly non-billable client tasks remain correct.
+- Recording time on standalone, no-client, or personal tasks does not
+  automatically set their billable preference. Client work retains automatic
+  marking and respects an explicit non-billable preference.
+- Moves to another client's project, a personal project, or standalone work
+  preserve sent/paid invoice details, entry claims/rates, actual intervals,
+  billing increments, and task cutoffs. Later unbilled work follows the current
+  destination. Canceling an eligible unpaid invoice releases only its claims
+  without moving the task back; paid cancellation remains refused.
+- Draft finalization refuses changed source project/client/billability before
+  applying entry claims. Legacy merged-task time remains excluded from new
+  invoice previews/selectors and uninvoiced report hours after a task moves.
 - Running timers increment only dashboard tracked-time displays once per minute
   while visible, with immediate lifecycle/focus refresh and frozen paused time.
   Period and local-start-date rules apply to concurrent and cross-midnight

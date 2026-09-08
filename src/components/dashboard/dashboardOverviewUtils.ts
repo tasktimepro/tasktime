@@ -1,3 +1,4 @@
+import { getBillableTaskIds } from '@/domain/time/taskBillability';
 import { THIRTY_DAYS_MS } from '@/constants/app';
 import { millisecondsToHours } from '@/utils/dateUtils';
 import { buildProjectRecentUpdateMap } from '@/utils/activityUtils';
@@ -202,6 +203,7 @@ export const buildDashboardProjects = ({
         expenses,
         recurrences,
     });
+    const billableTaskIds = getBillableTaskIds(activeTasks, projects, clients);
     const projectActivity = new Map<string, { totalTime: number; lastActivity: number; taskPendingTime: Record<string, number> }>();
 
     recentEntries.forEach((entry) => {
@@ -221,7 +223,7 @@ export const buildDashboardProjects = ({
         currentActivity.lastActivity = Math.max(currentActivity.lastActivity, entry.end);
 
         const taskLastBilledAt = task.lastBilledAt || 0;
-        if (entry.start > taskLastBilledAt && task.billable === true && entry.source !== 'invoice-adjustment') {
+        if (entry.start > taskLastBilledAt && billableTaskIds.has(task.id) && entry.source !== 'invoice-adjustment') {
             currentActivity.taskPendingTime[task.id] = (currentActivity.taskPendingTime[task.id] || 0) + getBillableDurationMs(entry);
         }
 

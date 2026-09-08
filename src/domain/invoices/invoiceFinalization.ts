@@ -1,3 +1,4 @@
+import { hasExplicitBillingMarker } from './invoiceEligibility';
 import type { Client, Expense, Invoice, InvoiceBillingSelectionSnapshot, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { isStoredDateWithinBillingRange } from '@/utils/billingPeriodUtils';
 import { getClientHourlyRate } from '@/utils/projectPlanningUtils';
@@ -80,6 +81,28 @@ export function planInvoiceFinalization({
         : (invoiceTaskIds.size > 0
             ? invoiceTaskIds
             : collectFallbackAgentDraftTaskIds({ agentDraft, invoice, tasks }));
+    // A draft cannot silently follow moved work to a different project/client.
+    // Finalized invoice edits retain their original, immutable attribution.
+    if (invoice.status === 'draft') {
+        const projectIds = collectInvoiceProjectIds(invoice, agentDraft);
+        // New agent drafts capture the source relationship independently of an
+        // explicitly selected invoice recipient. Older drafts retain the
+        // project/invoice consistency check without requiring a migration.
+        const hasSourceClient = agentDraft && Object.prototype.hasOwnProperty.call(agentDraft, 'projectClientIdAtPreview');
+        selectedTaskIds.forEach(taskId => {
+            const task = taskById.get(taskId);
+            const project = task?.projectId ? projectById.get(task.projectId) : undefined;
+            const clientChanged = hasSourceClient
+                ? (project?.preferredClientId ?? null) !== agentDraft.projectClientIdAtPreview
+                : Boolean(invoice.clientId && project?.preferredClientId !== undefined && project.preferredClientId !== invoice.clientId);
+            if (!task || task.billable !== true || !project || project.isPersonal === true
+                || (projectIds.length > 0 && !projectIds.includes(project.id))
+                || clientChanged) {
+                const title = task?.title || 'Selected task';
+                throw new Error(`"${title}" changed project, client, or billability after preview. Refresh the draft before finalizing.`);
+            }
+        });
+    }
     const taskLastBilledAt: Record<string, number | null> = {};
     const previousBillingCutoffs = new Map<string, number>();
     const nextTaskCutoffs = new Map<string, number>();
@@ -111,7 +134,7 @@ export function planInvoiceFinalization({
         if (selectedEntryById && !selectedEntry) return;
         if (!selectedTaskIds.has(entry.taskId)) return;
         if (entry.source === 'invoice-adjustment') return;
-        if (entry.billedInvoiceId || entry.billedAt) return;
+        if (hasExplicitBillingMarker(entry)) return;
         if (!entry.end || entry.end <= entry.start) return;
 
         if (selectedEntry) {

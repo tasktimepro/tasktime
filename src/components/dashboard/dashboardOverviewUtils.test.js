@@ -169,10 +169,21 @@ describe('dashboardOverviewUtils', () => {
         expect(result[0].client?.title).toBe('Acme Client');
     });
 
+    it('does not list no-client projects as unbilled when tasks retain billable flags', () => {
+        const result = buildDashboardProjects({
+            projects: [{ id: 'project', title: 'Internal', hourlyRate: 100 }],
+            activeTasks: [{ id: 'task', title: 'Moved', projectId: 'project', billable: true }],
+            timeEntries: [{ id: 'entry', taskId: 'task', start: Date.now() - 3600000, end: Date.now() }],
+            clients: [], invoices: [], expenses: [], recurrences: [],
+            projectFilter: 'unbilled', projectSearchQuery: '',
+        });
+        expect(result).toEqual([]);
+    });
+
     it('returns only unbilled active projects for the unbilled filter and applies search', () => {
         const result = buildDashboardProjects({
             projects: [
-                { id: 'project-1', title: 'Alpha Project' },
+                { id: 'project-1', title: 'Alpha Project', preferredClientId: 'client' },
                 { id: 'project-2', title: 'Beta Project' },
                 { id: 'project-3', title: 'Gamma Project', archived: true },
             ],
@@ -194,7 +205,7 @@ describe('dashboardOverviewUtils', () => {
                     end: Date.now() - 1_000,
                 },
             ],
-            clients: [],
+            clients: [{ id: 'client', title: 'Client' }],
             invoices: [],
             expenses: [],
             recurrences: [],

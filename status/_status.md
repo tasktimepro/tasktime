@@ -10,6 +10,15 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Program Phase 3 UI polishing in progress locally**
 
+- No-client billability is corrected locally across saved/live dashboard hours,
+  report/export totals, unbilled projections, automatic task marking, and task
+  controls/Kanban badges. Sent/paid invoice move preservation is verified;
+  stale drafts and legacy eligibility/entry-lock gaps are corrected. The final
+  2,569-test coverage gate, lint, typecheck, and app build pass. Fifty Chromium
+  and six PWA smoke checks also passed; the final Kanban-only guard has focused
+  and full coverage verification. Exact evidence boundaries are in
+  `app-status.md`. Changes are uncommitted and undeployed.
+
 - Phase 3 continuation is recorded in this local commit checkpoint: Expenses
   overview/interactions, Dashboard dots/empty states/axis sizing/live tracked
   time, and Yjs/Billing provider identity fixes. All current source changes and

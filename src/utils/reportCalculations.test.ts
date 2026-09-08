@@ -491,6 +491,17 @@ describe('reportCalculations', () => {
         expect(summary.totalsByCurrency.payments).toEqual({ EUR: 85 });
     });
 
+    it('keeps personal work out of billable work summaries without dropping actual time', () => {
+        const summary = buildProjectWorkSummary([{
+            id: 'entry', taskId: 'task', start: 1000, end: 3601000,
+            task: { id: 'task', title: 'Internal', projectId: 'project', billable: true },
+            project: { id: 'project', title: 'Internal', isPersonal: true },
+            client: null,
+        }]);
+        expect(summary.totals.actualMs).toBe(3600000);
+        expect(summary.totals.billableMs).toBe(0);
+    });
+
     it('builds a project work summary grouped by task', () => {
         const summary = buildProjectWorkSummary([
             {
@@ -499,7 +510,10 @@ describe('reportCalculations', () => {
                 start: new Date('2026-04-10T08:00:00Z').getTime(),
                 end: new Date('2026-04-10T09:00:00Z').getTime(),
                 note: 'Initial setup',
+                project: { id: 'project', title: 'Project', preferredClientId: 'client' },
+                client: { id: 'client', title: 'Client' },
                 task: {
+                    projectId: 'project',
                     id: 'task-1',
                     title: 'Setup',
                     billable: true,
@@ -510,7 +524,10 @@ describe('reportCalculations', () => {
                 taskId: 'task-1',
                 start: new Date('2026-04-10T09:00:00Z').getTime(),
                 end: new Date('2026-04-10T10:30:00Z').getTime(),
+                project: { id: 'project', title: 'Project', preferredClientId: 'client' },
+                client: { id: 'client', title: 'Client' },
                 task: {
+                    projectId: 'project',
                     id: 'task-1',
                     title: 'Setup',
                     billable: true,
@@ -522,7 +539,10 @@ describe('reportCalculations', () => {
                 start: new Date('2026-04-11T10:00:00Z').getTime(),
                 end: new Date('2026-04-11T11:00:00Z').getTime(),
                 note: 'Internal review',
+                project: { id: 'project', title: 'Project', preferredClientId: 'client' },
+                client: { id: 'client', title: 'Client' },
                 task: {
+                    projectId: 'project',
                     id: 'task-2',
                     title: 'Review',
                     billable: false,

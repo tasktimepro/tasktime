@@ -143,7 +143,13 @@ and preset-period reports with preceding-period trends. Its stacked chart uses
 actual saved time plus a read-only active-timer projection sampled each minute
 while visible. Tracked cards share that projection, with pause and stop identity
 handling; unbilled estimates and payment totals retain saved-record billing and
-currency semantics. Live ticks never write or sync product data.
+currency semantics. Live ticks never write or sync product data. Shared current task/project/client
+classification excludes personal and unassigned work from billable dashboard and
+report hours, exports, and unbilled summaries without rewriting saved flags or
+invoice evidence. Automatic billable marking requires a non-personal project
+with a client assignment. Task moves preserve finalized invoice attribution and
+source claims; stale drafts must refresh if their source project/client or
+billability changes before finalization.
 Validated history loads through existing Yjs store APIs, with explicit loading
 and retry. The chart bundle is lazy and precached for offline navigation; the
 service worker tolerates Origin-header variation only for manifest-listed public

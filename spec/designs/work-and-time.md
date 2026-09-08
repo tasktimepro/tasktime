@@ -17,6 +17,9 @@ Minimize the distance from identifying work to tracking it accurately.
 - Paused timers remain visibly distinct from running timers.
 - Stop and manual-entry flows validate dates/times and preserve notes.
 - Empty projects, completed/archived tasks, recurring occurrences, and missing referenced entities have explicit presentations.
+- Automatic billable marking, task controls, and Kanban billing badges require
+  a non-personal project with a client assignment. Existing task preferences are
+  retained when moving work; current-context totals do not rewrite invoice claims.
 
 ## Dashboard overview
 
@@ -87,10 +90,16 @@ Minimize the distance from identifying work to tracking it accurately.
   identities (including the legacy identity fallback) prevent double-counting
   while a saved entry and its timer temporarily coexist. Clearing a timer
   removes its contribution; stopping replaces it with the actual saved entry.
-  Current task billability splits each day into billable/non-billable; missing
-  task links retain actual time as non-billable. Zero-work days remain visible.
+  A saved billable flag counts only while the task belongs to a non-personal
+  project with a matching existing client. Standalone tasks, personal projects,
+  and missing project/client links retain actual time as non-billable, including
+  live timers. Moves and client changes reclassify the read-only projection;
+  they do not rewrite the saved flag, entries, or invoice snapshots. Archived
+  client work remains billable under the same relationship rule. Zero-work days
+  remain visible.
   This is distinct from billing-rounded eligible duration used by Unbilled amount.
-- Unbilled amount uses canonical invoice eligibility, including legacy finalized
+- Unbilled amount applies canonical invoice eligibility against complete source
+  history before filtering current project/client billability, including legacy finalized
   invoices, snapshots, late entries and cancellations. It is an hourly estimate;
   time without an hourly rate is disclosed, not silently priced. Received uses
   the canonical paid timestamp; Expenses uses paid gross amounts by expense date

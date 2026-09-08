@@ -291,9 +291,9 @@ describe('TaskViewModal billable toggle', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
-        hookMocks.clients = []
+        hookMocks.clients = [{ id: 'client', title: 'Client' }]
         hookMocks.tasks = [task]
-        hookMocks.projects = [{ id: 'project-1', title: 'Client Work', isPersonal: false }]
+        hookMocks.projects = [{ id: 'project-1', title: 'Client Work', isPersonal: false, preferredClientId: 'client' }]
         hookMocks.timeEntries = []
     })
 
@@ -311,6 +311,12 @@ describe('TaskViewModal billable toggle', () => {
 
         expect(screen.queryByRole('button', { name: 'Mark as billable' })).not.toBeInTheDocument()
     })
+
+    it('hides billable controls when the project has no client', () => {
+        hookMocks.projects = [{ id: 'project-1', title: 'Internal', hourlyRate: 100 }];
+        renderModal();
+        expect(screen.queryByRole('button', { name: 'Mark as billable' })).not.toBeInTheDocument();
+    });
 
     it('updates billable state from the modal using the existing task update behavior', () => {
         const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(123)

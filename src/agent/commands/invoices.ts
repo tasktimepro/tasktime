@@ -739,6 +739,7 @@ export async function createInvoiceDraftFromUnbilledWorkCommand(
                 version: 1,
                 source: 'tasktime-agent',
                 projectId: project.id,
+                projectClientIdAtPreview: project.preferredClientId ?? null,
                 clientId,
                 billingPeriodStart: input.billingPeriodStart ?? null,
                 billingPeriodEnd: input.billingPeriodEnd ?? null,

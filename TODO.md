@@ -8,10 +8,16 @@
 
 [x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository
 
+[ ] In the homepage, should we mention the direct sending and reminder email features as well?
+
+[ ] In the reports page I would add a get pro button aligned to the right with the title in the overview with the rocket icon
+
+[ ] Showcase one mobile screenshot for an "on-the go" section that mentions that the app looks and works as good as it does on your computer
+
 [ ] We should have the ability to pause recurring tasks
 [ ] Also have a look at expense categories, how we add and edit them, and include color tags that show in the UI that color rather than the inheritted project/client
 [ ] When we expand the sidebar, make sure to TaskTime Pro title doesn't drop until it full expands but rather has an ellipses and stays inline
-[ ] Should improve a bit the "account" sign-in in a way and not limit it to must go to cloud sync because the UX here is not really fitting and can be confusing
+[ ] Should improve a bit the "account" sign-in in a way and not limit it to must go to cloud sync because the UX here is not really fitting and can be confusing - this could be as simple as always showing the sign in in the same place we have sign out that would show a modal with the two cloud sync options available .. I think this could already improve the experience much better
 [ ] Project modal Billing & Timer Rules and Project Planning should be in a collapsible section like we have in other modals. I would also consider moving the trate notice and override client rate checkbox within the billing & timer rules as well if you agree
 
 [ ] Coordinated license, app-origin migration, homepage, and production-launch program
@@ -32,8 +38,7 @@
         [x] Pass the local app/site and Worker gates and finalize the supervised production cutover/rollback checklist
     [ ] Program Phase 3 — Complete the homepage and UX/UI adjustments
         [x] Dashboard readability — separate Today/Upcoming, add four glanceable stats, preset period reports, and billable/non-billable stacked hours; verify actions, historical/currency totals, mobile ordering, accessibility, offline charts, and bundle impact locally (Phase 3 local checkpoint; evidence in status/app-status.md)
-        [x] Dashboard live tracked time — minute updates for tracked cards/chart only, with paused/stop reconciliation and no financial or sync changes (local verification in status/app-status.md)
-        [x] Expenses overview — neutral summary cards, spending/category charts, and recorded activity; preserve the original list/tabs and verify payment/history/currency behavior, phones, and offline use locally (local checkpoint; evidence in status/app-status.md)
+        [x] Expenses overview — neutral summary cards, spending/category charts, and recorded activity; preserve the original list/tabs and verify payment/history/currency behavior, phones, and offline use locally (uncommitted; evidence in status/app-status.md)
         [ ] Promote the approved public product page to the `tasktime.pro` homepage
         [ ] Point every app CTA and app-launch flow to `https://app.tasktime.pro`
         [ ] Reconcile migration guidance, billing/pricing, Privacy/Terms, support, SEO/discovery, PWA install, and agent setup copy

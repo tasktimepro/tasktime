@@ -4772,6 +4772,40 @@ describe('agent commands', () => {
         expect(context.store.getAllInvoices).toHaveBeenCalled();
     });
 
+    it('excludes personal time from unbilled queries and report billability while preserving actual hours', async () => {
+        const context = createContext();
+        context.now = () => Date.parse('2026-06-25T12:00:00Z');
+        context.maps.projects.set('project-1', { ...context.maps.projects.get('project-1'), isPersonal: true });
+        const task = createTaskCommand(context, { id: 'personal-task', title: 'Internal', projectId: 'project-1', billable: true });
+        context.maps.entries.set('personal-entry', objectToYMap({
+            id: 'personal-entry', taskId: task.id,
+            start: Date.parse('2026-06-15T09:00:00Z'), end: Date.parse('2026-06-15T10:00:00Z'),
+        }));
+        expect(await findUnbilledTimeCommand(context)).toEqual([]);
+        expect(await getDashboardSummaryCommand(context)).toMatchObject({ unbilledDurationMs: 0 });
+        expect(await getProjectOverviewCommand(context, { projectId: 'project-1' })).toMatchObject({ unbilledDurationMs: 0 });
+        const report = await getReportSummaryCommand(context, { period: 'custom', customStart: '2026-06-01', customEnd: '2026-06-30', includeRows: true });
+        expect(report.time).toMatchObject({ totalHoursMs: 3600000, billableHoursMs: 0, uninvoicedHoursMs: 0 });
+        expect(report.rows.timeEntries[0]).toMatchObject({ billable: 'no', billableHours: 0, durationHours: 1 });
+    });
+
+    it('retains merged legacy invoice evidence after one task loses its project', async () => {
+        const context = createContext();
+        const tasks = [
+            { id: 'client-task', title: 'Client work', projectId: 'project-1', billable: true },
+            { id: 'moved-task', title: 'Moved work', projectId: null, billable: true },
+        ];
+        const start = Date.parse('2026-06-15T09:00:00Z');
+        context.store.getAllTasks = vi.fn(async () => tasks);
+        context.store.loadAllTimeEntries = vi.fn(async () => tasks.map(task => ({ id: task.id, taskId: task.id, start, end: start + 3600000 })));
+        context.store.getAllInvoices = vi.fn(async () => [{ id: 'legacy', date: '2026-06-20', status: 'sent', billingPeriodStart: '2026-06-01', billingPeriodEnd: '2026-06-30', tasks: [{ id: 'client-task', originalTimeMs: 7200000, mergedSubtasks: ['moved-task'] }] }]);
+        expect(await findUnbilledTimeCommand(context)).toEqual([]);
+        expect(await getDashboardSummaryCommand(context)).toMatchObject({ unbilledDurationMs: 0 });
+        expect(await getProjectOverviewCommand(context, { projectId: 'project-1' })).toMatchObject({ unbilledDurationMs: 0 });
+        const report = await getReportSummaryCommand(context, { period: 'custom', customStart: '2026-06-01', customEnd: '2026-06-30', includeRows: true });
+        expect(report.time.uninvoicedHoursMs).toBe(0);
+    });
+
     it('returns read-only report summaries using Reports-page filters and totals', async () => {
         const context = createContext();
         context.now = () => Date.parse('2026-06-25T12:00:00Z');
@@ -6464,6 +6498,77 @@ describe('agent commands', () => {
                 code: 'CONFLICT',
             }),
         }));
+    });
+
+    it.each(['client', 'personal', 'standalone'].flatMap(destination => ['sent', 'paid'].map(status => ({ destination, status }))))('preserves $status billing through a task move to $destination', async ({ destination, status }) => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'billing']);
+        context.now = () => Date.parse('2026-06-25T12:00:00Z');
+        context.maps.clients.set('client-2', { id: 'client-2', title: 'New client' });
+        context.maps.projects.set('destination', { id: 'destination', title: 'Destination', preferredClientId: destination === 'client' ? 'client-2' : null, isPersonal: destination === 'personal', hourlyRate: 200 });
+        createTaskCommand(context, { id: 'billed-move', title: 'Billed work', projectId: 'project-1', billable: true });
+        const start = Date.parse('2026-06-10T10:00:00Z');
+        context.maps.entries.set('billed-entry', objectToYMap({ id: 'billed-entry', taskId: 'billed-move', start, end: start + 3600000, billedDurationMs: 5400000, billingIncrementMinutes: 90 }));
+        const draft = await createInvoiceDraftFromUnbilledWorkCommand(context, { projectId: 'project-1', billingPeriodStart: '2026-06-01', billingPeriodEnd: '2026-06-30' });
+        await finalizeInvoiceCommand(context, { invoiceId: draft.invoice.id, confirmFinalize: true });
+        if (status === 'paid') {
+            markInvoicePaidCommand(context, { invoiceId: draft.invoice.id, confirmPaid: true, exchangeRates: { USD: 1, EUR: 0.8 } });
+        }
+        const invoiceBefore = readStored(context.maps.invoices, draft.invoice.id);
+        const entryBefore = readStored(context.maps.entries, 'billed-entry');
+        const taskBefore = readStored(context.maps.tasks, 'billed-move');
+        const targetProjectId = destination === 'standalone' ? null : 'destination';
+        await updateTaskCommand(context, { taskId: 'billed-move', updates: { projectId: targetProjectId } });
+        expect(readStored(context.maps.invoices, draft.invoice.id)).toEqual(invoiceBefore);
+        expect(readStored(context.maps.entries, 'billed-entry')).toEqual(entryBefore);
+        expect(readStored(context.maps.tasks, 'billed-move')).toMatchObject({ projectId: targetProjectId, lastBilledAt: taskBefore.lastBilledAt });
+        expect(await findUnbilledTimeCommand(context)).toEqual([]);
+        await expect(updateTimeEntryCommand(context, { entryId: 'billed-entry', end: start + 7200000 })).rejects.toThrow(/Billed time entries/);
+        // Work logged later follows the destination without changing the original claim.
+        context.maps.entries.set('later-entry', objectToYMap({ id: 'later-entry', taskId: 'billed-move', start: start + 7200000, end: start + 10800000 }));
+        expect((await findUnbilledTimeCommand(context)).map(entry => entry.id)).toEqual(destination === 'client' ? ['later-entry'] : []);
+        if (status === 'paid') {
+            await expect(cancelInvoiceCommand(context, { invoiceId: draft.invoice.id, confirmCancel: true, reason: 'Correction', confirmationText: invoiceBefore.invoiceNumber })).rejects.toMatchObject({ code: 'CONFLICT' });
+            expect(readStored(context.maps.invoices, draft.invoice.id)).toEqual(invoiceBefore);
+            expect(readStored(context.maps.entries, 'billed-entry')).toEqual(entryBefore);
+            return;
+        }
+        await cancelInvoiceCommand(context, { invoiceId: draft.invoice.id, confirmCancel: true, reason: 'Correction', confirmationText: invoiceBefore.invoiceNumber });
+        expect(readStored(context.maps.tasks, 'billed-move')).toMatchObject({ projectId: targetProjectId });
+        expect(readStored(context.maps.entries, 'billed-entry')).toMatchObject({ start, end: start + 3600000, billedDurationMs: 5400000, billingIncrementMinutes: 90 });
+        expect(readStored(context.maps.entries, 'billed-entry').billedInvoiceId).toBeFalsy();
+        expect(readStored(context.maps.invoices, draft.invoice.id)).toMatchObject({ status: 'canceled', clientId: invoiceBefore.clientId, projectId: invoiceBefore.projectId, billingSelectionSnapshot: invoiceBefore.billingSelectionSnapshot });
+    });
+
+    it('preserves an explicitly selected draft client when the project relationship has not changed', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'billing']);
+        context.now = () => Date.parse('2026-06-25T12:00:00Z');
+        context.maps.clients.set('invoice-client', { id: 'invoice-client', title: 'Invoice recipient' });
+        createTaskCommand(context, { id: 'override-client', title: 'Work', projectId: 'project-1', billable: true });
+        context.maps.entries.set('override-entry', objectToYMap({ id: 'override-entry', taskId: 'override-client', start: Date.parse('2026-06-10T10:00:00Z'), end: Date.parse('2026-06-10T11:00:00Z') }));
+        const draft = await createInvoiceDraftFromUnbilledWorkCommand(context, { projectId: 'project-1', clientId: 'invoice-client', billingPeriodStart: '2026-06-01', billingPeriodEnd: '2026-06-30' });
+        await expect(finalizeInvoiceCommand(context, { invoiceId: draft.invoice.id, confirmFinalize: true })).resolves.toMatchObject({ invoice: { status: 'sent', clientId: 'invoice-client' } });
+        expect(readStored(context.maps.entries, 'override-entry')).toMatchObject({ billedInvoiceId: draft.invoice.id });
+    });
+
+    it.each(['standalone', 'another project', 'changed client'])('rejects a stale draft after %s changes without claiming entries', async change => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write', 'billing']);
+        context.now = () => Date.parse('2026-06-25T12:00:00Z');
+        createTaskCommand(context, { id: 'move-draft', title: 'Moved draft task', projectId: 'project-1', billable: true });
+        context.maps.entries.set('move-entry', objectToYMap({ id: 'move-entry', taskId: 'move-draft', start: Date.parse('2026-06-10T10:00:00Z'), end: Date.parse('2026-06-10T11:00:00Z') }));
+        const draft = await createInvoiceDraftFromUnbilledWorkCommand(context, { projectId: 'project-1', billingPeriodStart: '2026-06-01', billingPeriodEnd: '2026-06-30' });
+        if (change === 'changed client') {
+            context.maps.clients.set('new-client', { id: 'new-client', title: 'New client' });
+            updateEntityFields(context.maps.projects, 'project-1', { preferredClientId: 'new-client' });
+        } else {
+            context.maps.projects.set('other-project', { id: 'other-project', title: 'Other project', preferredClientId: 'client-1' });
+            await updateTaskCommand(context, { taskId: 'move-draft', updates: { projectId: change === 'standalone' ? null : 'other-project' } });
+        }
+        await expect(finalizeInvoiceCommand(context, { invoiceId: draft.invoice.id, confirmFinalize: true })).rejects.toMatchObject({ code: 'CONFLICT' });
+        expect(readStored(context.maps.entries, 'move-entry')).not.toHaveProperty('billedInvoiceId');
+        expect(readStored(context.maps.invoices, draft.invoice.id)).toMatchObject({ status: 'draft' });
     });
 
     it('rejects finalization without billing side effects when a selected source record changed after preview', async () => {

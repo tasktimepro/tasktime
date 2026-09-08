@@ -9,13 +9,15 @@ const task = { id: 'task', title: 'Work', projectId: 'project', billable: true }
 const timer = { projectId: 'project', taskId: 'task', timerInstanceId: 'session', startTime: now - 5 * minute, paused: false };
 const tasks = [task];
 const entries = [];
+const projects = [{ id: 'project', title: 'Project', preferredClientId: 'client' }];
+const clients = [{ id: 'client', title: 'Client' }];
 
 describe('dashboard live time', () => {
     beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
     afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
     it('samples once per minute, ignoring per-second elapsed display updates', () => {
-        const { result, rerender, unmount } = renderHook(timers => useDashboardLiveTime(timers, entries, tasks), { initialProps: [timer] });
+        const { result, rerender, unmount } = renderHook(timers => useDashboardLiveTime(timers, entries, tasks, projects, clients), { initialProps: [timer] });
         const first = result.current;
         expect(first.get('2026-09-08')?.billable).toBe(5 * minute);
         act(() => { vi.advanceTimersByTime(30000); });
@@ -28,7 +30,7 @@ describe('dashboard live time', () => {
     });
 
     it('updates immediately on pause/resume/edit/discard and stops ticking while paused', () => {
-        const { result, rerender } = renderHook(timers => useDashboardLiveTime(timers, entries, tasks), { initialProps: [timer] });
+        const { result, rerender } = renderHook(timers => useDashboardLiveTime(timers, entries, tasks, projects, clients), { initialProps: [timer] });
         act(() => { vi.advanceTimersByTime(15000); });
         const paused = buildPausedTimer(timer, Date.now());
         rerender([paused]);
@@ -48,7 +50,7 @@ describe('dashboard live time', () => {
     it('suppresses a saved timer instance during stop reconciliation, including legacy timers', () => {
         for (const candidate of [timer, { ...timer, timerInstanceId: undefined }]) {
             const saved = planStoppedTimer({ timerKey: 'project', timer: candidate, entries, tasks, now }).entry;
-            const { result, rerender, unmount } = renderHook(props => useDashboardLiveTime([candidate], props, tasks), { initialProps: entries });
+            const { result, rerender, unmount } = renderHook(props => useDashboardLiveTime([candidate], props, tasks, projects, clients), { initialProps: entries });
             expect(result.current.size).toBe(1);
             rerender([saved]);
             expect(result.current.size).toBe(0);
@@ -63,14 +65,14 @@ describe('dashboard live time', () => {
             { ...timer, startTime },
             { ...timer, projectId: 'other', taskId: 'missing', startTime, paused: true, pausedElapsedTime: minute },
             { ...timer, projectId: 'future', startTime: Date.now() + minute },
-        ], entries, tasks));
+        ], entries, tasks, projects, clients));
         expect(result.current.size).toBe(1);
         expect(result.current.get('2026-09-30')).toEqual({ date: '2026-09-30', billable: 20 * minute, nonBillable: minute, total: 21 * minute });
     });
 
     it('suspends hidden polling and catches up immediately on visibility or focus', () => {
         const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
-        const { result } = renderHook(() => useDashboardLiveTime([timer], entries, tasks));
+        const { result } = renderHook(() => useDashboardLiveTime([timer], entries, tasks, projects, clients));
         visibility.mockReturnValue('hidden');
         act(() => { document.dispatchEvent(new Event('visibilitychange')); });
         expect(vi.getTimerCount()).toBe(0);

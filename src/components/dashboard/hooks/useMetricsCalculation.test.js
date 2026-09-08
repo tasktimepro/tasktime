@@ -8,7 +8,7 @@ const input = {
     todayStr: '2026-09-08', range: { startDate: '2026-08-01', endDate: '2026-08-31' },
     preferredCurrency: 'EUR', convertToCurrency: amounts => ({ amounts, hadConversionError: false }),
     tasks: [{ id: 'task', title: 'Work', projectId: 'project', billable: true }],
-    projects: [{ id: 'project', title: 'Project', hourlyRate: 100 }], clients: [], invoices: [], expenses: [], recurrences: [],
+    projects: [{ id: 'project', title: 'Project', hourlyRate: 100, preferredClientId: 'client' }], clients: [{ id: 'client', title: 'Client' }], invoices: [], expenses: [], recurrences: [],
     entries: [{ id: 'entry', taskId: 'task', start: at, end: at + hour, billedDurationMs: 1.5 * hour }],
 };
 
@@ -92,5 +92,25 @@ it('adds live time only to tracked totals, days and their trend while financial 
         rerender({ input: stoppedInput, timers: [] });
         expect(result.current.report.time).toBe(2 * hour + 60000);
         unmount();
+    } finally { vi.useRealTimers(); }
+});
+
+it('reclassifies saved and live time when the client is removed or the task moves', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(at + 2 * hour);
+    const client = { id: 'client', title: 'Client' };
+    const project = { ...input.projects[0], preferredClientId: client.id };
+    const source = { ...input, projects: [project], clients: [client], range: { startDate: '2026-09-01', endDate: '2026-09-30' } };
+    const timers = [{ projectId: 'project', taskId: 'task', startTime: at + hour, timerInstanceId: 'live' }];
+    try {
+        const { result, rerender } = renderHook(props => useMetricsCalculation(props, timers), { initialProps: source });
+        expect(result.current.report.billableTime).toBe(2 * hour);
+        rerender({ ...source, projects: [{ ...project, preferredClientId: null }] });
+        expect(result.current.report.days[7]).toMatchObject({ billable: 0, nonBillable: 2 * hour, total: 2 * hour });
+        expect(result.current.report.unbilledTime).toBe(0);
+        rerender({ ...source, tasks: [{ ...source.tasks[0], projectId: null }] });
+        expect(result.current.report.billableTime).toBe(0);
+        rerender(source);
+        expect(result.current.report.billableTime).toBe(2 * hour);
     } finally { vi.useRealTimers(); }
 });

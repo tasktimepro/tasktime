@@ -13,6 +13,7 @@ const mockExportOutstandingReportPdf = vi.fn(() => Promise.resolve());
 const mockExportExpensesReportPdf = vi.fn(() => Promise.resolve());
 const mockGeneratePdfBlob = vi.fn(() => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })));
 let mockIsMobileLayout = false;
+let mockProjectOverrides = {};
 const FIXED_REFERENCE_DATE = new Date('2026-05-15T12:00:00Z');
 const RealDate = Date;
 class MockDate extends RealDate {
@@ -199,6 +200,7 @@ vi.mock('@/hooks/useProjects.ts', () => ({
                 title: 'TaskTime Pro',
                 preferredClientId: 'client-1',
                 hourlyRate: 100,
+                ...mockProjectOverrides,
             },
         ],
     }),
@@ -313,6 +315,7 @@ describe('Reports', () => {
         global.Date = MockDate;
         mockIsMobileLayout = false;
         mockUpdateUrl.mockReset();
+        mockProjectOverrides = {};
         mockBuildCsvContent.mockClear();
         mockDownloadCsvFile.mockClear();
         mockDownloadZipFile.mockClear();
@@ -916,6 +919,25 @@ describe('Reports', () => {
 
         expect(within(invoiceRow).getByText('€1220.00')).toHaveClass('sensitive-data');
         expect(within(invoiceRow).getByText('€220.00')).toHaveClass('sensitive-data');
+    });
+
+    it.each([{ preferredClientId: null }, { isPersonal: true }])('keeps internal hours visible with zero billable hours in the report and CSV', (overrides) => {
+        mockSection = 'hours';
+        mockProjectOverrides = overrides;
+        render(<Reports />);
+        expect(screen.getByText('2h')).toBeInTheDocument();
+        expect(screen.getByText('Billable 0s')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+        expect(mockBuildCsvContent).toHaveBeenCalledWith(expect.any(Array), [expect.objectContaining({ totalHours: '2.00', billableHours: '0.00', unbilledBillableHours: '0.00' })]);
+    });
+
+    it.each(['rate marker', 'legacy invoice'])('does not call already billed hours unbilled with %s evidence', evidence => {
+        mockSection = 'hours';
+        if (evidence === 'rate marker') mockTimeEntries[0].billedHourlyRate = 100;
+        else mockInvoices.push({ id: 'legacy-billing', date: '2026-04-20', status: 'sent', billingPeriodStart: '2026-04-01', billingPeriodEnd: '2026-04-30', tasks: [{ id: 'task-1', originalTimeMs: 7200000 }] });
+        render(<Reports />);
+        fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+        expect(mockBuildCsvContent).toHaveBeenCalledWith(expect.any(Array), [expect.objectContaining({ totalHours: '2.00', billableHours: '2.00', unbilledBillableHours: '0.00' })]);
     });
 
     it('shows seconds in Hours report total and billable durations', () => {

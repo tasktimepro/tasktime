@@ -432,7 +432,15 @@ Provider-neutral cloud commands are canonical. The shipped Drive-named backup co
 
 `stop_timer` accepts an optional `idempotencyKey` and also converges concurrent stops through deterministic timer-instance entry identity. Manual time-entry commands validate complete local history and source/target billing rules before mutation. Generic `update_task` requests are normalized through task-state invariants; recurring completion still requires the occurrence-aware `complete_task` command. Create commands return `CONFLICT` for an existing persisted ID and must not replace the prior record.
 
-`find_unbilled_time`, dashboard/project unbilled summaries, and recent-entry billing state load complete local task, time-entry, and invoice history. Unbilled results use canonical invoice eligibility and legacy finalized-invoice evidence; entry summaries preserve `durationMs` as actual elapsed time and add `billableDurationMs` for invoice calculations.
+Task project changes preserve time-entry IDs, billing claims/rates/durations,
+task billing cutoffs, and finalized invoice project/client attribution. Active
+or paused timers and incompatible parent/subtask relationships block a move.
+Finalizing a draft after its selected task leaves the invoiced project, becomes
+non-billable, or changes source-client context returns `CONFLICT` before billing
+mutations. New agent drafts distinguish an explicitly chosen invoice recipient
+from the source project's client assignment.
+
+`find_unbilled_time`, dashboard/project unbilled summaries, and recent-entry billing state load complete local task, time-entry, and invoice history. Unbilled results require a current non-personal project with its matching client and use canonical invoice eligibility and legacy finalized-invoice evidence; entry summaries preserve `durationMs` as actual elapsed time and add `billableDurationMs` for invoice calculations.
 
 `cancel_invoice` is billing-scoped and approval-required. Its closed input contains `invoiceId`, `reason`, `confirmCancel: true`, exact `confirmationText`, optional finite `canceledAt`, and optional retry-safe `idempotencyKey`. Missing invoices return `NOT_FOUND`; invalid reason/confirmation returns `INVALID_INPUT`; draft, paid, terminal, or conflicting operation state returns `CONFLICT`; unavailable complete history returns a sanitized retry-safe error. Responses expose documented invoice summaries and release counts, never raw Yjs maps or journal records. Invoice/report status filters add `canceled` without renaming or changing existing defaults.
 

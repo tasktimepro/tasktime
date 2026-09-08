@@ -51,6 +51,17 @@ These invariants summarize critical production contracts. They supplement the de
 
 - At most one active timer exists per project, while different projects may have active timers concurrently.
 - Pausing preserves elapsed time and does not create a time entry; stopping creates the entry exactly once.
+- Dashboard/report billability and unbilled summaries require a billable task
+  linked to a non-personal project and its existing client. Relationship changes
+  reclassify projections without rewriting stored task flags, actual time, or
+  finalized invoice evidence; archiving alone does not make client work internal.
+- Automatic billable marking and task billable controls require a non-personal
+  project with a client assignment. They must not turn standalone/internal time
+  into client work merely because time has been recorded or a rate is retained.
+- Moving a task preserves its billing metadata and the claims on its entries;
+  sent/paid invoices retain their original client/project and snapshots. Eligible
+  unbilled work follows the destination. A draft must refresh after its selected
+  work leaves the invoiced project or its source-client/billability changes.
 - Time calculations must use a consistent unit and preserve exact stored duration semantics across timers, entries, reports, invoices, imports, and exports.
 - Tasks belong to projects, subtasks use `parentTaskId`, and subtasks cannot be recurring.
 
@@ -59,6 +70,10 @@ These invariants summarize critical production contracts. They supplement the de
 - Invoice calculations, billed state, payments, undo operations, currency handling, expense inclusion, and report totals must agree on the same source records and rounding rules.
 - Current billing and report ranges assign a time entry wholly to the local calendar date of its start timestamp and include the complete selected end date. Historical snapshot-less invoice recovery retains the period-boundary behavior that produced the invoice's stored source totals.
 - UI badges, invoice composition, and agent preview/draft commands share one invoice-eligibility operation. Neither a task cutoff alone nor entry markers alone may redefine legacy eligibility: exact finalized-invoice evidence may suppress markerless historical entries, while ambiguous or later-arriving work remains eligible.
+- Legacy eligibility is resolved against complete task/source-period evidence
+  before project, client, or visible report filters. A moved member of a legacy
+  merged invoice must not make already-claimed time available again. Supported
+  legacy rate markers also lock manual time-entry changes.
 - Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval; financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
 - Billing mutations must be explicit, reversible where supported, and idempotent against retries or repeated commands.
 - Cancellation is the terminal void-like exception to ordinary reversibility: only finalized unpaid sent/overdue invoices may be canceled; the retained invoice number, original values/snapshots, and project links are immutable, only sources still owned by that invoice are released, and template numbering is never rewound.

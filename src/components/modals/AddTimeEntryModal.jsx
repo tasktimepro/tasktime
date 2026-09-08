@@ -1,3 +1,4 @@
+import { canTaskBeBillable } from '@/domain/time/taskBillability';
 /**
  * AddTimeEntryModal - Modal for adding a new time entry
  */
@@ -228,8 +229,8 @@ const AddTimeEntryModal = ({
     const projectHasHourlyRate = useMemo(() => {
         if (!task?.projectId) return false;
         const project = projects.find(p => p.id === task.projectId);
-        return project && typeof project.hourlyRate === 'number' && project.hourlyRate > 0;
-    }, [task?.projectId, projects]);
+        return canTaskBeBillable(task, project) && typeof project.hourlyRate === 'number' && project.hourlyRate > 0;
+    }, [task, projects]);
 
     const taskBillableTimeMs = useMemo(() => {
         if (!task) return 0;

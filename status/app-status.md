@@ -2,6 +2,38 @@
 
 ## Current focus
 
+- [x] Correct no-client billability and preserve billing through task moves (2026-09-08,
+  uncommitted): saved/live dashboard hours, dashboard unbilled estimates and
+  project filtering, browser Hours/work-summary/export calculations, and agent
+  reports/unbilled queries now share current task/project/client classification.
+  A retained or auto-set task flag alone cannot make standalone/personal work
+  billable. Missing relationships are non-billable; archived client work remains
+  classified normally. Moves/client changes refresh projections without data
+  migration, flag rewrites, interval changes, or invoice mutations. Complete
+  legacy merged-task evidence is matched before filtering current billability,
+  so moving one old source cannot reopen another already-invoiced source.
+  Automatic marking in tasks, subtasks, and manual-entry flows now requires
+  client-project context; task controls and Kanban badges follow the same rule.
+  Sent/paid invoice move regressions cover another client, a personal project,
+  and standalone work: entry claims/rates/increments, original invoice context,
+  and task billing cutoffs survive; later work follows the destination. Unpaid
+  cancellation releases its original claims without moving the task back, and
+  paid cancellation remains blocked. Existing timer/hierarchy move guards remain.
+  Draft finalization rejects changed source project/client/billability before
+  mutation. Additive `agentDraft.projectClientIdAtPreview` retains explicit
+  invoice-recipient selection independently of source-client changes; older
+  drafts retain context checks. Legacy rate markers now lock manual edits, and
+  invoice previews/selectors plus report uninvoiced totals resolve complete
+  legacy source evidence before current-project/visible-period filters.
+  Red/green regressions cover the defects. Docker `npm run release` passed:
+  273 files / 2,566 tests with coverage, lint, typecheck, 50 Chromium smoke,
+  six PWA smoke, and app/blog build. The last Kanban-only guard followed the
+  Chromium run and was included in the final build; its 32 focused task/board
+  tests passed, followed by final lint/typecheck and 273 files / 2,569 tests
+  with coverage. Logs: `/private/tmp/tasktime-billability-release-gate.log`
+  and `/private/tmp/tasktime-billability-final-coverage.log`.
+  No commit, push, release, deployment, or production-data operation occurred.
+
 - [x] Phase 3 continuation commit and thread handoff (2026-09-08): includes all
   current Expenses overview/interactions, dashboard color dots/empty states/axis
   sizing/live tracked-time changes, shared Yjs/Billing context identity fixes,

@@ -62,6 +62,13 @@ describe('manual time entry operations', () => {
         })).toThrow(/Billed time entries/);
     });
 
+    it('protects rate-only legacy billed entries after a task moves', () => {
+        const movedTask = { ...task, projectId: 'destination', lastBilledAt: null };
+        const entry = { id: 'legacy', taskId: task.id, start: 3000, end: 4000, billedHourlyRate: 100 };
+        expect(() => buildManualTimeEntryUpdate({ entry, task: movedTask, tasks: [movedTask], entries: [entry], updates: { taskId: 'other' }, now: 5000 })).toThrow(/Billed time entries/);
+        expect(() => assertManualTimeEntryDeletion(entry, movedTask)).toThrow(/Billed time entries/);
+    });
+
     it('preserves legacy billable duration evidence unless clearing it is explicit', () => {
         const legacyDurationEntry = {
             id: 'entry-duration',

@@ -1,3 +1,5 @@
+import { getInvoiceEligibleTimeEntries } from '@/domain/invoices/invoiceEligibility';
+import { isBillableTask } from '@/domain/time/taskBillability';
 import { endOfDay } from 'date-fns';
 import type { AgentCommandContext } from '@/agent/types';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
@@ -435,6 +437,10 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
             return true;
         });
 
+    const eligibleEntryIds = new Set(getInvoiceEligibleTimeEntries({
+        tasks: data.tasks, timeEntries: data.timeEntries, invoices: data.invoices,
+    }).map(entry => entry.id));
+
     const hoursRows = Array.from(filteredTimeEntries.reduce((grouped, entry) => {
         const projectKey = entry.project?.id || `task:${entry.task!.id}`;
         const existing = grouped.get(projectKey) || {
@@ -447,11 +453,11 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
             entriesCount: 0,
         };
         const actualMs = Math.max(0, (entry.end || 0) - entry.start);
-        const billableMs = entry.task!.billable ? getBillableDurationMs(entry) : 0;
+        const billableMs = isBillableTask(entry.task, entry.project, entry.client) ? getBillableDurationMs(entry) : 0;
 
         existing.totalMs += actualMs;
         existing.billableMs += billableMs;
-        existing.unbilledBillableMs += entry.task!.billable && !entry.billedInvoiceId ? billableMs : 0;
+        existing.unbilledBillableMs += eligibleEntryIds.has(entry.id) ? billableMs : 0;
         existing.entriesCount += 1;
         grouped.set(projectKey, existing);
         return grouped;
@@ -520,7 +526,7 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
         getExpenseTaxAmount
     );
     const totalHoursMs = filteredTimeEntries.reduce((sum, entry) => sum + Math.max(0, (entry.end || 0) - entry.start), 0);
-    const billableHoursMs = filteredTimeEntries.reduce((sum, entry) => sum + (entry.task?.billable ? getBillableDurationMs(entry) : 0), 0);
+    const billableHoursMs = filteredTimeEntries.reduce((sum, entry) => sum + (isBillableTask(entry.task, entry.project, entry.client) ? getBillableDurationMs(entry) : 0), 0);
     const vatSummary = buildVatReportSummary({ invoices: financialFilteredInvoices, expenses: filteredExpenses, clientsById, businessInfosById });
     const outstandingSummary = buildOutstandingInvoiceSummary(outstandingInvoices, reportReferenceDate);
     const expenseTotalsSummary = buildExpenseTotalsSummary(filteredExpenses);
@@ -652,7 +658,7 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
             hours: hoursRows.slice(0, rowLimit),
             timeEntries: filteredTimeEntries.slice(0, rowLimit).map((entry) => {
                 const actualMs = Math.max(0, (entry.end || 0) - entry.start);
-                const billableMs = entry.task?.billable ? getBillableDurationMs(entry) : 0;
+                const billableMs = isBillableTask(entry.task, entry.project, entry.client) ? getBillableDurationMs(entry) : 0;
                 const billedInvoice = entry.billedInvoiceId
                     ? data.invoices.find((invoice) => invoice.id === entry.billedInvoiceId)
                     : null;
@@ -677,7 +683,7 @@ export async function getReportSummaryCommand(context: AgentCommandContext, inpu
                     task: entry.task?.title || '',
                     project: entry.project?.title || EMPTY_PROJECT,
                     client: entry.client?.title || EMPTY_CLIENT,
-                    billable: entry.task?.billable ? 'yes' : 'no',
+                    billable: isBillableTask(entry.task, entry.project, entry.client) ? 'yes' : 'no',
                     durationHours: actualMs / 3_600_000,
                     billableHours: billableMs / 3_600_000,
                     billedInvoiceNumber: billedInvoice?.invoiceNumber || '',

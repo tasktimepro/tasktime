@@ -61,6 +61,31 @@ async function seedDashboard(page, liveClock = false) {
 }
 
 test.describe('Dashboard smoke', () => {
+    test('keeps a standalone task moved to a no-client project non-billable after reload', async ({ page }) => {
+        await seedDashboard(page);
+        const reports = page.getByRole('region', { name: 'Reports Overview' });
+        const entriesBefore = await page.evaluate(() => JSON.stringify(Array.from(window.__TASKTIME_STORE__.activeTimeEntries.values())));
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.tasks.set('billable', { ...store.tasks.get('billable'), projectId: null, billable: true });
+        });
+        await expect(reports.getByRole('row', { name: '25 Sep 0s 1h 40m 1h 40m', exact: true })).toHaveCount(1);
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.tasks.set('billable', { ...store.tasks.get('billable'), projectId: 'internal' });
+        });
+        await expect(reports.getByRole('row', { name: '25 Sep 0s 1h 40m 1h 40m', exact: true })).toHaveCount(1);
+        await page.reload();
+        await expect(reports.getByRole('row', { name: '25 Sep 0s 1h 40m 1h 40m', exact: true })).toHaveCount(1);
+        expect(await page.evaluate(() => JSON.stringify(Array.from(window.__TASKTIME_STORE__.activeTimeEntries.values())))).toBe(entriesBefore);
+        // Restoring a client relationship uses the retained preference immediately.
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.tasks.set('billable', { ...store.tasks.get('billable'), projectId: 'project' });
+        });
+        await expect(reports.getByRole('row', { name: '25 Sep 1h 40m 1h 40m', exact: true })).toHaveCount(1);
+    });
+
     test('updates live tracked time each minute without changing financial values or writing entries', async ({ page }) => {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));

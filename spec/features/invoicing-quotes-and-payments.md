@@ -4,6 +4,15 @@
 
 - Preview gathers eligible unbilled time/tasks/expenses into explicit invoice line and project-breakdown data.
 - Drafts remain editable without applying billed markers.
+- Finalization rejects stale drafts when selected work leaves the invoiced
+  project, changes its source-client context, or becomes non-billable. Explicit
+  agent invoice-recipient selection remains supported when the captured source
+  relationship is unchanged.
+- Moving billed work retains finalized invoice client/project attribution,
+  source claims, rates, durations, and task billing metadata. Unbilled work
+  follows the destination; eligible cancellation releases original claims by
+  identity without restoring the task's previous project. Invoice previews and
+  selectors resolve complete legacy merged-task evidence before project filters.
 - Finalization snapshots billing/currency/branding data and applies source billing state once.
 - Payments record their financial context. **Mark as unpaid** is a confirmed correction for a mistakenly recorded payment: it removes `paidAt` and the payment-currency snapshot, preserves the finalized invoice and its billing-source claims, and returns the invoice to effective Outstanding or Overdue. It does not record or issue a refund.
 - Undo latest invoice uses stored billing snapshots to restore eligible source records safely.

@@ -1,3 +1,4 @@
+import { hasExplicitBillingMarker } from '@/domain/invoices/invoiceEligibility';
 import type { Task, TimeEntry } from '@/stores/yjs/types';
 import { buildBillableDurationFields } from '@/utils/timeEntryDurationUtils';
 import { checkTimeOverlap } from '@/utils/timeValidationUtils';
@@ -14,7 +15,7 @@ export class TimeEntryOperationError extends Error {
 }
 
 export function isTimeEntryBilled(entry: TimeEntry): boolean {
-    return Boolean(entry.billedAt || entry.billedInvoiceId);
+    return hasExplicitBillingMarker(entry);
 }
 
 export function isManualTimeEntryLocked(entry: TimeEntry, task?: Task | null): boolean {

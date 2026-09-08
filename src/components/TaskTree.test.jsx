@@ -123,12 +123,13 @@ vi.mock('./task/drag/SortableTaskItem', () => ({
     )
 }));
 vi.mock('./task/kanban/TaskKanbanBoard', () => ({
-    default: ({ parentTasks = [], dragDisabled = false, onUnarchiveTask = null, onDeleteTask = null, createColumnProps = null }) => (
+    default: ({ parentTasks = [], dragDisabled = false, onUnarchiveTask = null, onDeleteTask = null, createColumnProps = null, showBillableBadges = false }) => (
         <div
             data-testid={`kanban-board-${parentTasks.map((task) => task.id).join('-') || 'empty'}`}
             data-has-unarchive={String(Boolean(onUnarchiveTask))}
             data-has-delete={String(Boolean(onDeleteTask))}
             data-has-create-column={String(Boolean(createColumnProps))}
+            data-show-billable-badges={String(showBillableBadges)}
         >
             Kanban board{dragDisabled ? ' archived' : ''}
         </div>
@@ -156,6 +157,17 @@ describe('TaskTree', () => {
         taskTreeMocks.createTask.mockImplementation((data) => ({ id: data.id || 'created-task', ...data }));
         taskTreeMocks.updateTask.mockReset();
         taskTreeMocks.updateProject.mockReset();
+    });
+
+    it.each([
+        { preferredClientId: null, isPersonal: false, expected: false },
+        { preferredClientId: 'client', isPersonal: true, expected: false },
+        { preferredClientId: 'client', isPersonal: false, expected: true },
+    ])('shows Kanban billing only for client projects: %j', ({ preferredClientId, isPersonal, expected }) => {
+        taskTreeMocks.tasks = [{ id: 'task-1', title: 'Work', projectId: 'project-1', billable: true }];
+        render(<TaskTree project={{ id: 'project-1', title: 'Project', taskView: 'kanban', preferredClientId, isPersonal }} />);
+        expect(screen.getByTestId('kanban-board-task-1')).toHaveAttribute('data-show-billable-badges', String(expected));
+        expect(taskTreeMocks.updateTask).not.toHaveBeenCalled();
     });
 
     it('defaults to the list view for parent tasks', () => {

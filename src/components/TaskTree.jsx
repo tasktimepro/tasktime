@@ -200,8 +200,8 @@ const TaskTree = ({
         })
     );
 
-    const allowBillableToggle = !project.isPersonal;
-    const showEstimateFields = Boolean(!project.isPersonal && project.preferredClientId);
+    const allowBillableToggle = Boolean(!project.isPersonal && project.preferredClientId);
+    const showEstimateFields = allowBillableToggle;
     const isFlatRateProject = Boolean(project.flatRate);
 
     React.useEffect(() => {

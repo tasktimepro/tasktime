@@ -72,6 +72,12 @@ Approval-gated Phase 4 production target
   `DashboardHoursChart` loads Recharts from the separate precached chart bundle.
   Existing mutation handlers and the `/reports` entitlement branch remain owners
   of their behavior. See `spec/designs/work-and-time.md` for metric definitions.
+- `domain/time/taskBillability.ts` owns current task/project/client classification
+  for dashboard saved/live time, unbilled projections, browser reports, and agent
+  summaries/exports, plus client-project guards for automatic billable marking
+  and task controls. Invoice claim checks and persisted snapshots remain separate.
+  Invoice previews/selectors and report eligibility evaluate complete legacy
+  source evidence before filtering to the current project or visible period.
 - Domain modules remain UI-independent and receive explicit inputs/dependencies.
 - Expenses `expenseOverviewMetrics.ts` derives read-only projections from
   `useExpenses({ includeArchived: true })`, existing recurrence previews, and

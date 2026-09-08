@@ -144,7 +144,7 @@ export const getProjectInvoicePreview = (
     const entrySelections: ProjectInvoiceEntrySelection[] = [];
 
     const eligibleTimeEntries = getInvoiceEligibleTimeEntries({
-        tasks: projectTasks,
+        tasks,
         timeEntries,
         invoices,
         billingPeriodStart: activeBillingPeriodStart,

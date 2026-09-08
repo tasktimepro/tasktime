@@ -1,3 +1,5 @@
+import { canTaskBeBillable } from '@/domain/time/taskBillability';
+import { useProjects } from '@/hooks/useProjects';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import TimeEntriesModal from '../../TimeEntriesModal';
 import TaskHeader from '../TaskHeader';
@@ -38,6 +40,8 @@ const SubtaskItem = ({
 
     // Yjs hooks for state
     const { updateTask } = useTasks();
+    const { projects } = useProjects();
+    const canBillTask = canTaskBeBillable(task, projects.find(project => project.id === task.projectId));
     const { entries: timeEntries } = useTimeEntries();
     const { getTimerForTask, stopTimer } = useTimers();
     const { showError } = useToast();
@@ -86,10 +90,10 @@ const SubtaskItem = ({
     }, [timeEntries, task.id, task.lastBilledAt, task.createdAt]);
 
     useEffect(() => {
-        if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
+        if (canBillTask && !task.archived && hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
             updateTask(task.id, { billable: true, lastActive: Date.now() });
         }
-    }, [hasSignificantBillableTime, task.billableSetByUser, task.billable, task.id, updateTask]);
+    }, [canBillTask, task.archived, hasSignificantBillableTime, task.billableSetByUser, task.billable, task.id, updateTask]);
 
     /**
      * Toggle subtask completion status
@@ -211,7 +215,7 @@ const SubtaskItem = ({
                             onArchive={onArchive}
                             onUnarchive={onUnarchive}
                             onDelete={onDelete}
-                            onToggleBillable={onToggleBillable}
+                            onToggleBillable={canBillTask ? onToggleBillable : undefined}
                             onShowTimeEntries={() => setShowTimeEntriesModal(true)}
                             onEdit={handleEditTask}
                         />
@@ -263,7 +267,7 @@ const SubtaskItem = ({
                         onArchive={onArchive}
                         onUnarchive={onUnarchive}
                         onDelete={onDelete}
-                        onToggleBillable={onToggleBillable}
+                        onToggleBillable={canBillTask ? onToggleBillable : undefined}
                         onShowTimeEntries={() => setShowTimeEntriesModal(true)}
                         onEdit={handleEditTask}
                     />

@@ -14,6 +14,15 @@
   Existing expense rows, tabs, filters, status buckets, and mutation paths remain
   unchanged. History failures expose retry rather than a complete-looking total;
   nested archived-record changes refresh these projections.
+- Billable hours, utilization, work summaries, and uninvoiced time require a
+  billable task in a non-personal project with its matching existing client.
+  Browser reports and agent report/export results share this read-only rule.
+  Internal/standalone work stays in actual tracked totals; saved task preferences,
+  time entries, and finalized invoice snapshots are not rewritten.
+- Uninvoiced hours use canonical eligibility, including legacy rate markers and
+  exact finalized-invoice evidence. Browser history loading includes legacy
+  source periods before the visible report filter is applied, so a narrow
+  report or task move cannot reopen part of a previously billed merged task.
 - CSV, PDF, ZIP, and accountant outputs use the same filter and calculation semantics as the visible report.
 - Paid cross-currency expense creation and payment-sensitive updates prepare and validate their payment snapshot before the expense mutation is committed. Recurrence generation advances its cursor only after every due occurrence was created successfully.
 - Billed or tax-claimed expenses are protected records: both browser and agent deletion paths reject them until the invoice or tax-return relationship is explicitly reversed.

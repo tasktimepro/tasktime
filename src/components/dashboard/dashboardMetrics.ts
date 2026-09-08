@@ -1,3 +1,4 @@
+import { getBillableTaskIds } from '@/domain/time/taskBillability';
 import { addDays, differenceInCalendarDays, endOfMonth, format, startOfMonth, subDays, subMonths } from 'date-fns';
 import type { Client, Expense, Invoice, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils';
@@ -109,6 +110,7 @@ export function buildDashboardReport({ range, todayStr, preferredCurrency, conve
 }) {
     const taskMap = new Map(tasks.map(task => [task.id, task]));
     const projectMap = new Map(projects.map(project => [project.id, project]));
+    const billableTaskIds = getBillableTaskIds(tasks, projects, clients);
     const days: DashboardDay[] = [];
     for (let day = parseStoredDate(range.startDate)!; toStorageDate(day)! <= range.endDate; day = addDays(day, 1)) {
         days.push({ date: toStorageDate(day)!, billable: 0, nonBillable: 0, total: 0 });
@@ -119,13 +121,16 @@ export function buildDashboardReport({ range, todayStr, preferredCurrency, conve
         const day = dayMap.get(entryDate(entry) || '');
         if (!day) return;
         const duration = getActualDurationMs(entry);
-        // Missing legacy task links are kept in the total without claiming billability.
-        if (taskMap.get(entry.taskId)?.billable === true) day.billable += duration;
+        // Retained flags on standalone/personal tasks never make their hours billable.
+        if (billableTaskIds.has(entry.taskId)) day.billable += duration;
         else day.nonBillable += duration;
         day.total += duration;
     });
 
-    const eligible = getInvoiceEligibleTimeEntries({ tasks, timeEntries: validEntries, invoices, billingPeriodStart: range.startDate, billingPeriodEnd: range.endDate });
+    // Legacy invoices may merge tasks that now have different client relationships.
+    // Match their complete source evidence before filtering current billability.
+    const eligible = getInvoiceEligibleTimeEntries({ tasks, timeEntries: validEntries, invoices, billingPeriodStart: range.startDate, billingPeriodEnd: range.endDate })
+        .filter(entry => billableTaskIds.has(entry.taskId));
     const taskDurations = new Map<string, number>();
     eligible.forEach(entry => taskDurations.set(entry.taskId, (taskDurations.get(entry.taskId) || 0) + getBillableDurationMs(entry)));
     const unbilled = emptyMoney();

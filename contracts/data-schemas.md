@@ -61,6 +61,13 @@ Required: `id`, `title`. Optional legal/contact/address/tax/custom fields, hourl
 
 Required: `id`, `title`. Optional `projectId`, `parentTaskId`, notes, completion/archive/billable/order/activity/billing dates, start date, estimates, prompt behavior, quote billing snapshot, and recurrence state.
 
+`billable` is a saved task preference, not sufficient evidence of current client
+work. Read-only dashboard/report billability also requires the task's current
+non-personal project and matching client. Moving a task or changing its project
+client does not rewrite this flag, recorded time, or invoice snapshots.
+Automatic marking and billable controls require a non-personal project with a
+client assignment; retained flags remain readable without a migration.
+
 `lastBilledAt` is retained as legacy task-level compatibility metadata; it is not sufficient by itself to claim or exclude a time entry in current billing flows.
 
 Recurrence types are weekly, monthly, or yearly with their corresponding day/date settings. Subtasks must not use recurrence even though tolerant persisted validation may accept historical data pending normalization.
@@ -91,6 +98,12 @@ Historical invoices may omit cancellation metadata. A newly written canceled inv
 Each invoice item requires description, quantity, rate, and amount and may reference project/task/expense, original currency/exchange rate, line type, labels, and pricing mode (`hourly|flat|mixed`).
 
 `billingSelectionSnapshot` is additive, immutable versioned evidence captured before finalization. Version 1 records the invoice currency; exact selected entry IDs, task IDs, intervals, actual/billable durations, and billed rates; exact task pricing mode, quantity, rate, amount, and quoted allocation; and exact expense source/invoice amounts, currencies, and exchange rate. Finalization of a snapshot-backed draft must reject missing, changed, or already-consumed source records and must not discover newly arrived work during commit.
+
+New agent drafts optionally retain `agentDraft.projectClientIdAtPreview`
+(`string|null`) to detect changes to the source project's client independently
+of an explicitly selected invoice recipient. Older drafts remain supported
+through their saved project/invoice context. Task moves do not alter entry
+claims, billing increments, quoted claims, or finalized invoice snapshots.
 
 Billing snapshots are immutable evidence used for reporting/undo. Historical invoices may lack newer snapshots and require compatible fallback behavior; their absence must not make old records unreadable.
 

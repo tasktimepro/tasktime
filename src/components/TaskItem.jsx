@@ -1,3 +1,4 @@
+import { canTaskBeBillable } from '@/domain/time/taskBillability';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import TaskHeader from './task/TaskHeader';
 import TaskActions from './task/TaskActions';
@@ -105,6 +106,7 @@ const TaskItem = ({
         && !currentProject.isPersonal
         && currentProject.preferredClientId
     );
+    const canBillTask = canTaskBeBillable(task, currentProject);
     const isFlatRateProject = Boolean(currentProject?.flatRate);
 
     const getEntryOverlapMs = useCallback((entry, dayStart, dayEnd) => {
@@ -180,10 +182,10 @@ const TaskItem = ({
     }, [timeEntries, task.id, subtaskIds, task.lastBilledAt, task.createdAt]);
 
     useEffect(() => {
-        if (hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
+        if (canBillTask && !task.archived && hasSignificantBillableTime && !task.billableSetByUser && !task.billable) {
             updateTask(task.id, { billable: true, lastActive: Date.now() });
         }
-    }, [hasSignificantBillableTime, task.billableSetByUser, task.billable, task.id, updateTask]);
+    }, [canBillTask, task.archived, hasSignificantBillableTime, task.billableSetByUser, task.billable, task.id, updateTask]);
 
     /**
      * Toggle task completion status.
@@ -358,7 +360,7 @@ const TaskItem = ({
                                 onArchive={onArchive}
                                 onUnarchive={onUnarchive}
                                 onDelete={onDelete}
-                                onToggleBillable={onToggleBillable}
+                                onToggleBillable={canBillTask ? onToggleBillable : undefined}
                                 onShowTimeEntries={() => setShowTimeEntriesModal(true)}
                                 onEdit={handleEditTask}
                             />
@@ -411,7 +413,7 @@ const TaskItem = ({
                             onArchive={onArchive}
                             onUnarchive={onUnarchive}
                             onDelete={onDelete}
-                            onToggleBillable={onToggleBillable}
+                            onToggleBillable={canBillTask ? onToggleBillable : undefined}
                             onShowTimeEntries={() => setShowTimeEntriesModal(true)}
                             onEdit={handleEditTask}
                         />
@@ -439,7 +441,7 @@ const TaskItem = ({
                 <SubtaskSection
                     subtasks={subtasks}
                     task={task}
-                    onToggleBillable={onToggleBillable}
+                    onToggleBillable={canBillTask ? onToggleBillable : undefined}
                     onCreateSubtask={onCreateSubtask}
                     showCreateSubtaskForm={showCreateSubtaskForm}
                     setShowCreateSubtaskForm={setShowCreateSubtaskForm}

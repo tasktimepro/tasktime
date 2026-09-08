@@ -1,3 +1,4 @@
+import { isBillableTask } from '@/domain/time/taskBillability';
 import { endOfDay, startOfDay } from 'date-fns';
 import { differenceInCalendarDays } from 'date-fns/differenceInCalendarDays';
 import { parseStoredDate } from './dateUtils';
@@ -742,7 +743,7 @@ export const buildProjectWorkSummary = (entries: any[]) => {
         const actualMs = typeof entry?.start === 'number' && typeof entry?.end === 'number'
             ? Math.max(0, entry.end - entry.start)
             : 0;
-        const billableMs = entry?.task?.billable ? getBillableDurationMs(entry) : 0;
+        const billableMs = isBillableTask(entry?.task, entry?.project, entry?.client) ? getBillableDurationMs(entry) : 0;
 
         const current = grouped.get(taskId) || {
             taskId,

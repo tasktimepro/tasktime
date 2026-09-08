@@ -7,7 +7,7 @@ const range = { startDate: '2026-09-01', endDate: '2026-09-30' };
 const input = {
     range, todayStr: '2026-09-08', preferredCurrency: 'EUR',
     tasks: [{ id: 'billable', title: 'Client', projectId: 'p', billable: true }, { id: 'internal', title: 'Internal' }],
-    projects: [{ id: 'p', title: 'Project', hourlyRate: 100 }], clients: [],
+    projects: [{ id: 'p', title: 'Project', hourlyRate: 100, preferredClientId: 'client' }], clients: [{ id: 'client', title: 'Client' }],
     entries: [], invoices: [], expenses: [], recurrences: [],
     convertToCurrency: (amounts) => ({ amounts, hadConversionError: false }),
 };
@@ -25,6 +25,27 @@ describe('dashboard report', () => {
         expect(report.days[7]).toMatchObject({ date: '2026-09-08', billable: hour, nonBillable: 2.5 * hour, total: 3.5 * hour });
         expect(report.days[0].total).toBe(0);
         expect(report.days.reduce((sum, day) => sum + day.billable + day.nonBillable, 0)).toBe(report.time);
+    });
+
+    it.each([
+        ['standalone', null, undefined],
+        ['personal', 'p', { id: 'p', title: 'Personal', isPersonal: true, preferredClientId: 'client', hourlyRate: 100 }],
+        ['no client', 'p', { id: 'p', title: 'Internal', hourlyRate: 100 }],
+        ['missing client', 'p', { id: 'p', title: 'Orphan', preferredClientId: 'missing', hourlyRate: 100 }],
+        ['missing project', 'missing', undefined],
+    ])('keeps %s work non-billable despite a retained task flag', (_label, projectId, project) => {
+        const source = { ...input,
+            tasks: [{ id: 'task', title: 'Moved task', projectId, billable: true }],
+            projects: project ? [project] : [], clients: [{ id: 'client', title: 'Client' }],
+            entries: [{ id: 'entry', taskId: 'task', start, end: start + hour, billedDurationMs: 2 * hour }],
+        };
+        const before = JSON.stringify(source);
+        const report = buildDashboardReport(source);
+        expect(report.days[7]).toMatchObject({ billable: 0, nonBillable: hour, total: hour });
+        expect(report.unbilled.amounts).toEqual({});
+        expect(report.unbilledTime).toBe(0);
+        expect(report.unpricedTime).toBe(0);
+        expect(JSON.stringify(source)).toBe(before);
     });
 
     it('uses canonical eligibility, preserving late work before the old cutoff and excluding billing markers', () => {
@@ -97,6 +118,19 @@ describe('dashboard report', () => {
         expect(buildDashboardReport(source).unbilled.amounts).toEqual({});
         expect(JSON.stringify(source)).toBe(before);
         expect(buildDashboardReport({ ...source, invoices: [{ ...invoice, status: 'canceled' }] }).unbilled.amounts).toEqual({ EUR: 100 });
+    });
+
+    it('keeps complete legacy merged-task billing evidence when one task is now personal', () => {
+        const tasks = [...input.tasks, { id: 'moved', title: 'Moved subtask', projectId: null, billable: true }];
+        const entries = [
+            { id: 'parent-entry', taskId: 'billable', start, end: start + hour },
+            { id: 'moved-entry', taskId: 'moved', start, end: start + hour },
+        ];
+        const invoices = [{ id: 'legacy', date: '2026-09-09', status: 'sent', billingPeriodStart: '2026-09-01', billingPeriodEnd: '2026-09-30', tasks: [{ id: 'billable', originalTimeMs: 2 * hour, mergedSubtasks: ['moved'] }] }];
+        const report = buildDashboardReport({ ...input, tasks, entries, invoices });
+        expect(report.time).toBe(2 * hour);
+        expect(report.billableTime).toBe(hour);
+        expect(report.unbilledTime).toBe(0);
     });
 
     it('excludes future auto-paid expenses and recurring previews from spending', () => {

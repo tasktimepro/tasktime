@@ -58,12 +58,12 @@ export const buildInvoiceTaskData = ({
     const projectTaskMap = new Map(projectTasks.map(task => [task.id, task]));
 
     const billableEntries = getInvoiceEligibleTimeEntries({
-        tasks: projectTasks,
+        tasks,
         timeEntries,
         invoices,
         billingPeriodStart,
         billingPeriodEnd,
-    });
+    }).filter(entry => projectTaskMap.has(entry.taskId));
 
     // Get manually marked billable tasks (tasks with billable: true)
     // IMPORTANT: Explicitly check for billable === true to exclude tasks marked as non-billable

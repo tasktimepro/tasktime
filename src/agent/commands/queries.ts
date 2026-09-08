@@ -1,3 +1,4 @@
+import { getBillableTaskIds } from '@/domain/time/taskBillability';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 import type { Client, Expense, Invoice, MultiTimerState, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
@@ -112,6 +113,14 @@ async function getCompleteBillingData(context: AgentCommandContext): Promise<{
     };
 }
 
+/** Match complete legacy billing evidence before filtering current client work. */
+function getCurrentlyUnbilledEntries(context: AgentCommandContext, data: Awaited<ReturnType<typeof getCompleteBillingData>>): TimeEntry[] {
+    const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent query clients');
+    const ids = getBillableTaskIds(data.tasks, getProjects(context), clients);
+    return getInvoiceEligibleTimeEntries({ tasks: data.tasks, timeEntries: data.entries, invoices: data.invoices })
+        .filter(entry => ids.has(entry.taskId));
+}
+
 function getTaskProjectId(task: Task | undefined): string | null {
     if (!task) {
         return null;
@@ -166,11 +175,7 @@ export async function getDashboardSummaryCommand(context: AgentCommandContext): 
     const tasks = billingData.tasks.filter((task) => !task.archived);
     const expenses = getExpenses(context);
     const invoices = billingData.invoices;
-    const unbilledEntries = getInvoiceEligibleTimeEntries({
-        tasks: billingData.tasks,
-        timeEntries: billingData.entries,
-        invoices,
-    });
+    const unbilledEntries = getCurrentlyUnbilledEntries(context, billingData);
 
     return {
         projectCount: projects.length,
@@ -199,11 +204,7 @@ export async function getProjectOverviewCommand(
     const taskById = new Map(billingData.tasks.map((task) => [task.id, task]));
     const unbilledEntries = filterEntries(
         { projectId: project.id },
-        getInvoiceEligibleTimeEntries({
-            tasks: billingData.tasks,
-            timeEntries: billingData.entries,
-            invoices: billingData.invoices,
-        }),
+        getCurrentlyUnbilledEntries(context, billingData),
         taskById
     );
     const expenses = getExpenses(context).filter((expense) => expense.projectId === project.id);
@@ -270,11 +271,7 @@ export async function findUnbilledTimeCommand(
         invoices: billingData.invoices,
     });
 
-    return filterEntries(input, getInvoiceEligibleTimeEntries({
-        tasks: billingData.tasks,
-        timeEntries: billingData.entries,
-        invoices: billingData.invoices,
-    }), taskById)
+    return filterEntries(input, getCurrentlyUnbilledEntries(context, billingData), taskById)
         .sort((a, b) => b.end - a.end)
         .slice(0, getLimit(input.limit))
         .map((entry) => summarizeEntry(entry, taskById, legacyBilledEntryIds));

@@ -46,9 +46,9 @@ Prefer shared buttons, inputs, labels, selects, dialogs, dropdowns, cards, badge
 
 Dashboard charts use Recharts 3, the same chart engine used by shadcn, with the
 existing card/select primitives and semantic theme tokens. Billable work uses
-`--status-info-accent`; non-billable work uses `--chart-non-billable`, a muted blue
-that remains visible in both themes. Keep surfaces neutral and reserve semantic
-warning/error colors for actionable status. The chart has a labelled legend,
+`--status-info-accent`; non-billable work uses `--chart-non-billable`, a soft light
+blue in light mode and a muted darker blue in dark mode. Keep surfaces neutral
+and reserve semantic warning/error colors for actionable status. The chart has a labelled legend,
 keyboard/touch tooltip, no animation, and a screen-reader daily-values table.
 The chart sits in a bordered panel aligned with the metric grid; its legend is
 right-aligned beside the title. Totals and trends stay in the metric cards.

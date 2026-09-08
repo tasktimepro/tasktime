@@ -1,3 +1,4 @@
+import { isBillableTask } from '@/domain/time/taskBillability';
 /**
  * TaskViewModal - Preview modal for tasks
  * 
@@ -301,12 +302,12 @@ const TaskViewModal = ({
     }, [currentTask, dateStr, dateTotalWithSubtasks, todayTotalWithSubtasks, totalTimeWithSubtasks]);
 
     const billableTotal = useMemo(() => {
-        if (!currentTask?.billable) return 0;
+        if (!isBillableTask(currentTask, project, projectClient)) return 0;
         if (!billableRateInfo.rate || billableRateInfo.rate <= 0) return 0;
         const hours = millisecondsToHours(billableTimeMs);
         const roundedHours = Math.round(hours * 100) / 100;
         return roundedHours * billableRateInfo.rate;
-    }, [billableRateInfo.rate, billableTimeMs, currentTask?.billable]);
+    }, [billableRateInfo.rate, billableTimeMs, currentTask, project, projectClient]);
 
     const shouldShowBillableTotal = useMemo(() => {
         return !isTimerActive
@@ -315,8 +316,8 @@ const TaskViewModal = ({
     }, [billableRateInfo.currency, billableTotal, isTimerActive]);
 
     const canToggleBillable = useMemo(() => {
-        return Boolean(project && !project.isPersonal && !currentTask?.archived);
-    }, [project, currentTask?.archived]);
+        return Boolean(project && !project.isPersonal && projectClient && !currentTask?.archived);
+    }, [project, projectClient, currentTask?.archived]);
 
     const liveTaskTime = useMemo(() => {
         if (!currentTask) return 0;
