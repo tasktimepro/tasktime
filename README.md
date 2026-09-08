@@ -99,6 +99,21 @@ Compose project, so ordinary one-off validation commands cannot stop them:
 make dev
 ```
 
+The full stack also has its own `node_modules` volume. Installing dependencies
+with a one-off validation command does not update that running app. After
+`package.json` or `package-lock.json` changes, refresh the running app's locked
+dependencies and let Vite restart without interrupting the other services:
+
+```bash
+docker exec tasktime npm ci
+touch vite.config.js
+```
+
+Run validation through the Makefile's test targets so it uses isolated default
+feature settings. Commands executed inside the running full-stack container
+inherit its billing sandbox flags, which enable account-policy enforcement that
+the default test fixtures do not assume.
+
 Preparation accepts a current `STRIPE_SECRET_KEY=sk_test_...` or the authenticated
 Stripe CLI profiles. When several accounts are configured, it safely selects the
 test credential that can read TaskTime's exact configured Price instead of

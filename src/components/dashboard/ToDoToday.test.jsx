@@ -164,18 +164,18 @@ describe('ToDoToday', () => {
         expect(screen.getByText('Nothing due today').closest('div')?.className).toContain('pt-4')
     })
 
-    it('renders tasks and toggles upcoming section', async () => {
-        const user = userEvent.setup()
-
+    it('shows upcoming tasks in their own visible panel, outside today', () => {
         renderComponent()
 
         expect(screen.getByText('To Do Today (2)')).toBeInTheDocument()
         expect(screen.getByText('Overdue Task')).toBeInTheDocument()
         expect(screen.getByText('Today Task')).toBeInTheDocument()
 
-        expect(screen.queryByText('Upcoming Task')).not.toBeInTheDocument()
-        await user.click(screen.getByText('Upcoming tasks (1)'))
-        expect(screen.getByText('Upcoming Task')).toBeInTheDocument()
+        const today = screen.getByRole('region', { name: 'To Do Today (2)' })
+        const upcoming = screen.getByRole('region', { name: 'Upcoming' })
+        expect(within(today).queryByText('Upcoming Task')).not.toBeInTheDocument()
+        expect(within(upcoming).getByText('Upcoming Task')).toBeInTheDocument()
+        expect(within(upcoming).getByText('Next 7 days')).toBeInTheDocument()
     })
 
     it('stacks task metadata and actions below the title content', () => {
@@ -312,8 +312,7 @@ describe('ToDoToday', () => {
         expect(props.onTaskTitleClick).toHaveBeenCalledWith(expect.objectContaining({ id: recurringCarryOver.id }))
     })
 
-    it('renders and toggles upcoming expenses', async () => {
-        const user = userEvent.setup()
+    it('shows upcoming expenses immediately in the upcoming panel', () => {
         hookMocks.expenses = [
             {
                 id: 'expense-upcoming',
@@ -334,9 +333,7 @@ describe('ToDoToday', () => {
             upcomingTasks: [],
         })
 
-        expect(screen.queryByText('Upcoming Expense')).not.toBeInTheDocument()
-        await user.click(screen.getByText('Upcoming expenses (1)'))
-        expect(screen.getByText('Upcoming Expense')).toBeInTheDocument()
+        expect(within(screen.getByRole('region', { name: 'Upcoming' })).getByText('Upcoming Expense')).toBeInTheDocument()
     })
 
     it('marks manual unpaid expense as paid and opens expense view', async () => {
@@ -398,8 +395,7 @@ describe('ToDoToday', () => {
         expect(hookMocks.showError).toHaveBeenCalledWith('mark failed')
     })
 
-    it('hides mark paid button for auto-fixed, paid, and preview expenses', async () => {
-        const user = userEvent.setup()
+    it('hides mark paid button for auto-fixed, paid, and preview expenses', () => {
         hookMocks.expenses = [
             {
                 id: 'expense-auto',
@@ -443,7 +439,6 @@ describe('ToDoToday', () => {
             upcomingTasks: [],
         })
 
-        await user.click(screen.getByText(/Upcoming expenses/i))
         expect(screen.getByText('Preview expense')).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Mark expense paid' })).not.toBeInTheDocument()
     })

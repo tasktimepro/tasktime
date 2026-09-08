@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
     BanknotesIcon,
     BuildingOfficeIcon,
-    ClipboardDocumentCheckIcon,
+    ProjectIcon,
     DocumentTextIcon,
     FilterIcon,
     FunnelXIcon,
@@ -97,7 +97,7 @@ function ReportFilters({
                         <div className="space-y-1">
                             <div className="text-xs font-medium text-muted-foreground">Project</div>
                             <Select value={projectId} onValueChange={onProjectIdChange}>
-                                <SelectTrigger className={triggerClassName} leadingIcon={ClipboardDocumentCheckIcon} aria-label="Project filter">
+                                <SelectTrigger className={triggerClassName} leadingIcon={ProjectIcon} aria-label="Project filter">
                                     <SelectValue placeholder="Project" />
                                 </SelectTrigger>
                                 <SelectContent>

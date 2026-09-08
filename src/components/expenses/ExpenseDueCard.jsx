@@ -19,6 +19,7 @@ const ExpenseDueCard = ({
     isOverdue = false,
     isPreview = false,
     recurrence = null,
+    compact = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const isVariable = expense.amountType === 'variable';
@@ -108,7 +109,7 @@ const ExpenseDueCard = ({
         <div
             className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${isOverdue ? 'opacity-90' : ''}`}
         >
-            {isMobileLayout ? (
+            {isMobileLayout || compact ? (
                 <div className="flex items-start gap-3">
                     <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
                     <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden" data-testid={`expense-row-content-${expense.id}`}>

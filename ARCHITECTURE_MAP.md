@@ -58,6 +58,13 @@ Approval-gated Phase 4 production target
 
 - Components call hooks or focused domain/application functions; they do not create parallel persistence paths.
 - Hooks expose Yjs-backed collections and mutations through `YjsContext`/`YjsStore`.
+- Dashboard `useDashboardHistory` observes validated existing active/archive maps
+  and loads selected/comparison/current-period entry years plus legacy billing
+  intervals.
+  `dashboardMetrics.ts` projects actual chart time and canonical financial values;
+  `DashboardHoursChart` loads Recharts from the separate precached chart bundle.
+  Existing mutation handlers and the `/reports` entitlement branch remain owners
+  of their behavior. See `spec/designs/work-and-time.md` for metric definitions.
 - Domain modules remain UI-independent and receive explicit inputs/dependencies.
 - `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own the provider-neutral algorithm; `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google compatibility facades. Provider-neutral context/UI APIs expose Dropbox by default; an explicit build-time false value is an emergency UI opt-out, while matching Worker controls remain the fail-closed runtime boundary.
 - `YjsContext.disconnectActiveCloudSession(...)` owns the active provider/session/generation lifecycle boundary used by Cloud Sync settings, Account sign-out/deletion, and agent deletion. User-facing flows expose only Disconnect and Wipe data & disconnect; provider-specific revoke and local-session operations remain internal adapters.

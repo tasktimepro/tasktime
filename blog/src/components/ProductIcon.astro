@@ -1,0 +1,26 @@
+---
+import { createElement, type ElementType } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
+interface Props {
+    icon: ElementType;
+    variant?: 'card' | 'inline';
+    size?: number;
+    class?: string;
+}
+
+const { icon, variant = 'card', size = 24, class: className } = Astro.props;
+// Render the app's icon components at build time; the page needs no React runtime.
+const svg = renderToStaticMarkup(createElement(icon, {
+    size,
+    className,
+    'aria-hidden': true,
+    focusable: false,
+}));
+---
+
+{variant === 'card' ? (
+    <span class="product-card-icon" aria-hidden="true"><Fragment set:html={svg} /></span>
+) : (
+    <Fragment set:html={svg} />
+)}

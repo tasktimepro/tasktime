@@ -135,6 +135,15 @@ The Yjs store is split into documents so current work stays loaded and historica
    retaining its audit history. An isolated rehearsal validates the same
    lifecycle without production effects.
 
+The dashboard separates Today/Upcoming actions from fixed-timeframe summaries
+and preset-period reports with preceding-period trends. Its stacked chart uses
+actual saved time; unbilled estimates and payment totals retain canonical billing
+and currency semantics.
+Validated history loads through existing Yjs store APIs, with explicit loading
+and retry. The chart bundle is lazy and precached for offline navigation; the
+service worker tolerates Origin-header variation only for manifest-listed public
+build assets. No persisted contract or `/reports` entitlement changes are involved.
+
 ## Reliability and security model
 
 - Local data remains usable offline; cloud features are optional.

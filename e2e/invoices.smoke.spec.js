@@ -208,16 +208,15 @@ test.describe('Invoices smoke', () => {
         await page.goto('/');
         await expect(page.getByText('Reports Overview')).toBeVisible();
 
-        const thisMonthCard = page.getByRole('heading', { name: 'This Month', exact: true }).locator('xpath=ancestor::div[contains(@class, "rounded-lg")][1]');
-        await expect(thisMonthCard).toContainText('received');
+        const thisMonthCard = page.getByRole('region', { name: 'Reports Overview' }).getByRole('heading', { name: 'Received', exact: true }).locator('../..');
+        await expect(page.getByRole('combobox', { name: 'Dashboard report period' })).toHaveText('This Month');
         await expect(thisMonthCard).toContainText(frozenReceivedAmount);
 
         await updateExchangeRateCache(page, { USD: 1, EUR: 0.25 });
         await page.reload();
 
         await expect(page.getByText('Reports Overview')).toBeVisible();
-        const reloadedThisMonthCard = page.getByRole('heading', { name: 'This Month', exact: true }).locator('xpath=ancestor::div[contains(@class, "rounded-lg")][1]');
-        await expect(reloadedThisMonthCard).toContainText('received');
+        const reloadedThisMonthCard = page.getByRole('region', { name: 'Reports Overview' }).getByRole('heading', { name: 'Received', exact: true }).locator('../..');
         await expect(reloadedThisMonthCard).toContainText(frozenReceivedAmount);
         await expect(reloadedThisMonthCard).not.toContainText(liveConvertedAmountAfterRateChange);
     });

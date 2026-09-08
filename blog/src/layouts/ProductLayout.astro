@@ -1,6 +1,8 @@
 ---
 import '../styles/global.css';
 import '../styles/product.css';
+import ProductIcon from '../components/ProductIcon.astro';
+import { MoonIcon, SunIcon } from '@/components/ui/icons';
 import {
     DEFAULT_SOCIAL_IMAGE,
     DEFAULT_SOCIAL_IMAGE_ALT,
@@ -148,20 +150,8 @@ const structuredData = {
                     <div class="site-header-controls">
                         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle color theme">
                             <span class="sr-only">Toggle color theme</span>
-                            <svg class="theme-toggle__icon theme-toggle__icon--moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"></path>
-                            </svg>
-                            <svg class="theme-toggle__icon theme-toggle__icon--sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                                <circle cx="12" cy="12" r="4"></circle>
-                                <path d="M12 2v2"></path>
-                                <path d="M12 20v2"></path>
-                                <path d="m4.93 4.93 1.41 1.41"></path>
-                                <path d="m17.66 17.66 1.41 1.41"></path>
-                                <path d="M2 12h2"></path>
-                                <path d="M20 12h2"></path>
-                                <path d="m6.34 17.66-1.41 1.41"></path>
-                                <path d="m19.07 4.93-1.41 1.41"></path>
-                            </svg>
+                            <ProductIcon icon={MoonIcon} variant="inline" size={18} class="theme-toggle__icon theme-toggle__icon--moon" />
+                            <ProductIcon icon={SunIcon} variant="inline" size={18} class="theme-toggle__icon theme-toggle__icon--sun" />
                         </button>
                     </div>
                 </div>

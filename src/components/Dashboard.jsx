@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import TaskTimer from './TaskTimer';
 import {
-    formatDuration,
     parseStoredDate,
     toStorageDate
 } from '../utils/dateUtils';
-import { addDays, endOfMonth, startOfMonth, subDays, subMonths } from 'date-fns';
+import { addDays, subDays } from 'date-fns';
 import { useToast } from '../hooks/useToast';
 import { useTasks } from '../hooks/useTasks';
 import { useTimeEntries } from '../hooks/useTimeEntries';
@@ -17,6 +16,9 @@ import { THIRTY_DAYS_MS, ONE_HOUR_MS, ONE_MINUTE_MS } from '../constants/app';
 import useCurrencyConversion from './dashboard/hooks/useCurrencyConversion';
 import useMetricsCalculation from './dashboard/hooks/useMetricsCalculation';
 import MetricsCards from './dashboard/MetricsCards';
+import DashboardSummaryCards from './dashboard/DashboardSummaryCards';
+import useDashboardHistory from './dashboard/hooks/useDashboardHistory';
+import { buildDashboardPeriodOptions, resolveDashboardPeriod } from './dashboard/dashboardMetrics';
 import RecentTasks from './dashboard/RecentTasks';
 import ProjectsOverview from './dashboard/ProjectsOverview';
 import TimeEntriesOverview from './dashboard/TimeEntriesOverview';
@@ -35,8 +37,9 @@ import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
+import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import { linkifyNodes } from '@/utils/linkifyUtils';
-import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate, getPaidExpenseConvertedAmount } from '@/utils/expenseUtils';
+import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import AddTimeEntryModal from '@/components/modals/AddTimeEntryModal';
 import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
 
@@ -132,7 +135,6 @@ const Dashboard = ({
     onViewTask,
     openExpenseView
 }) => {
-    const hasClients = clients.length > 0;
     const { showWarning, showSuccess, showError } = useToast();
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [taskFilter, setTaskFilter] = useState(DEFAULT_TASK_FILTER);
@@ -140,6 +142,8 @@ const Dashboard = ({
     const [projectFilter, setProjectFilter] = useState(DEFAULT_PROJECT_FILTER);
     const [timeEntriesProjectFilter, setTimeEntriesProjectFilter] = useState(DEFAULT_TIME_ENTRIES_PROJECT_FILTER);
     const [expenseFilter, setExpenseFilter] = useState(DEFAULT_EXPENSES_FILTER);
+    const [reportPeriod, setReportPeriod] = useState('this-month');
+    const isMobileLayout = useIsMobileLayout();
     
     // Use Yjs hooks directly
     const {
@@ -173,7 +177,10 @@ const Dashboard = ({
     const notificationSeenKeysRef = useRef(new Set());
     const notificationSeenDayRef = useRef(null);
     const [notificationPermission] = useState(getNotificationPermission);
-    const todayStr = useTodayString();
+    const todayStr = useTodayString() || toStorageDate(new Date());
+    const reportRange = useMemo(() => resolveDashboardPeriod(reportPeriod, todayStr), [reportPeriod, todayStr]);
+    const history = useDashboardHistory(reportRange, todayStr);
+    const periodOptions = useMemo(() => buildDashboardPeriodOptions(todayStr, history.availableYears), [todayStr, history.availableYears]);
     const [showAddEntryModal, setShowAddEntryModal] = useState(false);
     const [addEntryTask, setAddEntryTask] = useState(null);
     const [addEntryDateStr, setAddEntryDateStr] = useState(null);
@@ -269,184 +276,13 @@ const Dashboard = ({
         needsExchangeRates,
         missingExchangeRates,
         convertToCurrency
-    } = useCurrencyConversion({ projects, invoices, clients });
+    } = useCurrencyConversion({ projects, invoices: history.invoices, expenses: history.expenses, clients });
 
-    const {
-        thisMonthMetrics,
-        lastMonthMetrics,
-        last90DaysMetrics,
-        invoiceMetrics,
-        thisMonthBillableHours,
-        thisMonthUnbilledDisplay
-    } = useMetricsCalculation({
-        timeEntries,
-        tasks: activeTasks,
-        projects,
-        invoices,
-        clients,
-        preferredCurrency,
-        convertToCurrency
-    });
-
-    const expenseMetricsByCurrency = useMemo(() => {
-        const todayDate = parseStoredDate(todayStr) || new Date();
-        const monthStart = startOfMonth(todayDate);
-        const monthEnd = endOfMonth(todayDate);
-        const lastMonthStart = startOfMonth(subMonths(todayDate, 1));
-        const lastMonthEnd = endOfMonth(subMonths(todayDate, 1));
-        const last90Start = subDays(todayDate, 89);
-
-        const monthEndStr = toStorageDate(monthEnd) || '';
-        const upcomingStart = addDays(todayDate, 1);
-        const upcomingStartStr = toStorageDate(upcomingStart) || '';
-
-        const datesByRecurrence = new Map();
-        expenses.forEach((expense) => {
-            if (!expense.recurrenceId) return;
-            if (!datesByRecurrence.has(expense.recurrenceId)) {
-                datesByRecurrence.set(expense.recurrenceId, new Set());
-            }
-            datesByRecurrence.get(expense.recurrenceId).add(expense.date);
-        });
-
-        const recurringPreviews = recurrences
-            .filter((recurrence) => recurrence.active)
-            .map((recurrence) => {
-                if (!upcomingStartStr || !monthEndStr) return null;
-
-                const baseStart = recurrence.lastGeneratedDate
-                    ? advanceByRepeat(
-                        recurrence.lastGeneratedDate,
-                        recurrence.repeat,
-                        recurrence.monthlyType,
-                        recurrence.monthlyDay
-                    )
-                    : recurrence.startDate;
-
-                const nextDate = getNextRecurringDate({
-                    startDate: baseStart,
-                    repeat: recurrence.repeat,
-                    monthlyType: recurrence.monthlyType,
-                    monthlyDay: recurrence.monthlyDay,
-                    endDate: recurrence.endDate,
-                    fromDate: upcomingStartStr,
-                });
-
-                if (!nextDate) return null;
-                const nextParsed = parseStoredDate(nextDate);
-                if (!nextParsed || nextParsed > monthEnd) return null;
-
-                const existingDates = datesByRecurrence.get(recurrence.id);
-                if (existingDates?.has(nextDate)) {
-                    return null;
-                }
-
-                const preview = buildExpenseFromRecurrence(recurrence, nextDate);
-                return {
-                    ...preview,
-                    id: `preview-${recurrence.id}-${nextDate}`,
-                    isPreview: true,
-                };
-            })
-            .filter(Boolean);
-
-        const upcomingExpenses = [...expenses, ...recurringPreviews].filter((expense) => {
-            const expenseDate = parseStoredDate(expense.date);
-            if (!expenseDate) return false;
-            if (expenseDate <= todayDate) return false;
-            return expenseDate >= monthStart && expenseDate <= monthEnd;
-        });
-
-        const addAmount = (acc, key, currency, amount) => {
-            acc[key][currency] = (acc[key][currency] || 0) + (amount || 0);
-        };
-
-        const initial = {
-            upcomingThisMonth: {},
-            upcomingThisMonthHasEstimate: false,
-            paidThisMonth: {},
-            paidThisMonthLiveFallback: {},
-            paidLastMonth: {},
-            paidLastMonthLiveFallback: {},
-            paidLast90Days: {},
-            paidLast90DaysLiveFallback: {},
-        };
-
-        const withUpcoming = upcomingExpenses.reduce((acc, expense) => {
-            const currency = expense.currency || preferences.currency || 'EUR';
-            addAmount(acc, 'upcomingThisMonth', currency, expense.amount || 0);
-            if (expense.amountType === 'variable') {
-                acc.upcomingThisMonthHasEstimate = true;
-            }
-            return acc;
-        }, initial);
-
-        return expenses.reduce((acc, expense) => {
-            const expenseDate = parseStoredDate(expense.date);
-            if (!expenseDate) return acc;
-
-            const currency = expense.currency || preferences.currency || 'EUR';
-            const amount = expense.amount || 0;
-            const resolvedPaidAmount = expense.paymentStatus === 'paid'
-                ? getPaidExpenseConvertedAmount(expense, preferredCurrency)
-                : null;
-
-            const addPaidAmount = (resolvedKey, fallbackKey) => {
-                if (!resolvedPaidAmount) {
-                    return;
-                }
-
-                if (resolvedPaidAmount.success) {
-                    addAmount(acc, resolvedKey, resolvedPaidAmount.currency, resolvedPaidAmount.amount);
-                    return;
-                }
-
-                addAmount(acc, fallbackKey, currency, amount);
-            };
-
-            if (expenseDate >= monthStart && expenseDate <= monthEnd && expenseDate <= todayDate && expense.paymentStatus === 'paid') {
-                addPaidAmount('paidThisMonth', 'paidThisMonthLiveFallback');
-            }
-
-            if (expense.paymentStatus === 'paid') {
-                if (expenseDate >= lastMonthStart && expenseDate <= lastMonthEnd) {
-                    addPaidAmount('paidLastMonth', 'paidLastMonthLiveFallback');
-                }
-
-                if (expenseDate >= last90Start && expenseDate <= todayDate) {
-                    addPaidAmount('paidLast90Days', 'paidLast90DaysLiveFallback');
-                }
-            }
-
-            return acc;
-        }, withUpcoming);
-    }, [expenses, preferredCurrency, preferences.currency, recurrences, todayStr]);
-
-    const expenseMetrics = useMemo(() => {
-        const upcoming = convertToCurrency(expenseMetricsByCurrency.upcomingThisMonth);
-        const mergeConvertedAmounts = (resolvedAmounts, fallbackAmounts) => {
-            return Object.entries(fallbackAmounts).reduce((merged, [currency, amount]) => {
-                merged[currency] = (merged[currency] || 0) + amount;
-                return merged;
-            }, { ...resolvedAmounts });
-        };
-
-        const paidThisMonthFallback = convertToCurrency(expenseMetricsByCurrency.paidThisMonthLiveFallback);
-        const paidLastMonthFallback = convertToCurrency(expenseMetricsByCurrency.paidLastMonthLiveFallback);
-        const paidLast90DaysFallback = convertToCurrency(expenseMetricsByCurrency.paidLast90DaysLiveFallback);
-
-        const paidThisMonth = mergeConvertedAmounts(expenseMetricsByCurrency.paidThisMonth, paidThisMonthFallback.amounts);
-        const paidLastMonth = mergeConvertedAmounts(expenseMetricsByCurrency.paidLastMonth, paidLastMonthFallback.amounts);
-        const paidLast90Days = mergeConvertedAmounts(expenseMetricsByCurrency.paidLast90Days, paidLast90DaysFallback.amounts);
-
-        return {
-            upcomingThisMonthTotal: upcoming.amounts[preferredCurrency] || 0,
-            upcomingThisMonthHasEstimate: expenseMetricsByCurrency.upcomingThisMonthHasEstimate,
-            paidThisMonthTotal: paidThisMonth[preferredCurrency] || 0,
-            paidLastMonthTotal: paidLastMonth[preferredCurrency] || 0,
-            paidLast90DaysTotal: paidLast90Days[preferredCurrency] || 0,
-        };
-    }, [convertToCurrency, expenseMetricsByCurrency, preferredCurrency]);
+    const metricsInput = useMemo(() => ({
+        range: reportRange, todayStr, preferredCurrency, convertToCurrency, projects, clients,
+        entries: history.entries, tasks: history.tasks, invoices: history.invoices, expenses: history.expenses,
+    }), [reportRange, todayStr, preferredCurrency, convertToCurrency, projects, clients, history.entries, history.tasks, history.invoices, history.expenses]);
+    const { report, comparison, currentMonth, todayTime, recentDays } = useMetricsCalculation(metricsInput);
 
     // Show warning if any conversion errors occurred (only once per session)
     useEffect(() => {
@@ -495,22 +331,19 @@ const Dashboard = ({
         }
 
         const hasConversionErrors =
-            thisMonthMetrics.hadConversionError ||
-            lastMonthMetrics.hadConversionError ||
-            last90DaysMetrics.hadConversionError;
+            [report.unbilled, report.received, report.spent, currentMonth.unpaid].some(value => value.hadConversionError);
 
         if (hasConversionErrors) {
             const warningKey = 'conversion:generic';
             if (!conversionWarningShown && lastWarningKeyRef.current !== warningKey) {
                 lastWarningKeyRef.current = warningKey;
-                showWarning('Some currency conversions could not be completed. Amounts may be approximate.');
+                showWarning('Some currency conversions are unavailable. Amounts are shown in their original currencies.');
                 setConversionWarningShown(true);
             }
         }
     }, [
-        thisMonthMetrics,
-        lastMonthMetrics,
-        last90DaysMetrics,
+        report,
+        currentMonth,
         conversionWarningShown,
         needsExchangeRates,
         exchangeRatesLoading,
@@ -1109,54 +942,46 @@ const Dashboard = ({
         showSuccess('Task archived');
     }, [archiveTask, timers, clearTimer, showSuccess]);
 
-    const reportsOverview = (
-        <MetricsCards
-            thisMonthMetrics={thisMonthMetrics}
-            lastMonthMetrics={lastMonthMetrics}
-            last90DaysMetrics={last90DaysMetrics}
-            invoiceMetrics={invoiceMetrics}
-            thisMonthBillableHours={thisMonthBillableHours}
-            thisMonthUnbilledDisplay={thisMonthUnbilledDisplay}
-            expenseThisMonthUpcomingTotal={expenseMetrics.upcomingThisMonthTotal}
-            expenseThisMonthUpcomingHasEstimate={expenseMetrics.upcomingThisMonthHasEstimate}
-            expenseThisMonthPaidTotal={expenseMetrics.paidThisMonthTotal}
-            expenseLastMonthPaidTotal={expenseMetrics.paidLastMonthTotal}
-            expenseLast90DaysPaidTotal={expenseMetrics.paidLast90DaysTotal}
-            hasClients={hasClients}
-            preferredCurrency={preferredCurrency}
-            formatDuration={formatDuration}
-            needsExchangeRates={needsExchangeRates}
-            exchangeRatesLoading={exchangeRatesLoading}
-            navigateToInvoices={navigateToInvoices}
-        />
+    const overdueIds = new Set(overdueTasks.filter(task => !getTaskCompletedStatus(task)).map(task => task.id));
+    const dueCount = new Set(tasksForToday.filter(task => !getTaskCompletedStatus(task) && !overdueIds.has(task.id)).map(task => task.id)).size;
+
+    const summaryCards = (
+        <div className="min-w-0">
+            <DashboardSummaryCards currentMonth={currentMonth} todayTime={todayTime} recentDays={recentDays} dueCount={dueCount} overdueCount={overdueIds.size} preferredCurrency={preferredCurrency} loading={history.isLoading} error={history.error} navigateToInvoices={navigateToInvoices} />
+        </div>
     );
 
-
     return (
-        <div className="space-y-6">
-            <ToDoToday
-                overdueTasks={overdueTasks}
-                tasksForToday={tasksForToday}
-                upcomingTasks={upcomingTasks}
-                handleCompleteTask={handleCompleteTask}
-                getTaskCompletedStatus={getTaskCompletedStatus}
-                renderTaskTitle={renderTaskTitle}
-                renderTaskControls={renderTaskControls}
-                handleProjectTitleClick={handleProjectTitleClick}
-                onTaskTitleClick={handleTaskTitleClick}
-                onEditTask={handleEditTask}
-                onDeleteTask={handleDeleteTask}
-                onArchiveTask={handleArchiveTask}
-                openExpenseView={openExpenseView}
-            />
+        <div className="flex min-w-0 flex-col gap-6">
+            {!isMobileLayout && summaryCards}
+            <div className="min-w-0">
+                <ToDoToday
+                    overdueTasks={overdueTasks}
+                    tasksForToday={tasksForToday}
+                    upcomingTasks={upcomingTasks}
+                    handleCompleteTask={handleCompleteTask}
+                    getTaskCompletedStatus={getTaskCompletedStatus}
+                    renderTaskTitle={renderTaskTitle}
+                    renderTaskControls={renderTaskControls}
+                    handleProjectTitleClick={handleProjectTitleClick}
+                    onTaskTitleClick={handleTaskTitleClick}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
+                    onArchiveTask={handleArchiveTask}
+                    openExpenseView={openExpenseView}
+                />
 
-            {reportsOverview}
+            </div>
+            {isMobileLayout && summaryCards}
+            <div className="min-w-0">
+                <MetricsCards report={report} comparison={comparison} period={reportPeriod} periodOptions={periodOptions} onPeriodChange={setReportPeriod} preferredCurrency={preferredCurrency} loading={history.isLoading} error={history.error} onRetry={history.retry} />
+            </div>
 
             {/* Below-fold widgets deferred until after initial paint */}
             {deferredReady && (
                 <>
                     {/* Recent Tasks and Projects Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
                         <RecentTasks
                             recentTasks={recentTasks}
                             taskFilter={taskFilter}
@@ -1187,7 +1012,7 @@ const Dashboard = ({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
                         <TimeEntriesOverview
                             entries={dashboardTimeEntries}
                             projects={sortedDashboardProjects}

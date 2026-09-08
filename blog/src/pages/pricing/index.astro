@@ -44,7 +44,7 @@ const freeFeatures = [
 const proFeatures = [
     'Unlimited active clients',
     'Advanced professional reports and exports',
-    'TaskTime-hosted invoice, quote, and reminder sending',
+    'Hosted invoice, quote, and reminder sending',
     'Everything included in Free',
 ];
 
@@ -72,7 +72,7 @@ const comparisonRows = [
     {
         feature: 'Invoice, quote, and reminder delivery',
         free: 'Download, copy, or send manually',
-        pro: 'TaskTime-hosted sending included',
+        pro: 'Hosted sending included',
     },
     {
         feature: 'Google Drive or Dropbox sync and backups',
@@ -89,7 +89,7 @@ const comparisonRows = [
 const faqs = [
     {
         question: 'Is Free a limited trial?',
-        answer: 'No. Free stays free, open source, and usable without a TaskTime account. It includes the complete local-first workflow for one active client at a time.',
+        answer: 'No. Free stays free, open source, and usable without a TaskTime Pro account. It includes the complete local-first workflow for one active client at a time.',
     },
     {
         question: 'How does the Pro trial work?',
@@ -97,15 +97,15 @@ const faqs = [
     },
     {
         question: 'What happens when I downgrade?',
-        answer: 'Your clients and work records remain visible and maintainable. If you are above the Free active-client limit, you can keep using and archiving existing clients, but you cannot add or reactivate another client until you are back within the limit. Advanced reports and TaskTime-hosted sending become unavailable.',
+        answer: 'Your clients and work records remain visible and maintainable. If you are above the Free active-client limit, you can keep using and archiving existing clients, but you cannot add or reactivate another client until you are back within the limit. Advanced reports and hosted sending become unavailable.',
     },
     {
         question: 'What happens to the founding price if I cancel?',
         answer: 'A cancellation normally takes effect at the end of the paid period. Reversing it before that date keeps the founding price. If the subscription fully ends, a later new subscription uses the current standard price.',
     },
     {
-        question: 'Where does TaskTime store my work?',
-        answer: 'Core work records stay in your browser. Optional sync and backups connect directly to your Google Drive or Dropbox account, so a TaskTime cloud account is not required for the Free workflow.',
+        question: 'Where does TaskTime Pro store my work?',
+        answer: 'Core work records stay in your browser. Optional sync and backups connect directly to your Google Drive or Dropbox account, so a TaskTime Pro cloud account is not required for the Free workflow.',
     },
 ];
 ---
@@ -121,7 +121,7 @@ const faqs = [
         <p class="eyebrow">Simple pricing</p>
         <h1 id="pricing-title">Start free. Go Pro when it saves you time.</h1>
         <p>
-            TaskTime stays useful without an account. Pro adds scale, convenience, and deeper administration—not
+            TaskTime Pro stays useful without an account. The Pro plan adds scale, convenience, and deeper administration—not
             access to your own work.
         </p>
     </section>
@@ -154,7 +154,7 @@ const faqs = [
                 <ul class="pricing-feature-list">
                     {freeFeatures.map((feature) => <li>{feature}</li>)}
                 </ul>
-                <a class="product-button product-button--secondary pricing-plan-action" href="/">Open TaskTime</a>
+                <a class="product-button product-button--secondary pricing-plan-action" href="/">Open TaskTime Pro</a>
                 <p class="pricing-plan-note">No signup required for core use.</p>
             </article>
 
@@ -171,7 +171,7 @@ const faqs = [
                 <ul class="pricing-feature-list">
                     {proFeatures.map((feature) => <li>{feature}</li>)}
                 </ul>
-                <a class="product-button product-button--primary pricing-plan-action" href="/account?section=billing">Review Pro in TaskTime</a>
+                <a class="product-button product-button--primary pricing-plan-action" href="/account?section=billing">Review the Pro plan</a>
                 <p class="pricing-plan-note">Try Pro for {LOCAL_REVIEW_PRICING.trialDays} days. No card and no automatic charge.</p>
             </article>
         </div>
@@ -190,7 +190,7 @@ const faqs = [
 
         <div class="pricing-table-wrap">
             <table class="pricing-table">
-                <caption class="sr-only">TaskTime Free and Pro feature comparison</caption>
+                <caption class="sr-only">TaskTime Pro: Free and Pro plan comparison</caption>
                 <thead>
                     <tr>
                         <th scope="col">Capability</th>
@@ -209,7 +209,7 @@ const faqs = [
                 </tbody>
             </table>
         </div>
-        <p class="pricing-table-note">TaskTime-hosted sending is subject to the allowance shown in the app.</p>
+        <p class="pricing-table-note">Hosted sending is subject to the allowance shown in the app.</p>
     </section>
 
     <section class="pricing-founding" aria-labelledby="founding-title">
@@ -267,8 +267,8 @@ const faqs = [
 
     <section class="product-final-cta pricing-final-cta" aria-labelledby="pricing-cta-title">
         <p class="eyebrow">Start with your real work</p>
-        <h2 id="pricing-cta-title">Use TaskTime free. Decide on Pro later.</h2>
+        <h2 id="pricing-cta-title">Use TaskTime Pro for free. Upgrade when you need more.</h2>
         <p>No setup call, no payment details, and no account required for the core workflow.</p>
-        <a class="product-button product-button--primary" href="/">Open TaskTime</a>
+        <a class="product-button product-button--primary" href="/">Open TaskTime Pro</a>
     </section>
 </ProductLayout>

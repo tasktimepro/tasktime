@@ -1,410 +1,86 @@
-import {
-    BanknotesIcon,
-    CalendarDaysIcon,
-    ChartBarIcon,
-    CheckIcon,
-    ClockIcon,
-    CurrencyDollarIcon,
-    DocumentTextIcon,
-    ExclamationTriangleIcon,
-    HandCoinsIcon
-} from '@/components/ui/icons';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency } from '../../utils/currencyUtils.ts';
+import { lazy, Suspense } from 'react';
+import { ChartBarIcon, ClockIcon, CurrencyDollarIcon, BanknotesIcon, HandCoinsIcon, ArrowUpRightIcon, ArrowDownRightIcon, MinusIcon } from '@/components/ui/icons';
+import { format } from 'date-fns';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatDurationWithSeconds, parseStoredDate } from '@/utils/dateUtils';
+import { DashboardMoneyValue } from './DashboardMoneyValue';
 
-const EXPENSE_SETTLED_LABEL = 'spent';
+const DashboardHoursChart = lazy(() => import('./DashboardHoursChart'));
 
-/**
- * MetricsCards component - Reports overview and invoice metrics.
- * @param {Object} props
- */
-const MetricsCards = ({
-    thisMonthMetrics,
-    lastMonthMetrics,
-    last90DaysMetrics,
-    invoiceMetrics,
-    thisMonthBillableHours,
-    thisMonthUnbilledDisplay,
-    expenseThisMonthUpcomingTotal,
-    expenseThisMonthUpcomingHasEstimate,
-    expenseThisMonthPaidTotal,
-    expenseLastMonthPaidTotal,
-    expenseLast90DaysPaidTotal,
-    hasClients,
-    preferredCurrency,
-    formatDuration,
-    needsExchangeRates,
-    exchangeRatesLoading,
-    navigateToInvoices
-}) => {
-    const formatExpenseAmount = (amount, hasEstimate = false, className = '') => {
-        const prefix = hasEstimate ? '~' : '';
-        return <span className={`${className} sensitive-data`}>{prefix}{formatCurrency(amount || 0, preferredCurrency)}</span>;
-    };
-
-    const renderExpenseLine = ({
-        amount,
-        hasEstimate,
-        label
-    }) => {
-        const hasAmount = (amount || 0) > 0;
-
-        if (!hasAmount) {
-            return null;
-        }
-
-        return (
-            <div className="flex items-center">
-                <HandCoinsIcon className="h-4 w-4 text-muted-foreground mr-1" />
-                <div className="text-lg font-semibold text-foreground">
-                    {formatExpenseAmount(amount, hasEstimate, 'text-foreground')}
-                </div>
-                <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
-                    {label}
-                </span>
-            </div>
-        );
-    };
-    const renderEarningsByCurrency = (metrics, colorScheme = 'blue') => {
-        if (!hasClients) {
-            return null;
-        }
-        // Show loading indicator if we need exchange rates and they're still loading
-        if (needsExchangeRates && exchangeRatesLoading) {
-            return <span className="text-muted-foreground text-sm italic">Loading rates...</span>;
-        }
-
-        const billableTotal = Object.values(metrics.billableEarnings).reduce((sum, amount) => sum + amount, 0);
-        const paidTotal = Object.values(metrics.paidInvoices).reduce((sum, amount) => sum + amount, 0);
-        const outstandingTotal = Object.values(metrics.outstandingInvoices).reduce((sum, amount) => sum + amount, 0);
-
-        // Hide empty earnings states so expense-only periods do not show a misleading zero row.
-        if (billableTotal === 0 && paidTotal === 0 && outstandingTotal === 0) {
-            return null;
-        }
-
-        const components = [];
-
-        // Color mappings for different schemes
-        const colorClasses = {
-            blue: {
-                icon: 'text-muted-foreground',
-                text: 'text-foreground',
-                bg: 'bg-muted',
-                badge: 'text-muted-foreground'
-            },
-            gray: {
-                icon: 'text-muted-foreground',
-                text: 'text-foreground',
-                bg: 'bg-muted',
-                badge: 'text-muted-foreground'
-            },
-            green: {
-                icon: 'text-muted-foreground',
-                text: 'text-foreground',
-                bg: 'bg-muted',
-                badge: 'text-muted-foreground'
-            }
-        };
-
-        const colors = colorClasses[colorScheme] || colorClasses.blue;
-
-        const renderAmountLine = (amountsByCurrency, label, Icon, iconClassName, keyPrefix) => {
-            const entries = Object.entries(amountsByCurrency).filter(([, amount]) => amount > 0);
-            if (entries.length === 0) return [];
-
-            const showPerCurrency = metrics.hadConversionError && entries.some(([currency]) => currency !== preferredCurrency);
-
-            const renderLine = (key, amount, currency) => (
-                <div key={key} className="flex items-center">
-                    <Icon className={`h-4 w-4 ${iconClassName} mr-1`} />
-                    <span className={`font-semibold ${colors.text} sensitive-data`}>
-                        {formatCurrency(amount, currency)}
-                    </span>
-                    <span className={`text-xs font-medium ${colors.bg} ${colors.badge} px-1.5 py-0.5 rounded ml-1`}>
-                        {label}
-                    </span>
-                </div>
-            );
-
-            if (showPerCurrency) {
-                return entries.map(([currency, amount]) => renderLine(`${keyPrefix}-${currency}`, amount, currency));
-            }
-
-            const total = entries.reduce((sum, [, amount]) => sum + amount, 0);
-            return [
-                renderLine(keyPrefix, total, preferredCurrency)
-            ];
-        };
-
-        // Add received invoice totals (highest priority)
-        if (paidTotal > 0) {
-            const paidLines = renderAmountLine(metrics.paidInvoices, 'received', BanknotesIcon, colors.icon, 'paid');
-            components.push(...paidLines);
-        }
-
-        // Add outstanding invoices as "pending"
-        if (outstandingTotal > 0) {
-            const pendingLines = renderAmountLine(metrics.outstandingInvoices, 'pending', DocumentTextIcon, 'text-muted-foreground', 'pending');
-            components.push(...pendingLines);
-        }
-
-        // Add unbilled time as "unbilled"
-        if (billableTotal > 0) {
-            const unbilledLines = renderAmountLine(metrics.billableEarnings, 'unbilled', CurrencyDollarIcon, 'text-muted-foreground', 'unbilled');
-            components.push(...unbilledLines);
-        }
-
-        return (
-            <div className="space-y-1">
-                {components}
-            </div>
-        );
-    };
-
-    const thisMonthEarnings = renderEarningsByCurrency(thisMonthMetrics, 'blue');
-    const lastMonthEarnings = renderEarningsByCurrency(lastMonthMetrics, 'gray');
-    const last90DaysEarnings = renderEarningsByCurrency(last90DaysMetrics, 'green');
-
+/** Direction is neutral: more tracked time or spending is not inherently better. */
+function ReportTrend({ trend, comparison }) {
+    if (!trend) return null;
+    const Icon = trend.direction === 'up' ? ArrowUpRightIcon : trend.direction === 'down' ? ArrowDownRightIcon : MinusIcon;
+    const changed = trend.direction === 'up' || trend.direction === 'down';
+    const dates = `${format(parseStoredDate(comparison.range.startDate), 'd MMM yyyy')} – ${format(parseStoredDate(comparison.range.endDate), 'd MMM yyyy')}`;
     return (
-        <Card>
-            <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
-                <CardTitle className="flex items-center text-lg">
-                    <ChartBarIcon className="status-info-text-strong mr-2 h-5 w-5" />
-                    Reports Overview
-                </CardTitle>
+        <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" title={`${trend.label} ${comparison.label} (${dates})`}>
+            <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap ${changed ? 'status-info-text-strong' : ''}`}><Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{trend.label}</span>
+            <span className="truncate">{comparison.label}</span>
+        </p>
+    );
+}
+
+/** A single selected period governs both the four cards and the hours chart. */
+export default function MetricsCards({ report, comparison, period, periodOptions, onPeriodChange, preferredCurrency, loading, error, onRetry }) {
+    const money = value => <DashboardMoneyValue money={value} currency={preferredCurrency} />;
+    const conversionFallback = [report.unbilled, report.received, report.spent].some(value => value.hadConversionError);
+    const cards = [
+        { label: 'Tracked time', value: formatDurationWithSeconds(report.time), detail: `${formatDurationWithSeconds(report.billableTime)} billable`, icon: ClockIcon, trend: comparison?.time },
+        { label: 'Unbilled amount', value: money(report.unbilled), detail: `${formatDurationWithSeconds(report.unbilledTime)} unbilled`, icon: CurrencyDollarIcon, trend: comparison?.unbilled },
+        { label: 'Received', value: money(report.received), detail: 'By payment date', icon: BanknotesIcon, trend: comparison?.received },
+        { label: 'Expenses', value: money(report.spent), detail: 'Paid · by expense date', icon: HandCoinsIcon, trend: comparison?.spent },
+    ];
+    return (
+        <Card role="region" aria-labelledby="dashboard-reports-title" className="min-w-0 shadow-sm">
+            <CardHeader className="px-3 pt-3 pb-4 sm:px-5 sm:pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 id="dashboard-reports-title" className="flex items-center text-lg font-semibold"><ChartBarIcon className="status-info-text-strong mr-2 h-5 w-5" />Reports Overview</h2>
+                    <Select value={period} onValueChange={onPeriodChange}>
+                        <SelectTrigger aria-label="Dashboard report period" className="w-auto min-w-40"><SelectValue /></SelectTrigger>
+                        <SelectContent align="end" className="max-h-[min(18rem,var(--radix-select-content-available-height))]">{periodOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
             </CardHeader>
-            <CardContent className="px-3 pb-2.5 pt-0 sm:px-5 sm:pb-4">
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-3 md:gap-6">
-                    {/* This Month */}
-                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="status-info-text text-sm font-medium">This Month</h3>
-                                <div className="mt-2">
-                                    {thisMonthEarnings && (
-                                        <div className="flex items-center">
-                                            <div className="status-info-text text-lg font-semibold">
-                                                {thisMonthEarnings}
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="mt-2 space-y-1">
-                                        {renderExpenseLine({
-                                            amount: expenseThisMonthUpcomingTotal,
-                                            hasEstimate: expenseThisMonthUpcomingHasEstimate,
-                                            label: 'upcoming'
-                                        })}
-                                        {renderExpenseLine({
-                                            amount: expenseThisMonthPaidTotal,
-                                            label: EXPENSE_SETTLED_LABEL
-                                        })}
+            <CardContent className="px-3 pb-4 pt-0 sm:px-5 sm:pb-5" aria-busy={loading}>
+                {error ? (
+                    <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm"><span>{error}</span><Button size="sm" variant="outline" onClick={onRetry}>Retry</Button></div>
+                ) : loading ? (
+                    <div role="status" className="flex h-64 items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">Loading report…</div>
+                ) : (
+                    <>
+                        <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-5">
+                            <div className="grid min-w-0 grid-cols-2 gap-3 xl:col-span-2" data-testid="dashboard-report-metrics">
+                                {cards.map(card => {
+                                    const { label, value, detail, icon: Icon, trend } = card;
+                                    return (
+                                    <div key={label} className="flex min-w-0 flex-col rounded-lg border bg-muted/20 p-3 sm:p-4">
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted"><Icon className="status-info-text-strong h-5 w-5" /></span><h3>{label}</h3></div>
+                                        <div className="mt-2 break-words text-xl font-semibold tracking-tight tabular-nums sm:text-2xl">{value}</div>
+                                        <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+                                        <div className="mt-auto pt-3"><ReportTrend trend={trend} comparison={comparison} /></div>
                                     </div>
-                                    <div className="flex items-center mt-2">
-                                        <ClockIcon className="status-info-text-strong mr-1 h-4 w-4" />
-                                        <span className="status-info-text text-sm">
-                                            {formatDuration(thisMonthMetrics.time)}
-                                        </span>
-                                    </div>
-                                </div>
+                                ); })}
                             </div>
-                            <CalendarDaysIcon className="status-info-text-strong h-8 w-8" />
-                        </div>
-                    </div>
-
-                    {/* Last Month */}
-                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-sm font-medium text-foreground">Last Month</h3>
-                                <div className="mt-2">
-                                    {lastMonthEarnings && (
-                                        <div className="flex items-center">
-                                            <div className="text-lg font-semibold text-foreground">
-                                                {lastMonthEarnings}
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="mt-2">
-                                        {renderExpenseLine({
-                                            amount: expenseLastMonthPaidTotal,
-                                            label: EXPENSE_SETTLED_LABEL
-                                        })}
-                                    </div>
-                                    <div className="flex items-center mt-2">
-                                        <ClockIcon className="h-4 w-4 text-muted-foreground mr-1" />
-                                        <span className="text-sm text-foreground">
-                                            {formatDuration(lastMonthMetrics.time)}
-                                        </span>
+                            <div className="flex min-w-0 flex-col rounded-lg border bg-muted/20 p-3 sm:p-4 xl:col-span-3" role="region" aria-labelledby="dashboard-hours-title">
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <h3 id="dashboard-hours-title" className="shrink-0 text-sm font-medium">Hours tracked</h3>
+                                    <div className="flex min-w-0 flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground" role="group" aria-label="Chart legend">
+                                        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[hsl(var(--status-info-accent))]" />Billable</span>
+                                        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[hsl(var(--chart-non-billable))]" />Non-billable</span>
                                     </div>
                                 </div>
-                            </div>
-                            <CalendarDaysIcon className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                    </div>
-
-                    {/* Last 90 Days */}
-                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="status-success-text text-sm font-medium">Last 90 Days</h3>
-                                <div className="mt-2">
-                                    {last90DaysEarnings && (
-                                        <div className="flex items-center">
-                                            <div className="status-success-text text-lg font-semibold">
-                                                {last90DaysEarnings}
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="mt-2">
-                                        {renderExpenseLine({
-                                            amount: expenseLast90DaysPaidTotal,
-                                            label: EXPENSE_SETTLED_LABEL
-                                        })}
-                                    </div>
-                                    <div className="flex items-center mt-2">
-                                        <ClockIcon className="status-success-text-strong mr-1 h-4 w-4" />
-                                        <span className="status-success-text text-sm">
-                                            {formatDuration(last90DaysMetrics.time)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <CalendarDaysIcon className="status-success-text-strong h-8 w-8" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Invoice Metrics */}
-                {hasClients && (
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-5 sm:gap-4 md:grid-cols-3">
-                    {/* Pending Bills This Month Notice */}
-                    <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="status-info-text text-sm font-medium">Pending Bills This Month</h3>
-                                <div className="mt-2">
-                                    <div className="flex items-center">
-                                        <div className="status-info-text text-lg font-semibold">
-                                            <div className="flex items-center">
-                                                <CurrencyDollarIcon className="h-4 w-4 text-muted-foreground mr-1" />
-                                                <span className="font-semibold text-foreground sensitive-data">
-                                                    {thisMonthUnbilledDisplay}
-                                                </span>
-                                                <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-1">
-                                                    unbilled
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center mt-1">
-                                        <ClockIcon className="status-info-text-strong mr-1 h-4 w-4" />
-                                        <span className="status-info-text text-sm">
-                                            {formatDuration(thisMonthBillableHours * 3600000)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <ClockIcon className="status-info-text-strong h-8 w-8" />
-                        </div>
-                    </div>
-
-                    {/* Outstanding Invoices */}
-                    {invoiceMetrics.outstanding > 0 ? (
-                        <button
-                            onClick={() => navigateToInvoices({ section: 'invoices', tab: 'outstanding' })}
-                            className="rounded-lg border border-border bg-muted/40 p-3 text-left transition-colors hover:bg-accent cursor-pointer sm:p-4"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="status-warning-text text-sm font-medium">Outstanding Invoices</h3>
-                                    <div className="flex items-center mt-2">
-                                        <DocumentTextIcon className="status-warning-text-strong mr-2 h-4 w-4" />
-                                        <span className="status-warning-text text-lg font-semibold">
-                                            {invoiceMetrics.outstanding} invoices
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center mt-1">
-                                        <CurrencyDollarIcon className="status-warning-text-strong mr-2 h-4 w-4" />
-                                        <span className="status-warning-text text-sm sensitive-data">
-                                            {formatCurrency(invoiceMetrics.outstandingTotal, preferredCurrency)} total
-                                        </span>
-                                    </div>
-                                </div>
-                                <DocumentTextIcon className="status-warning-text-strong h-8 w-8" />
-                            </div>
-                        </button>
-                    ) : (
-                        <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="status-success-text text-sm font-medium">Outstanding Invoices</h3>
-                                    <div className="flex items-center mt-2">
-                                        <CheckIcon className="status-success-text-strong mr-2 h-4 w-4" />
-                                        <span className="status-success-text text-lg font-semibold">
-                                            No outstanding invoices
-                                        </span>
-                                    </div>
-                                    <div className="status-success-text mt-1 text-sm">
-                                        No current invoices awaiting payment
-                                    </div>
-                                </div>
-                                <DocumentTextIcon className="status-success-text-strong h-8 w-8" />
+                                <Suspense fallback={<div role="status" className="flex h-64 items-center justify-center text-sm text-muted-foreground">Loading chart…</div>}><DashboardHoursChart days={report.days} /></Suspense>
+                                {report.time === 0 && <p className="mt-2 text-sm text-muted-foreground">No time tracked in this period.</p>}
                             </div>
                         </div>
-                    )}
-
-                    {/* Past Due Invoices */}
-                    {invoiceMetrics.pastDue > 0 ? (
-                        <button
-                            onClick={() => navigateToInvoices({ section: 'invoices', tab: 'overdue' })}
-                            className="rounded-lg border border-border bg-muted/40 p-3 text-left transition-colors hover:bg-accent cursor-pointer sm:p-4"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="status-danger-text flex items-center text-sm font-medium">
-                                        Past Due Invoices
-                                    </h3>
-                                    <div className="flex items-center mt-2">
-                                        <DocumentTextIcon className="status-danger-text-strong mr-2 h-4 w-4" />
-                                        <span className="status-danger-text text-lg font-semibold">
-                                            {invoiceMetrics.pastDue} invoices
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center mt-1">
-                                        <CurrencyDollarIcon className="status-danger-text-strong mr-2 h-4 w-4" />
-                                        <span className="status-danger-text text-sm sensitive-data">
-                                            {formatCurrency(invoiceMetrics.pastDueTotal, preferredCurrency)} overdue
-                                        </span>
-                                    </div>
-                                </div>
-                                <ExclamationTriangleIcon className="status-danger-text-strong h-8 w-8" />
-                            </div>
-                        </button>
-                    ) : (
-                        <div className="rounded-lg bg-muted/40 p-3 sm:p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="status-success-text text-sm font-medium">No Past Due Invoices</h3>
-                                    <div className="flex items-center mt-2">
-                                        <CheckIcon className="status-success-text-strong mr-2 h-4 w-4" />
-                                        <span className="status-success-text text-lg font-semibold">
-                                            All invoices are up-to-date
-                                        </span>
-                                    </div>
-                                    <div className="status-success-text mt-1 text-sm">
-                                        Great job staying on top of payments!
-                                    </div>
-                                </div>
-                                <DocumentTextIcon className="status-success-text-strong h-8 w-8" />
-                            </div>
-                        </div>
-                    )}
-                </div>
+                        {report.unpricedTime > 0 && <p className="mt-3 text-xs text-muted-foreground">Unbilled amount estimates hourly work. {formatDurationWithSeconds(report.unpricedTime)} has no hourly rate.</p>}
+                        {conversionFallback && <p className="mt-3 text-xs text-muted-foreground">Unavailable conversions are shown in their original currencies.</p>}
+                    </>
                 )}
             </CardContent>
         </Card>
     );
-};
-
-export default MetricsCards;
+}

@@ -25,6 +25,33 @@
 - Stop creates one entry for the selected task, including the correct interval/note, and clears only that timer.
 - Repeating a recovered stop operation does not create a duplicate entry.
 
+## Dashboard regression boundary
+
+- Today and Upcoming retain task/recurrence/timer/expense actions. Upcoming is
+  visible without expanding Today; more than five items remain accessible.
+- At phone widths, Today and Upcoming precede horizontally scrollable summary
+  cards in DOM order, with no page overflow. Desktop uses adjacent action panels.
+- Daily billable plus non-billable actual duration equals the selected-period
+  tracked total, including zero days and archived work; billed snapshots do not
+  inflate actual hours. Current summary timeframes survive report-period changes.
+- Reports match chart and metric-grid heights on desktop, align the legend with
+  the title on the right, and omit duplicate chart totals/trends, the upcoming-
+  expense note and visible daily dropdown. The Y-axis ceiling is
+  `max(8, ceil(largest daily stacked hours))`.
+- Trends compare the preceding calendar month or preceding 90 days, loading
+  relevant archived years. Zero baselines never produce infinite percentages;
+  currency failures never produce a comparison across incompatible amounts.
+- Dashboard remains usable when exchange rates finish loading successfully and
+  when a page reload reads cached rates; conversion-warning checks use only
+  current report fields and preserve frozen payment amounts.
+- Paid timestamps, frozen conversions, mixed-currency failure, canceled/legacy
+  invoice eligibility, rapid period changes, loading failures and retry have
+  regressions. A legacy invoice arriving later refreshes required source years.
+- A production PWA can open the dashboard and its chart offline after installation,
+  even if the dashboard was not visited online. Cache matching may ignore Vary
+  only for same-origin `/assets/` URLs in the generated build manifest; other
+  requests retain existing cache/privacy behavior.
+
 ## Billing and finance
 
 - Invoice preview includes only eligible selected work/expenses and its totals equal the visible line calculation, adjustments, and tax.

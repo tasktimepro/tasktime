@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ClipboardDocumentCheckIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
+import { ArrowLeftIcon, PlusIcon, BanknotesIcon, ProjectIcon, ClockIcon, CurrencyDollarIcon, DocumentTextIcon, ChevronDownIcon, ChevronRightIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -840,7 +840,7 @@ const ClientDashboard = ({
                 <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                     {activeClientProjects.length === 0 && archivedClientProjects.length === 0 ? (
                         <div className="text-center py-8">
-                            <ClipboardDocumentCheckIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <ProjectIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                             <p className="text-muted-foreground mb-4">No projects for this client yet.</p>
                             <Button
                                 onClick={handleCreateProject}

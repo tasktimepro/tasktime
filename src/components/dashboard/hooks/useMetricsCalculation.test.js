@@ -1,238 +1,58 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
-import useMetricsCalculation from './useMetricsCalculation'
+import { describe, it, expect } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import useMetricsCalculation from './useMetricsCalculation';
 
-const baseDate = new Date('2026-01-19T12:00:00.000Z')
+const hour = 3600000;
+const at = new Date(2026, 8, 8, 12).getTime();
+const input = {
+    todayStr: '2026-09-08', range: { startDate: '2026-08-01', endDate: '2026-08-31' },
+    preferredCurrency: 'EUR', convertToCurrency: amounts => ({ amounts, hadConversionError: false }),
+    tasks: [{ id: 'task', title: 'Work', projectId: 'project', billable: true }],
+    projects: [{ id: 'project', title: 'Project', hourlyRate: 100 }], clients: [], invoices: [], expenses: [], recurrences: [],
+    entries: [{ id: 'entry', taskId: 'task', start: at, end: at + hour, billedDurationMs: 1.5 * hour }],
+};
 
-describe('useMetricsCalculation', () => {
+describe('dashboard metrics calculation', () => {
+    it('compares the selected report with its actual preceding period and recomputes on selection', () => {
+        const entry = (id, month, hours) => ({ id, taskId: 'task', start: new Date(2026, month - 1, 8, 12).getTime(), end: new Date(2026, month - 1, 8, 12).getTime() + hours * hour });
+        const entries = [entry('july', 7, 2), entry('august', 8, 1), entry('september', 9, 3)];
+        const { result, rerender } = renderHook(props => useMetricsCalculation(props), { initialProps: { ...input, entries } });
+        expect(result.current.comparison.range).toEqual({ startDate: '2026-07-01', endDate: '2026-07-31' });
+        expect(result.current.comparison.time).toEqual({ direction: 'down', label: '−50%' });
+        expect(result.current.comparison.unbilled.label).toBe('−50%');
+        rerender({ ...input, entries, range: { startDate: '2026-09-01', endDate: '2026-09-30' } });
+        expect(result.current.comparison.time).toEqual({ direction: 'up', label: '+200%' });
+        expect(result.current.comparison.unbilled.label).toBe('+200%');
+    });
 
-    const convertToCurrency = (amounts) => ({ amounts, hadConversionError: false })
+    it('keeps summary cards on this month while selecting another report month', () => {
+        const { result } = renderHook(() => useMetricsCalculation(input));
+        expect(result.current.report.time).toBe(0);
+        expect(result.current.currentMonth.time).toBe(hour);
+        expect(result.current.currentMonth.unbilled.amounts.EUR).toBe(150);
+        expect(result.current.todayTime).toBe(hour);
+        expect(result.current.recentDays).toEqual([0, 0, 0, 0, 0, 0, hour]);
+    });
 
-    beforeEach(() => {
+    it('updates summary and report at local month rollover while retaining the seven-day trend', () => {
+        const entry = { id: 'entry', taskId: 'task', start: new Date(2026, 8, 30, 10).getTime(), end: new Date(2026, 8, 30, 11).getTime() };
+        const { result, rerender } = renderHook(props => useMetricsCalculation(props), { initialProps: { ...input, todayStr: '2026-09-30', entries: [entry] } });
+        expect(result.current.todayTime).toBe(hour);
+        rerender({ ...input, todayStr: '2026-10-01', entries: [entry] });
+        expect(result.current.todayTime).toBe(0);
+        expect(result.current.currentMonth.time).toBe(0);
+        expect(result.current.recentDays).toEqual([0, 0, 0, 0, 0, hour, 0]);
+    });
 
-        vi.useFakeTimers()
-        vi.setSystemTime(baseDate)
-    })
-
-    afterEach(() => {
-
-        vi.useRealTimers()
-    })
-
-    it('calculates time and invoice metrics for the current month', () => {
-
-        const tasks = [
-            { id: 'task-1', projectId: 'project-1', billable: true }
-        ]
-        const projects = [{ id: 'project-1', hourlyRate: 100 }]
-        const timeEntries = [
-            { taskId: 'task-1', start: baseDate.getTime() - 3600000, end: baseDate.getTime() }
-        ]
-        const invoices = [
-            { date: '2026-01-10', total: 120, currency: 'USD', status: 'paid' },
-            { date: '2026-01-11', total: 80, currency: 'USD', status: 'sent' }
-        ]
-
-        const { result } = renderHook(() => useMetricsCalculation({
-            timeEntries,
-            tasks,
-            projects,
-            invoices,
-            clients: [],
-            preferredCurrency: 'USD',
-            convertToCurrency
-        }))
-
-        expect(result.current.thisMonthMetrics.time).toBe(3600000)
-        expect(result.current.thisMonthMetrics.paidInvoices.USD).toBe(120)
-        expect(result.current.thisMonthMetrics.outstandingInvoices.USD).toBe(80)
-    })
-
-    it('uses stored payment currency snapshots for paid invoice totals', () => {
-
-        const snapshotAwareConvertToCurrency = (amounts) => {
-            if (amounts.USD) {
-                return { amounts: { EUR: 999 }, hadConversionError: false }
-            }
-
-            return { amounts, hadConversionError: false }
-        }
-
-        const invoices = [
-            {
-                date: '2026-01-10',
-                total: 100,
-                currency: 'USD',
-                status: 'paid',
-                paidAt: 1700000000000,
-                paymentCurrencySnapshot: {
-                    capturedAt: 1700000000000,
-                    sourceCurrency: 'USD',
-                    sourceAmount: 100,
-                    preferredCurrencyAtPayment: 'EUR',
-                    preferredCurrencyAmount: 85,
-                    exchangeRatesBase: 'USD',
-                    exchangeRates: { USD: 1, EUR: 0.85 },
-                },
-            },
-        ]
-
-        const { result } = renderHook(() => useMetricsCalculation({
-            timeEntries: [],
-            tasks: [],
-            projects: [],
-            invoices,
-            clients: [],
-            preferredCurrency: 'EUR',
-            convertToCurrency: snapshotAwareConvertToCurrency
-        }))
-
-        expect(result.current.thisMonthMetrics.paidInvoices.EUR).toBe(85)
-    })
-
-    it('keeps outstanding and past due invoice metrics mutually exclusive', () => {
-
-        const { result } = renderHook(() => useMetricsCalculation({
-            timeEntries: [],
-            tasks: [],
-            projects: [],
-            invoices: [
-                { date: '2026-01-10', total: 120, currency: 'USD', status: 'paid' },
-                { date: '2026-01-11', total: 80, currency: 'USD', status: 'sent', dueDate: '2026-01-25' },
-                { date: '2026-01-12', total: 90, currency: 'USD', status: 'sent', dueDate: '2026-01-01' },
-                {
-                    date: '2026-01-13',
-                    total: 500,
-                    currency: 'USD',
-                    status: 'canceled',
-                    dueDate: '2026-01-01',
-                    canceledAt: baseDate.getTime(),
-                    cancellationReason: 'Duplicate invoice',
-                },
+    it('keeps task-by-task invoice rounding for monetary estimates', () => {
+        const { result } = renderHook(() => useMetricsCalculation({ ...input,
+            range: { startDate: '2026-09-01', endDate: '2026-09-30' },
+            tasks: [...input.tasks, { id: 'second', title: 'Second task', projectId: 'project', billable: true }],
+            entries: [
+                { id: 'a', taskId: 'task', start: at, end: at + 1.234 * hour },
+                { id: 'b', taskId: 'second', start: at, end: at + 1.111 * hour },
             ],
-            clients: [],
-            preferredCurrency: 'USD',
-            convertToCurrency
-        }))
-
-        expect(result.current.invoiceMetrics).toEqual({
-            outstanding: 1,
-            outstandingTotal: 80,
-            pastDue: 1,
-            pastDueTotal: 90,
-            hadConversionError: false,
-        })
-        expect(result.current.thisMonthMetrics.outstandingInvoices).toEqual({ USD: 170 })
-    })
-
-    it('excludes non-billable tasks from unbilled totals', () => {
-
-        const tasks = [
-            { id: 'task-1', projectId: 'project-1', billable: true },
-            { id: 'task-2', projectId: 'project-1', billable: false }
-        ]
-        const projects = [{ id: 'project-1', hourlyRate: 50 }]
-        const timeEntries = [
-            { taskId: 'task-1', start: baseDate.getTime() - 3600000, end: baseDate.getTime() },
-            { taskId: 'task-2', start: baseDate.getTime() - 7200000, end: baseDate.getTime() - 3600000 }
-        ]
-
-        const { result } = renderHook(() => useMetricsCalculation({
-            timeEntries,
-            tasks,
-            projects,
-            invoices: [],
-            clients: [],
-            preferredCurrency: 'USD',
-            convertToCurrency
-        }))
-
-        expect(result.current.thisMonthUnbilledTotal).toBe(50)
-    })
-
-    it('rounds unbilled hours per task before summing', () => {
-
-        const tasks = [
-            { id: 'task-1', projectId: 'project-1', billable: true },
-            { id: 'task-2', projectId: 'project-2', billable: true }
-        ]
-        const projects = [
-            { id: 'project-1', hourlyRate: 80 },
-            { id: 'project-2', hourlyRate: 120 }
-        ]
-
-        const hoursToMs = (hours) => Math.round(hours * 3600000)
-
-        const timeEntries = [
-            { taskId: 'task-1', start: baseDate.getTime() - hoursToMs(1.234), end: baseDate.getTime() },
-            { taskId: 'task-2', start: baseDate.getTime() - hoursToMs(2.345), end: baseDate.getTime() - hoursToMs(1.234) }
-        ]
-
-        const { result } = renderHook(() => useMetricsCalculation({
-            timeEntries,
-            tasks,
-            projects,
-            invoices: [],
-            clients: [],
-            preferredCurrency: 'USD',
-            convertToCurrency
-        }))
-
-        expect(result.current.thisMonthBillableHours).toBe(2.34)
-    })
-
-    it('excludes invoice adjustments from unbilled earnings', () => {
-
-        const tasks = [
-            { id: 'task-1', projectId: 'project-1', billable: true }
-        ]
-        const projects = [{ id: 'project-1', hourlyRate: 100 }]
-        const timeEntries = [
-            { taskId: 'task-1', start: baseDate.getTime() - 3600000, end: baseDate.getTime() },
-            { taskId: 'task-1', start: baseDate.getTime() - 7200000, end: baseDate.getTime() - 3600000, source: 'invoice-adjustment' }
-        ]
-
-        const { result } = renderHook(() => useMetricsCalculation({
-            timeEntries,
-            tasks,
-            projects,
-            invoices: [],
-            clients: [],
-            preferredCurrency: 'USD',
-            convertToCurrency
-        }))
-
-        expect(result.current.thisMonthUnbilledTotal).toBe(100)
-    })
-
-    it('uses billable duration overrides for unbilled totals while keeping worked time actual', () => {
-
-        const tasks = [
-            { id: 'task-1', projectId: 'project-1', billable: true }
-        ]
-        const projects = [{ id: 'project-1', hourlyRate: 100 }]
-        const timeEntries = [
-            {
-                taskId: 'task-1',
-                start: baseDate.getTime() - (5 * 60 * 1000),
-                end: baseDate.getTime(),
-                billedDurationMs: 15 * 60 * 1000,
-                billingIncrementMinutes: 15,
-            }
-        ]
-
-        const { result } = renderHook(() => useMetricsCalculation({
-            timeEntries,
-            tasks,
-            projects,
-            invoices: [],
-            clients: [],
-            preferredCurrency: 'USD',
-            convertToCurrency
-        }))
-
-        expect(result.current.thisMonthMetrics.time).toBe(5 * 60 * 1000)
-        expect(result.current.thisMonthUnbilledTotal).toBe(25)
-        expect(result.current.thisMonthBillableHours).toBe(0.25)
-    })
-})
+        }));
+        expect(result.current.report.unbilled.amounts.EUR).toBe(234);
+    });
+});

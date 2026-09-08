@@ -7,7 +7,7 @@ import {
     CheckIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
-    ClipboardDocumentCheckIcon,
+    ProjectIcon,
     ClockIcon,
     TimerIcon,
     CloudCheckIcon,
@@ -18,12 +18,13 @@ import {
     KanbanIcon,
     LayoutDashboardIcon,
     ListTodoIcon,
+    ShieldCheckIcon,
     UserCircleIcon,
     UserGroupIcon,
 } from '@/components/ui/icons';
 import Modal from './Modal';
 import LegalInlineLinks from './legal/LegalInlineLinks';
-import { Layers3 as LayersIcon, RocketIcon, ShieldCheck as ShieldIcon } from 'lucide-react';
+import { Layers3 as LayersIcon, RocketIcon } from 'lucide-react';
 
 const STEPS = [
     { id: 'welcome', label: 'Welcome' },
@@ -33,7 +34,7 @@ const STEPS = [
 
 const BENEFIT_CARDS = [
     {
-        icon: ShieldIcon,
+        icon: ShieldCheckIcon,
         title: 'Privacy first',
         description: 'You own the data. TaskTime Pro can never access or see your data.',
     },
@@ -71,7 +72,7 @@ const WORKFLOW_CARDS = [
         description: 'The dashboard gives you a quick view of what’s pending today, your recent activity, and key report metrics.',
     },
     {
-        icon: ClipboardDocumentCheckIcon,
+        icon: ProjectIcon,
         title: 'Projects',
         description: 'Projects group work, rates, and billing setup so time and invoices stay tied to the right workstream.',
     },
@@ -269,7 +270,7 @@ const OnboardingModal = ({
                             icon={DocumentTextIcon}
                             title="Automatic backups"
                             description={dropboxUiEnabled
-                                ? 'TaskTime keeps up to 7 recent daily snapshots and 4 weekly Sunday backups in your connected cloud storage.'
+                                ? 'TaskTime Pro keeps up to 7 recent daily snapshots and 4 weekly Sunday backups in your connected cloud storage.'
                                 : 'Separate Drive backups keep up to 7 recent daily snapshots and 4 weekly Sunday backups.'}
                         />
                     </div>

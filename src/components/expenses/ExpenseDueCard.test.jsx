@@ -5,6 +5,12 @@ import userEvent from '@testing-library/user-event'
 import ExpenseDueCard from './ExpenseDueCard'
 
 describe('ExpenseDueCard', () => {
+    it('keeps the amount and actions visible in a compact dashboard column on desktop', () => {
+        render(<ExpenseDueCard compact expense={{ id: 'compact', title: 'A long software subscription', amount: 29, currency: 'EUR', paymentStatus: 'unpaid', date: '2026-09-28' }} onView={() => {}} onMarkPaid={() => {}} />);
+        expect(screen.getByTestId('expense-row-secondary-compact')).toBeInTheDocument();
+        expect(screen.getByText('€29.00 EUR')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument();
+    });
 
     const setMatchMedia = (matches) => {
         Object.defineProperty(window, 'matchMedia', {

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
  * 
  * @param {Object} props - Component props
  * @param {React.ElementType} props.icon - Icon component to display
+ * @param {'default'|'sm'} props.iconSize - Icon size (sm matches compact dashboard states)
  * @param {string} props.title - Title text
  * @param {string} props.description - Description text
  * @param {string} props.actionLabel - Button label (optional)
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button';
  */
 const EmptyState = ({
     icon: Icon,
+    iconSize = 'default',
     title,
     description,
     actionLabel,
@@ -26,11 +28,13 @@ const EmptyState = ({
     className,
 }) => {
 
+    const iconSizeClass = iconSize === 'sm' ? 'h-8 w-8' : 'h-12 w-12';
+
     return (
         <div className={cn("text-center py-12", className)}>
             {Icon && (
-                <div className="mx-auto h-12 w-12 text-muted-foreground">
-                    <Icon className="h-12 w-12" />
+                <div className={cn("mx-auto text-muted-foreground", iconSizeClass)}>
+                    <Icon className={iconSizeClass} />
                 </div>
             )}
 
@@ -63,6 +67,7 @@ const EmptyState = ({
 
 EmptyState.propTypes = {
     icon: PropTypes.elementType,
+    iconSize: PropTypes.oneOf(['default', 'sm']),
     title: PropTypes.string,
     description: PropTypes.string,
     actionLabel: PropTypes.string,

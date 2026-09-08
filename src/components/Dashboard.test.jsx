@@ -122,14 +122,10 @@ vi.mock('./dashboard/hooks/useCurrencyConversion', () => ({
     default: (...args) => mockUseCurrencyConversion(...args),
 }));
 
-vi.mock('./dashboard/hooks/useMetricsCalculation', () => ({
+vi.mock('./dashboard/hooks/useDashboardHistory', () => ({
     default: () => ({
-        thisMonthMetrics: { billableEarnings: {}, paidInvoices: {}, outstandingInvoices: {}, hadConversionError: false, time: 0 },
-        lastMonthMetrics: { billableEarnings: {}, paidInvoices: {}, outstandingInvoices: {}, hadConversionError: false, time: 0 },
-        last90DaysMetrics: { billableEarnings: {}, paidInvoices: {}, outstandingInvoices: {}, hadConversionError: false, time: 0 },
-        invoiceMetrics: { outstanding: 0, outstandingTotal: 0, pastDue: 0, pastDueTotal: 0 },
-        thisMonthBillableHours: 0,
-        thisMonthUnbilledDisplay: '$0.00',
+        entries: mockTimeEntries, tasks: [], invoices: [], expenses: mockExpenses,
+        availableYears: [], isLoading: false, error: null, retry: vi.fn(),
     }),
 }));
 
@@ -493,7 +489,7 @@ describe('Dashboard', () => {
     it('uses frozen expense payment snapshots for paid expense totals', () => {
         mockUseCurrencyConversion.mockReturnValue({
             preferredCurrency: 'EUR',
-            exchangeRates: null,
+            exchangeRates: { USD: 1, EUR: 0.5 },
             exchangeRatesLoading: false,
             exchangeRatesError: null,
             needsExchangeRates: true,
@@ -535,11 +531,25 @@ describe('Dashboard', () => {
         renderDashboard();
 
         expect(mockMetricsCards).toHaveBeenCalledWith(expect.objectContaining({
-            expenseThisMonthPaidTotal: 80,
-            expenseLastMonthPaidTotal: 0,
-            expenseLast90DaysPaidTotal: 80,
+            report: expect.objectContaining({ spent: { amounts: { EUR: 80 }, hadConversionError: false } }),
             preferredCurrency: 'EUR',
         }), undefined);
+        expect(mockShowWarning).not.toHaveBeenCalled();
+    });
+
+    it('preserves the once-per-session conversion warning when rates exist but a report conversion fails', () => {
+        mockUseCurrencyConversion.mockReturnValue({
+            preferredCurrency: 'EUR', exchangeRates: { USD: 1, EUR: 0.9 },
+            exchangeRatesLoading: false, exchangeRatesError: null, needsExchangeRates: true,
+            missingExchangeRates: [], convertToCurrency: amounts => ({ amounts, hadConversionError: true }),
+        });
+        mockExpenses.push({ id: 'conversion-fallback', title: 'Hosting', amount: 100, currency: 'USD', date: '2026-03-10', paymentStatus: 'paid', amountType: 'fixed' });
+
+        renderDashboard();
+
+        expect(screen.getByTestId('metrics-cards')).toBeInTheDocument();
+        expect(mockShowWarning).toHaveBeenCalledTimes(1);
+        expect(mockShowWarning).toHaveBeenCalledWith('Some currency conversions are unavailable. Amounts are shown in their original currencies.');
     });
 
     it('preloads archived tasks for the dashboard filters', () => {

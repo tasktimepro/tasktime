@@ -219,9 +219,17 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Public build assets are invariant by Origin. Module requests can carry
+    // Origin while install-time precaching does not (notably with Vary: Origin).
+    // Keep normal Vary matching for every request outside the build manifest.
+    const isBuildAsset = requestUrl?.pathname.startsWith('/assets/') && BUILD_ASSETS.some((entry) => {
+        const url = typeof entry === 'string' ? entry : entry?.url;
+        return url && new URL(url, self.location.origin).href === requestUrl.href;
+    });
+
     // Static assets: cache-first with background refresh
     event.respondWith(
-        caches.match(request).then((cachedResponse) => {
+        caches.match(request, isBuildAsset ? { ignoreVary: true } : undefined).then((cachedResponse) => {
             if (cachedResponse) {
                 event.waitUntil(
                     fetch(request)

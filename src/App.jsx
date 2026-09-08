@@ -61,7 +61,7 @@ import { getCurrentPushSubscription, getPushSupportState, uploadPushSchedules } 
 import { useTodayString } from './hooks/useDayRollover';
 import { useDarkModePreference } from './hooks/useDarkModePreference.ts';
 import { SYNC_WORKER_CONFIG } from './config/google.ts';
-import { ClipboardDocumentCheckIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, ChartBarIcon } from '@/components/ui/icons';
+import { ProjectIcon, DocumentTextIcon, UserCircleIcon, ClockIcon, UserGroupIcon, SunIcon, MoonIcon, EyeIcon, EyeOffIcon, PanelLeftCloseIcon, LayoutDashboardIcon, KanbanIcon, HandCoinsIcon, ChartBarIcon } from '@/components/ui/icons';
 import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -1282,7 +1282,7 @@ function AppContent() {
         {
             key: 'projects',
             label: 'Projects',
-            Icon: ClipboardDocumentCheckIcon,
+            Icon: ProjectIcon,
             isActive: isMobilePrimarySelectionVisible && activeView === 'projects',
             onClick: () => navigateToProjects(),
         },
@@ -1525,7 +1525,7 @@ function AppContent() {
                                             }`}
                                             aria-label="Projects"
                                         >
-                                            <ClipboardDocumentCheckIcon className="h-5 w-5 flex-shrink-0" />
+                                            <ProjectIcon className="h-5 w-5 flex-shrink-0" />
                                         </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="right" align="center">
@@ -1541,7 +1541,7 @@ function AppContent() {
                                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                     }`}
                                 >
-                                    <ClipboardDocumentCheckIcon className="h-5 w-5 mr-3 flex-shrink-0" />
+                                    <ProjectIcon className="h-5 w-5 mr-3 flex-shrink-0" />
                                     Projects
                                 </button>
                             )}

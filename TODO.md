@@ -4,6 +4,10 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
+[ ] Check lightsail and all the necessary meta and SEO/AEO stuff before launching
+
+[ ] Global search
+
 [x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository
 
 [ ] Coordinated license, app-origin migration, homepage, and production-launch program
@@ -23,6 +27,7 @@
         [x] Finish exact Worker/OAuth/email/Push/metrics/billing configuration tests, PWA transition guidance, and agent default-URL compatibility
         [x] Pass the local app/site and Worker gates and finalize the supervised production cutover/rollback checklist
     [ ] Program Phase 3 — Complete the homepage and UX/UI adjustments
+        [x] Dashboard readability — separate Today/Upcoming, add four glanceable stats, preset period reports, and billable/non-billable stacked hours; verify actions, historical/currency totals, mobile ordering, accessibility, offline charts, and bundle impact locally (Phase 3 local checkpoint; evidence in status/app-status.md)
         [ ] Promote the approved public product page to the `tasktime.pro` homepage
         [ ] Point every app CTA and app-launch flow to `https://app.tasktime.pro`
         [ ] Reconcile migration guidance, billing/pricing, Privacy/Terms, support, SEO/discovery, PWA install, and agent setup copy

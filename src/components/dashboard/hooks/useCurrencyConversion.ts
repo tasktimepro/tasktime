@@ -21,7 +21,10 @@ type CurrencyConversionParams = {
     projects: ProjectItem[];
     invoices: InvoiceItem[];
     clients: ClientItem[];
+    expenses?: InvoiceItem[];
 };
+
+const NO_EXPENSES: InvoiceItem[] = [];
 
 type ConversionResult = {
     amounts: Record<string, number>;
@@ -36,7 +39,7 @@ type ConversionResult = {
  * @param {Array} params.clients
  * @returns {Object}
  */
-const useCurrencyConversion = ({ projects, invoices, clients }: CurrencyConversionParams) => {
+const useCurrencyConversion = ({ projects, invoices, clients, expenses = NO_EXPENSES }: CurrencyConversionParams) => {
     const { showWarning } = useToast();
     const { preferences } = usePreferences();
     const preferredCurrency = normalizeCurrencyCode(preferences.currency);
@@ -45,12 +48,13 @@ const useCurrencyConversion = ({ projects, invoices, clients }: CurrencyConversi
     const [exchangeRatesError, setExchangeRatesError] = useState<string | null>(null);
     const lastRatesFetchKeyRef = useRef<string | null>(null);
 
-    // Track currencies in use across projects and invoices
+    // Track currencies in use across projects, invoices and expenses.
     const currenciesInUse = useMemo(() => {
         const projectCurrencies = Array.from(new Set(projects.map(p => getProjectCurrency(p, clients, preferredCurrency))));
         const invoiceCurrencies = Array.from(new Set(invoices.map(i => i.currency || preferredCurrency)));
-        return Array.from(new Set([...projectCurrencies, ...invoiceCurrencies]));
-    }, [projects, invoices, preferredCurrency, clients]);
+        const expenseCurrencies = expenses.map(expense => expense.currency || preferredCurrency);
+        return Array.from(new Set([...projectCurrencies, ...invoiceCurrencies, ...expenseCurrencies]));
+    }, [projects, invoices, expenses, preferredCurrency, clients]);
 
     const sortedCurrenciesInUse = useMemo(() => {
         return [...currenciesInUse].sort();
@@ -71,7 +75,8 @@ const useCurrencyConversion = ({ projects, invoices, clients }: CurrencyConversi
         const loadExchangeRates = async () => {
             if (needsExchangeRates) {
                 const fetchKey = `${preferredCurrency}|${sortedCurrenciesInUse.join(',')}`;
-                if (exchangeRatesLoading || (exchangeRates && lastRatesFetchKeyRef.current === fetchKey)) {
+                // A failed request also settles this input set; do not spin while offline.
+                if (exchangeRatesLoading || lastRatesFetchKeyRef.current === fetchKey) {
                     return;
                 }
                 lastRatesFetchKeyRef.current = fetchKey;
@@ -93,6 +98,7 @@ const useCurrencyConversion = ({ projects, invoices, clients }: CurrencyConversi
                     }
                 }
             } else {
+                lastRatesFetchKeyRef.current = null;
                 setExchangeRates(null);
                 setExchangeRatesLoading(false);
                 setExchangeRatesError(null);
@@ -139,7 +145,7 @@ const useCurrencyConversion = ({ projects, invoices, clients }: CurrencyConversi
                 });
 
                 return {
-                    amounts: { [preferredCurrency]: totalInPreferredCurrency },
+                    amounts: hadConversionError ? amountsByCurrency : { [preferredCurrency]: totalInPreferredCurrency },
                     hadConversionError
                 };
             }

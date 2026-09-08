@@ -10,7 +10,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ClipboardDocumentCheckIcon, SortIcon, CheckIcon } from '@/components/ui/icons';
+import { PlusIcon, PencilIcon, TrashIcon, ClockIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, ProjectIcon, SortIcon, CheckIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { fetchExchangeRates, formatCurrency, getCurrencySymbol, getProjectCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
@@ -588,7 +588,7 @@ const ProjectList = ({
             {/* Projects Grid */}
             {activeProjects.length === 0 && archivedProjects.length === 0 ? (
                 <EmptyState
-                    icon={ClipboardDocumentCheckIcon}
+                    icon={ProjectIcon}
                     title="No projects"
                     description="Get started by creating your first project."
                     actionLabel="Create First Project"

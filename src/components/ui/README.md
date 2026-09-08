@@ -120,7 +120,7 @@ When creating or modifying a UI component, ensure:
 | Component | Location | Key Props |
 |-----------|----------|-----------|
 | Button | `ui/button.jsx` | variant, size, leadingIcon, trailingIcon, loading, loadingText, fullWidth |
-| EmptyState | `ui/empty-state.jsx` | icon, title, description, actionLabel, actionIcon, onAction |
+| EmptyState | `ui/empty-state.jsx` | icon, iconSize (default: 48px; sm: 32px), title, description, actionLabel, actionIcon, onAction |
 | StatCard | `ui/stat-card.jsx` | title, value, subtitle, icon, variant, onClick |
 | Checkbox | `ui/checkbox.jsx` | checked, onCheckedChange, disabled |
 | Dialog | `ui/dialog.jsx` | open, onOpenChange, hideCloseButton |

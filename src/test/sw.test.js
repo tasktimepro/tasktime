@@ -121,6 +121,25 @@ describe('service worker caching', () => {
         expect(await response.text()).toBe('Offline')
     })
 
+    it('serves a precached build module despite Origin header variation, without relaxing other requests', async () => {
+        vi.resetModules()
+        globalThis.self.__WB_MANIFEST = [{ url: 'assets/charts-abc.js', revision: null }]
+        await import('../../public/sw.js')
+        const cachedResponse = new Response('export default {}', { status: 200, headers: { Vary: 'Origin' } })
+        globalThis.caches.match.mockImplementation(async (_request, options) => options?.ignoreVary ? cachedResponse : undefined)
+        globalThis.fetch.mockRejectedValue(new Error('offline'))
+
+        const event = createEvent()
+        event.request = new Request('https://tasktime.pro/assets/charts-abc.js', { headers: { Origin: 'https://tasktime.pro' } })
+        handlers.fetch(event)
+        expect(await event.respondWith.mock.calls[0][0]).toBe(cachedResponse)
+
+        const other = createEvent()
+        other.request = new Request('https://tasktime.pro/not-a-build-asset')
+        handlers.fetch(other)
+        expect((await other.respondWith.mock.calls[0][0]).status).toBe(503)
+    })
+
     it.each([
         'https://sync.tasktime.pro/auth/status',
         'https://www.googleapis.com/drive/v3/files',

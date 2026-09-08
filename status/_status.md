@@ -8,8 +8,35 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
-**Program Phase 2 app-origin migration preparation complete locally**
+**Program Phase 3 UI polishing in progress locally**
 
+- The dashboard readability slice is complete locally: separate Today/Upcoming,
+  four fixed-timeframe summaries, preset-period reports, and a neutral stacked
+  billable/non-billable chart. Phones put action panels first and scroll summary
+  cards horizontally. Canonical billing/payment history, currency fallback and
+  offline chart loading are covered. Reports include compact preceding-period
+  trends, an aligned chart container with its legend beside the title, and an
+  8h minimum axis ceiling. Validation and the successful/cached exchange-rate
+  crash regression are recorded in `app-status.md`. This is a local checkpoint,
+  with no deployment or persisted-contract change.
+
+- Phase 3 homepage copy now leads with “Run your freelance work. From task to
+  invoice.” in the centered hero, with one primary app action and compact
+  Local-first/Open source/Works offline trust chips. The one-person-team section
+  follows the product visual; optional AI assistance follows billing with
+  concrete unbilled-time and invoice-draft examples linked to the existing guide.
+  Capability descriptions are shorter, and sync stays with privacy. Capability
+  and ownership cards now share the app's icons and consistent spacing; the
+  third ownership card explains export/restore. Projects uses a closed folder
+  throughout the app and homepage. The
+  production build, lint, typecheck, and all five PWA regressions pass, including
+  section order and keyboard navigation to the guide. Desktop, tablet, and
+  narrow-mobile visual checks pass locally. Final product captures remain
+  pending. Homepage and shared project-icon changes are included in the same
+  local Phase 3 checkpoint; publication remains pending.
+- Release scope: next core-app minor release (`1.6.0` from `1.5.0`); no published
+  agent artifact changed. This checkpoint makes no version bump, tag, push,
+  publication, or deployment. See `spec/roadmap.md` for the remaining program.
 - Direct browser-to-Google Drive sync is deployed. The active Worker retains only OAuth/token control-plane duties, rejects the retired `/drive/*` route without CORS permission, and permits the exact `http://localhost:3101` production-equivalent preview origin. The temporary staging resources, local secrets/configuration, tests, and runbook have been removed. Privacy, terms, contracts, specifications, architecture, contributor guidance, and public copy state the direct browser-to-Google Drive boundary.
 - Offline lazy-document navigation now short-circuits before any remote Drive work and subscribes locally; a red/green provider regression covers the cached-manifest case that previously produced failed offline requests. Focused provider tests, app typecheck, lint, and diff checks are green.
 - Direct Drive auto-sync now batches project-note typing after a 1.5-second quiet period, retries genuine pending work after active-sync/Web Lock contention with bounded backoff, and checks for remote changes every five minutes only while Sync mode is visible.

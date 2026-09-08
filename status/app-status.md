@@ -2,6 +2,97 @@
 
 ## Current focus
 
+- [x] Reconcile and validate the complete Phase 3 local checkpoint (2026-09-08):
+  dashboard layout/reports and follow-up fixes, homepage presentation/copy,
+  product naming, and shared project icons. Specs, acceptance criteria,
+  architecture summaries, development guidance, and work tracking match the
+  final implementation. Docker-backed lint, typecheck, all 266 files / 2,497
+  tests with the 75% per-file coverage gate, all 42 Chromium smoke scenarios,
+  the 50-page production build, and all five production PWA checks pass.
+  Coverage used `docker compose run --rm app npx vitest run --pool=threads
+  --maxWorkers=2 --testTimeout=30000 --coverage`; the PWA checks consumed that
+  completed production build. An initial run inside the interactive billing
+  sandbox inherited enforcement flags and failed default account-policy
+  fixtures; the isolated gate passed without source or assertion changes.
+  README now explains the validation environment and dependency-volume boundary.
+  Release assessment: next core-app minor release (`1.6.0` from `1.5.0`), with
+  no changed published agent artifacts. This is a local commit checkpoint only;
+  versions, tags, remote publication, and deployment are not part of it.
+  Final homepage captures and the remaining Phase 3/launch work stay pending.
+
+- [x] Complete the Reports Overview refinement locally: bordered chart aligned with the
+  four cards, right-aligned legend, neutral preceding-period trends, 8h minimum
+  axis ceiling rounded up for larger daily totals, and removal of the upcoming
+  estimate note and visible daily-values dropdown. Implementation, 74 focused
+  tests with all changed files above 75% coverage, desktop/phone Chromium checks,
+  lint, typecheck, and the production build pass. All five production PWA checks
+  pass, including first dashboard/chart navigation offline and the keyboard
+  tooltip. The stale dropdown interaction in that smoke was replaced with the
+  screen-reader table and tooltip assertions. No persisted data or mutation
+  contract changed; the refinement is part of the local Phase 3 checkpoint and
+  remains undeployed.
+  Follow-up crash correction: the Dashboard currency-warning effect still read
+  removed `report.upcomingExpenses` after exchange rates loaded successfully.
+  The earlier snapshot fixture used null rates and skipped that branch. Updating
+  it to successful rates reproduced the exact exception; removing the obsolete
+  reference fixes it while preserving conversion warnings. All 75 dashboard
+  tests and three Chromium scenarios now pass, including actual asynchronous
+  rate loading and a reload with cached rates in an isolated browser context.
+  Final presentation refinement removes the chart's duplicate total/trend and
+  aligns its legend with the title. Labels use “vs last month”, “vs last 90d”,
+  “New”, and “N/A”; trend rows stay on one line with full hover text. All 75
+  dashboard tests, three responsive/currency Chromium scenarios, changed-file
+  lint, and the repository typecheck pass.
+
+- [x] Complete the Program Phase 3 dashboard readability slice locally
+  (2026-09-08). Today and Upcoming share existing task/recurrence/timer/expense
+  handlers; Upcoming exposes all items after the first five. Fixed summary cards
+  show saved time today, tasks due today, this month's hourly unbilled estimate,
+  and all unpaid invoices. A preset selector controls four report metrics and
+  the stacked actual billable/non-billable chart. Phone DOM order puts actions
+  first, with a horizontal summary rail. Definitions are authoritative in
+  `spec/designs/work-and-time.md#dashboard-overview`.
+  History observes validated active/archive maps, loads required entry years and
+  legacy billing intervals, ignores stale requests, and exposes loading/retry.
+  Paid snapshots and canonical eligibility remain authoritative; failed FX
+  preserves original currencies without a retry loop. Recharts 3.10.1 and its
+  matching React peer are pinned; the chart engine is a separate ~105 KB gzip
+  chunk. Total compressed app JavaScript increased by ~109 KB against the local
+  pre-change build. The PWA cache tolerates Origin-header variation only for
+  manifest-listed public build assets, enabling first dashboard navigation offline.
+  Docker validation: 266 files / 2,483 tests and all 75% per-file coverage
+  thresholds pass, including the dashboard modules now in the regular coverage
+  gate. The busy host required the isolated command
+  `npx vitest run --pool=threads --maxWorkers=2 --testTimeout=30000 --coverage`;
+  no assertions or persisted timeout defaults were relaxed. All 41 Chromium
+  smoke scenarios were verified through the full suite and focused reruns of
+  the updated dashboard fixture/payment-snapshot selectors. Keyboard tooltip,
+  exact daily values, historical periods, and 320/390/768/1024/1440px layouts
+  pass; light/dark screenshots were inspected. Lint, typecheck, the real 50-page
+  production build, all five PWA smokes, and diff checks pass. Existing homepage
+  edits, recent-widget limits, other actions, routes, `/reports` entitlements,
+  Yjs contracts and provider behavior are preserved. These are the initial
+  slice's validation results; final checkpoint evidence is recorded above.
+  Follow-up runtime verification (2026-09-08): the running full-stack app used
+  `tasktime-dev_node_modules`, separate from the validated `tasktime_node_modules`
+  volume, and still lacked Recharts. Installed the existing lockfile with
+  `docker exec tasktime npm ci` and triggered Vite's config restart without
+  stopping the Worker/Stripe stack. The actual server on port 3101 now resolves
+  the chart module; a fresh Chromium context renders the dashboard chart with
+  zero Vite overlays or page exceptions. The dependency-refresh workflow is
+  documented in README; no application source correction was required.
+  Follow-up visual refinement: Today/Upcoming now stretch to equal desktop
+  heights. Upcoming's centered empty state uses a 32px icon and title only;
+  stacked phone panels retain natural heights. All 28 existing focused dashboard
+  tests and changed-component lint pass. Fresh Chromium checks against the
+  running app verify equal 1440px panel heights, compact 390/320px stacking,
+  the smaller icon, no description, no page overflow, and no page exceptions.
+
+- [x] Align Projects with the closed-folder icon through shared `ProjectIcon`,
+  including desktop/mobile navigation, onboarding, dashboard summaries, project
+  and client empty states, and report filters. The New Task clipboard remains
+  unchanged. This visual-only change passes 63 existing focused component tests,
+  lint, typecheck, and the production build/PWA gate locally.
 - [x] Complete the simplified Program Phase 2 local gate. The focused origin,
   provider-bootstrap, backup/restore, metrics, and agent tests pass alongside
   lint, app and Worker typechecks, the full Worker suite, the real split 50-page

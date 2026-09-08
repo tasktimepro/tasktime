@@ -17,7 +17,17 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
-            include: ['src/utils/**', 'src/hooks/**'],
+            include: [
+                'src/utils/**',
+                'src/hooks/**',
+                'src/components/dashboard/dashboardMetrics.ts',
+                'src/components/dashboard/hooks/**',
+                'src/components/dashboard/DashboardHoursChart.jsx',
+                'src/components/dashboard/DashboardMoneyValue.tsx',
+                'src/components/dashboard/DashboardSummaryCards.jsx',
+                'src/components/dashboard/MetricsCards.jsx',
+                'src/components/dashboard/Upcoming.jsx',
+            ],
             exclude: [
                 'src/**/*.{test,spec}.{js,jsx,ts,tsx}',
                 'src/hooks/yjs/**',

@@ -123,7 +123,14 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            // Rollup's shared CommonJS helpers belong with React/vendor, not in
+            // the lazy chart chunk (which would introduce a vendor/chart cycle).
+            if (id.includes('commonjsHelpers')) return 'vendor';
             if (!id.includes('node_modules')) return undefined;
+
+            // Keep the dashboard's optional chart and its exclusive dependencies
+            // out of the app's startup vendor chunk. The PWA precaches this chunk.
+            if (/\/node_modules\/(?:recharts|victory-vendor|d3-[^/]+|@reduxjs\/toolkit|@standard-schema\/utils|react-redux|redux(?:-thunk)?|reselect|immer|internmap|es-toolkit|eventemitter3|decimal\.js-light|tiny-invariant)\//.test(id)) return 'charts';
 
             if (id.includes('@radix-ui')) return 'radix';
             if (id.includes('lucide-react')) return 'icons';

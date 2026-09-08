@@ -1,4 +1,4 @@
-import { ClipboardDocumentCheckIcon, ListFilterIcon } from '@/components/ui/icons';
+import { ProjectIcon, ListFilterIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import useIsMobileLayout from '../../hooks/useIsMobileLayout';
@@ -33,7 +33,7 @@ const ProjectsOverview = ({
             <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                     <CardTitle className="order-1 mr-auto flex items-center text-lg">
-                        <ClipboardDocumentCheckIcon className="status-info-text-strong mr-2 h-5 w-5" />
+                        <ProjectIcon className="status-info-text-strong mr-2 h-5 w-5" />
                         Projects
                     </CardTitle>
                     <CardSearchControl
@@ -125,7 +125,7 @@ const ProjectsOverview = ({
                     </div>
                 ) : (
                     <div className="px-6 py-8 text-center text-muted-foreground">
-                        <ClipboardDocumentCheckIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <ProjectIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm">
                             {emptyStateMessage}
                         </p>

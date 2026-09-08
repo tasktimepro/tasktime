@@ -106,6 +106,7 @@ main,
         --status-info-border: 214 92% 88%;
         --status-info-foreground: 217 48% 32%;
         --status-info-accent: 217 91% 60%;
+        --chart-non-billable: 217 30% 39%;
         --status-success-surface: 138 68% 96%;
         --status-success-border: 141 55% 78%;
         --status-success-foreground: 142 45% 24%;
@@ -149,6 +150,7 @@ main,
         --status-info-border: 217 43% 36%;
         --status-info-foreground: 214 100% 90%;
         --status-info-accent: 213 94% 68%;
+        --chart-non-billable: 215 38% 44%;
         --status-success-surface: 142 44% 16%;
         --status-success-border: 142 42% 31%;
         --status-success-foreground: 138 70% 89%;

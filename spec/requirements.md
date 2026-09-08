@@ -28,6 +28,15 @@ Requirement identifiers are stable references for acceptance criteria, design do
   restore, and sync never fail, discard, or auto-archive records because of the
   count.
 
+## Dashboard
+
+- **DASH-1:** Dashboard priorities and next-seven-day work remain independently
+  readable, with action panels first on phones and compact scrollable summaries.
+- **DASH-2:** Dashboard preset-period metrics and stacked daily billable/non-billable
+  actual time follow [the dashboard definitions](designs/work-and-time.md#dashboard-overview),
+  preserving canonical billing eligibility, payment snapshots, historical sources,
+  original-currency fallback and the separate Reports entitlement boundary.
+
 ## Time tracking
 
 - **TIME-1:** Permit multiple active timers across projects but at most one timer state per project.
