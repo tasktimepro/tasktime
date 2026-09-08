@@ -166,7 +166,7 @@ describe('Expense recurrence auto-pay integration', () => {
             />
         )
 
-        expect(screen.getByText('Auto Rent')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Auto Rent', exact: true })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Mark as Paid' })).not.toBeInTheDocument()
     })
 
@@ -204,8 +204,8 @@ describe('Expense recurrence auto-pay integration', () => {
             />
         )
 
-        const overdueOldest = screen.getByText('Overdue Oldest')
-        const overdueRecent = screen.getByText('Overdue Recent')
+        const overdueOldest = screen.getByRole('heading', { name: 'Overdue Oldest', exact: true })
+        const overdueRecent = screen.getByRole('heading', { name: 'Overdue Recent', exact: true })
         expect(overdueOldest.compareDocumentPosition(overdueRecent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
@@ -243,8 +243,8 @@ describe('Expense recurrence auto-pay integration', () => {
             />
         )
 
-        const upcomingNearest = screen.getByText('Upcoming Nearest')
-        const upcomingLater = screen.getByText('Upcoming Later')
+        const upcomingNearest = screen.getByRole('heading', { name: 'Upcoming Nearest', exact: true })
+        const upcomingLater = screen.getByRole('heading', { name: 'Upcoming Later', exact: true })
         expect(upcomingNearest.compareDocumentPosition(upcomingLater) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
@@ -284,8 +284,8 @@ describe('Expense recurrence auto-pay integration', () => {
             />
         )
 
-        const paidMostRecent = screen.getByText('Paid Most Recent')
-        const paidOlder = screen.getByText('Paid Older')
+        const paidMostRecent = screen.getByRole('heading', { name: 'Paid Most Recent', exact: true })
+        const paidOlder = screen.getByRole('heading', { name: 'Paid Older', exact: true })
         expect(paidOlder.compareDocumentPosition(paidMostRecent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
@@ -325,8 +325,8 @@ describe('Expense recurrence auto-pay integration', () => {
         )
 
         expect(screen.getByText('Outstanding (1)')).toBeInTheDocument()
-        expect(screen.getByText('February Rent')).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: /Expenses/i }).textContent).toContain('(2)')
+        expect(screen.getByRole('heading', { name: 'February Rent', exact: true })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Expenses/i, level: 1 }).textContent).toContain('(2)')
 
         expect(screen.getByRole('tab', { name: 'Upcoming (1)' })).toBeInTheDocument()
     })
@@ -370,8 +370,8 @@ describe('Expense recurrence auto-pay integration', () => {
 
         fireEvent.click(screen.getByRole('tab', { name: 'Paid (1)' }))
 
-        expect(screen.getByText('Recent Paid Expense')).toBeInTheDocument()
-        expect(screen.queryByText('Old Paid Expense')).not.toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Recent Paid Expense', exact: true })).toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Old Paid Expense', exact: true })).not.toBeInTheDocument()
     })
 
     it('shows paid expenses from the previous calendar month when last month is selected', () => {
@@ -415,7 +415,7 @@ describe('Expense recurrence auto-pay integration', () => {
     fireEvent.click(screen.getAllByRole('combobox')[0])
         fireEvent.click(screen.getByRole('option', { name: 'Last Month' }))
 
-        expect(screen.getByText('April Paid Expense')).toBeInTheDocument()
-        expect(screen.queryByText('May Paid Expense')).not.toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'April Paid Expense', exact: true })).toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'May Paid Expense', exact: true })).not.toBeInTheDocument()
     })
 })

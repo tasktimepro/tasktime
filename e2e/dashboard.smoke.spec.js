@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 
 test.use({ timezoneId: 'Europe/Ljubljana' });
 
-async function seedDashboard(page) {
-    await page.clock.setFixedTime(new Date('2026-09-25T12:00:00+02:00'));
+async function seedDashboard(page, liveClock = false) {
+    const time = new Date('2026-09-25T12:00:00+02:00');
+    if (liveClock) await page.clock.install({ time });
+    else await page.clock.setFixedTime(time);
     await page.addInitScript(() => {
         localStorage.setItem('tasktime-onboarding-completed', 'true');
         localStorage.setItem('tasktime-dark-mode', 'true');
@@ -59,6 +61,93 @@ async function seedDashboard(page) {
 }
 
 test.describe('Dashboard smoke', () => {
+    test('updates live tracked time each minute without changing financial values or writing entries', async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await seedDashboard(page, true);
+        await page.clock.pauseAt(new Date('2026-09-25T12:01:00+02:00'));
+        const summary = page.getByRole('region', { name: 'Dashboard summary' });
+        const reports = page.getByRole('region', { name: 'Reports Overview' });
+        const today = summary.getByRole('heading', { name: 'Tracked today', exact: true }).locator('../..');
+        const tracked = reports.getByRole('heading', { name: 'Tracked time', exact: true }).locator('../..');
+        const unbilled = reports.getByRole('heading', { name: 'Unbilled amount', exact: true }).locator('../..');
+        const moneyBefore = await unbilled.innerText();
+        await expect(today).toContainText('1h 40m');
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.timers.set('project', { projectId: 'project', taskId: 'billable', timerInstanceId: 'dashboard-live',
+                startTime: Date.now() - 3600000, paused: false, pausedElapsedTime: 0 });
+            window.__dashboardLiveWrites = 0;
+            store.timers.doc.on('update', () => window.__dashboardLiveWrites++);
+            store.activeEntriesDoc.on('update', () => window.__dashboardLiveWrites++);
+        });
+        await expect(today).toContainText('2h 40m');
+        await expect(tracked).toContainText('incl. active');
+        await expect(reports.getByRole('row', { name: '25 Sep 2h 40m 2h 40m', exact: true })).toHaveCount(1);
+        const initialTracked = await tracked.innerText();
+        await page.clock.runFor(30000);
+        expect(await tracked.innerText()).toBe(initialTracked);
+        await page.clock.runFor(30000);
+        await expect(today).toContainText('2h 41m');
+        await expect(reports.getByRole('row', { name: '25 Sep 2h 1m 40m 2h 41m', exact: true })).toHaveCount(1);
+        expect(await unbilled.innerText()).toBe(moneyBefore);
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.activeTimeEntries.size)).toBe(51);
+        expect(await page.evaluate(() => window.__dashboardLiveWrites)).toBe(0);
+        await page.getByTitle('Pause Timer', { exact: true }).first().click();
+        await page.clock.runFor(60000);
+        await expect(today).toContainText('2h 41m');
+        expect(await unbilled.innerText()).toBe(moneyBefore);
+        await page.getByTitle('Save & Stop Timer', { exact: true }).first().click();
+        await expect.poll(() => page.evaluate(() => window.__TASKTIME_STORE__.timers.size)).toBe(0);
+        await expect(today).toContainText('2h 41m');
+        await expect(tracked).not.toContainText('incl. active');
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.activeTimeEntries.size)).toBe(52);
+        await page.reload();
+        await expect(today).toContainText('2h 41m');
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.activeTimeEntries.size)).toBe(52);
+        expect(errors).toEqual([]);
+    });
+
+    test('keeps project dots compact and project names keyboard navigable in both themes', async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await seedDashboard(page);
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.projects.set('project', { ...store.projects.get('project'), color: '#eab308', title: 'Website redesign with a longer project name' });
+            store.projects.set('internal', { ...store.projects.get('internal'), color: null });
+            store.clients.set('client', { ...store.clients.get('client'), color: '#172554' });
+            store.projects.set('inherited', { id: 'inherited', title: 'Client color', preferredClientId: 'client', color: null, isPersonal: false, invoiceIds: [] });
+        });
+        const projects = page.getByRole('region', { name: 'Projects', exact: true });
+        const projectName = projects.getByRole('button', { name: 'Website redesign with a longer project name', exact: true });
+        const dot = projectName.getByTestId('project-color-dot');
+        for (const theme of ['dark', 'light']) {
+            await page.setViewportSize({ width: 1440, height: 900 });
+            if (theme === 'light') {
+                await page.getByRole('button', { name: 'Light Mode', exact: true }).click();
+                await expect(page.locator('html')).not.toHaveClass(/dark/);
+            } else await expect(page.locator('html')).toHaveClass(/dark/);
+            await expect(dot).toHaveCSS('background-color', 'rgb(234, 179, 8)');
+            const inherited = projects.getByRole('button', { name: 'Client color', exact: true });
+            await expect(inherited.getByTestId('project-color-dot')).toHaveCSS('background-color', 'rgb(23, 37, 84)');
+            for (const width of [1440, 390, 320]) {
+                await page.setViewportSize({ width, height: 900 });
+                await projectName.scrollIntoViewIfNeeded();
+                const bounds = await dot.boundingBox();
+                expect(bounds.width).toBe(8);
+                expect(bounds.height).toBe(8);
+                expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+                await projectName.focus();
+                await expect(projectName).toBeFocused();
+                await projects.screenshot({ path: `test-results/project-dots-${width}-${theme}.png` });
+            }
+        }
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(/\/projects\/project(?:\?|$)/);
+        expect(errors).toEqual([]);
+    });
+
     test('survives successful currency-rate loading and reloads with the cached rates', async ({ page }) => {
         const errors = [];
         let requests = 0;

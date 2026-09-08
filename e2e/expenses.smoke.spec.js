@@ -32,7 +32,7 @@ test.describe('Expenses smoke', () => {
         const outstandingTab = page.getByRole('tab', { name: /^Outstanding \(1\)$/ });
         await expect(outstandingTab).toBeVisible();
 
-        const expenseRow = page.getByRole('button', { name: new RegExp(expenseTitle) }).first();
+        const expenseRow = page.getByRole('button', { name: new RegExp(expenseTitle) }).filter({ has: page.getByRole('heading', { name: expenseTitle, exact: true }) });
         await expect(expenseRow).toBeVisible();
         await expect(expenseRow).toContainText('12.34');
 
@@ -41,7 +41,7 @@ test.describe('Expenses smoke', () => {
         const paidTab = page.getByRole('tab', { name: /^Paid \(1\)$/ });
         await paidTab.click();
 
-        const paidExpenseRow = page.getByRole('button', { name: new RegExp(expenseTitle) }).first();
+        const paidExpenseRow = page.getByRole('button', { name: new RegExp(expenseTitle) }).filter({ has: page.getByRole('heading', { name: expenseTitle, exact: true }) });
         await expect(paidExpenseRow).toBeVisible();
         await expect(paidExpenseRow).toContainText('Paid');
         await expect(paidExpenseRow).toContainText('12.34');
@@ -59,7 +59,7 @@ test.describe('Expenses smoke', () => {
         await expect(page.getByRole('heading', { name: expensesHeadingName })).toBeVisible();
         await page.getByRole('tab', { name: /^Paid \(1\)$/ }).click();
 
-        const reloadedPaidRow = page.getByRole('button', { name: new RegExp(expenseTitle) }).first();
+        const reloadedPaidRow = page.getByRole('button', { name: new RegExp(expenseTitle) }).filter({ has: page.getByRole('heading', { name: expenseTitle, exact: true }) });
         await expect(reloadedPaidRow).toBeVisible();
         await expect(reloadedPaidRow).toContainText('Paid');
         await expect(reloadedPaidRow).toContainText('12.34');

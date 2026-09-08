@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Modal from './Modal'
 
@@ -119,6 +119,14 @@ describe('Modal', () => {
         )
 
         expect(onOpenAutoFocus).toHaveBeenCalledTimes(1)
+    })
+
+    it('forwards close autofocus overrides for externally controlled modal triggers', async () => {
+        const onCloseAutoFocus = vi.fn(event => event.preventDefault())
+        const props = { onClose: vi.fn(), title: 'Recent activity', onCloseAutoFocus }
+        const { rerender } = render(<Modal {...props} isOpen><div>Activity</div></Modal>)
+        rerender(<Modal {...props} isOpen={false}><div>Activity</div></Modal>)
+        await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalledOnce())
     })
 
     it('keeps the title aligned with the close button and footer actions on one row', () => {

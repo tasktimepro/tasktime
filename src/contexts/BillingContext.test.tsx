@@ -123,6 +123,19 @@ describe('BillingProvider Checkout continuity', () => {
         state.billingStatusOptions = null;
     });
 
+    it('keeps the mounted account and entitlement when a lazy consumer loads a hot-updated module', async () => {
+        // Vite versions invalidated imports this way when Reports first loads
+        // after a shared-modal update. The mounted provider is not remounted.
+        const updated = await import('./BillingContext.tsx?hmr-regression');
+        expect(updated.BillingProvider).not.toBe(BillingProvider);
+        function UpdatedConsumer() {
+            const billing = updated.useBilling();
+            return <p>{billing.resolution.kind}:{String(billing.hasActiveCloudAccount)}</p>;
+        }
+        render(<BillingProvider><UpdatedConsumer /></BillingProvider>);
+        expect(screen.getByText('canonical:true')).toBeInTheDocument();
+    });
+
     it('refreshes a stale founding offer and requires a fresh explicit confirmation', async () => {
         state.createCheckout.mockRejectedValueOnce(new BillingClientError(
             'FOUNDING_OFFER_ENDED',

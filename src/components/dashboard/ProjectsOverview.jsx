@@ -6,6 +6,23 @@ import { formatCurrency, getProjectCurrency } from '../../utils/currencyUtils.ts
 import { PROJECT_FILTER_OPTIONS } from './dashboardOverviewUtils.ts';
 import CardSearchControl from './CardSearchControl';
 
+/** Match project-list color inheritance without changing stored project data. */
+function ProjectColorDot({ project }) {
+    const selectedColor = project.color || project.client?.color;
+    const color = typeof selectedColor === 'string'
+        ? selectedColor.trim().replace(/^#([a-f\d])([a-f\d])([a-f\d])$/i, '#$1$1$2$2$3$3')
+        : '';
+
+    return (
+        <span
+            aria-hidden="true"
+            data-testid="project-color-dot"
+            className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground"
+            style={/^#[a-f\d]{6}$/i.test(color) ? { backgroundColor: color } : undefined}
+        />
+    );
+}
+
 /**
  * ProjectsOverview component - Recent projects list with search.
  * @param {Object} props
@@ -29,7 +46,7 @@ const ProjectsOverview = ({
             : 'No recent projects found';
 
     return (
-        <Card>
+        <Card role="region" aria-label="Projects">
             <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                     <CardTitle className="order-1 mr-auto flex items-center text-lg">
@@ -76,16 +93,17 @@ const ProjectsOverview = ({
                     <div className="divide-y divide-border">
                         {recentProjects.map((project) => (
                             <div key={project.id} className="px-3 py-3 hover:bg-muted transition-colors">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-3">
                                     <div className="flex-1 min-w-0 space-y-1">
                                         <button
                                             onClick={() => navigateToProject(project.id)}
-                                            className="hover-status-info-text-strong text-sm font-medium text-foreground truncate cursor-pointer text-left block"
+                                            className="hover-status-info-text-strong flex max-w-full items-center gap-2 text-sm font-medium text-foreground cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             title={`Click to open ${project.title} project`}
                                         >
-                                            {project.title}
+                                            <ProjectColorDot project={project} />
+                                            <span className="truncate">{project.title}</span>
                                         </button>
-                                        <div className="text-xs text-muted-foreground">
+                                        <div className="pl-4 text-xs text-muted-foreground">
                                             {project.client ? (
                                                 <span>
                                                     <button
@@ -103,7 +121,7 @@ const ProjectsOverview = ({
                                         </div>
                                     </div>
                                     {!project.isPersonal && (
-                                        <div className="text-right">
+                                        <div className="shrink-0 text-right">
                                             {/* Pending Bills */}
                                             <div className="text-sm font-medium text-foreground">
                                                 {project.pendingAmount > 0 ? (

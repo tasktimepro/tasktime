@@ -32,10 +32,10 @@ export default function DashboardHoursChart({ days }) {
             <div className="relative min-h-44 w-full min-w-0 flex-1 text-xs text-muted-foreground [&_.recharts-cartesian-axis-tick_text]:fill-current">
                 <div className="absolute inset-0">
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart data={chartDays} accessibilityLayer margin={{ top: 8, right: 0, left: -12, bottom: 0 }} barCategoryGap="25%" aria-label="Daily tracked hours, split into billable and non-billable time">
+                        <BarChart data={chartDays} accessibilityLayer margin={{ top: 8, right: 0, left: 0, bottom: 0 }} barCategoryGap="25%" aria-label="Daily tracked hours, split into billable and non-billable time">
                             <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
                             <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={32} tickMargin={10} tickFormatter={date => format(parseStoredDate(date), 'd MMM')} />
-                            <YAxis tickLine={false} axisLine={false} width={48} domain={[0, maxHours]} ticks={ticks} interval={0} tickFormatter={value => `${value}h`} />
+                            <YAxis tickLine={false} axisLine={false} width="auto" domain={[0, maxHours]} ticks={ticks} interval={0} tickFormatter={value => `${value}h`} />
                             <Tooltip content={<HoursTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.5 }} />
                             <Bar dataKey="billableHours" name="Billable" stackId="hours" fill={BILLABLE_COLOR} isAnimationActive={false} />
                             <Bar dataKey="nonBillableHours" name="Non-billable" stackId="hours" fill={NON_BILLABLE_COLOR} isAnimationActive={false} />

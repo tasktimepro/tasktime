@@ -28,7 +28,7 @@ export default function MetricsCards({ report, comparison, period, periodOptions
     const money = value => <DashboardMoneyValue money={value} currency={preferredCurrency} />;
     const conversionFallback = [report.unbilled, report.received, report.spent].some(value => value.hadConversionError);
     const cards = [
-        { label: 'Tracked time', value: formatDurationWithSeconds(report.time), detail: `${formatDurationWithSeconds(report.billableTime)} billable`, icon: ClockIcon, trend: comparison?.time },
+        { label: 'Tracked time', value: formatDurationWithSeconds(report.time), detail: `${formatDurationWithSeconds(report.billableTime)} billable${report.liveTime > 0 ? ' · incl. active' : ''}`, icon: ClockIcon, trend: comparison?.time },
         { label: 'Unbilled amount', value: money(report.unbilled), detail: `${formatDurationWithSeconds(report.unbilledTime)} unbilled`, icon: CurrencyDollarIcon, trend: comparison?.unbilled },
         { label: 'Received', value: money(report.received), detail: 'By payment date', icon: BanknotesIcon, trend: comparison?.received },
         { label: 'Expenses', value: money(report.spent), detail: 'Paid · by expense date', icon: HandCoinsIcon, trend: comparison?.spent },
@@ -73,7 +73,6 @@ export default function MetricsCards({ report, comparison, period, periodOptions
                                     </div>
                                 </div>
                                 <Suspense fallback={<div role="status" className="flex h-64 items-center justify-center text-sm text-muted-foreground">Loading chart…</div>}><DashboardHoursChart days={report.days} /></Suspense>
-                                {report.time === 0 && <p className="mt-2 text-sm text-muted-foreground">No time tracked in this period.</p>}
                             </div>
                         </div>
                         {report.unpricedTime > 0 && <p className="mt-3 text-xs text-muted-foreground">Unbilled amount estimates hourly work. {formatDurationWithSeconds(report.unpricedTime)} has no hourly rate.</p>}

@@ -54,6 +54,14 @@ forward enforcement and never hide, discard, or auto-archive records.
 
 `useExpenses` retains synchronous raw create/update methods for controlled internal applications, while user-facing paid or payment-sensitive mutations use `createExpenseWithPaymentSnapshot` and `updateExpenseWithPaymentSnapshot`. Those asynchronous methods prepare required cross-currency evidence before committing. `deleteExpense` rejects billed/invoice-linked and tax-claimed expenses on every UI call path.
 
+With `includeArchived`, `useExpenses` exposes archive loading through `isLoading`,
+a failed history load through nullable `error`, and an explicit `retryHistory()`
+callback. `isLoading` remains true until history is complete, preserving existing
+billing/report readiness gates; error-aware views prioritize the retry state.
+Active and archived records retain the existing merge/validation rules;
+nested archived updates notify consumers. These are additive read-state fields,
+with no persisted expense or mutation contract change.
+
 `useInvoices.cancelInvoice` and the agent `cancel_invoice` command are adapters over one shared cancellation application. The operation accepts `invoiceId`, a trimmed 1–500 character `reason`, a stable `operationId`, and an optional finite `canceledAt`; adapters additionally require exact invoice-number confirmation and agent approval. It returns the retained canceled invoice plus stable counts for released time entries, deleted adjustment entries, released expenses, released quoted tasks, restored task cutoffs, and retained project links, with `retainedInvoiceNumber: true` and retry state through `alreadyApplied`. The operation rejects missing, draft, paid, and conflicting already-canceled invoices without partial product mutation and replays the same persisted operation idempotently.
 
 `useInvoices.markAsUnpaid` and the agent `mark_invoice_unpaid` command are payment-correction boundaries, not refund operations. They accept only an invoice whose current persisted status is `paid`, clear its payment evidence, and preserve every billing-source claim. Missing, non-paid, and canceled invoices fail without mutation; callers cannot use this transition to reopen or alter a sent, overdue, draft, or canceled invoice.

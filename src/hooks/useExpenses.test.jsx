@@ -81,6 +81,32 @@ describe('useExpenses', () => {
         mockFetchExchangeRates.mockResolvedValue({ rates: { USD: 1, EUR: 0.8 }, error: null })
     })
 
+    it('exposes history failure and retry while keeping legacy completeness gates closed', async () => {
+        const { store, loadArchivedExpenses } = buildStore({ active: [buildExpense()] })
+        loadArchivedExpenses.mockRejectedValueOnce(new Error('offline'))
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedExpenses })
+        const { result } = renderHook(() => useExpenses({ includeArchived: true }))
+        await waitFor(() => expect(result.current.error).toBe('Unable to load expense history.'))
+        expect(result.current.isLoading).toBe(true)
+        expect(result.current.expenses).toHaveLength(1)
+        act(() => result.current.retryHistory())
+        await waitFor(() => expect(result.current.error).toBeNull())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+        expect(loadArchivedExpenses).toHaveBeenCalledTimes(2)
+    })
+
+    it('observes nested archived expense edits for historical overview totals', async () => {
+        const { store, loadArchivedExpenses } = buildStore()
+        const archived = await loadArchivedExpenses()
+        const entity = new Y.Map(Object.entries(buildExpense({ id: 'archived', paymentStatus: 'paid' })))
+        archived.set('archived', entity)
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedExpenses })
+        const { result } = renderHook(() => useExpenses({ includeArchived: true }))
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+        act(() => entity.set('amount', 99))
+        await waitFor(() => expect(result.current.expenses[0].amount).toBe(99))
+    })
+
     it('filters and sorts expenses by date desc', () => {
         const { store, loadArchivedExpenses } = buildStore({
             active: [

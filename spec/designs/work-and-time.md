@@ -20,18 +20,28 @@ Minimize the distance from identifying work to tracking it accurately.
 
 ## Dashboard overview
 
+- Project names have a small 8px color dot, using the exact project color or
+  its associated client's color when the project has none, matching the project
+  list. Missing or invalid colors use the neutral muted-foreground token.
+  Dots are decorative and sit inside the existing project-name button, without
+  an extra keyboard stop. Names retain click/keyboard navigation and truncate
+  on narrow screens. Client links, financial values, filters and row padding
+  remain unchanged.
+
+- Today and Upcoming use the shared compact 32px empty-state icon size.
+
 - Desktop shows four summary cards above Today and Upcoming; the two action
   panels sit side by side at `xl` (3:2), stretching to equal height. Below `md`,
   actual DOM order is Today, Upcoming, the horizontally scrollable summary cards,
   then Reports Overview.
   Tablet uses a two-column summary grid and stacked action panels.
-- Summary timeframes are fixed: **Tracked today** is saved actual time with a
-  decorative seven-day sparkline; **Tasks due today** excludes completed tasks
+- Summary timeframes are fixed: **Tracked today** is saved actual time plus
+  active timer elapsed time, with a decorative seven-day sparkline; **Tasks due today** excludes completed tasks
   and shows overdue separately; **Unbilled this month** estimates eligible hourly
   work; **Unpaid invoices** includes all sent/overdue invoices, with separate
   links to the existing Outstanding and Overdue buckets. Changing the report
   period does not change these timeframes. Running/paused timers retain their
-  existing controls and are not added to saved-time totals.
+  existing controls. Only tracked-time displays include their elapsed time.
 - Upcoming moves the existing next-seven-day task/expense occurrences into its
   own panel, ordered by date. Show five initially and expose all remaining items
   through Show all/Show less. Completion, recurrence dates, timer guards, expense
@@ -57,13 +67,26 @@ Minimize the distance from identifying work to tracking it accurately.
 - The chart has its own bordered container, matching the combined height of the
   four metric cards on desktop. Its billable/non-billable legend is right-aligned
   beside “Hours tracked”; the chart header does not duplicate the first card's
-  total or trend. The Y axis starts at zero, with an 8h minimum
+  total or trend. Empty periods retain the chart without a message underneath.
+  The Y-axis width automatically fits its formatted hour labels, without a fixed
+  left gutter or negative margin. The axis starts at zero, with an 8h minimum
   ceiling, increasing to the next whole hour of the largest daily stacked total
   (8.5h becomes 9h). The visible daily-values dropdown is removed; exact values
   remain available through keyboard/touch tooltips and a screen-reader table.
-- The chart and Tracked time use completed entries' actual intervals, grouped
-  wholly by local start date, including archived and already invoiced work.
-  Invoice adjustments and deleted/invalid intervals do not count as worked time.
+- The chart and Tracked time use saved actual intervals plus active timer
+  elapsed time, grouped wholly by local start date (the effective start for
+  resumed timers), including archived and already invoiced saved work. Invoice
+  adjustments and deleted/invalid intervals do not count as worked time.
+- Live time updates once per minute while visible and immediately after timer
+  lifecycle changes or returning to the tab. Paused elapsed time remains included
+  without increasing. Only Tracked today and its sparkline, selected-period
+  Tracked time and its time trend/billable detail, and Hours tracked include live
+  time; these cards identify active contributions. Financial metrics and trends,
+  other widgets, and the standalone Reports page continue using saved records.
+  The projection never writes data or applies billing rounding. Stopped-timer
+  identities (including the legacy identity fallback) prevent double-counting
+  while a saved entry and its timer temporarily coexist. Clearing a timer
+  removes its contribution; stopping replaces it with the actual saved entry.
   Current task billability splits each day into billable/non-billable; missing
   task links retain actual time as non-billable. Zero-work days remain visible.
   This is distinct from billing-rounded eligible duration used by Unbilled amount.

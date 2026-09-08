@@ -10,7 +10,7 @@ function TrackedSparkline({ values }) {
 }
 
 /** Fixed-timeframe summaries remain independent of the report period. */
-export default function DashboardSummaryCards({ currentMonth, todayTime, recentDays, dueCount, overdueCount, preferredCurrency, loading, error, navigateToInvoices }) {
+export default function DashboardSummaryCards({ currentMonth, todayTime, todayLiveTime = 0, recentDays, dueCount, overdueCount, preferredCurrency, loading, error, navigateToInvoices }) {
     const invoiceLinks = [
         { count: currentMonth.unpaidCount - currentMonth.overdueCount, label: 'outstanding', tab: 'outstanding' },
         { count: currentMonth.overdueCount, label: 'overdue', tab: 'overdue' },
@@ -19,7 +19,7 @@ export default function DashboardSummaryCards({ currentMonth, todayTime, recentD
         <button key={item.tab} type="button" className="rounded-sm py-1 underline decoration-border underline-offset-4 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" disabled={!navigateToInvoices} aria-label={`${item.count} ${item.label} ${item.count === 1 ? 'invoice' : 'invoices'}`} onClick={() => navigateToInvoices?.({ section: 'invoices', tab: item.tab })}>{item.count} {item.label}</button>
     ))}</span> : 'No unpaid invoices';
     const cards = [
-        { title: 'Tracked today', value: formatDurationWithSeconds(todayTime), detail: 'Saved time · last 7 days', icon: ClockIcon, sparkline: true },
+        { title: 'Tracked today', value: formatDurationWithSeconds(todayTime), detail: todayLiveTime > 0 ? 'Incl. active · last 7 days' : 'Saved time · last 7 days', icon: ClockIcon, sparkline: true },
         { title: 'Tasks due today', value: dueCount, detail: `${overdueCount} overdue`, icon: ListTodoIcon, ready: true },
         { title: 'Unbilled this month', value: <DashboardMoneyValue money={currentMonth.unbilled} currency={preferredCurrency} />, detail: `${formatDurationWithSeconds(currentMonth.unbilledTime)} unbilled${currentMonth.unpricedTime > 0 ? ' · some time has no hourly rate' : ''}`, icon: CurrencyDollarIcon },
         { title: 'Unpaid invoices', value: <DashboardMoneyValue money={currentMonth.unpaid} currency={preferredCurrency} />, detail: invoiceDetail, icon: DocumentTextIcon },

@@ -7,6 +7,9 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 ## Runtime components
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
+- **React context identity:** Yjs and billing context objects live in UI-independent
+  shared modules so lazy Reports imports after development hot updates retain
+  their mounted providers. Store lifecycle and entitlement policy are unchanged.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
 - **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. Dropbox's verified connected-account email is read browser-to-provider and retained in the origin-local auth record; the Worker keeps its pseudonymous subject for identity and entitlement. Only when the user explicitly starts paid Checkout may the browser submit that verified email as a separate billing contact for the mapped Stripe Customer. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
@@ -137,12 +140,20 @@ The Yjs store is split into documents so current work stays loaded and historica
 
 The dashboard separates Today/Upcoming actions from fixed-timeframe summaries
 and preset-period reports with preceding-period trends. Its stacked chart uses
-actual saved time; unbilled estimates and payment totals retain canonical billing
-and currency semantics.
+actual saved time plus a read-only active-timer projection sampled each minute
+while visible. Tracked cards share that projection, with pause and stop identity
+handling; unbilled estimates and payment totals retain saved-record billing and
+currency semantics. Live ticks never write or sync product data.
 Validated history loads through existing Yjs store APIs, with explicit loading
 and retry. The chart bundle is lazy and precached for offline navigation; the
 service worker tolerates Origin-header variation only for manifest-listed public
 build assets. No persisted contract or `/reports` entitlement changes are involved.
+
+The Expenses overview derives paid spending, recurring estimates, upcoming
+occurrences, category shares, and recorded activity from existing active/archive
+expense hooks. It preserves the original expense tabs/list and mutation paths,
+uses canonical payment snapshots, and shares the lazy offline chart bundle.
+See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
 
 ## Reliability and security model
 

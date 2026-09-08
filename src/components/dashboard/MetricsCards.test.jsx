@@ -20,7 +20,7 @@ describe('dashboard reports overview', () => {
         render(<MetricsCards {...props} />);
         for (const label of ['Tracked time', 'Unbilled amount', 'Received', 'Expenses']) expect(screen.getByRole('heading', { name: label, exact: true })).toBeVisible();
         expect(await screen.findByTestId('chart')).toHaveTextContent('30 days');
-        expect(screen.getByText('No time tracked in this period.')).toBeVisible();
+        expect(screen.queryByText('No time tracked in this period.')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /previous|next|custom/i })).not.toBeInTheDocument();
         screen.getByRole('combobox', { name: 'Dashboard report period' }).focus();
         await userEvent.keyboard('{Enter}');

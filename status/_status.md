@@ -10,6 +10,32 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Program Phase 3 UI polishing in progress locally**
 
+- Phase 3 continuation is recorded in this local commit checkpoint: Expenses
+  overview/interactions, Dashboard dots/empty states/axis sizing/live tracked
+  time, and Yjs/Billing provider identity fixes. All current source changes and
+  user TODO edits are included; homepage work was already committed in `faa4441`.
+  Latest checks: 2,525 unit tests with coverage, eight targeted Chromium cases,
+  lint, typecheck and app build passed. Earlier broad smoke/PWA evidence remains
+  separately dated in `app-status.md`. Continue remaining UX work from TODO in
+  the next thread. Release scope remains core minor `1.6.0`; no agent artifact
+  release is needed. No version bump, tag, push, publication or deployment.
+
+- Reports hot-update regression is fixed locally: Yjs and billing context
+  identity are independent of provider UI dependencies. First lazy Reports
+  navigation after a shared Modal update is covered with enforcement enabled.
+  All 2,513 unit tests, 47 Chromium smoke scenarios, six PWA checks, lint,
+  typecheck, and the production build pass. The existing localhost workspace
+  also retains advanced report access, totals, and In sync after the same hot
+  update. This fix is included in the continuation checkpoint and remains undeployed.
+
+- The Expenses overview slice is complete locally: neutral summary cards,
+  spending/category charts, and recorded activity with phone ordering and
+  offline support. Follow-up refinements add a 30-day activity modal, padded
+  hover rows, and full-card navigation for recurring/upcoming summaries.
+  The original expense list and tabs are restored and retained.
+  Full unit/coverage, Chromium smoke, PWA, lint, typecheck, and build checks pass;
+  details are in `app-status.md`. This slice is included in the continuation checkpoint and remains undeployed.
+
 - The dashboard readability slice is complete locally: separate Today/Upcoming,
   four fixed-timeframe summaries, preset-period reports, and a neutral stacked
   billable/non-billable chart. Phones put action panels first and scroll summary
@@ -19,6 +45,11 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   8h minimum axis ceiling. Validation and the successful/cached exchange-rate
   crash regression are recorded in `app-status.md`. This is a local checkpoint,
   with no deployment or persisted-contract change.
+  The Projects widget now adds 8px dots in the original project colors,
+  inherited client colors when absent, and a neutral fallback. Project/client
+  navigation and light/dark phone layouts are verified. Dashboard tracked-time
+  displays now include a read-only minute-sampled active-timer projection;
+  financial calculations and other views retain saved-record semantics.
 
 - Phase 3 homepage copy now leads with “Run your freelance work. From task to
   invoice.” in the centered hero, with one primary app action and compact

@@ -27,6 +27,11 @@ export default defineConfig({
                 'src/components/dashboard/DashboardSummaryCards.jsx',
                 'src/components/dashboard/MetricsCards.jsx',
                 'src/components/dashboard/Upcoming.jsx',
+                'src/components/expenses/expenseOverviewMetrics.ts',
+                'src/components/expenses/ExpenseMetrics.jsx',
+                'src/components/expenses/ExpenseAmount.jsx',
+                'src/components/expenses/ExpenseInsights.jsx',
+                'src/components/expenses/ExpenseSpendingChart.jsx',
             ],
             exclude: [
                 'src/**/*.{test,spec}.{js,jsx,ts,tsx}',

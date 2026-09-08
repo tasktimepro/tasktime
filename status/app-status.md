@@ -2,6 +2,143 @@
 
 ## Current focus
 
+- [x] Phase 3 continuation commit and thread handoff (2026-09-08): includes all
+  current Expenses overview/interactions, dashboard color dots/empty states/axis
+  sizing/live tracked-time changes, shared Yjs/Billing context identity fixes,
+  tests, specifications, and existing user TODO edits. The original Expenses
+  table and tabs remain intact. The homepage checkpoint is already in `faa4441`.
+  Final source validation: 270 files / 2,525 unit tests with coverage, eight
+  Dashboard/Timer/Reports Chromium scenarios, lint, typecheck, and production
+  app build pass. Earlier full 47-scenario smoke and six PWA checks predate the
+  final dashboard refinements; they were not rerun for this commit.
+  Release assessment: next core-app minor release `1.6.0` from `1.5.0`;
+  no published agent artifact contents or metadata changed. This checkpoint
+  does not bump versions, tag, push, publish, or deploy. Continue the remaining
+  Phase 3 UX work in the next thread, using TODO and these feature definitions.
+  No known blocking issue remains; production launch/release gates stay separate.
+
+- [x] Include live timers in Dashboard tracked-time displays (2026-09-08):
+  Tracked today and its sparkline, selected-period Tracked time and its time
+  trend/billable detail, and Hours tracked include active elapsed time. A
+  dashboard-only clock samples each minute while visible and refreshes on timer
+  lifecycle changes or focus/visibility return. Paused time stays fixed.
+  Period attribution follows the existing local effective-start-date rule.
+  No synthetic entries, billing rounding, sync writes, or financial projection
+  changes; all other widgets and standalone Reports retain existing behavior.
+  Stopped-entry identities suppress duplicate live contributions, including
+  legacy timers. Small active-time labels distinguish unsaved contributions.
+  Red/green regressions cover sampling, pause/resume/edit/discard, concurrent
+  timers, midnight, historical selections, hidden/focus recovery, financial
+  object stability, and saved-entry/timer coexistence. Isolated browser proof
+  covers real timer controls, minute growth, zero periodic Yjs writes, unchanged
+  unbilled amounts, stop and reload. Full Docker gate: 270 files / 2,525 tests
+  pass with coverage; the new hook has 100% line/function and 95.23% branch
+  coverage. All eight Dashboard/Timer/Reports Chromium scenarios pass, plus
+  lint, typecheck, production app compilation and diff checks. Specs,
+  overview/map and TODO are reconciled. Included in the Phase 3 continuation checkpoint; undeployed.
+
+- [x] Tighten overview chart presentation (2026-09-08): Expenses and Dashboard
+  Hours tracked use Recharts automatic Y-axis width based on formatted labels, replacing the fixed gutter
+  and negative left margin. Reports Overview no longer adds an empty-period
+  message below Hours tracked. Existing text assertion and design notes updated.
+  Installed Recharts support was confirmed; visual review remains with the user
+  and no automated checks were run. Included in the Phase 3 continuation checkpoint; undeployed.
+
+- [x] Align widget empty states (2026-09-08): To Do Today now uses the shared
+  32px icon size. Expenses By category and Recent activity use centered shared
+  empty states with 32px muted icons and existing labels, without descriptions.
+  Visual review is left to the user as requested; no automated checks were run
+  for this styling-only adjustment. Included in the Phase 3 continuation checkpoint; undeployed.
+
+- [x] Add project color dots to the Dashboard Projects widget (2026-09-08):
+  8px dots beside project names preserve the original project color, inherit
+  the associated client color when absent, and otherwise fall back to neutral.
+  Dots are decorative within the project-name button, with no extra keyboard
+  stop. Client links, pending values, filters and row padding are preserved;
+  long names truncate. No data fields or other project lists changed.
+  Red/green coverage passes: 24 focused tests, 100% widget line/function
+  coverage and 77.27% branch coverage. The focused Chromium dot/navigation
+  scenario passes; captures were reviewed at 1440/390/320px in light/dark mode.
+  Focused lint and diff checks pass. Before this cosmetic adjustment, all six
+  Dashboard/Reports Chromium scenarios, full lint, typecheck and production
+  app compilation passed. Design and acceptance notes are updated.
+  Included in the Phase 3 continuation checkpoint; undeployed.
+
+- [x] Trace the Dashboard scrolling console error (2026-09-08): opened the
+  user's exact `VM2292:2:19429` source in Edge DevTools. The failing
+  `et.reportAllChanges` callback is DevTools' injected INP/Web Vitals reporter
+  reading `metric.entries[0].startTime` without an entry. It includes
+  `window.devToolsReportSoftNavs` and matches Chromium's live-metrics script;
+  the current upstream event builders use optional entry access in
+  [spec.ts](https://github.com/ChromeDevTools/devtools-frontend/blob/main/front_end/models/live-metrics/web-vitals-injected/spec/spec.ts).
+  No matching reporter exists in app source, the diagnostics SDK, or Recharts,
+  and the local DebugBundle incident list is empty. A disposable Chromium
+  diagnostic passed 15 scroll gestures at 1280/390px, chart keyboard interaction,
+  and three Planner/Dashboard round trips with no runtime or ErrorBoundary
+  errors. No app-code patch or error suppression was applied. Closing DevTools
+  and reloading avoids its injected reporter; browser-release inclusion of the
+  upstream guard was not verified.
+
+- [x] Verify the Reports navigation provider fix locally (2026-09-08). Reproduced the
+  reported `useYjs` error by opening Expenses, emitting a shared Modal hot update,
+  then opening Reports for the first time with enforcement enabled. Vite loaded
+  a new consumer-side context while the original provider remained mounted.
+  The same module-identity issue silently dropped Reports' billing context.
+  UI-independent context modules preserve both identities without changing
+  provider lifecycle, persisted records, routing, or entitlement decisions.
+  The exact browser reproduction and the red/green billing-context unit
+  regression pass. Earlier cold/default-enforcement smoke checks missed this
+  path; the standard browser gate now includes it and catches handled React
+  ErrorBoundary errors. Docker-backed validation passes: 268 files / 2,513 unit
+  tests with the configured per-file coverage gate, all 47 Chromium smoke
+  scenarios, lint, typecheck, the 50-page production build, and six PWA checks.
+  The existing localhost workspace also passes fresh Expenses -> Modal HMR ->
+  first Reports navigation with advanced report access, retained totals, and
+  In sync status. The stopped dev app required a scoped container restart after
+  a separate file-watcher ENOMEM; no browser data reset was needed. Docs and
+  architecture guidance are reconciled. Included in the Phase 3 continuation checkpoint; undeployed.
+
+- [x] Refine Expenses overview interactions locally (2026-09-08): Show more
+  opens the shared Modal with the last 30 local calendar days of recorded
+  activity; the widget stays at three rows and retains its next-payment hint.
+  Both activity views use padded rows, pointer cursors, and the shared blue
+  service-name hover/focus treatment. Detail-modal navigation and close-focus
+  restoration are verified; Modal exposes an optional close-autofocus passthrough
+  without changing existing callers. Recurring expenses and Upcoming payments
+  use full-area native buttons and no bottom links, preserving their destinations.
+  Red/green regressions and 35 focused tests pass, with the changed overview files
+  above the 75% per-file coverage gate. Four expense Chromium scenarios pass,
+  including keyboard activation, card-edge clicks, original payment/reload flows,
+  30-day boundaries, nested detail navigation, and modal scrolling at 1440/390/320px.
+  Lint, typecheck, the production build, and diff checks pass. Specs are reconciled;
+  the original expense list/tabs remain unchanged. Included in the Phase 3 continuation checkpoint; undeployed.
+
+- [x] Complete the Program Phase 3 Expenses overview locally (2026-09-08):
+  neutral cards for period paid spend, estimated monthly recurring commitments,
+  existing upcoming occurrences, and top category; six-month spending bars,
+  category breakdown, and recorded activity. Phones use a summary rail and
+  place the original actionable list before stacked analytical panels.
+  The attempted list/table redesign was removed at the user's request:
+  `ExpenseList`, `ExpenseRow`, the status-tab markup, and list props match the
+  preceding commit. Existing sorting, status/date buckets, recurrence previews,
+  filters, and payment/edit flows are preserved. Tests now distinguish original
+  row headings from the same expense appearing in Recent activity.
+  Paid FX snapshots remain authoritative; mixed unavailable currencies never
+  become a combined chart/trend. Archived category names remain available in
+  summaries. History failures expose retry while preserving existing billing/
+  reports completeness gates; nested archived edits refresh overview values.
+  Red/green regressions cover projections, history failure/retry, archive
+  observation, completeness, and category retention. Docker-backed validation:
+  268 files / 2,510 tests and the 75% per-file coverage gate passed; the final
+  category wiring also passed the 14-test expense/list integration check.
+  All 44 Chromium smoke scenarios and six production PWA checks passed,
+  including first Expenses/chart navigation offline. Responsive captures were
+  inspected at desktop and 320/390px, with overflow checks through 1440px.
+  Final lint, typecheck, the 50-page production build, and diff checks passed.
+  Specifications, hook interface docs, architecture summaries, and tracking
+  are reconciled. No dependencies or persisted schemas changed. Included in the Phase 3 continuation checkpoint; undeployed. Subsequent
+  Phase 3 work remains open.
+
 - [x] Reconcile and validate the complete Phase 3 local checkpoint (2026-09-08):
   dashboard layout/reports and follow-up fixes, homepage presentation/copy,
   product naming, and shared project icons. Specs, acceptance criteria,

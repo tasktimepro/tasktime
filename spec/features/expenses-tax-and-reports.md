@@ -6,6 +6,14 @@
 - Recurrences deterministically create/manage expected expense occurrences and can pause/resume.
 - Tax-return periods group explicit claimed/filed/paid states.
 - Reports aggregate canonical time, billed/unbilled work, invoices/payments, expenses, and tax data under shared filters.
+- The main Expenses overview adds period paid-spend, estimated monthly recurring
+  commitments, existing upcoming-occurrence totals, category shares, monthly
+  history, and recorded activity as read-only projections of active and archived
+  records. Metric scopes and responsive ordering follow
+  [Expenses overview](../designs/billing-and-finance.md#expenses-overview).
+  Existing expense rows, tabs, filters, status buckets, and mutation paths remain
+  unchanged. History failures expose retry rather than a complete-looking total;
+  nested archived-record changes refresh these projections.
 - CSV, PDF, ZIP, and accountant outputs use the same filter and calculation semantics as the visible report.
 - Paid cross-currency expense creation and payment-sensitive updates prepare and validate their payment snapshot before the expense mutation is committed. Recurrence generation advances its cursor only after every due occurrence was created successfully.
 - Billed or tax-claimed expenses are protected records: both browser and agent deletion paths reject them until the invoice or tax-return relationship is explicitly reversed.

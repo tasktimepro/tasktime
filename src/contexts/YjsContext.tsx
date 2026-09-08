@@ -9,7 +9,8 @@
  * - Sync state tracking
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { YjsContext } from './YjsContext.shared';
 import {
     YjsStore,
     getYjsStore,
@@ -133,8 +134,6 @@ export interface YjsContextValue {
     /** Delete all backup files from the selected cloud provider */
     deleteAllBackups: () => Promise<void>;
 }
-
-const YjsContext = createContext<YjsContextValue | null>(null);
 
 interface YjsProviderProps {
     children: React.ReactNode;

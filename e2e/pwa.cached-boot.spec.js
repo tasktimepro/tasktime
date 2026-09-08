@@ -244,6 +244,22 @@ test.describe('PWA smoke', () => {
         expect(errors).toEqual([]);
     });
 
+    test('opens the expense overview and chart offline before its first expense visit', async ({ page, context }) => {
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.addInitScript(() => localStorage.setItem('tasktime-onboarding-completed', 'true'));
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+        await waitForActiveServiceWorker(page);
+        await context.setOffline(true);
+        await page.goto('/expenses');
+        await expect(page.getByRole('region', { name: 'Expense summary' })).toBeVisible();
+        await expect(page.getByRole('application', { name: 'Monthly paid expenses' })).toBeVisible();
+        await expect(page.getByRole('table', { name: 'Monthly paid expense values' })).toHaveCount(1);
+        await expect(page.getByText('Loading expense overview…')).toHaveCount(0);
+        expect(errors).toEqual([]);
+    });
+
     test('keeps static public routes out of the app shell after the production service worker is active', async ({ browser }) => {
         const context = await browser.newContext();
 

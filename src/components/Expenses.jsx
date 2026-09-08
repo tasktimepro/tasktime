@@ -37,6 +37,11 @@ import { formatCurrency } from '@/utils/currencyUtils.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate, isExpenseInDateRange } from '@/utils/expenseUtils';
 import ExpenseList from '@/components/expenses/ExpenseList';
+import ExpenseMetrics from '@/components/expenses/ExpenseMetrics';
+import ExpenseInsights from '@/components/expenses/ExpenseInsights';
+import { buildExpenseOverview } from '@/components/expenses/expenseOverviewMetrics';
+import useCurrencyConversion from '@/components/dashboard/hooks/useCurrencyConversion';
+import { useTodayString } from '@/hooks/useDayRollover';
 import ExpenseFilters from '@/components/expenses/ExpenseFilters';
 import PaymentMethods from '@/components/PaymentMethods';
 import BusinessInfo from '@/components/BusinessInfo';
@@ -52,6 +57,7 @@ const PERIOD_OPTIONS = [
     { value: 'year', label: 'This Year' },
     { value: 'custom', label: 'Custom Range' },
 ];
+const EMPTY_COLLECTION = [];
 
 /**
  * Expenses component - Main expenses page
@@ -70,6 +76,9 @@ const Expenses = ({
     const { showSuccess, showError } = useToast();
     const {
         expenses,
+        isLoading: expensesLoading,
+        error: expensesError,
+        retryHistory,
         markAsPaid,
         markAsUnpaid,
         createExpenseWithPaymentSnapshot,
@@ -84,7 +93,7 @@ const Expenses = ({
     } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
-    const { expenseCategories } = useExpenseCategories();
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
     const { preferences } = usePreferences();
 
     const [search, setSearch] = useState('');
@@ -104,7 +113,8 @@ const Expenses = ({
     const [pendingDeleteRecurrence, setPendingDeleteRecurrence] = useState(null);
     const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
     const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-    const todayStr = useMemo(() => toStorageDate(new Date()) || '', []);
+    const todayStr = useTodayString() || toStorageDate(new Date()) || '';
+    const expenseListRef = useRef(null);
 
     const sideNavItems = useMemo(() => [
         {
@@ -166,7 +176,7 @@ const Expenses = ({
     }, [clientId, getProjectsByClient, activeProjects, personalOnly]);
 
     useEffect(() => {
-        if (expenseRecurrencesLoading || recurrenceGeneratedRef.current) return;
+        if (expenseRecurrencesLoading || expensesLoading || expensesError || recurrenceGeneratedRef.current) return;
         recurrenceGeneratedRef.current = true;
         void Promise.resolve(generatePendingExpenses(
             createExpenseWithPaymentSnapshot,
@@ -178,6 +188,8 @@ const Expenses = ({
     }, [
         createExpenseWithPaymentSnapshot,
         expenseRecurrencesLoading,
+        expensesLoading,
+        expensesError,
         expenses,
         generatePendingExpenses,
         showError,
@@ -202,7 +214,7 @@ const Expenses = ({
     }, []);
 
     const { historicalStartDate, historicalEndDate, upcomingStartDate, upcomingEndDate } = useMemo(() => {
-        const today = new Date();
+        const today = parseStoredDate(todayStr);
         const todayValue = toStorageDate(today) || '';
 
         if (period === 'month') {
@@ -253,7 +265,7 @@ const Expenses = ({
             upcomingStartDate: customStart,
             upcomingEndDate: customEnd,
         };
-    }, [period, customStart, customEnd]);
+    }, [period, customStart, customEnd, todayStr]);
 
     const recurringPreviewExpenses = useMemo(() => {
         if (!upcomingStartDate || !upcomingEndDate || !todayStr) {
@@ -506,6 +518,28 @@ const Expenses = ({
         if (activeStatusTab === 'upcoming') return upcomingExpenses;
         return outstandingExpenses;
     }, [activeStatusTab, outstandingExpenses, upcomingExpenses, paidExpenses]);
+
+    // Commitment estimates use schedule scope, independently of occurrence payment/billing state.
+    const scopedRecurrences = useMemo(() => recurrences.filter(item => {
+        if (clientId !== 'all' && item.clientId !== clientId) return false;
+        if (projectId !== 'all' && item.projectId !== projectId) return false;
+        if (categoryId !== 'all' && item.categoryId !== categoryId) return false;
+        if (personalOnly && !item.isPersonal) return false;
+        if (billableOnly && !item.billable) return false;
+        const query = search.trim().toLowerCase();
+        return !query || [item.title, item.note, item.supplierName].some(value => value?.toLowerCase().includes(query));
+    }), [recurrences, clientId, projectId, categoryId, personalOnly, billableOnly, search]);
+    const overviewCurrencySources = useMemo(() => [...expenses, ...scopedRecurrences], [expenses, scopedRecurrences]);
+    const { preferredCurrency, convertToCurrency } = useCurrencyConversion({ projects: EMPTY_COLLECTION, clients: EMPTY_COLLECTION, invoices: EMPTY_COLLECTION, expenses: overviewCurrencySources });
+    const overview = useMemo(() => buildExpenseOverview({
+        expenses: commonFilteredExpenses, recurrences: scopedRecurrences, upcoming: upcomingExpenses,
+        categories: allExpenseCategories, range: { startDate: historicalStartDate, endDate: historicalEndDate },
+        period, today: todayStr, currency: preferredCurrency, convert: convertToCurrency,
+    }), [commonFilteredExpenses, scopedRecurrences, upcomingExpenses, allExpenseCategories, historicalStartDate, historicalEndDate, period, todayStr, preferredCurrency, convertToCurrency]);
+    const periodLabel = period === 'month' ? 'This month' : period === 'last-month' ? 'Last month' : period === 'quarter' ? 'This quarter' : period === 'year' ? 'This year' : 'Period';
+    const overviewError = expensesError || (overview.invalidRange ? 'Choose a valid start and end date.' : null);
+    const overviewLoading = !overviewError && (expensesLoading || expenseRecurrencesLoading);
+    const insights = !overviewError && !overviewLoading && <ExpenseInsights overview={overview} currency={preferredCurrency} periodLabel={periodLabel} onView={openExpenseView} />;
 
     const hasStatusFilters = activeStatusTab !== 'outstanding';
 
@@ -799,7 +833,16 @@ const Expenses = ({
                             )}
                         </div>
 
-                        <div className="mt-6">
+                        <div className="mt-6 space-y-4">
+                            <ExpenseMetrics overview={overview} currency={preferredCurrency} periodLabel={periodLabel} loading={overviewLoading} error={overviewError}
+                                onRecurring={() => handleSectionChange('recurring')}
+                                onUpcoming={() => { setActiveStatusTab('upcoming'); expenseListRef.current?.scrollIntoView({ block: 'start' }); }} />
+                            {overviewError ? <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm"><span>{overviewError}</span>{expensesError && <Button variant="outline" size="sm" onClick={retryHistory}>Retry</Button>}</div>
+                                : overviewLoading ? <p role="status" className="text-sm text-muted-foreground">Loading expense overview…</p> : null}
+                            {!isMobileLayout && insights}
+                        </div>
+
+                        <div className="mt-6" ref={expenseListRef}>
                             <Tabs value={activeStatusTab} onValueChange={setActiveStatusTab}>
                                 <TabsList className={cn(
                                     'w-full bg-transparent rounded-none',
@@ -855,6 +898,7 @@ const Expenses = ({
                                 onCreateFirst={() => openExpenseModal(null)}
                             />
                         </div>
+                        {isMobileLayout && <div className="mt-6">{insights}</div>}
                     </div>
                 )}
 

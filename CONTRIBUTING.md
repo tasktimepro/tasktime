@@ -64,6 +64,11 @@ Use Playwright smoke tests for browser flows:
 make test-e2e-smoke
 ```
 
+The smoke gate includes billing-enabled Reports navigation after a shared-modal
+Vite hot update, using its own server and disposable browser data. Fresh page
+loads alone do not exercise this lazy-import/provider boundary. It also checks
+React ErrorBoundary console errors, which do not necessarily emit `pageerror`.
+
 ## Data Compatibility
 
 Existing browser IndexedDB data, Yjs document shapes, export files, and Google

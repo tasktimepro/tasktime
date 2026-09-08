@@ -428,6 +428,7 @@ const ToDoToday = ({
                         ) : (
                             <EmptyState
                                 icon={ListTodoIcon}
+                                iconSize="sm"
                                 title="Nothing due today"
                                 description="You're all caught up."
                                 className="pt-4 pb-6"

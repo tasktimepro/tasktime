@@ -36,6 +36,9 @@ Requirement identifiers are stable references for acceptance criteria, design do
   actual time follow [the dashboard definitions](designs/work-and-time.md#dashboard-overview),
   preserving canonical billing eligibility, payment snapshots, historical sources,
   original-currency fallback and the separate Reports entitlement boundary.
+- **DASH-3:** Dashboard tracked-time displays include active timer elapsed time
+  through a read-only minute refresh. Financial values and other views remain
+  saved-record based; stopping a timer must not double-count its saved entry.
 
 ## Time tracking
 
@@ -51,6 +54,11 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **EXP-2:** Support recurring-expense schedules with pause, resume, and deterministic occurrence handling.
 - **EXP-3:** Track tax-return periods and explicit claimed/filed/paid state transitions.
 - **EXP-4:** Preserve original currency, conversion information, supplier/project/client relationships, and invoice linkage where present.
+- **EXP-5:** Provide a responsive, offline-capable expense overview with paid-spend
+  trends, recurring estimates, upcoming totals, category shares, and recorded
+  activity. Preserve the existing expense list/tabs and actions, payment snapshots,
+  historical records, and explicit unavailable-conversion/loading states; use
+  [the defined metric scopes](designs/billing-and-finance.md#expenses-overview).
 
 ## Invoices, quotes, and payments
 

@@ -61,7 +61,14 @@ export function useExpenses(options: UseExpensesOptions = {}) {
     const [isLoading, setIsLoading] = useState(true);
     const [archivedLoading, setArchivedLoading] = useState(false);
     const [archivedLoaded, setArchivedLoaded] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [historyAttempt, setHistoryAttempt] = useState(0);
     const archivedLoadTriggered = useRef(false);
+    const retryHistory = useCallback(() => {
+        archivedLoadTriggered.current = false;
+        setHistoryError(null);
+        setHistoryAttempt(attempt => attempt + 1);
+    }, []);
 
     const syncExpenses = useCallback(() => {
         if (!isReady) return;
@@ -109,18 +116,21 @@ export function useExpenses(options: UseExpensesOptions = {}) {
                 setArchivedLoaded(true);
                 syncExpenses();
             })
+            .catch(() => {
+                setHistoryError('Unable to load expense history.');
+            })
             .finally(() => {
                 setArchivedLoading(false);
             });
-    }, [options.includeArchived, isReady, archivedLoaded, loadArchivedExpenses, syncExpenses]);
+    }, [options.includeArchived, isReady, archivedLoaded, loadArchivedExpenses, syncExpenses, historyAttempt]);
 
     useEffect(() => {
         if (!options.includeArchived || !archivedLoaded || !store.archivedExpenses) return;
 
         const handler = () => syncExpenses();
-        store.archivedExpenses.observe(handler);
+        store.archivedExpenses.observeDeep(handler);
 
-        return () => store.archivedExpenses?.unobserve(handler);
+        return () => store.archivedExpenses?.unobserveDeep(handler);
     }, [options.includeArchived, archivedLoaded, store, syncExpenses]);
 
     const filteredExpenses = useMemo(() => {
@@ -578,7 +588,10 @@ export function useExpenses(options: UseExpensesOptions = {}) {
         paidExpenses,
         unbilledExpenses,
         billedExpenses,
+        // Preserve the completeness gate used by billing/report consumers, even after failure.
         isLoading: isLoading || Boolean(options.includeArchived && (archivedLoading || !archivedLoaded)),
+        error: options.includeArchived ? historyError : null,
+        retryHistory,
         totals,
 
         getExpense,

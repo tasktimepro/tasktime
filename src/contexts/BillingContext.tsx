@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo } from 'react';
+import { BillingContext } from './BillingContext.shared';
 import { BILLING_FEATURES } from '@/config/billingFeatures';
 import { buildLocalReviewBillingCatalog } from '@/config/localReviewPricing';
 import type { EntitlementResolution } from '@/domain/entitlements/entitlementTypes';
@@ -16,7 +17,7 @@ import {
 } from '@/utils/billingStorage';
 import { useYjs } from './YjsContext';
 
-type BillingContextValue = {
+export type BillingContextValue = {
     resolution: EntitlementResolution;
     status: BillingStatusResponseV1 | null;
     catalog: BillingCatalogV1 | null;
@@ -41,30 +42,6 @@ type BillingContextValue = {
     handleCheckoutReturn: (outcome: 'success' | 'cancel') => Promise<void>;
     handlePortalReturn: () => Promise<void>;
 };
-
-const DISABLED_VALUE: BillingContextValue = {
-    resolution: { kind: 'unresolved', reason: 'lifecycle' },
-    status: null,
-    catalog: null,
-    isLoading: false,
-    offline: false,
-    clockUntrusted: false,
-    error: null,
-    catalogError: null,
-    hasActiveCloudAccount: false,
-    isCloudAccountLoading: false,
-    isBillingConnectionReady: false,
-    isBillingReconnecting: false,
-    connectedAccountReference: null,
-    refresh: async () => undefined,
-    startTrial: async () => { throw new Error('BILLING_DISABLED'); },
-    createCheckout: async () => { throw new Error('BILLING_DISABLED'); },
-    openPortal: async () => { throw new Error('BILLING_DISABLED'); },
-    handleCheckoutReturn: async () => { throw new Error('BILLING_DISABLED'); },
-    handlePortalReturn: async () => { throw new Error('BILLING_DISABLED'); },
-};
-
-const BillingContext = createContext<BillingContextValue>(DISABLED_VALUE);
 
 function isChangedCheckoutOffer(error: unknown): error is BillingClientError {
     return error instanceof BillingClientError

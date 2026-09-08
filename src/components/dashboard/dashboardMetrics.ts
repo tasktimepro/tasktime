@@ -49,6 +49,11 @@ function calculateTrend(current: number | null, previous: number | null): Dashbo
     return { direction: current > previous ? 'up' : 'down', label: `${current > previous ? '+' : '−'}${amount}%` };
 }
 
+/** The live dashboard can refresh its time trend without recalculating money. */
+export function compareDashboardTime(current: number, previous: number): DashboardTrend {
+    return calculateTrend(current, previous);
+}
+
 /** Financial comparisons require one shared currency and successful conversions in both periods. */
 export function buildDashboardComparison(current: Pick<DashboardReport, 'time' | 'unbilled' | 'received' | 'spent'>, previous: Pick<DashboardReport, 'time' | 'unbilled' | 'received' | 'spent'>) {
     const moneyTrend = (now: DashboardMoney, before: DashboardMoney) => {
@@ -57,7 +62,7 @@ export function buildDashboardComparison(current: Pick<DashboardReport, 'time' |
         const total = (money: DashboardMoney) => Math.round(Object.values(money.amounts).reduce((sum, value) => sum + value, 0) * 100) / 100;
         return calculateTrend(total(now), total(before));
     };
-    return { time: calculateTrend(current.time, previous.time), unbilled: moneyTrend(current.unbilled, previous.unbilled), received: moneyTrend(current.received, previous.received), spent: moneyTrend(current.spent, previous.spent) };
+    return { time: compareDashboardTime(current.time, previous.time), unbilled: moneyTrend(current.unbilled, previous.unbilled), received: moneyTrend(current.received, previous.received), spent: moneyTrend(current.spent, previous.spent) };
 }
 
 /** Offer named months back through known history, with one year available initially. */

@@ -11,6 +11,64 @@ Let users understand exactly what will be billed, what changed after finalizatio
 - Expense views provide filters, due/recurrence context, paid state, categories, project/client links, and tax status.
 - Reports place filters near affected totals and use tables/exports where comparison matters.
 
+## Expenses overview
+
+The main Expenses section adds four neutral summary cards and analytical panels
+around the existing filters, Outstanding/Upcoming/Paid tabs, expense list, and
+payment/edit actions. The list and tabs retain their previous presentation and
+behavior. Recurring Expenses, Payment Methods, Your Business, and tax views keep
+their established flows.
+
+- **Period spend:** saved paid expenses by expense date in the selected period,
+  through today. Future automatic payments, unpaid records, and recurrence
+  previews do not count as spending. Compare the last calendar month, quarter,
+  or year; custom ranges compare the same number of preceding calendar days.
+  Zero baselines show New or No change, never an infinite percentage.
+- **Recurring expenses:** estimated monthly commitment for active schedules in
+  the search/client/project/category/personal/billable scope, excluding ended
+  schedules. Annual amounts divide by twelve; variable schedules without an
+  estimate are disclosed. This schedule estimate is independent of occurrence
+  payment/billing filters and the selected date period. The entire card opens
+  Recurring Expenses, with a visible keyboard focus ring and no bottom link.
+- **Upcoming payments:** totals and counts use the existing Upcoming bucket,
+  including its one next-occurrence preview per schedule. Labels identify next
+  occurrences and estimates. The entire card selects the existing Upcoming tab,
+  with keyboard access and no bottom link.
+- **Top category:** the largest category's share of selected-period paid spend.
+  Archived categories retain their names in historical summaries.
+  Mixed unconvertible currencies or negative category totals suppress ranking
+  and percentage visuals rather than creating a misleading comparison.
+- **Spending overview:** six monthly paid-spend bars ending at the selected
+  period's end, capped at the current month. The chart states its six-month
+  window separately from the selected-period category breakdown. The Y-axis
+  width fits its formatted currency labels automatically, without a fixed
+  left gutter or negative margin. Frozen payment
+  conversions remain authoritative. Unavailable conversions retain original
+  currencies; incompatible currencies disable combined charts and trends.
+- **Recent activity:** recorded payment dates or creation timestamps from today
+  and the preceding 29 local calendar days, independent of the spending period
+  while retaining the existing search/scope filters. The card includes the
+  nearest occurrence from Upcoming and stays capped at three rows. **Show more**
+  opens the shared Modal with recorded activity for those 30 days and an explicit
+  date range; upcoming payment hints remain in the card. The modal scrolls
+  internally and restores focus to its trigger on close. Marked paid describes
+  a recorded status, not a transfer of money. Rows in both views use horizontal
+  padding, a pointer cursor, and the shared blue service-name hover/focus color.
+  They open the existing expense view, with return to the activity modal after
+  closing expense details. Additional categories retain their expansion control.
+
+By category and Recent activity use the shared centered widget empty state:
+32px muted icons, compact labels, and no additional description. Empty content
+centers within the available panel height.
+
+Desktop places the card row and adjacent analytical panels above the original
+list. Phones use a horizontally scrollable card rail, then the original tabs
+and actionable list, then stacked analytical panels. Blue is the shared chart
+and icon accent; categories do not acquire new persisted colors. Charts support
+keyboard tooltips and an accessible values table, reuse the lazy Recharts bundle,
+and work offline after PWA installation. History loading and retry states avoid
+presenting partial totals as complete.
+
 ## Locally implemented Free to Pro experience (production-disabled)
 
 - Reports stays neutral in desktop/mobile navigation. Its Free Overview shows

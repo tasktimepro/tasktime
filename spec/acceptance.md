@@ -27,6 +27,12 @@
 
 ## Dashboard regression boundary
 
+- Project names show an 8px dot in the original project color, inheriting the
+  client color when absent and otherwise falling back to neutral. Dots are
+  decorative; project-name click and keyboard navigation remain intact in both
+  themes and on phones. Existing client links, pending values, search/filter
+  behavior, and empty states remain intact.
+
 - Today and Upcoming retain task/recurrence/timer/expense actions. Upcoming is
   visible without expanding Today; more than five items remain accessible.
 - At phone widths, Today and Upcoming precede horizontally scrollable summary
@@ -34,6 +40,12 @@
 - Daily billable plus non-billable actual duration equals the selected-period
   tracked total, including zero days and archived work; billed snapshots do not
   inflate actual hours. Current summary timeframes survive report-period changes.
+- Running timers increment only dashboard tracked-time displays once per minute
+  while visible, with immediate lifecycle/focus refresh and frozen paused time.
+  Period and local-start-date rules apply to concurrent and cross-midnight
+  timers. Live ticks cause no Yjs writes or financial recalculation; saved
+  stop identities suppress duplicate contributions, including legacy timers.
+  Stop/reload preserves the actual total and creates one entry.
 - Reports match chart and metric-grid heights on desktop, align the legend with
   the title on the right, and omit duplicate chart totals/trends, the upcoming-
   expense note and visible daily dropdown. The Y-axis ceiling is
@@ -52,6 +64,36 @@
   only for same-origin `/assets/` URLs in the generated build manifest; other
   requests retain existing cache/privacy behavior.
 
+## Expenses overview regression boundary
+
+- The existing Outstanding/Upcoming/Paid tabs, expense rows, sorting, date/status
+  scopes, and payment/edit flows retain their behavior and presentation. Older
+  unpaid expenses remain visible in Outstanding when a newer period is selected.
+- Selected-period spend, category amounts, and matching monthly bars reconcile
+  saved paid expenses by expense date, excluding future automatic payments and
+  previews. Marking an older expense paid does not move its expense date.
+- Frozen payment FX values win over live rates. Unavailable conversions retain
+  separate currencies and cannot produce false combined charts or trends.
+- Recurring estimates normalize annual schedules and disclose unknown variable
+  amounts; Upcoming totals use the same records and previews as the existing tab.
+- The complete Recurring expenses and Upcoming payments cards activate their
+  existing destinations by pointer or keyboard, without separate bottom links.
+- History loading/failure cannot display partial overview totals as final; retry
+  restores the view, and nested archived-record updates refresh it.
+- Phones keep original list actions ahead of the analytical panels, with a
+  horizontally scrollable summary rail and no page overflow at 320px. Desktop
+  places the analytical panels above the original tabs/list.
+- Chart values are keyboard and screen-reader accessible. An installed production
+  PWA can first visit Expenses offline and load its chart without a prior online
+  Expenses visit. Activity opens the original record and never claims money was sent.
+- Recent activity stays at three widget rows. Show more opens the shared modal
+  for today and the preceding 29 local calendar days, excluding older recorded
+  activity across month/DST boundaries; the card retains its upcoming hint.
+  Opening the modal never stretches the panels. Padded rows show a pointer
+  cursor and the shared blue name on hover/focus. Expense details return to the
+  modal, and closing it restores focus to Show more. Long lists scroll inside
+  the modal at desktop and phone widths.
+
 ## Billing and finance
 
 - Invoice preview includes only eligible selected work/expenses and its totals equal the visible line calculation, adjustments, and tax.
@@ -65,6 +107,11 @@
 - Expense and tax state transitions are explicit and reflected consistently in reports/exports.
 
 ## Reports and portability
+
+- First Reports navigation after a shared-modal development hot update must
+  retain the mounted Yjs and billing providers, local records, and report-access
+  decisions. Browser smoke coverage exercises this with Reports enforcement
+  enabled and catches React ErrorBoundary errors as well as unhandled errors.
 
 - Equivalent filters produce consistent on-screen, CSV, PDF, and accountant-pack totals.
 - Canceled invoices remain visible in audit/register scopes with original face value and cancellation metadata while contributing zero to financial, tax, payment, outstanding, aging, statement, and project-revenue totals; released eligible sources reappear exactly once in browser and agent unbilled views.

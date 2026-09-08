@@ -24,6 +24,9 @@ const expensesState = vi.hoisted(() => ({
     markAsPaid: vi.fn(),
     markAsUnpaid: vi.fn(),
     createExpenseWithPaymentSnapshot: vi.fn(),
+    isLoading: false,
+    error: null,
+    retryHistory: vi.fn(),
 }));
 
 const recurrenceState = vi.hoisted(() => ({
@@ -97,6 +100,10 @@ vi.mock('@/components/expenses/ExpenseList', () => ({
     default: () => <div data-testid="expense-list">Expense list</div>,
 }));
 
+vi.mock('@/components/expenses/ExpenseSpendingChart', () => ({
+    default: () => <div>Monthly paid expenses</div>,
+}));
+
 vi.mock('@/components/PaymentMethods', () => ({
     default: () => <div data-testid="payment-methods">Payment methods</div>,
 }));
@@ -113,7 +120,38 @@ describe('Expenses', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         expensesState.expenses = [];
+        expensesState.isLoading = false;
+        expensesState.error = null;
+        expenseCategoryState.allExpenseCategories = undefined;
         window.matchMedia = createMatchMedia();
+    });
+
+    it('adds paid spending summaries while keeping old outstanding expenses visible', () => {
+        const today = toLocalStorageDate(new Date());
+        expenseCategoryState.allExpenseCategories = [{ id: 'archived-category', name: 'Archived software', archived: true }];
+        expensesState.expenses = [
+            { id: 'paid', title: 'Software', date: today, amount: 50, currency: 'EUR', paymentStatus: 'paid', categoryId: 'archived-category' },
+            { id: 'overdue', title: 'Old unpaid', date: '2020-01-01', amount: 999, currency: 'EUR', paymentStatus: 'unpaid' },
+        ];
+        render(<Expenses openExpenseModal={vi.fn()} openExpenseView={vi.fn()} />);
+        expect(screen.getByRole('region', { name: 'Expense summary' })).toHaveTextContent('€50.00');
+        expect(screen.getByRole('region', { name: 'Expense summary' })).toHaveTextContent('Archived software');
+        expect(screen.getByRole('tab', { name: 'Outstanding (1)' })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Spending overview' })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Recent activity' })).toBeInTheDocument();
+    });
+
+    it('prioritizes history retry over loading without showing incomplete overview totals', () => {
+        expensesState.isLoading = true;
+        expensesState.error = 'Unable to load expense history.';
+        render(<Expenses openExpenseModal={vi.fn()} openExpenseView={vi.fn()} />);
+        expect(screen.getByRole('alert')).toHaveTextContent('Unable to load expense history.');
+        expect(screen.getAllByLabelText('Unavailable')).toHaveLength(4);
+        expect(screen.queryByRole('region', { name: 'Spending overview' })).not.toBeInTheDocument();
+        expect(screen.queryByText('Loading expense overview…')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(expensesState.retryHistory).toHaveBeenCalledOnce();
+        expect(recurrenceState.generatePendingExpenses).not.toHaveBeenCalled();
     });
 
     it('opens the mobile filter sheet', () => {

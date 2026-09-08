@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils.ts';
  * @param {React.ReactNode} props.headerActions - Header content rendered beside the close button (optional)
  * @param {string} props.className - Additional class names for the modal content wrapper
  * @param {React.ReactNode} props.footer - Footer content (optional) - USE THIS FOR ACTION BUTTONS
+ * @param {Function} props.onCloseAutoFocus - Optional Radix close-focus override for external triggers
  */
 const Modal = ({
     isOpen,
@@ -60,6 +61,7 @@ const Modal = ({
     footer,
     contentRef,
     onOpenAutoFocus,
+    onCloseAutoFocus,
 }) => {
 
     // Map size prop to max-width classes
@@ -88,6 +90,7 @@ const Modal = ({
                 // Hide default close button if showCloseButton is false
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onOpenAutoFocus={onOpenAutoFocus}
+                onCloseAutoFocus={onCloseAutoFocus}
                 hideCloseButton
             >
                 {/* Header */}
@@ -164,6 +167,7 @@ Modal.propTypes = {
         PropTypes.shape({ current: PropTypes.any }),
     ]),
     onOpenAutoFocus: PropTypes.func,
+    onCloseAutoFocus: PropTypes.func,
 };
 
 export default Modal;

@@ -6,9 +6,13 @@
 
 [ ] Check lightsail and all the necessary meta and SEO/AEO stuff before launching
 
-[ ] Global search
-
 [x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository
+
+[ ] We should have the ability to pause recurring tasks
+[ ] Also have a look at expense categories, how we add and edit them, and include color tags that show in the UI that color rather than the inheritted project/client
+[ ] When we expand the sidebar, make sure to TaskTime Pro title doesn't drop until it full expands but rather has an ellipses and stays inline
+[ ] Should improve a bit the "account" sign-in in a way and not limit it to must go to cloud sync because the UX here is not really fitting and can be confusing
+[ ] Project modal Billing & Timer Rules and Project Planning should be in a collapsible section like we have in other modals. I would also consider moving the trate notice and override client rate checkbox within the billing & timer rules as well if you agree
 
 [ ] Coordinated license, app-origin migration, homepage, and production-launch program
     - Dependency rule: complete and locally verify Program Phase 1 before implementing Program Phase 2. Phase 1 may prepare origin-neutral contracts and configuration seams, but neither phase publishes or changes production by itself.
@@ -28,6 +32,8 @@
         [x] Pass the local app/site and Worker gates and finalize the supervised production cutover/rollback checklist
     [ ] Program Phase 3 — Complete the homepage and UX/UI adjustments
         [x] Dashboard readability — separate Today/Upcoming, add four glanceable stats, preset period reports, and billable/non-billable stacked hours; verify actions, historical/currency totals, mobile ordering, accessibility, offline charts, and bundle impact locally (Phase 3 local checkpoint; evidence in status/app-status.md)
+        [x] Dashboard live tracked time — minute updates for tracked cards/chart only, with paused/stop reconciliation and no financial or sync changes (local verification in status/app-status.md)
+        [x] Expenses overview — neutral summary cards, spending/category charts, and recorded activity; preserve the original list/tabs and verify payment/history/currency behavior, phones, and offline use locally (local checkpoint; evidence in status/app-status.md)
         [ ] Promote the approved public product page to the `tasktime.pro` homepage
         [ ] Point every app CTA and app-launch flow to `https://app.tasktime.pro`
         [ ] Reconcile migration guidance, billing/pricing, Privacy/Terms, support, SEO/discovery, PWA install, and agent setup copy
@@ -64,6 +70,8 @@
     [ ] Glama
     [ ] MCP.so
 
+[ ] Think about publishing an official supported chatGPT plugin
+
 ---
 
 ## Blog Posts
@@ -76,8 +84,6 @@
 
 ## Project updates
 
-[ ] Task Templates - Create “global” tasks which are assigned a category/tag and these can be assigned to all projects for that category by default (or at a click of a button → import default tasks for this project category)
-    [ ] This would be a button under projects page “Create task templates”, then when creating a new project, we can choose a task template to be added
 
 
 ---
@@ -85,10 +91,16 @@
 ## Invoice updates
 
 
+
 ---
 
 ## Ideas
 
+[ ] Global search
+
 [ ] Timed sessions with sound alerts - I want to work on this for 1hour
     - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on
     [ ] This can also be an alert reminder settings in account that when a time passes a certain amount, we ping with a sound, and when we have push notifications, also have that choice
+
+[ ] Task Templates - Create “global” tasks which are assigned a category/tag and these can be assigned to all projects for that category by default (or at a click of a button → import default tasks for this project category)
+    [ ] This would be a button under projects page “Create task templates”, then when creating a new project, we can choose a task template to be added

@@ -282,7 +282,7 @@ const Dashboard = ({
         range: reportRange, todayStr, preferredCurrency, convertToCurrency, projects, clients,
         entries: history.entries, tasks: history.tasks, invoices: history.invoices, expenses: history.expenses,
     }), [reportRange, todayStr, preferredCurrency, convertToCurrency, projects, clients, history.entries, history.tasks, history.invoices, history.expenses]);
-    const { report, comparison, currentMonth, todayTime, recentDays } = useMetricsCalculation(metricsInput);
+    const { report, comparison, currentMonth, todayTime, todayLiveTime, recentDays } = useMetricsCalculation(metricsInput, timers);
 
     // Show warning if any conversion errors occurred (only once per session)
     useEffect(() => {
@@ -947,7 +947,7 @@ const Dashboard = ({
 
     const summaryCards = (
         <div className="min-w-0">
-            <DashboardSummaryCards currentMonth={currentMonth} todayTime={todayTime} recentDays={recentDays} dueCount={dueCount} overdueCount={overdueIds.size} preferredCurrency={preferredCurrency} loading={history.isLoading} error={history.error} navigateToInvoices={navigateToInvoices} />
+            <DashboardSummaryCards currentMonth={currentMonth} todayTime={todayTime} todayLiveTime={todayLiveTime} recentDays={recentDays} dueCount={dueCount} overdueCount={overdueIds.size} preferredCurrency={preferredCurrency} loading={history.isLoading} error={history.error} navigateToInvoices={navigateToInvoices} />
         </div>
     );
 
