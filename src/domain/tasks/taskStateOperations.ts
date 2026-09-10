@@ -45,6 +45,27 @@ export function buildTaskStatePatchUpdates({
     const hasSkippedDate = hasOwn(updates, 'skippedOccurrenceDate');
 
     if (nextRecurring) {
+        if (updates.recurring) {
+            const config = { ...updates.recurring };
+            const previous = task.recurring;
+            if (task.parentTaskId || updates.parentTaskId) {
+                throw new TaskStateOperationError('Subtasks cannot have recurring schedules.');
+            }
+            if (config.paused !== undefined && typeof config.paused !== 'boolean') {
+                throw new TaskStateOperationError('recurring.paused must be a boolean.');
+            }
+            // Schedule edits from existing clients do not implicitly resume a pause.
+            if (config.paused === undefined && previous?.paused !== undefined) config.paused = previous.paused;
+            if (config.resumeFrom !== undefined && config.resumeFrom !== previous?.resumeFrom) {
+                throw new TaskStateOperationError('recurring.resumeFrom is managed by resuming recurrence.');
+            }
+            if (previous?.resumeFrom) config.resumeFrom = previous.resumeFrom;
+            if (previous?.paused && config.paused === false) {
+                config.resumeFrom = assertStorageDate(toStorageDate(new Date(now)), 'recurring.resumeFrom');
+            }
+            normalized.recurring = config;
+        }
+
         if (hasCompleted || hasCompletedOnDate) {
             throw new TaskStateOperationError(
                 'Recurring task completion must identify a specific occurrence date.',

@@ -104,7 +104,9 @@ These invariants summarize critical production contracts. They supplement the de
   manual delivery remain Free. Trial/purchase return never sends automatically.
 - Free permits one active client, where missing or false `archived` is active;
   Trial/Pro permit unlimited active clients. Only a forward create/unarchive
-  transition at the current limit is refused. Existing, imported, restored,
+  transition at the current limit is refused. Because the first slot is common
+  to every plan, it remains safe to create while plan status is unresolved;
+  increasing beyond that slot requires verified status or recovery. Existing, imported, restored,
   synced, downgraded, or concurrently merged over-limit clients and dependent
   data remain visible, editable, usable, archivable, deletable, exportable, and
   recoverable. Import/restore/sync never auto-corrects the count destructively.
@@ -119,6 +121,22 @@ These invariants summarize critical production contracts. They supplement the de
   assertion; they gate only online refresh and hosted billing actions. A
   definitive lifecycle removal, account mismatch, conflict, invalid signature,
   unsafe clock, or expiry still fails closed.
+- Open tabs recheck signed expiry and clock rollback on a bounded timer and on
+  foreground wake; response latency must not extend a signed deadline. A known
+  expired or unsafe-clock assertion is deselected from the device cache as well.
+  Cached public-key HTTP freshness does not shorten an already verified offline
+  license; offline key reuse is bounded by the maximum signed-license lifetime.
+  Failed/disconnected status transport drops online action and quota projections
+  without discarding a still-valid exact-bound local assertion. Delayed billing
+  actions and cache cleanup cannot cross the selected account lifecycle.
+- UI surfaces consume one derived entitlement presentation state that keeps the
+  verified plan (`free`, `pro`, or `unknown`) separate from transport readiness
+  (`ready`, `reconnecting`, `reconnect-required`, `offline`, or `disconnected`). Shared Get Pro
+  visibility never turns a reconnecting, offline, unresolved-account, suspended,
+  or permanent complimentary-Pro state into a new-purchase prompt.
+  Client-limit and hosted-email notices use the same recovery classification as
+  locked Reports previews. Client writes re-read entitlement as well as client
+  count after acquiring the application lock, in browser and agent adapters.
 - The founding offer permits at most 250 lifetime paid canonical-principal
   allocations. Atomic bounded reservations may not oversell; paid allocations
   never recycle after cancellation/refund/dispute/deletion. No public response

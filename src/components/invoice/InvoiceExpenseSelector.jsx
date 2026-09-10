@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { formatCurrency, CURRENCY_NAMES, normalizeCurrencyCode } from '../../utils/currencyUtils.ts';
 import { Notice } from '@/components/ui/notice';
 import CustomCheckbox from '../CustomCheckbox';
@@ -5,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrashIcon } from '@/components/ui/icons';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
+import { getExpenseCategoryColor } from '@/components/expenses/CategoryLabel';
 
 /**
  * InvoiceExpenseSelector component - Expense selection for invoicing.
@@ -34,6 +37,10 @@ const InvoiceExpenseSelector = ({
     exchangeRatesError,
     exchangeRatesLoading
 }) => {
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
+    const expenseCategoriesById = useMemo(() => new Map(
+        allExpenseCategories.map((category) => [category.id, category])
+    ), [allExpenseCategories]);
     const hasMultipleProjects = new Set(
         expenses
             .map((expense) => expense?.projectId || '')
@@ -134,11 +141,14 @@ const InvoiceExpenseSelector = ({
                                 const isConvertible = expense.isConvertible !== false;
                                 const originalCurrency = expense.originalCurrency || invoiceCurrency;
                                 const showOriginal = originalCurrency !== invoiceCurrency;
+                                const category = expense.categoryId ? expenseCategoriesById.get(expense.categoryId) : null;
+                                const borderColor = getExpenseCategoryColor(category);
 
                                 return (
                                     <div
                                         key={expense.id}
-                                        className={`flex items-center justify-between rounded border bg-card p-3 ${!isConvertible ? 'opacity-60' : ''}`}
+                                        className={`flex items-center justify-between rounded border border-l-4 border-l-border bg-card p-3 ${!isConvertible ? 'opacity-60' : ''}`}
+                                        style={borderColor ? { borderLeftColor: borderColor } : undefined}
                                     >
                                         <div className="flex min-w-0 flex-1 items-center gap-3">
                                             <CustomCheckbox
@@ -212,7 +222,7 @@ const InvoiceExpenseSelector = ({
                                     return (
                                         <div
                                             key={expense.id}
-                                            className="flex items-center justify-between rounded border bg-card p-3"
+                                            className="flex items-center justify-between rounded border border-l-4 border-l-border bg-card p-3"
                                         >
                                             <div className="flex min-w-0 flex-1 items-center gap-3">
                                                 <Button

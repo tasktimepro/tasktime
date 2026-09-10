@@ -32,6 +32,19 @@ the selected light, dark, or system theme through existing semantic tokens.
 
 ## Components
 
+Expense category Color Tags reuse the project/client `ColorPicker`, including
+its clear/neutral choice. Compact category labels use the same 8px original-color
+dot as dashboard projects, with neutral text and a neutral missing-color fallback.
+Long compact labels stay within their available width, use an ellipsis, and expose
+the full name through the native title tooltip.
+Expense cards carry that color on the left border and omit the repeated dot;
+rows without a colored border retain the dot.
+Main Projects and Clients page-heading icons use the neutral muted-foreground
+token. Dashboard section icons retain the existing info accent, keeping the
+stronger blue treatment scoped to dashboard summaries rather than entity color
+identity on the index pages.
+
+
 Prefer shared buttons, inputs, labels, selects, dialogs, dropdowns, cards, badges, notices, empty states, tabs, tooltips, date/time controls, and icons. Add reusable variants centrally instead of restyling repeated controls at call sites.
 
 ## Product patterns

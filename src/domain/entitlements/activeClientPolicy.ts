@@ -38,7 +38,17 @@ export function countActiveClients(clients: readonly ClientLike[]): number {
 }
 
 export function evaluateActiveClientTransition(input: Input): ActiveClientDecision {
+    const activeCount = countActiveClients(input.clients);
+    let netIncrease = input.transition === 'create';
+    if (input.transition === 'update') {
+        const existing = input.clients.find(client => client.id === input.existingClientId);
+        netIncrease = Boolean(existing?.archived === true && input.nextArchived === false);
+    }
+    if (!netIncrease) return { allowed: true, reason: 'no_net_increase' };
     if (input.entitlement.kind === 'unresolved') {
+        // Every plan includes one active client, so this transition is safe
+        // without guessing whether the unresolved account is Free or Pro.
+        if (activeCount < 1) return { allowed: true, reason: 'under_limit' };
         return {
             allowed: false,
             code: 'ENTITLEMENT_STATUS_UNAVAILABLE',
@@ -47,13 +57,6 @@ export function evaluateActiveClientTransition(input: Input): ActiveClientDecisi
         };
     }
     if (input.entitlement.activeClientLimit === null) return { allowed: true, reason: 'entitled' };
-    const activeCount = countActiveClients(input.clients);
-    let netIncrease = input.transition === 'create';
-    if (input.transition === 'update') {
-        const existing = input.clients.find(client => client.id === input.existingClientId);
-        netIncrease = Boolean(existing?.archived === true && input.nextArchived === false);
-    }
-    if (!netIncrease) return { allowed: true, reason: 'no_net_increase' };
     if (activeCount < input.entitlement.activeClientLimit) return { allowed: true, reason: 'under_limit' };
     return {
         allowed: false,
@@ -64,4 +67,3 @@ export function evaluateActiveClientTransition(input: Input): ActiveClientDecisi
         recovery: 'upgrade_or_trial',
     };
 }
-

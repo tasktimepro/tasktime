@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import InvoiceExpenseSelector from './InvoiceExpenseSelector';
 
+const categoryState = vi.hoisted(() => ({ categories: [] }));
+vi.mock('@/hooks/useExpenseCategories.ts', () => ({
+    useExpenseCategories: () => ({
+        expenseCategories: categoryState.categories,
+        allExpenseCategories: categoryState.categories,
+    }),
+}));
+
 const createBaseProps = (overrides = {}) => ({
     activeSection: 'expenses',
     toggleSection: vi.fn(),
@@ -44,6 +52,7 @@ const findAncestorWithClass = (element, className) => {
 
 describe('InvoiceExpenseSelector', () => {
     it('keeps expense rows inline and stacks add-expense form actions on mobile', () => {
+        categoryState.categories = [{ id: 'software', name: 'Software', color: '#ef4444' }];
         render(
             <InvoiceExpenseSelector
                 {...createBaseProps({
@@ -54,6 +63,7 @@ describe('InvoiceExpenseSelector', () => {
                             amount: 75,
                             convertedAmount: 75,
                             supplierName: 'Example Vendor',
+                            categoryId: 'software',
                         }
                     ],
                     showAddExpenseForm: true,
@@ -61,13 +71,14 @@ describe('InvoiceExpenseSelector', () => {
             />
         );
 
-        const expenseRow = findAncestorWithClass(screen.getByText('Hosting'), 'rounded border bg-card p-3');
+        const expenseRow = findAncestorWithClass(screen.getByText('Hosting'), 'border-l-4');
         const amountInput = screen.getByPlaceholderText('0.00');
         const addExpenseButtonRow = findAncestorWithClass(screen.getByRole('button', { name: 'Add Expense' }), 'flex-col-reverse');
 
         expect(expenseRow?.className.includes('items-center')).toBe(true);
         expect(expenseRow?.className.includes('justify-between')).toBe(true);
         expect(expenseRow?.className.includes('flex-col')).toBe(false);
+        expect(expenseRow).toHaveStyle({ borderLeftColor: '#ef4444' });
         expect(amountInput.className.includes('w-full')).toBe(true);
         expect(addExpenseButtonRow?.className.includes('flex-col-reverse')).toBe(true);
     });

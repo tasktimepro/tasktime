@@ -72,6 +72,18 @@ client assignment; retained flags remain readable without a migration.
 
 Recurrence types are weekly, monthly, or yearly with their corresponding day/date settings. Subtasks must not use recurrence even though tolerant persisted validation may accept historical data pending normalization.
 
+`recurring.paused?: boolean` suppresses automatic due/overdue scheduling while
+preserving the schedule, completion dates, skips, time entries, and timers.
+Missing means active. Explicit resume from a paused schedule sets
+`recurring.resumeFrom?: YYYY-MM-DD` to the local resume date; scheduled dates
+before that boundary are excluded rather than caught up. Repeated resume is
+idempotent. Schedule-only edits preserve these optional fields. Generic task
+updates share the same rules for browser and agent callers; the resume boundary
+is managed by the domain operation, not edited independently.
+The task editor omits the menu-owned Enable/Disable fields from its saved recurrence settings so
+an older open draft cannot overwrite newer control state.
+
+
 ### TimeEntry
 
 Required: `id`, `taskId`, finite `start`, finite `end`; `end >= start`. Optional timestamps, note/source, billed rate/date/invoice/duration/increment snapshots, and stopped-timer instance/operation reconciliation identity.
@@ -115,6 +127,17 @@ The core Yjs document contains an internal `invoiceBillingOperations` map for cr
 
 The journal is written before product data is mutated, is replayed at startup for pending operations, and is replayed after sync for both pending and completed operations so late-arriving document updates converge. Before the first cancellation journal write, the store revalidates the current persisted invoice eligibility; the persisted cancellation application is constrained to cancellation metadata and the documented source-release fields so a malformed plan cannot mutate unrelated invoice or source data. Replay must be conditional and idempotent: it must not replace a newer invoice payment state, a newer task cutoff, a different invoice's entry/expense/quote claim, a later project invoice reference, or an advanced template sequence. Completed cancellation replay also discovers late-arriving entries, adjustments, expenses, and quoted-task claims that still name the canceled invoice and releases only those claims; task cutoffs are restored only when their current value still equals the cancellation operation's expected final cutoff. A persisted terminal cancellation is the narrow exception for stale same-invoice sent/payment state from a pre-cancellation view: replay reasserts canceled and clears only that invoice's stale payment metadata while leaving other invoices and external systems untouched. Cancellation retains project links and never changes template sequence. Journal records are sync metadata in the core document and are intentionally omitted from portable backups; export must finish any pending operation before creating a backup snapshot.
 
+### ExpenseCategory
+
+Required `id` and `name`; `isDefault` and `archived` default to false for legacy
+records. Optional `group`, timestamps, and `color?: string | null`. The color
+uses the same original hex color representation as project/client color tags.
+Missing, cleared, or unsupported display colors use a neutral fallback, without
+inheriting project/client identity. Archived categories retain their IDs, names,
+and colors for historical expenses. Expenses and recurrence templates store the
+category ID, so category name, group, and color edits are reflected dynamically
+without rewriting referring expenses.
+
 ### Templates and payment methods
 
 - `InvoiceTemplate`: required `id`, `name`; optional numbering, notes/tax/due defaults, default flag, layout/branding/display settings.
@@ -135,9 +158,15 @@ Optional fields cover notes/supplier/receipt, payment details/mode/currency snap
 
 Required: identity/title/currency/amount, amount type, repeat (`monthly|yearly`), start date, personal/billable/tax-exempt flags, and active state. Optional schedule end/day/type, relationships, payment/tax fields, last generated date, and timestamps.
 
+Generated expenses copy the recurrence's category ID. Editing a recurrence
+changes ordinary fields for future instances only. When its category ID changes,
+the interactive form may explicitly apply only that category change to existing
+linked expenses whose stored category still equals the recurrence's previous
+category; individually changed expense categories remain untouched.
+
 ### ExpenseCategory and TaxReturnPeriod
 
-- Category: required `id`, `name`, `isDefault`, `archived`; optional group/timestamps.
+- Category: required `id`, `name`, `isDefault`, `archived`; optional group/color/timestamps.
 - Tax period: required `id`, `title`, type (`vat|income-tax|sales-tax|other`), start/end dates, status (`draft|filed|paid`); optional business, event timestamps, notes, and timestamps.
 
 ## Planning and preferences

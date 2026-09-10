@@ -196,6 +196,23 @@ describe('ClientList', () => {
         expect(actions?.className).toContain('flex-wrap')
     })
 
+    it('identifies the page with the shared clients icon and hides the count on phones', () => {
+        render(
+            <ClientList
+                onSelectClient={vi.fn()}
+                openClientModal={vi.fn()}
+                editClientModal={vi.fn()}
+            />
+        )
+
+        const pageHeading = screen.getByRole('heading', { name: 'Clients (1)' })
+        const count = pageHeading.querySelector('span')
+
+        expect(pageHeading.querySelector('svg')).toHaveClass('lucide-users', 'text-muted-foreground')
+        expect(pageHeading.querySelector('svg')).not.toHaveClass('status-info-text-strong')
+        expect(count).toHaveClass('hidden', 'sm:inline')
+    })
+
     it('renders archived client menu triggers with the same styling as active client cards', async () => {
         const user = userEvent.setup()
 

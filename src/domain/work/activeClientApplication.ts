@@ -53,6 +53,7 @@ export async function runActiveClientApplication<T>(input: {
     enforcementEnabled: boolean;
     readClients: () => readonly ClientLike[];
     resolution: EntitlementResolution;
+    readResolution?: () => EntitlementResolution;
     transition: 'create' | 'update';
     existingClientId?: string;
     nextArchived?: boolean;
@@ -63,7 +64,7 @@ export async function runActiveClientApplication<T>(input: {
         assertActiveClientApplication({
             enforcementEnabled: input.enforcementEnabled,
             clients: input.readClients(),
-            resolution: input.resolution,
+            resolution: input.readResolution?.() ?? input.resolution,
             transition: input.transition,
             existingClientId: input.existingClientId,
             nextArchived: input.nextArchived,

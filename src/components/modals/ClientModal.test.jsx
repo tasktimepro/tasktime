@@ -6,6 +6,7 @@ import ClientModal from './ClientModal';
 
 const state = vi.hoisted(() => ({
     clients: [],
+    connection: 'ready',
     resolution: {
         kind: 'canonical',
         snapshot: {
@@ -24,7 +25,15 @@ vi.mock('@/config/billingFeatures', () => ({
     BILLING_FEATURES: { clientLimitEnforcement: true },
 }));
 vi.mock('@/contexts/BillingContext', () => ({
-    useBilling: () => ({ resolution: state.resolution }),
+    useBilling: () => ({
+        resolution: state.resolution,
+        entitlementState: {
+            plan: state.resolution.kind === 'canonical' ? 'free' : 'unknown',
+            accessStatus: state.resolution.snapshot?.accessStatus ?? 'unresolved',
+            verified: state.resolution.kind === 'canonical',
+            connection: state.connection,
+        },
+    }),
 }));
 vi.mock('../../hooks/useClients.ts', () => ({
     useClients: () => ({
@@ -50,6 +59,7 @@ describe('ClientModal active-client policy', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         state.clients = [];
+        state.connection = 'ready';
         state.resolution = {
             kind: 'canonical',
             snapshot: {
@@ -90,13 +100,44 @@ describe('ClientModal active-client policy', () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
         state.resolution = { kind: 'unresolved', reason: 'network' };
+        state.clients = [{ id: 'existing-client', archived: false }];
 
         render(<ClientModal isOpen={true} onClose={onClose} />);
 
         expect(screen.getByText('Plan status needs confirmation')).toBeInTheDocument();
         expect(screen.queryByText('Unlock unlimited clients')).not.toBeInTheDocument();
-        await user.click(screen.getByRole('button', { name: 'Check cloud account' }));
-        expect(state.updateUrl).toHaveBeenCalledWith({ view: 'account', section: 'sync' });
+        await user.click(screen.getByRole('button', { name: 'Check plan status' }));
+        expect(state.updateUrl).toHaveBeenCalledWith({ view: 'account', section: 'billing' });
+    });
+
+    it.each([
+        ['disconnected', 'Unlock unlimited clients', 'billing'],
+        ['reconnect_required', 'Reconnect Cloud Sync', 'sync'],
+        ['reconnecting', 'Reconnecting…', null],
+        ['offline', 'Offline', null],
+    ])('uses the shared recovery for an unverified %s account', async (connection, label, section) => {
+        state.resolution = { kind: 'unresolved', reason: 'lifecycle' };
+        state.connection = connection;
+        state.clients = [{ id: 'existing-client', archived: false }];
+        render(<ClientModal isOpen={true} onClose={vi.fn()} />);
+        const action = screen.getByRole('button', { name: label });
+        if (section) {
+            await userEvent.setup().click(action);
+            expect(state.updateUrl).toHaveBeenCalledWith({ view: 'account', section });
+        } else {
+            expect(action).toBeDisabled();
+        }
+        expect(state.createClientWithPolicyLock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the first-client form available before plan status resolves', () => {
+        state.resolution = { kind: 'unresolved', reason: 'lifecycle' };
+
+        render(<ClientModal isOpen={true} onClose={vi.fn()} />);
+
+        expect(screen.getByLabelText(/Client Title/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Create Client' })).toBeInTheDocument();
+        expect(screen.queryByText('Plan status needs confirmation')).not.toBeInTheDocument();
     });
 
     it('creates the first Free client through the revalidating policy lock', async () => {

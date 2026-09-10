@@ -1,3 +1,4 @@
+import { CategoryLabel } from '@/components/expenses/CategoryLabel';
 /**
  * ExpenseViewModal - Read-only expense details modal
  *
@@ -68,10 +69,10 @@ const ExpenseViewModal = ({
         if (!currentExpense?.businessId) return null;
         return businessInfos.find((item) => item.id === currentExpense.businessId) || null;
     }, [businessInfos, currentExpense]);
-    const category = useMemo(() => {
-        if (!currentExpense?.categoryId) return null;
-        return getExpenseCategory(currentExpense.categoryId) || null;
-    }, [currentExpense, getExpenseCategory]);
+    // The collection getter is stable; read again when its subscription rerenders.
+    const category = currentExpense?.categoryId
+        ? getExpenseCategory(currentExpense.categoryId) || null
+        : null;
 
     const isPreview = Boolean(currentExpense?.isPreview);
     const isPaid = currentExpense?.paymentStatus === 'paid';
@@ -273,7 +274,7 @@ const ExpenseViewModal = ({
                         {category && (
                             <div className="space-y-1">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Category</p>
-                                <p className="text-sm text-foreground">{category.name}</p>
+                                <p className="text-sm text-foreground"><CategoryLabel category={category} /></p>
                             </div>
                         )}
                         {business && (

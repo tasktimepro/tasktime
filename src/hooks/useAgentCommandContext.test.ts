@@ -1,6 +1,12 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAgentCommandContext } from './useAgentCommandContext';
+import type { EntitlementResolution } from '@/domain/entitlements/entitlementTypes';
+
+const billing = vi.hoisted(() => ({ resolution: {
+    kind: 'unresolved', reason: 'lifecycle',
+} as EntitlementResolution }));
+vi.mock('@/contexts/BillingContext', () => ({ useBilling: () => billing }));
 
 const yjsMocks = vi.hoisted(() => ({
     store: { marker: 'store' },
@@ -25,6 +31,16 @@ vi.mock('./useGoogleAuth', () => ({
 }));
 
 describe('useAgentCommandContext', () => {
+    it('keeps retained command contexts pointed at the current entitlement', () => {
+        billing.resolution = { kind: 'canonical', snapshot: { accessStatus: 'active' } as never };
+        const hook = renderHook(() => useAgentCommandContext());
+        const queuedContext = hook.result.current;
+        expect(queuedContext.entitlementResolution?.kind).toBe('canonical');
+        billing.resolution = { kind: 'unresolved', reason: 'lifecycle' };
+        hook.rerender();
+        expect(queuedContext.entitlementResolution).toEqual(billing.resolution);
+    });
+
     beforeEach(() => {
         yjsMocks.isReady = true;
         yjsMocks.driveSessionId = 'drive-session-1';

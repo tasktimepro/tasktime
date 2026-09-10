@@ -16,7 +16,9 @@ Let users understand exactly what will be billed, what changed after finalizatio
 The main Expenses section adds four neutral summary cards and analytical panels
 around the existing filters, Outstanding/Upcoming/Paid tabs, expense list, and
 payment/edit actions. The list and tabs retain their previous presentation and
-behavior. Recurring Expenses, Payment Methods, Your Business, and tax views keep
+behavior. The desktop status-tab strip permits horizontal overflow when needed
+but clips vertical overflow so it never shows a vertical scrollbar. Recurring
+Expenses, Payment Methods, Your Business, and tax views keep
 their established flows.
 
 - **Period spend:** saved paid expenses by expense date in the selected period,
@@ -64,7 +66,12 @@ centers within the available panel height.
 Desktop places the card row and adjacent analytical panels above the original
 list. Phones use a horizontally scrollable card rail, then the original tabs
 and actionable list, then stacked analytical panels. Blue is the shared chart
-and icon accent; categories do not acquire new persisted colors. Charts support
+and icon accent for general spending. Category identity uses its own optional
+color, following the project/client Color Tag picker and neutral clear state.
+Category summaries use the same original-color 8px dots as dashboard expense rows;
+category bars and expense card left borders use that category color, with neutral
+fallbacks and no duplicate dot inside a bordered card. Expense rows without a
+colored left border use the 8px dot. Project/client associations remain separately labelled. Charts support
 keyboard tooltips and an accessible values table, reuse the lazy Recharts bundle,
 and work offline after PWA installation. History loading and retry states avoid
 presenting partial totals as complete.
@@ -76,12 +83,19 @@ presenting partial totals as complete.
   advanced tab remains visible in the established single-row, horizontally
   scrollable tab layout. Selecting a gated tab shows a tailored static Pro
   preview before any protected data loads; the tabs do not repeat Pro badges.
+  A rocket-led **Get Pro** button aligns opposite the Overview title only when
+  the shared Plan & Billing action policy permits it; reconnecting, offline,
+  unresolved connected-account, verified Pro, suspended, and permanent-grant
+  states do not show it.
 - Invoice/quote email composition, templates, forwarding choice, PDF preview/
   download, copying, and manual delivery remain usable. Only the final TaskTime-
   hosted **Send** action becomes the Pro conversion point. It stays visible but
   unavailable with an inline explanation and a separate enabled trial/Pro or
   recovery action; a disabled control is never the only path forward. Trial/
   purchase return restores the draft and always requires a fresh Send.
+  Verified Pro with an unavailable or mismatched hosted-service lifecycle keeps
+  its Pro presentation and replaces Send/upgrade with a direct Cloud Sync
+  reconnection action.
 - Modal upgrade explanations use the neutral notice treatment rather than a
   warning state. Their primary upgrade action is the last, right-aligned footer
   action and uses a rocket icon; account-status recovery remains distinct and
@@ -106,6 +120,9 @@ presenting partial totals as complete.
   transfer. The stable TaskTime account reference follows the provider label and
   email as a support/operator reference; it is not a login or Stripe identity.
   Selecting the action is the explicit confirmation, without a second checkbox.
+  The shared presentation state keeps verified plan and connection readiness as
+  separate dimensions; Reports, client limits, and hosted-email messaging consume
+  that same distinction instead of inferring Free from a transport failure.
 - Pricing presents only Free and Pro. It labels annual `EUR 39` truthfully as
   the founding base price for the first 250 paid members and annual `EUR 59`
   as the automatic standard offer afterward. Temporary reservation saturation
@@ -187,3 +204,35 @@ presenting partial totals as complete.
 - Canceled records expose only safe preview/download actions. Every document is visibly marked CANCELED; edit, finalize, payment, sent/unpaid transitions, undo, invoice/reminder email, repeated cancel, and uncancel are unavailable.
 
 Destructive or reversal actions name the invoice/expense and state their downstream effects. Cancellation is terminal, explicit, offline-capable, and separate from delete-draft, undo-latest, mark-unpaid, refunds, and credit notes.
+
+
+## Expense category management
+
+The manager aligns Add category opposite the active-category heading and count,
+and uses a wider add/edit form. It lists active and archived categories with usage and existing
+edit/archive/restore/delete actions. Add category and Edit open a separate
+stacked modal containing Name, optional Group, and the shared Color Tag picker.
+Save returns to the manager; Cancel discards only that form draft. Category
+labels in selectors, expense details/lists, and reports share the same color
+identity. Referenced categories retain deletion protection, and archived
+categories remain available for existing expense selection and history. Trying
+to delete a referenced category opens a centered blocking dialog that shows its
+usage and recommends Archive, so the result is visible at any manager scroll
+position.
+
+Expenses store a category ID rather than a category name, group, or color
+snapshot. Editing those category details updates every referring expense. When
+the category on a recurring expense is changed, save the recurrence first and
+then offer `Future expenses only` or a counted `Update N existing expenses`
+action. The bulk action changes only linked expenses that still carry the
+recurrence's previous category value, preserving individually recategorized
+instances. Changes to all other recurrence fields remain future-only and do not
+show this dialog.
+
+Expense forms place `Manage categories` beside the Category label using the
+shared inline field-action treatment. It opens the category manager as a nested
+modal and restores the expense form, including its unsaved values and edit
+context, when the manager closes. The temporary draft is scoped to the exact
+expense or recurring-template ID. Save, delete, Cancel, and the final
+category-propagation choice clear it; draft persistence pauses while saving and
+while the post-save choice is open, so another expense editor cannot inherit it.

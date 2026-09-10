@@ -371,12 +371,16 @@ export function useDropboxAuth() {
                 storageRole,
                 error: null,
             });
+            // A retry can originate in Account while the sync provider has its
+            // own hook instance. Share recovery without repeating the status call.
+            if (force) publishAuthChange('connected', stored.sessionId, instanceId.current);
             return;
         }
         const isDefinitivelyInvalid = statusResult.status === 401 || body.authenticated === false;
         if (isDefinitivelyInvalid) {
             await clearStoredDropboxSession(stored.sessionId);
             await clearCloudStorageSession(storageSession, { force: true }).catch(() => undefined);
+            if (force) publishAuthChange('disconnected', stored.sessionId, instanceId.current);
         }
         if (!mounted.current) return;
         setState({

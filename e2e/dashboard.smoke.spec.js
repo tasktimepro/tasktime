@@ -133,7 +133,51 @@ test.describe('Dashboard smoke', () => {
         expect(errors).toEqual([]);
     });
 
-    test('keeps project dots compact and project names keyboard navigable in both themes', async ({ page }) => {
+    test('keeps other tasks in a running timer project from opening on the dashboard', async ({ page }) => {
+        await seedDashboard(page);
+        await page.evaluate(() => {
+            window.__TASKTIME_STORE__.timers.set('project', {
+                projectId: 'project',
+                taskId: 'billable',
+                timerInstanceId: 'dashboard-disabled-task',
+                startTime: Date.now() - 60_000,
+                paused: false,
+                pausedElapsedTime: 0,
+            });
+        });
+
+        const today = page.getByRole('region', { name: /^To Do Today/ });
+        const upcoming = page.getByRole('region', { name: 'Upcoming' });
+        const activeTaskTitle = today.getByRole('button', { name: 'Build the dashboard', exact: true });
+        const upcomingBlockedTitle = upcoming.getByRole('button', {
+            name: 'Plan next month’s work with a longer task title',
+            exact: true,
+        });
+
+        for (const width of [1440, 390]) {
+            await page.setViewportSize({ width, height: 900 });
+            const blockedTaskTitles = page.getByRole('button', { name: 'Prepare the invoice', exact: true });
+            await expect(blockedTaskTitles).toHaveCount(2);
+            await expect(blockedTaskTitles.nth(0)).toBeDisabled();
+            await expect(blockedTaskTitles.nth(1)).toBeDisabled();
+            await expect(blockedTaskTitles.nth(0)).toHaveAttribute(
+                'title',
+                'Another task in this project is currently running',
+            );
+            await expect(upcomingBlockedTitle).toBeDisabled();
+            await expect(activeTaskTitle).toBeEnabled();
+            await expect(today.getByRole('button', { name: 'Open task details' })).toHaveCount(0);
+        }
+
+        await page.getByRole('button', { name: 'Prepare the invoice', exact: true }).first()
+            .evaluate((element) => element.click());
+        await expect(page.getByRole('dialog', { name: 'Prepare the invoice' })).toHaveCount(0);
+
+        await activeTaskTitle.click();
+        await expect(page.getByRole('dialog', { name: 'Build the dashboard' })).toBeVisible();
+    });
+
+    test('keeps project folder icons compact, metadata aligned and project names keyboard navigable in both themes', async ({ page }) => {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
         await seedDashboard(page);
@@ -146,26 +190,30 @@ test.describe('Dashboard smoke', () => {
         });
         const projects = page.getByRole('region', { name: 'Projects', exact: true });
         const projectName = projects.getByRole('button', { name: 'Website redesign with a longer project name', exact: true });
-        const dot = projectName.getByTestId('project-color-dot');
+        const icon = projectName.getByTestId('project-color-icon');
+        const metadata = projectName.locator('xpath=following-sibling::*[@data-testid="project-metadata"]');
         for (const theme of ['dark', 'light']) {
             await page.setViewportSize({ width: 1440, height: 900 });
             if (theme === 'light') {
                 await page.getByRole('button', { name: 'Light Mode', exact: true }).click();
                 await expect(page.locator('html')).not.toHaveClass(/dark/);
             } else await expect(page.locator('html')).toHaveClass(/dark/);
-            await expect(dot).toHaveCSS('background-color', 'rgb(234, 179, 8)');
+            await expect(icon).toHaveClass(/lucide-folder-closed/);
+            await expect(icon).toHaveCSS('color', 'rgb(234, 179, 8)');
             const inherited = projects.getByRole('button', { name: 'Client color', exact: true });
-            await expect(inherited.getByTestId('project-color-dot')).toHaveCSS('background-color', 'rgb(23, 37, 84)');
+            await expect(inherited.getByTestId('project-color-icon')).toHaveCSS('color', 'rgb(23, 37, 84)');
             for (const width of [1440, 390, 320]) {
                 await page.setViewportSize({ width, height: 900 });
                 await projectName.scrollIntoViewIfNeeded();
-                const bounds = await dot.boundingBox();
-                expect(bounds.width).toBe(8);
-                expect(bounds.height).toBe(8);
+                const bounds = await icon.boundingBox();
+                const metadataBounds = await metadata.boundingBox();
+                expect(bounds.width).toBe(14);
+                expect(bounds.height).toBe(14);
+                expect(Math.abs(metadataBounds.x - bounds.x)).toBeLessThan(1);
                 expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
                 await projectName.focus();
                 await expect(projectName).toBeFocused();
-                await projects.screenshot({ path: `test-results/project-dots-${width}-${theme}.png` });
+                await projects.screenshot({ path: `test-results/project-icons-${width}-${theme}.png` });
             }
         }
         await page.keyboard.press('Enter');
@@ -241,6 +289,7 @@ test.describe('Dashboard smoke', () => {
     test('keeps phone actions first and stats horizontally scrollable, with no page overflow', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await seedDashboard(page);
+        await expect(page.getByText('Next 7 days', { exact: true })).toHaveCount(0);
         for (const width of [390, 320, 768, 1024, 1440]) {
             await page.setViewportSize({ width, height: 1000 });
             const today = await page.getByRole('region', { name: /^To Do Today/ }).boundingBox();

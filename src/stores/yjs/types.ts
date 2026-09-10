@@ -117,6 +117,10 @@ export interface Task {
 }
 
 export interface RecurringConfig {
+    /** Pauses scheduling without changing timer or completion history. */
+    paused?: boolean;
+    /** Earliest local occurrence date after explicit resume; absent for legacy schedules. */
+    resumeFrom?: string;
     type: 'weekly' | 'monthly' | 'yearly';
     weeklyDays?: number[];
     monthlyType?: 'first' | 'last' | 'specific';
@@ -523,6 +527,8 @@ export interface ExpenseRecurrence {
 }
 
 export interface ExpenseCategory {
+    /** Optional identity color; absent or null uses the neutral UI fallback. */
+    color?: string | null;
     id: string;
     name: string;
     group?: string | null;

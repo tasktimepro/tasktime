@@ -106,6 +106,38 @@ describe('ProjectDashboard', () => {
         hookMocks.showSuccess.mockClear();
     });
 
+    it('uses a folder icon with the inherited client color in the project heading', () => {
+        render(
+            <ProjectDashboard
+                project={{ id: 'project-1', title: 'Website', isPersonal: false, preferredClientId: 'client-1' }}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToProjects={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[{ id: 'client-1', title: 'Acme', color: '#ef4444' }]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openTaskModal={vi.fn()}
+                onViewTask={vi.fn()}
+                navigateToClient={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        const icon = screen.getByTestId('project-dashboard-icon');
+
+        expect(icon).toHaveClass('lucide-folder-closed', 'text-muted-foreground');
+        expect(icon).toHaveStyle({ color: '#ef4444' });
+    });
+
     it('uses a horizontal stats rail on mobile', () => {
         setMatchMedia(true);
 
@@ -149,6 +181,43 @@ describe('ProjectDashboard', () => {
         expect(screen.getByRole('tab', { name: 'Tasks' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
         expect(screen.getByText('Task tree')).toBeInTheDocument();
+    });
+
+    it('uses the same icon and content columns for Unbilled as the other metric cards', () => {
+        render(
+            <ProjectDashboard
+                project={{ id: 'project-1', title: 'Website', hourlyRate: 125, isPersonal: false }}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToProjects={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openTaskModal={vi.fn()}
+                onViewTask={vi.fn()}
+                navigateToClient={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        const content = screen.getByTestId('project-unbilled-metric-content');
+        const [iconColumn, detailsColumn] = content.children;
+
+        expect(content).toHaveClass('flex', 'items-center', 'w-full');
+        expect(iconColumn).toHaveClass('flex-shrink-0');
+        expect(iconColumn.querySelector('svg')).toHaveClass('lucide-dollar-sign', 'h-5', 'w-5');
+        expect(detailsColumn).toHaveClass('ml-4', 'w-0', 'flex-1');
+        expect(detailsColumn).toContainElement(screen.getByText('Unbilled'));
+        expect(detailsColumn.querySelector('dd')).toHaveClass('font-semibold', 'text-foreground', 'text-lg');
     });
 
     it('keeps the invoice action on the header row until flex wrapping is needed on mobile', () => {

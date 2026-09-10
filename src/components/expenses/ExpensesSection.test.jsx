@@ -8,6 +8,7 @@ const hookMocks = vi.hoisted(() => ({
 
     expenses: [],
     recurrences: [],
+    categories: [],
     markAsPaid: vi.fn(),
     markAsUnpaid: vi.fn(),
     showError: vi.fn()
@@ -36,17 +37,26 @@ vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
     })
 }))
 
+vi.mock('@/hooks/useExpenseCategories.ts', () => ({
+    useExpenseCategories: () => ({
+        expenseCategories: hookMocks.categories,
+        allExpenseCategories: hookMocks.categories,
+    })
+}))
+
 vi.mock('./ExpenseList', () => ({
 
-    default: ({ expenses, projectsById, showProjectContext }) => (
+    default: ({ expenses, expenseCategoriesById, projectsById, showProjectContext }) => (
         <div data-testid="expense-list">
             {expenses.map((expense) => {
                 const project = projectsById.get(expense.projectId || '')
+                const category = expenseCategoriesById.get(expense.categoryId || '')
 
                 return (
                     <div key={expense.id}>
                         {expense.title}
                         {showProjectContext && project ? ` Project: ${project.title}` : ''}
+                        {category ? ` Category: ${category.name}` : ''}
                     </div>
                 )
             })}
@@ -84,6 +94,7 @@ describe('ExpensesSection', () => {
             }
         ]
         hookMocks.recurrences = []
+        hookMocks.categories = []
         hookMocks.markAsPaid.mockReset()
         hookMocks.markAsPaid.mockResolvedValue(undefined)
         hookMocks.markAsUnpaid.mockReset()
@@ -239,5 +250,15 @@ describe('ExpensesSection', () => {
 
         expect(screen.getByText(/Project expense Project: Website Build/)).toBeInTheDocument()
         expect(screen.getByText('Client expense')).toBeInTheDocument()
+    })
+
+    it('passes archived category identity through client and project expense lists', async () => {
+        hookMocks.categories = [{ id: 'software', name: 'Archived software', color: '#ef4444', archived: true }]
+        hookMocks.expenses = [{ ...baseExpense, categoryId: 'software' }]
+
+        render(<ExpensesSection clientId="client-1" openExpenseModal={vi.fn()} />)
+        await user.click(screen.getByRole('button', { name: 'Expenses (1)' }))
+
+        expect(screen.getByText(/Category: Archived software/)).toBeInTheDocument()
     })
 })

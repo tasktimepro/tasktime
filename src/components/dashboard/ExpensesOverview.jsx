@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { HandCoinsIcon, ListFilterIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +7,8 @@ import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { formatCurrency } from '../../utils/currencyUtils.ts';
 import { toDisplayDate } from '../../utils/dateUtils.ts';
 import { DASHBOARD_EXPENSE_FILTER_OPTIONS } from './dashboardWidgetConstants';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
+import { CategoryColorDot } from '@/components/expenses/CategoryLabel';
 
 const getAmountDisplay = (expense, preferredCurrency) => {
     if (expense.amountType === 'variable') {
@@ -28,6 +31,10 @@ const ExpensesOverview = ({
     onExpenseClick,
 }) => {
     const isMobileLayout = useIsMobileLayout();
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
+    const expenseCategoriesById = useMemo(() => new Map(
+        allExpenseCategories.map((category) => [category.id, category])
+    ), [allExpenseCategories]);
     const emptyStateMessage = {
         paid: 'No paid expenses in the last 30 days',
         upcoming: 'No upcoming expenses in the next 30 days',
@@ -83,6 +90,7 @@ const ExpensesOverview = ({
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0 flex-1 space-y-1">
                                             <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                                <CategoryColorDot category={expense.categoryId ? expenseCategoriesById.get(expense.categoryId) : null} />
                                                 <button
                                                     type="button"
                                                     onClick={() => onExpenseClick?.(expense)}

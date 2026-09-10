@@ -1,3 +1,4 @@
+import { CategoryLabel, getExpenseCategoryColor } from '@/components/expenses/CategoryLabel';
 import { getInvoiceEligibleTimeEntries } from '@/domain/invoices/invoiceEligibility';
 import { isBillableTask } from '@/domain/time/taskBillability';
 import { useEffect, useMemo, useState } from 'react';
@@ -3476,6 +3477,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                                         const client = expense.clientId ? clientsById.get(expense.clientId) : null;
                                         const project = expense.projectId ? projectsById.get(expense.projectId) : null;
                                         const category = expense.categoryId ? expenseCategoriesById.get(expense.categoryId) : null;
+                                        const categoryColor = getExpenseCategoryColor(category);
                                         const taxClaimStatus = getExpenseTaxClaimStatus(expense);
                                         const taxReturnPeriod = expense.taxClaimPeriodId ? taxReturnPeriodsById.get(expense.taxClaimPeriodId) : null;
                                         const claimBadgeVariant = taxClaimStatus === 'claimed'
@@ -3483,7 +3485,8 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                                             : (taxClaimStatus === 'excluded' ? 'secondary' : 'outline');
 
                                         return (
-                                            <div key={expense.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-3">
+                                            <div key={expense.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-l-4 border-border border-l-border p-3"
+                                                style={categoryColor ? { borderLeftColor: categoryColor } : undefined}>
                                                 <div className="pt-0.5">
                                                     <Checkbox
                                                         checked={selectedExpenseIds.includes(expense.id)}
@@ -3508,7 +3511,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                                                         {project?.title || client?.title || business?.businessName || business?.name || business?.title || EMPTY_BUSINESS}
                                                     </p>
                                                     <p className="mt-1 text-xs text-muted-foreground">
-                                                        {category?.name || EMPTY_CATEGORY}
+                                                        {category ? <CategoryLabel category={category} showColor={false} /> : EMPTY_CATEGORY}
                                                         {taxReturnPeriod ? ` • ${taxReturnPeriod.title}` : ''}
                                                     </p>
                                                     <p className="mt-1 text-xs text-muted-foreground">

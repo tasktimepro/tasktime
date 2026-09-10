@@ -785,6 +785,7 @@ const MCP_TOOL_DEFINITIONS = [
         id: optionalString,
         name: optionalString,
         group: nullableString,
+        color: nullableString,
         isDefault: optionalBoolean,
         archived: optionalBoolean,
         idempotencyKey: optionalString
@@ -795,7 +796,7 @@ const MCP_TOOL_DEFINITIONS = [
   },
   {
     name: "update_expense_category",
-    description: "Update expense category metadata such as name, group, default flag, and archive state.",
+    description: "Update expense category metadata such as name, group, color, default flag, and archive state.",
     scopes: ["write"],
     inputSchema: {
       type: "object",
@@ -916,6 +917,7 @@ const MCP_TOOL_DEFINITIONS = [
           type: ["object", "null"],
           properties: {
             type: { type: "string", enum: ["weekly", "monthly", "yearly"] },
+            paused: optionalBoolean,
             weeklyDays: { type: "array", items: optionalNumber },
             monthlyType: { type: "string", enum: ["first", "last", "specific"] },
             monthlyDay: optionalNumber,
@@ -935,7 +937,7 @@ const MCP_TOOL_DEFINITIONS = [
   },
   {
     name: "update_task",
-    description: "Update a TaskTime Pro task through relationship and task-state invariants. Use complete_task for recurring occurrences.",
+    description: "Update a TaskTime Pro task through relationship and task-state invariants. Use complete_task for recurring occurrences. Set updates.recurring.paused to true to pause the schedule or false to resume without catching up; include the recurrence type and schedule. Timer state is unchanged.",
     scopes: ["write"],
     inputSchema: {
       type: "object",

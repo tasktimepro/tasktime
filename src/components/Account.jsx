@@ -1,10 +1,11 @@
+import { isDropboxCloudUiEnabled } from '@/config/cloudProviders';
 /**
  * Account deletion and cloud disconnect flows must follow the sync contract source of truth:
  * ./sync/README.md
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { BotIcon, CogIcon, TrashIcon, CloudIcon, SignOutIcon } from '@/components/ui/icons';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { BotIcon, CogIcon, TrashIcon, CloudIcon, SignInIcon, SignOutIcon, GoogleDriveBrandIcon, DropboxBrandIcon } from '@/components/ui/icons';
 import { CreditCard, Database, Mail } from 'lucide-react';
 import { useUrlState } from '../hooks/useUrlState.ts';
 import ExportImport from './ExportImport';
@@ -47,13 +48,17 @@ const Account = ({
     emailTemplates,
     expenses,
     onImport,
-    cloudSyncNeedsReconnect = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
     const {
         clearAllData,
+        isOffline,
+        isConnecting,
+        isCloudIdentityLoading,
+        syncState,
+        movedToStorageProvider,
         isCloudConnected,
         activeStorageProvider,
         forceSyncCloud,
@@ -62,8 +67,44 @@ const Account = ({
         deleteAllBackups,
     } = useYjs();
     const { preferences, updatePreferences } = usePreferences();
-    const { user: googleUser } = useGoogleAuth();
-    const { accountEmail: dropboxAccountEmail } = useDropboxAuth();
+    const { user: googleUser, signIn: signInGoogle, isLoading: googleLoading } = useGoogleAuth();
+    const {
+        accountEmail: dropboxAccountEmail, signIn: signInDropbox, isLoading: dropboxLoading,
+        sessionId: dropboxSessionId, isSignedIn: dropboxSignedIn, error: dropboxAuthError, refresh: refreshDropbox,
+    } = useDropboxAuth();
+    const [showSignInModal, setShowSignInModal] = useState(false);
+    const [signInPending, setSignInPending] = useState(false);
+    const [signInError, setSignInError] = useState(null);
+    const signInLock = useRef(false);
+    const accountActionRef = useRef(null);
+    const signInBusy = signInPending || isConnecting || isCloudIdentityLoading || googleLoading || dropboxLoading;
+    const needsDropboxRetry = activeStorageProvider === 'dropbox' && dropboxSessionId && !dropboxSignedIn;
+    const connectionFailed = !isCloudConnected && !signInBusy && syncState === 'error';
+    const accountConnectionError = signInError || (activeStorageProvider === 'dropbox' ? dropboxAuthError : null)
+        || (connectionFailed ? 'Your account could not connect. Try again or open Cloud Sync for connection details.' : null);
+
+    useEffect(() => {
+        if (isCloudConnected) setShowSignInModal(false);
+    }, [isCloudConnected]);
+
+    const handleSignIn = async (provider) => {
+        if (signInLock.current || signInBusy || isOffline || movedToStorageProvider) return;
+        if (activeStorageProvider && activeStorageProvider !== provider) return;
+        signInLock.current = true;
+        setSignInPending(true);
+        setSignInError(null);
+        try {
+            await (provider === 'dropbox'
+                ? (needsDropboxRetry ? refreshDropbox() : signInDropbox())
+                : signInGoogle());
+        } catch (error) {
+            setSignInError(error instanceof Error ? error.message : 'Unable to sign in. Please try again.');
+        } finally {
+            signInLock.current = false;
+            setSignInPending(false);
+        }
+    };
+
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -219,7 +260,6 @@ const Account = ({
                 return (
                     <BillingPanel
                         onOpenSync={() => handleSectionChange('sync')}
-                        cloudSyncNeedsReconnect={cloudSyncNeedsReconnect}
                         connectedAccountEmail={connectedAccountEmail}
                     />
                 );
@@ -300,8 +340,9 @@ const Account = ({
                         <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
                     )}
                 </div>
-                {isCloudConnected && (
+                {isCloudConnected ? (
                     <Button
+                        ref={accountActionRef}
                         variant="ghost"
                         onClick={() => setShowSignOutModal(true)}
                         disabled={isSigningOut}
@@ -310,8 +351,41 @@ const Account = ({
                     >
                         {isSigningOut ? 'Signing out...' : 'Sign out'}
                     </Button>
+                ) : (
+                    <Button ref={accountActionRef} variant="ghost" className="shrink-0" leadingIcon={SignInIcon} onClick={() => { setSignInError(null); setShowSignInModal(true); }}>
+                        {activeStorageProvider ? 'Reconnect' : 'Sign in'}
+                    </Button>
                 )}
             </div>
+
+            <Modal isOpen={showSignInModal} onClose={() => setShowSignInModal(false)}
+                onCloseAutoFocus={event => { event.preventDefault(); accountActionRef.current?.focus(); }}
+                title={activeStorageProvider ? 'Reconnect account' : 'Sign in'}
+                description="Choose your cloud storage provider to connect your account and sync your data.">
+                <div className="space-y-3">
+                    {isOffline && <Notice title="You're offline" description="Connect to the internet to sign in. Your local work remains available." />}
+                    {accountConnectionError && <div role="alert"><Notice variant="warning" title={accountConnectionError} /></div>}
+                    {movedToStorageProvider ? (
+                        <Button className="w-full" onClick={() => { setShowSignInModal(false); handleSectionChange('sync'); }}>Review moved account connection</Button>
+                    ) : <>
+                        {(!activeStorageProvider || activeStorageProvider === 'google-drive') && (
+                            <Button className="w-full" leadingIcon={GoogleDriveBrandIcon}
+                                disabled={Boolean(isOffline || signInBusy)} onClick={() => handleSignIn('google-drive')}>
+                                Continue with Google Drive
+                            </Button>
+                        )}
+                        {(activeStorageProvider === 'dropbox' || (!activeStorageProvider && isDropboxCloudUiEnabled())) && (
+                            <Button className="w-full" leadingIcon={DropboxBrandIcon}
+                                disabled={Boolean(isOffline || signInBusy)} onClick={() => handleSignIn('dropbox')}>
+                                {needsDropboxRetry ? 'Retry Dropbox connection' : 'Continue with Dropbox'}
+                            </Button>
+                        )}
+                    </>}
+                    {signInBusy && <p role="status" className="text-sm text-muted-foreground">Connecting your account…</p>}
+                    {connectionFailed && !movedToStorageProvider && <Button variant="ghost" className="w-full"
+                        onClick={() => { setShowSignInModal(false); handleSectionChange('sync'); }}>View connection details</Button>}
+                </div>
+            </Modal>
 
             {/* Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={handleSectionChange}>

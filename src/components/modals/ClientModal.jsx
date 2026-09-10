@@ -18,6 +18,7 @@ import { parseOptionalNumberInput, parseOptionalPositiveNumberInput } from '@/ut
 import { useBilling } from '@/contexts/BillingContext';
 import { BILLING_FEATURES } from '@/config/billingFeatures';
 import { evaluateActiveClientTransition } from '@/domain/entitlements/activeClientPolicy';
+import { getEntitlementRecovery } from '@/domain/entitlements/entitlementPolicy';
 import { activeClientEntitlementFromResolution, isActiveClientPolicyError } from '@/domain/work/activeClientApplication';
 import { EntitlementNotice } from '@/components/billing/EntitlementNotice';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -91,7 +92,7 @@ const ClientModal = ({
         createClientWithPolicyLock,
         updateClient,
     } = useClients();
-    const { resolution } = useBilling();
+    const { resolution, entitlementState } = useBilling();
     const { updateUrl } = useUrlState();
     const { preferences } = usePreferences();
 
@@ -268,19 +269,22 @@ const ClientModal = ({
         : { allowed: true };
 
     if (!editingClient && !createDecision.allowed) {
-        const unavailable = createDecision.code === 'ENTITLEMENT_STATUS_UNAVAILABLE';
+        const recovery = getEntitlementRecovery(entitlementState);
+        const upgrade = recovery.kind === 'upgrade';
         const handleEntitlementAction = () => {
+            if (!recovery.section) return;
             onClose();
-            updateUrl({ view: 'account', section: unavailable ? 'sync' : 'billing' });
+            updateUrl({ view: 'account', section: recovery.section });
         };
         const footer = (
             <div className="flex flex-row flex-wrap justify-end gap-2">
                 <Button variant="outline" onClick={onClose}>Close</Button>
                 <Button
-                    leadingIcon={unavailable ? Cloud : Rocket}
+                    leadingIcon={upgrade ? Rocket : Cloud}
+                    disabled={!recovery.section}
                     onClick={handleEntitlementAction}
                 >
-                    {unavailable ? 'Check cloud account' : 'Unlock unlimited clients'}
+                    {upgrade ? 'Unlock unlimited clients' : recovery.actionLabel}
                 </Button>
             </div>
         );
@@ -294,11 +298,12 @@ const ClientModal = ({
                 footer={footer}
             >
                 <EntitlementNotice
-                    title={unavailable ? 'Plan status needs confirmation' : 'Free includes one active client'}
+                    title={upgrade ? 'Free includes one active client' : recovery.title}
                 >
-                    {unavailable
-                        ? 'Reconnect or refresh the active TaskTime cloud account before creating a client. Existing clients and data remain available.'
-                        : 'Archive an active client or unlock unlimited clients. Existing clients, projects, invoices, and time remain fully usable.'}
+                    {upgrade
+                        ? 'Archive an active client to free a slot, or unlock unlimited clients with Pro.'
+                        : 'Archive an active client to free a slot, or restore verified Pro access to add more clients.'}
+                    {' '}Existing clients, projects, invoices, and time remain fully usable.
                 </EntitlementNotice>
             </Modal>
         );

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronDownIcon, PlusIcon } from '@/components/ui/icons';
 import { useExpenses } from '@/hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
 import { useToast } from '@/hooks/useToast.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
@@ -28,10 +29,14 @@ const ExpensesSection = ({
 
     const { expenses, markAsPaid, markAsUnpaid } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
     const { showError } = useToast();
     const [isExpanded, setIsExpanded] = useState(false);
     const clientsById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
     const projectsById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+    const expenseCategoriesById = useMemo(() => new Map(
+        allExpenseCategories.map((category) => [category.id, category])
+    ), [allExpenseCategories]);
     const showProjectContext = Boolean(clientId && !projectId);
 
     const filteredExpenses = useMemo(() => {
@@ -201,6 +206,7 @@ const ExpensesSection = ({
                 <CardContent className={cn('space-y-4', isMobileLayout && 'px-3 pb-3 pt-0')}>
                     <ExpenseList
                         expenses={displayedExpenses}
+                        expenseCategoriesById={expenseCategoriesById}
                         clientsById={clientsById}
                         projectsById={projectsById}
                         compact

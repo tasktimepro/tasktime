@@ -57,10 +57,12 @@ vi.mock('@/hooks/usePaymentMethods.ts', () => ({
     })
 }))
 
+const categoryGetter = vi.hoisted(() => vi.fn());
+
 vi.mock('@/hooks/useExpenseCategories.ts', () => ({
 
     useExpenseCategories: () => ({
-        getExpenseCategory: (id) => expenseCategoriesMock.find((category) => category.id === id),
+        getExpenseCategory: categoryGetter,
     })
 }))
 
@@ -82,11 +84,23 @@ describe('ExpenseViewModal', () => {
         businessInfosMock.length = 0
         paymentMethodsMock.length = 0
         expenseCategoriesMock.length = 0
+        categoryGetter.mockImplementation(id => expenseCategoriesMock.find(category => category.id === id))
         markAsPaidMock.mockReset()
         markAsPaidMock.mockResolvedValue(undefined)
         showSuccessMock.mockReset()
         showErrorMock.mockReset()
     })
+
+    it('refreshes an open category label when a synced category color changes', () => {
+        const expense = { id: 'e', title: 'Tools', categoryId: 'c', amount: 10, currency: 'EUR', date: '2026-09-08', paymentStatus: 'paid' };
+        expenseCategoriesMock.push({ id: 'c', name: 'Software', color: '#3b82f6' });
+        const props = { isOpen: true, onClose: vi.fn(), expense };
+        const { rerender } = render(<ExpenseViewModal {...props} />);
+        expect(screen.getByTestId('category-color-dot')).toHaveStyle({ backgroundColor: '#3b82f6' });
+        expenseCategoriesMock[0] = { id: 'c', name: 'Software', color: '#ef4444' };
+        rerender(<ExpenseViewModal {...props} />);
+        expect(screen.getByTestId('category-color-dot')).toHaveStyle({ backgroundColor: '#ef4444' });
+    });
 
     it('shows expense details and marks as paid', async () => {
         const expense = {

@@ -1,3 +1,4 @@
+import TaskRecurrenceMenuItem from './TaskRecurrenceMenuItem';
 /**
  * TaskActionsMenu - Three-dot menu for task edit/delete actions.
  */
@@ -73,6 +74,7 @@ const TaskActionsMenu = ({ task, onEdit, onDelete, onArchive = null }) => {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                    {task?.recurring && <TaskRecurrenceMenuItem task={task} />}
                     <DropdownMenuItem
                         onClick={() => onEdit(task)}
                         className="cursor-pointer hover:bg-accent focus:bg-accent"

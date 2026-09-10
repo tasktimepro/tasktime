@@ -2,6 +2,25 @@
 
 ## Current focus
 
+- Local checkpoint release assessment (2026-09-11): the pending recurrence and
+  expense-category work changes bridge tool schemas/descriptions and generated
+  OpenClaw artifacts, so the broader checkpoint is not core-only. A future
+  approved release must include bridge/MCP Registry and OpenClaw updates, refresh
+  the Claude vendored bridge from the same canonical build, and include that
+  changed Claude bundle. The current OpenClaw vendor matches the local bridge
+  build; the Claude vendor is still the preceding version. The unchanged ClawHub
+  skill needs no additional publication solely for this checkpoint. Keep the
+  existing unpublished candidate versions until release preparation; no artifact
+  is published here. Dated `uncommitted` entries below describe their earlier
+  validation state and are included in this local checkpoint.
+
+- [x] Harden queued active-client entitlement checks (2026-09-10, uncommitted).
+  Browser-owned command contexts retain live plan reads through app-session
+  scope adaptation, and the client application lock rechecks plan as well as
+  count before commit. Regressions cover a pending Pro command becoming
+  unresolved before lock acquisition and the universally Free first-client
+  slot. Public command/wire schemas and published agent artifacts are unchanged;
+  this is browser/core-app implementation only. See `app-status.md` for audit gates.
 - [x] Add the local subscription policy surface to the command registry:
   argument-aware Free `get_report_summary`, Pro report exports, hosted Send,
   read-only email-attempt status, active-client transitions, stable entitlement

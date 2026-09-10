@@ -143,7 +143,18 @@ and preset-period reports with preceding-period trends. Its stacked chart uses
 actual saved time plus a read-only active-timer projection sampled each minute
 while visible. Tracked cards share that projection, with pause and stop identity
 handling; unbilled estimates and payment totals retain saved-record billing and
-currency semantics. Live ticks never write or sync product data. Shared current task/project/client
+currency semantics. Live ticks never write or sync product data. While a task
+timer is running, the Dashboard keeps other task rows in that project visibly
+and natively disabled across Today, Upcoming, and Tasks, including every route
+into task details; the timer-owning task and paused project timers remain usable.
+Recurring-task
+Disable recurrence/Enable recurrence controls use calendar-off/calendar-check
+actions in task menus and remain separate from timers: optional persisted pause
+state suppresses due work until Enable,
+which establishes a local date boundary without catch-up. Disabled state appears
+as a neutral calendar-off `Disabled` schedule tag inline with the repeat description
+in task details and in place of the normal recurrence tag in task lists; task titles
+remain unchanged. Shared current task/project/client
 classification excludes personal and unassigned work from billable dashboard and
 report hours, exports, and unbilled summaries without rewriting saved flags or
 invoice evidence. Automatic billable marking requires a non-personal project
@@ -159,6 +170,18 @@ The Expenses overview derives paid spending, recurring estimates, upcoming
 occurrences, category shares, and recorded activity from existing active/archive
 expense hooks. It preserves the original expense tabs/list and mutation paths,
 uses canonical payment snapshots, and shares the lazy offline chart bundle.
+Expense categories have optional original-color tags and separate add/edit
+modals; historical references retain archived category identity. Expenses keep
+category IDs, so later category name/group/color edits render immediately.
+Planner expenses resolve the same live category identity for their left accent,
+with a neutral fallback and no project/client color inheritance. A
+recurrence category change can explicitly update only linked instances that
+still carry its prior category; other recurrence changes remain future-only.
+The expense form opens category management through the shared modal stack and
+restores its unsaved draft on return. Account offers provider sign-in directly
+in its header through the existing authentication flow.
+Retained Dropbox sessions recover through status retry; auth results reach the
+sync runtime through the existing auth-change channel without replacing the session.
 See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
 
 ## Reliability and security model
@@ -171,6 +194,12 @@ See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
   The exact origin-local lifecycle continues selecting its bounded signed plan
   during startup, reconnect, and offline use; transport readiness gates network
   work without downgrading or deleting that verified device state.
+  Open tabs enforce signed expiry/clock rollback on a bounded timer and wake;
+  delayed responses cannot extend access. Offline keys remain usable within the
+  signed lifetime independently of HTTP freshness. Online action/quota data is
+  discarded on transport failure, and delayed billing side effects are fenced
+  to the initiating account. Browser/agent client writes re-read the plan at
+  lock acquisition rather than retaining an earlier Pro decision.
 - Schema changes are additive or explicitly migrated and tested against historical data.
 - UI badges, invoice composition, and agent invoice commands share the same read-only eligibility operation. Current billing ranges include the complete selected end date and assign cross-midnight entries by their local start date; finalized legacy invoices with markerless source entries retain conservative historical period matching.
 - Browser and agent cancellation adapters share one journaled source-release operation. Cancellation revalidates current eligibility before the first journal write; retains the invoice number, original snapshots, and project links; releases only sources still owned by that invoice across active/historical/archive documents; never rewinds numbering; and conditionally converges late-arriving same-invoice claims after partial failure or stale Drive/archive replay without overwriting later billing.
@@ -183,7 +212,15 @@ See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
   Overview, and every tab remain visible; a locked advanced tab branches to a
   static section-specific preview before mounting protected modules, history,
   calculations, rows, or export builders. Import/restore/sync never discards or
-  auto-archives an over-limit client.
+  auto-archives an over-limit client. The universally Free first-client slot is
+  safe even before plan status resolves. Billing context publishes one derived
+  plan-plus-connection state so Reports, Plan & Billing, and hosted-email UI keep
+  verified access separate from temporary transport readiness. Reports Overview
+  and locked advanced previews consume the same Get Pro decision; preview copy
+  distinguishes fresh acquisition, browser-offline, automatic-reconnect, and
+  explicit-reconnect states instead of flattening them into account
+  confirmation. Hosted email applies the same state distinction instead of
+  presenting temporary recovery as a new upgrade.
 - The guarded loopback development stack exercises the normal provider-bound
   browser policy against local Worker/D1 state, Stripe test mode, and the
   configured email provider. It has no synthetic billing-state selector and the

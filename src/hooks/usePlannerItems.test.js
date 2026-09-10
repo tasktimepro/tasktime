@@ -11,6 +11,7 @@ const mockTimers = vi.hoisted(() => []);
 const mockEntries = vi.hoisted(() => []);
 const mockExpenses = vi.hoisted(() => []);
 const mockRecurrences = vi.hoisted(() => []);
+const mockExpenseCategories = vi.hoisted(() => []);
 const mockGetGoalForDate = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock('./usePlannerAttachments', () => ({
@@ -70,6 +71,13 @@ vi.mock('./useExpenseRecurrences', () => ({
     })
 }));
 
+vi.mock('./useExpenseCategories', () => ({
+    useExpenseCategories: () => ({
+        expenseCategories: mockExpenseCategories.filter((category) => !category.archived),
+        allExpenseCategories: mockExpenseCategories,
+    })
+}));
+
 vi.mock('./useDailyGoals', () => ({
     useDailyGoals: () => ({
         getGoalForDate: mockGetGoalForDate,
@@ -115,6 +123,7 @@ describe('usePlannerItems', () => {
         mockEntries.length = 0;
         mockExpenses.length = 0;
         mockRecurrences.length = 0;
+        mockExpenseCategories.length = 0;
         mockGetGoalForDate.mockReset();
         mockGetGoalForDate.mockReturnValue(null);
         vi.mocked(isRecurringTaskDueOnDate).mockReset();
@@ -416,17 +425,33 @@ describe('usePlannerItems', () => {
         expect(day.items.find((i) => i.type === 'client' && i.title === 'Archived Client')).toBeFalsy();
     });
 
-    it('uses project color for expense items', () => {
+    it('uses the current category color for expense items without inheriting project or client colors', () => {
         const dateStr = format(new Date(), 'yyyy-MM-dd');
 
-        mockProjects.push({ id: 'p-exp', title: 'Expense Project', color: '#123456' });
-        mockExpenses.push({ id: 'exp-1', title: 'Expense', date: dateStr, amount: 10, paymentStatus: 'unpaid', projectId: 'p-exp' });
+        mockClients.push({ id: 'c-exp', title: 'Expense Client', color: '#654321' });
+        mockProjects.push({ id: 'p-exp', title: 'Expense Project', color: '#123456', preferredClientId: 'c-exp' });
+        mockExpenseCategories.push({ id: 'cat-exp', name: 'Cloud services', color: '#ef4444', archived: false });
+        mockExpenses.push({ id: 'exp-1', title: 'Expense', date: dateStr, amount: 10, paymentStatus: 'unpaid', projectId: 'p-exp', clientId: 'c-exp', categoryId: 'cat-exp' });
 
         const { result } = renderHook(() => usePlannerItems(0));
         const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
 
         const expenseItem = day.items.find((i) => i.type === 'expense' && i.title === 'Expense');
-        expect(expenseItem?.color).toBe('#123456');
+        expect(expenseItem?.color).toBe('#ef4444');
+    });
+
+    it('does not inherit a project or client color for an uncategorized expense', () => {
+        const dateStr = format(new Date(), 'yyyy-MM-dd');
+
+        mockClients.push({ id: 'c-exp', title: 'Expense Client', color: '#654321' });
+        mockProjects.push({ id: 'p-exp', title: 'Expense Project', color: '#123456', preferredClientId: 'c-exp' });
+        mockExpenses.push({ id: 'exp-1', title: 'Uncategorized expense', date: dateStr, amount: 10, paymentStatus: 'unpaid', projectId: 'p-exp', clientId: 'c-exp' });
+
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find((d) => d.dateStr === dateStr);
+
+        const expenseItem = day.items.find((i) => i.type === 'expense' && i.title === 'Uncategorized expense');
+        expect(expenseItem?.color).toBeNull();
     });
 
     it('excludes archived projects after archivedOnDate', () => {
@@ -476,6 +501,19 @@ describe('usePlannerItems', () => {
 
         const projectItem = day.items.find((i) => i.type === 'project' && i.title === 'Color Project');
         expect(projectItem?.color).toBe('#ff00ff');
+    });
+
+    it('hides paused scheduled work but keeps completed occurrence history visible', () => {
+        const date = new Date();
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const recurring = { type: 'weekly', weeklyDays: [date.getDay()], paused: true };
+        mockTasks.push({ id: 'paused', title: 'Paused task', recurring });
+        mockTasks.push({ id: 'history', title: 'Completed history', recurring,
+            completedDatesByYear: { [date.getFullYear()]: { [date.getMonth() + 1]: [date.getDate()] } } });
+        const { result } = renderHook(() => usePlannerItems(0));
+        const day = result.current.weekDays.find(item => item.dateStr === dateStr);
+        expect(day.items.some(item => item.title === 'Paused task')).toBe(false);
+        expect(day.items.find(item => item.title === 'Completed history')?.isCompleted).toBe(true);
     });
 
     it('includes archived tasks before archivedOnDate', () => {
@@ -669,9 +707,11 @@ describe('usePlannerItems', () => {
         const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
         const dateStr = format(addDays(weekStart, 2), 'yyyy-MM-dd');
 
+        mockExpenseCategories.push({ id: 'cat-hosting', name: 'Hosting', color: '#22c55e', archived: true });
         mockRecurrences.push({
             id: 'rec-1',
             title: 'Hosting Renewal',
+            categoryId: 'cat-hosting',
             startDate: dateStr,
             repeat: 'monthly',
             amount: 25,
@@ -696,6 +736,7 @@ describe('usePlannerItems', () => {
         expect(expenseItems).toHaveLength(1);
         expect(expenseItems[0].title).toBe('Hosting Renewal');
         expect(expenseItems[0].isPreview).toBe(true);
+        expect(expenseItems[0].color).toBe('#22c55e');
     });
 
     it('calculates earnings with billed rate and currency conversion', async () => {

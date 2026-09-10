@@ -116,6 +116,42 @@ describe('useDropboxAuth', () => {
         vi.stubGlobal('fetch', vi.fn());
     });
 
+    it('shares a successful retained-session retry with other mounted auth consumers', async () => {
+        mocks.getStoredDropboxSession.mockResolvedValue({
+            provider: 'dropbox', sessionId: 'stored-dropbox-session', createdAt: '2026-08-19T10:00:00.000Z',
+        });
+        vi.mocked(fetch).mockRejectedValue(new Error('Offline'));
+        const account = renderHook(() => useDropboxAuth());
+        const sync = renderHook(() => useDropboxAuth());
+        await waitFor(() => expect(account.result.current.error).toMatch(/temporarily unavailable/));
+        await waitFor(() => expect(sync.result.current.error).toMatch(/temporarily unavailable/));
+
+        vi.mocked(fetch).mockClear().mockResolvedValue(Response.json({ authenticated: true, provider: 'dropbox' }));
+        await act(async () => { await account.result.current.refresh(); });
+
+        await waitFor(() => expect(sync.result.current.isSignedIn).toBe(true));
+        expect(account.result.current.isSignedIn).toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(mocks.claimActiveCloudStorageSession).not.toHaveBeenCalled();
+    });
+
+    it('shares a definitively expired session discovered by retry with other mounted consumers', async () => {
+        mocks.getStoredDropboxSession.mockResolvedValue({
+            provider: 'dropbox', sessionId: 'stored-dropbox-session', createdAt: '2026-08-19T10:00:00.000Z',
+        });
+        vi.mocked(fetch).mockResolvedValue(Response.json({ authenticated: true, provider: 'dropbox' }));
+        const account = renderHook(() => useDropboxAuth());
+        const sync = renderHook(() => useDropboxAuth());
+        await waitFor(() => expect(account.result.current.isSignedIn).toBe(true));
+        await waitFor(() => expect(sync.result.current.isSignedIn).toBe(true));
+
+        vi.mocked(fetch).mockResolvedValue(Response.json({ authenticated: false }, { status: 401 }));
+        await act(async () => { await account.result.current.refresh(); });
+
+        await waitFor(() => expect(sync.result.current.sessionId).toBeNull());
+        expect(account.result.current.sessionId).toBeNull();
+    });
+
     it('restores a provider-scoped session without requesting a file token', async () => {
         mocks.getStoredDropboxSession.mockResolvedValue({
             provider: 'dropbox',

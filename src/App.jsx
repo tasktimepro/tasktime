@@ -159,7 +159,6 @@ function AppContent() {
         isDriveConnected,
         isCloudConnected,
         activeStorageProvider,
-        activeStorageSessionId,
         movedToStorageProvider,
         isConnecting,
         hasSynced,
@@ -172,8 +171,9 @@ function AppContent() {
         lastSyncedAt,
         restoreBackupData,
         hostedServiceSessionId,
+        hadPreviousCloudSession,
     } = useYjs();
-    const { hadPreviousSession, isLoading: authLoading, isSignedIn } = useGoogleAuth();
+    const { isLoading: authLoading, isSignedIn } = useGoogleAuth();
     const cloudConnected = isCloudConnected ?? isDriveConnected;
     const cloudProvider = activeStorageProvider ?? (isDriveConnected ? 'google-drive' : null);
     const cloudProviderName = cloudProvider === 'dropbox' ? 'Dropbox' : 'Google Drive';
@@ -183,9 +183,7 @@ function AppContent() {
             ? 'Google Drive'
             : null;
     const cloudAuthLoading = cloudProvider === 'dropbox' ? false : authLoading;
-    const cloudHadPreviousSession = cloudProvider === 'dropbox'
-        ? Boolean(activeStorageSessionId)
-        : hadPreviousSession;
+    const cloudHadPreviousSession = hadPreviousCloudSession;
     const cloudProviderSignedIn = cloudProvider === 'dropbox' ? cloudConnected : isSignedIn;
     const toast = useContext(ToastContext);
     const [isSyncIndicatorOffline, setIsSyncIndicatorOffline] = useState(() => {
@@ -957,9 +955,6 @@ function AppContent() {
         syncPhase,
         syncState,
     ]);
-    const cloudSyncNeedsReconnect = mobileSyncStatus.kind === SYNC_STATUS_KIND.DISCONNECTED
-        && cloudHadPreviousSession;
-
     useEffect(() => {
         if (mobileSyncHideTimeoutRef.current) {
             clearTimeout(mobileSyncHideTimeoutRef.current);
@@ -1351,11 +1346,11 @@ function AppContent() {
             <div className={isMobileLayout ? 'app-viewport-shell' : 'flex gap-6'}>
             {/* Sidebar Navigation */}
             {!isMobileLayout && (
-            <aside className={`${isSidebarCollapsed ? 'w-18' : 'w-64'} bg-card shadow-sm border border-border rounded-xl flex flex-col h-[calc(var(--viewport-height)-3rem)] sidebar my-6 transition-[width] duration-200`}>
+            <aside className={`${isSidebarCollapsed ? 'w-18' : 'w-64'} bg-card shadow-sm border border-border rounded-xl flex shrink-0 flex-col h-[calc(var(--viewport-height)-3rem)] sidebar my-6 transition-[width] duration-200`}>
             <TooltipProvider>
                 {/* Sidebar Header */}
-                <div className={`${isSidebarCollapsed ? 'p-4' : 'p-6'} flex-shrink-0`}>
-                    <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
+                <div className={`${isSidebarCollapsed ? 'p-4' : 'px-5 py-6'} flex-shrink-0`}>
+                    <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} gap-2`}>
                         {isSidebarCollapsed ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1379,15 +1374,15 @@ function AppContent() {
                         ) : (
                             <button
                                 type="button"
-                                className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity group"
+                                className="flex min-w-0 flex-1 items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity group"
                                 onClick={() => navigateToDashboard()}
                                 aria-label="Go to Dashboard"
                             >
-                                <div className="relative">
+                                <div className="relative shrink-0">
                                     <ClockIcon className="h-6 w-6 text-foreground" />
                                 </div>
-                                <div>
-                                    <h1 className="text-lg font-bold text-foreground leading-none">
+                                <div className="min-w-0">
+                                    <h1 className="truncate text-lg font-bold text-foreground leading-none">
                                         TaskTime Pro
                                     </h1>
                                 </div>
@@ -1397,7 +1392,7 @@ function AppContent() {
                             <button
                                 type="button"
                                 onClick={() => setIsSidebarCollapsed(true)}
-                                className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground opacity-70 hover:opacity-100 hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                                className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center text-muted-foreground opacity-70 hover:opacity-100 hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
                                 title="Collapse sidebar"
                                 aria-label="Collapse sidebar"
                             >
@@ -1808,6 +1803,7 @@ function AppContent() {
                                 clients={clients}
                                 openProjectModal={openProjectModal}
                                 editProjectModal={editProjectModal}
+                                navigateToClient={navigateToClient}
                             />
                             </ErrorBoundary>
                         )}
@@ -1948,7 +1944,6 @@ function AppContent() {
                                 dailyGoals={dailyGoals}
                                 plannerAttachments={plannerAttachments}
                                 onImport={handleImport}
-                                cloudSyncNeedsReconnect={cloudSyncNeedsReconnect}
                             />
                             </ErrorBoundary>
                         )}

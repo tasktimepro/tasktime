@@ -52,4 +52,28 @@ describe('TimeEntriesOverview', () => {
         expect(screen.getByText('0s')).toBeInTheDocument();
         expect(screen.queryByText('0m')).not.toBeInTheDocument();
     });
+
+    it('keeps disabled recurrence status out of time-entry titles', () => {
+        const start = Date.parse('2026-07-13T10:00:00.000Z');
+        const task = {
+            id: 'task-1',
+            title: 'Disabled weekly task',
+            recurring: { type: 'weekly', weeklyDays: [1], paused: true },
+        };
+
+        render(
+            <TimeEntriesOverview
+                entries={[{ id: 'entry-1', task, project: null, start, end: start + 60_000 }]}
+                projects={[]}
+                projectFilter={DEFAULT_TIME_ENTRIES_PROJECT_FILTER}
+                setProjectFilter={vi.fn()}
+                onTaskClick={vi.fn()}
+                onProjectClick={vi.fn()}
+            />
+        );
+
+        const titleButton = screen.getByRole('button', { name: 'Disabled weekly task' });
+        expect(titleButton).toHaveClass('block');
+        expect(screen.queryByLabelText('Recurring task disabled')).not.toBeInTheDocument();
+    });
 });

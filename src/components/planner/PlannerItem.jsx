@@ -2,7 +2,7 @@
  * PlannerItem - Individual item card in the planner
  * 
  * Displays a client, project, or task with appropriate styling
- * Shows color tag as left border when color is set
+ * Shows resolved colors as a left border; projects and expenses retain a neutral fallback
  * Shows progress fill when estimated hours is set
  * Has dropdown menu for actions (remove, etc.)
  */
@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { 
     UserIcon, 
-    DocumentTextIcon, 
+    ProjectIcon,
     CheckIcon,
     PlayIcon,
     ArrowPathIcon,
@@ -106,7 +106,7 @@ const PlannerItem = ({
         }
         return {
             client: UserIcon,
-            project: DocumentTextIcon,
+            project: ProjectIcon,
             task: CheckIcon,
         }[type];
     };
@@ -114,6 +114,7 @@ const PlannerItem = ({
     const Icon = getIcon();
     const iconClasses = 'text-muted-foreground';
     const hasColor = !!color;
+    const hasAccentBorder = hasColor || isExpense || type === 'project';
 
     // Calculate progress percentage if we have estimated hours
     // For tasks, progress is actual time vs estimated hours
@@ -258,12 +259,13 @@ const PlannerItem = ({
                 "hover:shadow-sm",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
                 "bg-card border-border",
-                hasColor && "border-l-4",
+                hasAccentBorder && "border-l-4 border-l-border",
                 isCompleted && "opacity-60",
                 isMobileLayout && 'rounded-xl px-3 py-3'
             )}
             style={{
                 ...(hasColor ? { borderLeftColor: color } : {}),
+                ...(isExpense ? { borderLeftStyle: 'dotted' } : {}),
                 height: isMobileLayout ? 'auto' : dynamicHeight,
                 minHeight: isMobileLayout ? '56px' : '42px',
             }}
@@ -328,7 +330,11 @@ const PlannerItem = ({
                 </div>
 
                 {type === 'task' && isTimerActive && (
-                    <span className="status-success-text-strong animate-pulse flex-shrink-0 text-xs">●</span>
+                    <span
+                        aria-label="Timer active"
+                        title="Timer active"
+                        className="status-danger-fill h-2 w-2 flex-shrink-0 animate-pulse rounded-full"
+                    />
                 )}
 
                 {/* Three-dot menu button - appears on hover */}

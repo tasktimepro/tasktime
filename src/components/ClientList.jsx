@@ -342,9 +342,10 @@ const ClientList = ({
         <div className={cn('space-y-8', isMobileLayout && 'space-y-6 overflow-x-hidden')}>
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="min-w-0 flex-1 text-2xl font-bold text-foreground">
+                <h2 className="flex min-w-0 flex-1 items-center gap-2 text-2xl font-bold text-foreground">
+                    <UserGroupIcon aria-hidden="true" className="h-6 w-6 shrink-0 text-muted-foreground" />
                     Clients {activeClients.length > 0 && (
-                        <span>
+                        <span className="hidden sm:inline">
                             ({activeClients.length})
                         </span>
                     )}

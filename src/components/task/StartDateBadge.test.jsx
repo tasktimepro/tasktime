@@ -23,6 +23,19 @@ describe('StartDateBadge', () => {
         expect(getByText('Every Mo, We, Fr')).toBeInTheDocument()
     })
 
+    it('replaces the recurring schedule tag with Disabled when recurrence is disabled', () => {
+
+        const { getByLabelText, getByText, queryByText } = render(
+            <StartDateBadge recurring={{ type: 'weekly', weeklyDays: [1, 3, 5], paused: true }} />
+        )
+
+        const disabledBadge = getByLabelText('Recurring task disabled')
+
+        expect(getByText('Disabled')).toBeInTheDocument()
+        expect(disabledBadge.querySelector('svg')).toHaveClass('lucide-calendar-off')
+        expect(queryByText('Every Mo, We, Fr')).not.toBeInTheDocument()
+    })
+
     it('renders overdue badge when start date is in the past', () => {
 
         const { getByText } = render(

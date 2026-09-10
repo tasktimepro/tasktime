@@ -8,8 +8,12 @@ it('orders mixed upcoming work by date and keeps every item and its original act
     const view = vi.fn();
     const tasks = Array.from({ length: 5 }, (_, index) => ({ id: `task-${index}`, title: `Task ${index}`, startDate: `2026-09-${12 + index}` }));
     const expense = { id: 'expense', title: 'Subscription', date: '2026-09-11' };
-    const renderItem = item => <button onClick={() => view(item)}>{item.title}</button>;
-    render(<Upcoming tasks={tasks} expenses={[expense]} renderTask={renderItem} renderExpense={renderItem} />);
+    const renderTask = vi.fn((item) => <button onClick={() => view(item)}>{item.title}</button>);
+    const renderExpense = vi.fn((item) => <button onClick={() => view(item)}>{item.title}</button>);
+    render(<Upcoming tasks={tasks} expenses={[expense]} renderTask={renderTask} renderExpense={renderExpense} />);
+    expect(screen.queryByText('Next 7 days')).not.toBeInTheDocument();
+    expect(renderExpense).toHaveBeenCalledWith(expense, { context: 'upcoming' });
+    expect(renderTask).toHaveBeenCalledWith(tasks[0], { context: 'upcoming' });
     expect(screen.getAllByRole('button')[0]).toHaveTextContent('Subscription');
     expect(screen.queryByText('Task 4')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Show all 6 upcoming items' }));

@@ -1,3 +1,4 @@
+import TaskRecurrenceMenuItem from '../TaskRecurrenceMenuItem';
 import { PencilIcon, TrashIcon } from '@/components/ui/icons';
 import {
     DropdownMenu,
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/button';
  * TaskDropdown component - Edit/Delete dropdown menu.
  * @param {Object} props
  */
-const TaskDropdown = ({ onEdit, onDelete }) => {
+const TaskDropdown = ({ task, onEdit, onDelete }) => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -26,6 +27,7 @@ const TaskDropdown = ({ onEdit, onDelete }) => {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+                {task?.recurring && <TaskRecurrenceMenuItem task={task} />}
                 <DropdownMenuItem
                     onClick={onEdit}
                     className="flex items-center space-x-2"

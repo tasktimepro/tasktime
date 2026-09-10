@@ -6,9 +6,12 @@ import { Check, ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils.ts"
 
+const DROPDOWN_SCROLL_DISMISS_THRESHOLD = 8
+
 const DropdownMenuContext = React.createContext(null)
 
 const DropdownMenu = ({
+  modal = false,
   open: openProp,
   defaultOpen = false,
   onOpenChange,
@@ -18,6 +21,7 @@ const DropdownMenu = ({
   const isControlled = openProp !== undefined
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen)
   const open = isControlled ? openProp : uncontrolledOpen
+  const triggerRef = React.useRef(null)
 
   const setOpen = React.useCallback((nextOpen) => {
     const resolvedOpen = typeof nextOpen === "function" ? nextOpen(open) : nextOpen
@@ -29,11 +33,42 @@ const DropdownMenu = ({
     onOpenChange?.(resolvedOpen)
   }, [isControlled, onOpenChange, open])
 
-  const contextValue = React.useMemo(() => ({ open, setOpen }), [open, setOpen])
+  React.useEffect(() => {
+    if (!open || !triggerRef.current) {
+      return undefined
+    }
+
+    const startPosition = triggerRef.current.getBoundingClientRect()
+    let dismissed = false
+    const closeIfTriggerMoved = () => {
+      if (!triggerRef.current || dismissed) {
+        return
+      }
+
+      const currentPosition = triggerRef.current.getBoundingClientRect()
+      const horizontalDistance = Math.abs(currentPosition.left - startPosition.left)
+      const verticalDistance = Math.abs(currentPosition.top - startPosition.top)
+
+      if (Math.max(horizontalDistance, verticalDistance) > DROPDOWN_SCROLL_DISMISS_THRESHOLD) {
+        dismissed = true
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("scroll", closeIfTriggerMoved, true)
+    window.addEventListener("scroll", closeIfTriggerMoved, true)
+
+    return () => {
+      document.removeEventListener("scroll", closeIfTriggerMoved, true)
+      window.removeEventListener("scroll", closeIfTriggerMoved, true)
+    }
+  }, [open, setOpen])
+
+  const contextValue = React.useMemo(() => ({ open, setOpen, triggerRef }), [open, setOpen])
 
   return (
     <DropdownMenuContext.Provider value={contextValue}>
-      <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen} {...props}>
+      <DropdownMenuPrimitive.Root modal={modal} open={open} onOpenChange={setOpen} {...props}>
         {children}
       </DropdownMenuPrimitive.Root>
     </DropdownMenuContext.Provider>
@@ -42,11 +77,24 @@ const DropdownMenu = ({
 
 const DropdownMenuTrigger = React.forwardRef(({ onClick, onPointerDown, onPointerMove, onPointerCancel, ...props }, ref) => {
   const menuContext = React.useContext(DropdownMenuContext)
+  const triggerRef = menuContext?.triggerRef
   const touchStateRef = React.useRef({
     pendingToggle: false,
     startX: 0,
     startY: 0,
   })
+
+  const setTriggerRef = React.useCallback((element) => {
+    if (triggerRef) {
+      triggerRef.current = element
+    }
+
+    if (typeof ref === "function") {
+      ref(element)
+    } else if (ref) {
+      ref.current = element
+    }
+  }, [ref, triggerRef])
 
   const handlePointerDown = React.useCallback((event) => {
     onPointerDown?.(event)
@@ -99,7 +147,7 @@ const DropdownMenuTrigger = React.forwardRef(({ onClick, onPointerDown, onPointe
 
   return (
     <DropdownMenuPrimitive.Trigger
-      ref={ref}
+      ref={setTriggerRef}
       onClick={handleClick}
       onPointerCancel={handlePointerCancel}
       onPointerDown={handlePointerDown}

@@ -936,6 +936,10 @@ export async function createBillableProject(page, {
         clientTitle,
     );
 
+    if (statusMode === 'quote' || deadline || (budgetAmount !== null && budgetAmount !== undefined)) {
+        await projectDialog.getByRole('button', { name: 'Project Planning' }).click();
+    }
+
     if (statusMode === 'quote') {
         await selectComboboxOption(
             page,
@@ -953,6 +957,7 @@ export async function createBillableProject(page, {
     }
 
     if (billableTimeIncrementOption) {
+        await projectDialog.getByRole('button', { name: 'Billing & Timer Rules' }).click();
         await selectComboboxOption(
             page,
             projectDialog.getByRole('combobox', { name: 'Minimum billed time increment' }),

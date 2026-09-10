@@ -15,6 +15,12 @@ const DISABLED_VALUE: BillingContextValue = {
     isBillingConnectionReady: false,
     isBillingReconnecting: false,
     connectedAccountReference: null,
+    entitlementState: {
+        plan: 'unknown',
+        accessStatus: 'unresolved',
+        verified: false,
+        connection: 'disconnected',
+    },
     refresh: async () => undefined,
     startTrial: async () => { throw new Error('BILLING_DISABLED'); },
     createCheckout: async () => { throw new Error('BILLING_DISABLED'); },

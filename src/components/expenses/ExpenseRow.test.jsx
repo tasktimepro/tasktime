@@ -78,6 +78,23 @@ describe('ExpenseRow', () => {
         expect(screen.getByText('Health AI')).toBeInTheDocument();
     });
 
+    it('uses the category color on the card border without repeating its dot', () => {
+        render(
+            <ExpenseRow
+                expense={{ id: 'expense-color', title: 'Subscription', date: '2026-04-12', amount: 20, currency: 'EUR', paymentStatus: 'paid', categoryId: 'software' }}
+                category={{ id: 'software', name: 'Software', color: '#ef4444' }}
+                project={{ id: 'project-1', title: 'Website', color: '#22c55e' }}
+                client={{ id: 'client-1', title: 'Acme', color: '#3b82f6' }}
+                onEdit={vi.fn()}
+                onTogglePaid={vi.fn()}
+            />
+        );
+
+        expect(screen.getByRole('presentation')).toHaveStyle({ borderLeftColor: '#ef4444' });
+        expect(screen.getByText('Software')).toBeVisible();
+        expect(screen.queryByTestId('category-color-dot')).not.toBeInTheDocument();
+    });
+
     it('renders billed expenses in the top-right badge row for both full and compact cards', () => {
         const expense = {
             id: 'expense-1',

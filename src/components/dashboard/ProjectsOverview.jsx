@@ -5,23 +5,7 @@ import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { formatCurrency, getProjectCurrency } from '../../utils/currencyUtils.ts';
 import { PROJECT_FILTER_OPTIONS } from './dashboardOverviewUtils.ts';
 import CardSearchControl from './CardSearchControl';
-
-/** Match project-list color inheritance without changing stored project data. */
-function ProjectColorDot({ project }) {
-    const selectedColor = project.color || project.client?.color;
-    const color = typeof selectedColor === 'string'
-        ? selectedColor.trim().replace(/^#([a-f\d])([a-f\d])([a-f\d])$/i, '#$1$1$2$2$3$3')
-        : '';
-
-    return (
-        <span
-            aria-hidden="true"
-            data-testid="project-color-dot"
-            className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground"
-            style={/^#[a-f\d]{6}$/i.test(color) ? { backgroundColor: color } : undefined}
-        />
-    );
-}
+import ProjectColorIcon from '../ProjectColorIcon';
 
 /**
  * ProjectsOverview component - Recent projects list with search.
@@ -97,13 +81,13 @@ const ProjectsOverview = ({
                                     <div className="flex-1 min-w-0 space-y-1">
                                         <button
                                             onClick={() => navigateToProject(project.id)}
-                                            className="hover-status-info-text-strong flex max-w-full items-center gap-2 text-sm font-medium text-foreground cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            className="hover-status-info-text-strong flex min-w-0 max-w-full items-center gap-2 text-sm font-medium text-foreground cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             title={`Click to open ${project.title} project`}
                                         >
-                                            <ProjectColorDot project={project} />
+                                            <ProjectColorIcon project={project} />
                                             <span className="truncate">{project.title}</span>
                                         </button>
-                                        <div className="pl-4 text-xs text-muted-foreground">
+                                        <div data-testid="project-metadata" className="truncate text-xs text-muted-foreground">
                                             {project.client ? (
                                                 <span>
                                                     <button

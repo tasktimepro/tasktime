@@ -65,6 +65,8 @@ export interface YjsContextValue {
     isDriveConnected: boolean;
     /** Whether connected to the active cloud-storage provider */
     isCloudConnected: boolean;
+    /** Whether this browser retains a provider session that may need explicit reconnection */
+    hadPreviousCloudSession: boolean;
     /** Current Drive session ID in Worker mode */
     driveSessionId: string | null;
     /** Provider allowed to perform cloud storage work in this browser profile */
@@ -199,6 +201,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         sessionId,
         driveTransport,
         isLoading: authLoading,
+        hadPreviousSession: hadPreviousDriveSession,
         signIn,
         signOut,
         revokeAccess,
@@ -242,6 +245,9 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 ? authLoading
                 : authLoading || dropboxAuthLoading);
     const isDriveConnected = isCloudConnected && activeStorageProvider === 'google-drive';
+    const hadPreviousCloudSession = activeStorageProvider === 'dropbox'
+        ? Boolean(activeStorageSessionId)
+        : hadPreviousDriveSession;
 
     // Only an absent or already-Google storage binding may be claimed here; a
     // Dropbox binding always wins until explicit transfer. Hosted services use
@@ -1114,6 +1120,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         syncPhase,
         isDriveConnected,
         isCloudConnected,
+        hadPreviousCloudSession,
         activeStorageProvider,
         movedToStorageProvider,
         activeStorageSessionId,
@@ -1155,6 +1162,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         syncPhase,
         isDriveConnected,
         isCloudConnected,
+        hadPreviousCloudSession,
         activeStorageProvider,
         movedToStorageProvider,
         activeStorageSessionId,

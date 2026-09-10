@@ -82,7 +82,8 @@ export const isRecurringTaskDueOnDate = (
     date: Date,
     config?: RecurringConfig | null
 ): boolean => {
-    if (!config) return false;
+    if (!config || config.paused) return false;
+    if (config.resumeFrom && format(date, 'yyyy-MM-dd') < config.resumeFrom) return false;
 
     if (config.type === 'weekly') {
         const dayIndex = date.getDay();
@@ -128,7 +129,7 @@ export const findPreviousRecurringDueDate = (
     config?: RecurringConfig | null,
     maxDays = 366
 ): Date | null => {
-    if (!config) return null;
+    if (!config || config.paused) return null;
 
     const base = startOfDay(date);
 
@@ -154,7 +155,7 @@ export const findNextRecurringDueDate = (
     config?: RecurringConfig | null,
     maxDays = 366
 ): Date | null => {
-    if (!config) return null;
+    if (!config || config.paused) return null;
 
     const base = startOfDay(date);
 

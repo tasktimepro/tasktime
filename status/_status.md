@@ -10,6 +10,89 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Program Phase 3 UI polishing in progress locally**
 
+- Local checkpoint (2026-09-11): this commit includes all pending app, billing,
+  UI, site, test, documentation, and generated OpenClaw changes. Dated validation
+  entries below retain their original pre-commit evidence; their `uncommitted`
+  labels describe that earlier state. Release scope is core minor `1.6.0` plus
+  the affected bridge/MCP Registry and bundled-agent release train described in
+  `agent-status.md`. Versions remain unchanged. No push, tag, publication,
+  deployment, or live billing mutation is part of this checkpoint.
+
+- Billing-state pre-launch audit is hardened locally (2026-09-10, uncommitted):
+  signed expiry/clock safety now covers open tabs and delayed responses, offline
+  key reuse respects the license window, stale online actions are discarded,
+  and account-switch/queued-client races are fenced in browser and agent paths.
+  Client/email/report recovery uses one shared classification. App coverage
+  passes 278 files / 2,694 tests, lint and both typechecks pass, and nine targeted
+  browser scenarios pass across Chromium, Firefox, and WebKit. The 50-page build,
+  six PWA checks, and 355 Worker tests pass; the local D1 suite requires the
+  explicitly recorded 15-second test budget. Evidence is in `app-status.md`;
+  production billing switches, live Stripe/provider state, and deployment remain
+  unchanged. Live launch configuration/canary approval is still separate.
+
+- Task/account/category polish is implemented locally and uncommitted:
+  explicit Disable recurrence/Enable recurrence actions with calendar icons in
+  task menus; category modals and
+  category-only original-color borders/dots across expense surfaces; dynamic
+  category references, category-only recurrence propagation, and inline category
+  management that restores the expense draft;
+  stable sidebar-title expansion; direct Account provider sign-in; collapsible
+  client-gated project billing/planning; actionable invoice links; and matching
+  centered Today/Upcoming rows. Expense tabs clip vertical overflow, and shared
+  three-dot menus leave scrolling available, then close after an 8px movement
+  threshold. Recurrence actions now match neighboring menu spacing; disabled
+  schedules replace list recurrence tags with a neutral calendar-off `Disabled`
+  tag and show it inline with the repeat description under Schedule in task
+  details while titles remain clean.
+  Planner uses the same red running-timer dot as the global timer. Project identity
+  now uses the closed-folder glyph for attached Planner projects, the neutral
+  Projects page heading, and the project-detail heading. Project detail shares
+  project-first/client-inherited/neutral color resolution with the Dashboard
+  widget, while project cards retain their colored border and text-only titles;
+  active and archived project grids match the Clients page's 24px gap and card
+  padding. Project status tags sit immediately after the title while menus stay
+  aligned at the far right, and the cards
+  omit the redundant Most recent display while preserving activity-based sorting.
+  Project-list and client-dashboard project cards share a flexible details row,
+  keeping invoice/deadline pills right-aligned beside the text until narrow
+  widths require wrapping instead of reserving separate footer space.
+  Client identity now mirrors this treatment: the Clients heading uses the
+  shared users glyph in neutral muted-foreground, client detail replaces its color dot with a color-resolved
+  single-user icon matching Planner attachments, and project-card client names navigate directly to their client
+  without opening the project card.
+  Planner projects without an explicit or inherited color now retain the same
+  4px identity border with the neutral border token.
+  Planner expense accents are dotted on the left edge only, preserving category
+  colors and neutral fallback. Project and Client heading totals hide on phones
+  so the existing icons, titles, sort controls, and create buttons retain room.
+  Client and project dashboard Unbilled cards now match the icon/content column
+  structure of their adjacent metric cards while retaining an optional secondary
+  unbilled-expense amount.
+  Compatibility and browser checks are recorded in `app-status.md`. Follow-up review fixes
+  stale recurrence edits/menu intent,
+  hidden rate validation, and retained Dropbox recovery. Final local gates:
+  2,639 unit tests across 277 files with coverage, lint, and typecheck passed on the
+  preceding draft-state source; all nine affected scenarios passed in Chromium, Firefox,
+  and WebKit after the complete 59-case Chromium smoke gate. Six PWA tests,
+  production build, and agent bridge/bundle smoke also passed for that baseline.
+  The follow-up neutral Projects/Clients index icons pass 21 focused component
+  tests, their focused Chromium scenario, lint, and scoped diff checks; the
+  broader cross-browser, coverage, PWA, typecheck, and build gates were not rerun.
+  Dashboard task rows now fully honor the existing running-project lock: another
+  task in that project cannot open task details through its title or overdue date
+  in Today, Upcoming, or Tasks, while the timer owner and paused timers stay usable.
+  Red/green coverage passes 31 focused component tests; the broader Dashboard
+  unit gate passes all 100 tests across 16 files, and all seven Chromium Dashboard
+  scenarios pass at desktop and phone widths. The focused interaction also passes
+  in Firefox and WebKit. Full lint, typecheck, and scoped diff checks pass;
+  coverage, PWA, and build were not rerun for this interaction fix.
+  A text-only follow-up removes the redundant `Next 7 days` subtitle from the
+  Upcoming header while retaining the same scheduling window; 18 focused unit
+  tests, the Chromium multi-width Dashboard scenario, and full lint pass.
+  Agent bridge/OpenClaw tool metadata and the vendored bridge
+  are updated locally; their release assessment now accompanies core 1.6.0.
+  Nothing has been committed, published, or deployed for this slice.
+
 - No-client billability is corrected locally across saved/live dashboard hours,
   report/export totals, unbilled projections, automatic task marking, and task
   controls/Kanban badges. Sent/paid invoice move preservation is verified;
@@ -54,14 +137,14 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   8h minimum axis ceiling. Validation and the successful/cached exchange-rate
   crash regression are recorded in `app-status.md`. This is a local checkpoint,
   with no deployment or persisted-contract change.
-  The Projects widget now adds 8px dots in the original project colors,
-  inherited client colors when absent, and a neutral fallback. Project/client
+  The Projects widget now uses 14px folder outlines in the original project
+  colors, inherited client colors when absent, and a neutral fallback. Its
+  metadata lines align with the folder edge like expense metadata. Project/client
   navigation and light/dark phone layouts are verified. Dashboard tracked-time
   displays now include a read-only minute-sampled active-timer projection;
   financial calculations and other views retain saved-record semantics.
 
-- Phase 3 homepage copy now leads with “Run your freelance work. From task to
-  invoice.” in the centered hero, with one primary app action and compact
+- Phase 3 homepage copy now leads with “Run your freelance business. From task to invoice.” in the centered hero, with one primary app action and compact
   Local-first/Open source/Works offline trust chips. The one-person-team section
   follows the product visual; optional AI assistance follows billing with
   concrete unbilled-time and invoice-draft examples linked to the existing guide.
@@ -127,7 +210,15 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   refund/Portal/support policy, Dropbox broad-public access, the
   app-origin migration, homepage work, and live release approval remain gates.
   Local green evidence is not release approval. The Phase 1 code candidate is
-  complete.
+  complete. A later uncommitted UX hardening follow-up gives every surface the
+  same derived plan-plus-connection state and Get Pro decision, keeps cached Pro
+  distinct from temporary transport loss, permits the universally Free first
+  client before status resolves, and gives hosted Send state-specific offline,
+  automatic-reconnect, or explicit-reconnect guidance. Locked advanced Reports
+  previews now consume the same state: a fresh browser offers Get Pro while
+  offline and reconnect paths retain their own recovery guidance. It passes 278
+  files / 2,668 tests with coverage, lint, typecheck, the 50-page build, and a
+  fresh isolated browser review; production controls remain off.
   The synthetic billing-state preview has been retired in favor of a guarded
   loopback-development pre-production sandbox. It runs the normal app against
   local Worker/D1 and real Stripe test-mode Checkout/webhooks. Hosted email now

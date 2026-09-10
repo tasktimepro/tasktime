@@ -8,6 +8,7 @@ const {
     mockShowWarning,
     mockShowSuccess,
     mockMetricsCards,
+    mockToDoToday,
     mockUseCurrencyConversion,
     mockUseTasks,
     mockTimeEntries,
@@ -20,6 +21,7 @@ const {
     mockShowWarning: vi.fn(),
     mockShowSuccess: vi.fn(),
     mockMetricsCards: vi.fn(() => <div data-testid="metrics-cards">Metrics cards</div>),
+    mockToDoToday: vi.fn(() => <div data-testid="todo-today">To do today</div>),
     mockUseCurrencyConversion: vi.fn(),
     mockTimeEntries: [],
     mockLoadTimeEntriesYear: vi.fn(),
@@ -102,6 +104,13 @@ vi.mock('../hooks/useExpenseRecurrences', () => ({
     }),
 }));
 
+vi.mock('../hooks/useExpenseCategories', () => ({
+    useExpenseCategories: () => ({
+        expenseCategories: [],
+        allExpenseCategories: [],
+    }),
+}));
+
 vi.mock('../hooks/usePreferences', () => ({
     usePreferences: () => ({
         preferences: mockPreferences,
@@ -130,7 +139,7 @@ vi.mock('./dashboard/hooks/useDashboardHistory', () => ({
 }));
 
 vi.mock('./dashboard/ToDoToday', () => ({
-    default: () => <div data-testid="todo-today">To do today</div>,
+    default: (...args) => mockToDoToday(...args),
 }));
 
 vi.mock('./dashboard/RecentTasks', () => ({
@@ -170,6 +179,8 @@ describe('Dashboard', () => {
         mockShowWarning.mockReset();
         mockShowSuccess.mockReset();
         mockMetricsCards.mockClear();
+        mockToDoToday.mockReset();
+        mockToDoToday.mockImplementation(() => <div data-testid="todo-today">To do today</div>);
         mockUseTasks.mockClear();
         mockTimeEntries.length = 0;
         mockLoadTimeEntriesYear.mockReset();
@@ -194,7 +205,7 @@ describe('Dashboard', () => {
         });
     });
 
-    const renderDashboard = () => render(
+    const renderDashboard = (overrides = {}) => render(
         <Dashboard
             projects={[]}
             invoices={[]}
@@ -205,6 +216,7 @@ describe('Dashboard', () => {
             onEditTask={vi.fn()}
             onViewTask={vi.fn()}
             openExpenseView={vi.fn()}
+            {...overrides}
         />
     );
 
@@ -217,6 +229,28 @@ describe('Dashboard', () => {
 
         expect(todo.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(metrics.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('renders a disabled task title as non-interactive', () => {
+        const onViewTask = vi.fn();
+        mockToDoToday.mockImplementation(({ renderTaskTitle }) => (
+            <div data-testid="todo-today">
+                {renderTaskTitle(
+                    { id: 'blocked-task', title: 'Blocked dashboard task' },
+                    false,
+                    { disabled: true },
+                )}
+            </div>
+        ));
+
+        renderDashboard({ onViewTask });
+
+        const titleButton = screen.getByRole('button', { name: 'Blocked dashboard task' });
+        expect(titleButton).toBeDisabled();
+        expect(titleButton).toHaveAttribute('title', 'Another task in this project is currently running');
+
+        titleButton.click();
+        expect(onViewTask).not.toHaveBeenCalled();
     });
 
     it('loads the newest archived year when no active time entries remain', async () => {

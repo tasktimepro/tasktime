@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import ClientModal from './ClientModal';
 import ProjectModal from './ProjectModal';
 import TemplateModal from './TemplateModal';
@@ -7,6 +7,7 @@ import BusinessModal from './BusinessModal';
 import InvoiceModal from '../invoice/InvoiceModal';
 import TaskModal from './TaskModal';
 import ExpenseModal from './ExpenseModal';
+import ExpenseCategoryManagerModal from './ExpenseCategoryManagerModal';
 
 /**
  * ModalManager - Central manager for all form modals
@@ -25,33 +26,50 @@ const ModalManager = ({
     // Modal stack to preserve states when opening nested modals
     const [modalStack, setModalStack] = useState([]);
     
-    // Store form states for each modal type
-    const [modalFormStates, setModalFormStates] = useState({});
+    // Drafts only need to survive a nested-modal round trip; keeping them in a
+    // ref avoids rerendering the active form every time its debounce saves.
+    const modalFormStatesRef = useRef({});
 
     // Function to save current modal's form state
-    const saveCurrentModalState = (modalType, formData) => {
-        setModalFormStates(prev => ({
-            ...prev,
+    const saveCurrentModalState = useCallback((modalType, formData) => {
+        modalFormStatesRef.current = {
+            ...modalFormStatesRef.current,
             [modalType]: {
                 ...formData,
                 timestamp: Date.now() // To track freshness
             }
-        }));
-    };
+        };
+    }, []);
 
     // Function to get saved form state for a modal
-    const getSavedModalState = (modalType) => {
-        return modalFormStates[modalType] || null;
-    };
+    const getSavedModalState = useCallback((modalType) => {
+        return modalFormStatesRef.current[modalType] || null;
+    }, []);
 
     // Function to clear saved state when modal is successfully submitted
-    const clearModalState = (modalType) => {
-        setModalFormStates(prev => {
-            const newState = { ...prev };
-            delete newState[modalType];
-            return newState;
-        });
-    };
+    const clearModalState = useCallback((modalType) => {
+        const next = { ...modalFormStatesRef.current };
+        delete next[modalType];
+        modalFormStatesRef.current = next;
+    }, []);
+
+    const saveProjectFormState = useCallback((formData) => {
+        saveCurrentModalState('project', formData);
+    }, [saveCurrentModalState]);
+    const getProjectFormState = useCallback(() => getSavedModalState('project'), [getSavedModalState]);
+    const clearProjectFormState = useCallback(() => clearModalState('project'), [clearModalState]);
+
+    const saveTaskFormState = useCallback((formData) => {
+        saveCurrentModalState('task', formData);
+    }, [saveCurrentModalState]);
+    const getTaskFormState = useCallback(() => getSavedModalState('task'), [getSavedModalState]);
+    const clearTaskFormState = useCallback(() => clearModalState('task'), [clearModalState]);
+
+    const saveExpenseFormState = useCallback((formData) => {
+        saveCurrentModalState('expense', formData);
+    }, [saveCurrentModalState]);
+    const getExpenseFormState = useCallback(() => getSavedModalState('expense'), [getSavedModalState]);
+    const clearExpenseFormState = useCallback(() => clearModalState('expense'), [clearModalState]);
 
     const closeModal = () => {
         if (modalStack.length > 0) {
@@ -64,6 +82,8 @@ const ModalManager = ({
             // No previous modal, close everything
             setActiveModal(null);
             setEditingItem(null);
+            modalFormStatesRef.current = {};
+            setModalStack([]);
             // Clear modal options when closing
             if (setModalOptions) {
                 setModalOptions(null);
@@ -101,9 +121,9 @@ const ModalManager = ({
                     editingProject={editingItem}
                     modalOptions={modalOptions}
                     openClientModal={() => openNestedModal('client')}
-                    saveFormState={(formData) => saveCurrentModalState('project', formData)}
-                    getSavedState={() => getSavedModalState('project')}
-                    clearSavedState={() => clearModalState('project')}
+                    saveFormState={saveProjectFormState}
+                    getSavedState={getProjectFormState}
+                    clearSavedState={clearProjectFormState}
                 />
             )}
 
@@ -144,9 +164,9 @@ const ModalManager = ({
                     editingTask={editingItem}
                     modalOptions={modalOptions}
                     openProjectModal={() => openNestedModal('project')}
-                    saveFormState={(formData) => saveCurrentModalState('task', formData)}
-                    getSavedState={() => getSavedModalState('task')}
-                    clearSavedState={() => clearModalState('task')}
+                    saveFormState={saveTaskFormState}
+                    getSavedState={getTaskFormState}
+                    clearSavedState={clearTaskFormState}
                 />
             )}
 
@@ -157,9 +177,17 @@ const ModalManager = ({
                     onClose={closeModal}
                     editingExpense={editingItem}
                     modalOptions={modalOptions}
-                    saveFormState={(formData) => saveCurrentModalState('expense', formData)}
-                    getSavedState={() => getSavedModalState('expense')}
-                    clearSavedState={() => clearModalState('expense')}
+                    saveFormState={saveExpenseFormState}
+                    getSavedState={getExpenseFormState}
+                    clearSavedState={clearExpenseFormState}
+                    openExpenseCategoriesModal={() => openNestedModal('expense-categories')}
+                />
+            )}
+
+            {activeModal === 'expense-categories' && (
+                <ExpenseCategoryManagerModal
+                    isOpen={true}
+                    onClose={closeModal}
                 />
             )}
         </>

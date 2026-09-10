@@ -75,7 +75,7 @@ const RecentTasks = ({
                             />
                         )}
                         <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden">
-                            {renderTaskTitle(task, isCompleted)}
+                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable })}
                             <div className="flex w-full flex-wrap items-center justify-end gap-2">
                                 <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
                                     {(task.startDate || task.recurring) && (
@@ -128,7 +128,7 @@ const RecentTasks = ({
                             />
                         )}
                         <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
-                            {renderTaskTitle(task, isCompleted)}
+                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable })}
                         </div>
                         {(task.startDate || task.recurring) && (
                             <StartDateBadge

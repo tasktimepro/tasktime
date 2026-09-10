@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import {
     DropdownMenu,
@@ -10,18 +10,59 @@ import {
 
 function TestDropdownMenu() {
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <button type="button">More actions</button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-                <DropdownMenuItem>Open</DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <div data-testid="scroll-container">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button type="button">More actions</button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem>Open</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
     )
 }
 
 describe('DropdownMenu', () => {
+    it('keeps scrolling available and closes after the trigger moves beyond the scroll threshold', async () => {
+        render(<TestDropdownMenu />)
+
+        const trigger = screen.getByRole('button', { name: 'More actions' })
+        const scrollContainer = screen.getByTestId('scroll-container')
+        vi.spyOn(trigger, 'getBoundingClientRect').mockImplementation(() => DOMRect.fromRect({
+            x: 0,
+            y: 100 - scrollContainer.scrollTop,
+            width: 100,
+            height: 32,
+        }))
+
+        fireEvent.pointerDown(trigger, {
+            button: 0,
+            clientX: 24,
+            clientY: 24,
+            ctrlKey: false,
+            pointerType: 'mouse',
+        })
+
+        await waitFor(() => {
+            expect(screen.getByRole('menu')).toBeInTheDocument()
+        })
+
+        expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+        fireEvent.scroll(screen.getByRole('menu'))
+        expect(screen.getByRole('menu')).toBeInTheDocument()
+
+        scrollContainer.scrollTop = 4
+        fireEvent.scroll(scrollContainer)
+        expect(screen.getByRole('menu')).toBeInTheDocument()
+
+        scrollContainer.scrollTop = 9
+        fireEvent.scroll(scrollContainer)
+        await waitFor(() => {
+            expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+        })
+    })
+
     it('waits for click after a touch press instead of opening on pointer down', async () => {
         render(<TestDropdownMenu />)
 

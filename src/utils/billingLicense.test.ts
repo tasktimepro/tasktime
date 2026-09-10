@@ -86,6 +86,16 @@ async function fixture(overrides: Record<string, unknown> = {}, headerOverrides:
 }
 
 describe('verifyBillingLicense', () => {
+    it('rejects a non-finite verification clock instead of bypassing expiry comparisons', async () => {
+        const { token, key } = await fixture();
+        for (const nowMs of [NaN, Infinity, -Infinity]) {
+            expect(await verifyBillingLicense(token, {
+                keys: [key], expectedSubject: 'principal-1',
+                expectedIssuer: 'https://sync.tasktime.pro', nowMs,
+            })).toEqual({ ok: false, code: 'INVALID_CLAIMS' });
+        }
+    });
+
     it('accepts only a bounded, unique ES256 public-key set', async () => {
         const { key } = await fixture();
         expect(parseBillingJwks({ keys: [key] })).toEqual([key]);

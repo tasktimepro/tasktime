@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { LICENSE_MAX_LIFETIME_SECONDS } from './billingLicense';
 import type {
     BillingLicensePayloadV1,
     BillingPublicJwk,
@@ -101,6 +102,7 @@ export async function writePendingBillingCheckout(input: {
     lifecycle: BillingLifecycle;
     attemptId: string;
     createdAt?: number;
+    isCurrent?: () => boolean;
 }): Promise<void> {
     if (!isLifecycle(input.lifecycle)
         || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(input.attemptId)) {
@@ -115,6 +117,7 @@ export async function writePendingBillingCheckout(input: {
         createdAt: input.createdAt ?? Date.now(),
     };
     const db = await getDb();
+    if (input.isCurrent && !input.isCurrent()) return;
     await db.transaction(CHECKOUT_STORE, 'readwrite').store.put(record, ACTIVE_CHECKOUT_KEY);
 }
 
@@ -135,10 +138,19 @@ export async function readPendingBillingCheckout(
     }
 }
 
-export async function clearPendingBillingCheckout(): Promise<void> {
+export async function clearPendingBillingCheckout(lifecycle?: BillingLifecycle): Promise<void> {
     try {
+        const fingerprint = lifecycle ? await createBillingSessionFingerprint(lifecycle.sessionId) : null;
         const db = await getDb();
-        await db.transaction(CHECKOUT_STORE, 'readwrite').store.delete(ACTIVE_CHECKOUT_KEY);
+        const transaction = db.transaction(CHECKOUT_STORE, 'readwrite');
+        const pending: unknown = await transaction.store.get(ACTIVE_CHECKOUT_KEY);
+        if (!lifecycle || (isPendingCheckout(pending)
+            && pending.provider === lifecycle.provider
+            && pending.generation === lifecycle.generation
+            && pending.sessionIdFingerprint === fingerprint)) {
+            await transaction.store.delete(ACTIVE_CHECKOUT_KEY);
+        }
+        await transaction.done;
     } catch {
         // Recovery metadata cleanup must not block canonical billing refresh.
     }
@@ -215,6 +227,7 @@ export async function writeVerifiedBillingCache(input: {
     serverTime: number;
     wallTime: number;
     authoritativeOnlineRebase?: boolean;
+    isCurrent?: () => boolean;
 }): Promise<void> {
     if (!isLifecycle(input.lifecycle)
         || input.subject !== input.payload.subject
@@ -230,6 +243,10 @@ export async function writeVerifiedBillingCache(input: {
     const licenses = transaction.objectStore(LICENSES_STORE);
     const bindings = transaction.objectStore(BINDINGS_STORE);
     const previous: unknown = await bindings.get(ACTIVE_BINDING_KEY);
+    if (input.isCurrent && !input.isCurrent()) {
+        await transaction.done;
+        return;
+    }
     const sameLifecycle = isStoredBinding(previous)
         && previous.provider === input.lifecycle.provider
         && previous.generation === input.lifecycle.generation
@@ -313,10 +330,22 @@ export async function readBoundBillingCache(
     }
 }
 
-export async function clearActiveBillingBinding(): Promise<void> {
+export async function clearActiveBillingBinding(
+    lifecycle?: BillingLifecycle,
+    isCurrent: () => boolean = () => true,
+): Promise<void> {
     try {
+        const fingerprint = lifecycle ? await createBillingSessionFingerprint(lifecycle.sessionId) : null;
         const db = await getDb();
-        await db.transaction(BINDINGS_STORE, 'readwrite').store.delete(ACTIVE_BINDING_KEY);
+        const transaction = db.transaction(BINDINGS_STORE, 'readwrite');
+        const binding: unknown = await transaction.store.get(ACTIVE_BINDING_KEY);
+        if (isCurrent() && (!lifecycle || (isStoredBinding(binding)
+            && binding.provider === lifecycle.provider
+            && binding.generation === lifecycle.generation
+            && binding.sessionIdFingerprint === fingerprint))) {
+            await transaction.store.delete(ACTIVE_BINDING_KEY);
+        }
+        await transaction.done;
     } catch {
         // Cache cleanup must remain fail-safe and never block provider sign-out.
     }
@@ -327,7 +356,10 @@ export async function writeCachedBillingJwks(input: StoredJwksV1): Promise<void>
     await db.transaction(PUBLIC_STORE, 'readwrite').store.put(input, 'jwks-v1');
 }
 
-export async function readCachedBillingJwks(nowMs = Date.now()): Promise<StoredJwksV1 | null> {
+export async function readCachedBillingJwks(
+    nowMs = Date.now(),
+    options: { forOfflineLicense?: boolean } = {},
+): Promise<StoredJwksV1 | null> {
     try {
         const db = await getDb();
         const value: unknown = await db.transaction(PUBLIC_STORE).store.get('jwks-v1');
@@ -338,7 +370,13 @@ export async function readCachedBillingJwks(nowMs = Date.now()): Promise<StoredJ
             || record.keys.length < 1
             || record.keys.length > 4
             || !Number.isFinite(record.expiresAt)
-            || Number(record.expiresAt) <= nowMs) return null;
+            || !Number.isFinite(record.storedAt)
+            || !Number.isFinite(nowMs)
+            || (options.forOfflineLicense
+                // HTTP key freshness must not shorten an already signed license.
+                // The verifier still checks the signature and its exact expiry.
+                ? Number(record.expiresAt) + LICENSE_MAX_LIFETIME_SECONDS * 1000 <= nowMs
+                : Number(record.expiresAt) <= nowMs)) return null;
         return record as StoredJwksV1;
     } catch {
         return null;

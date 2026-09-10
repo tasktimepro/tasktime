@@ -62,6 +62,7 @@ function runAgentActiveClientApplication<T>(
                 'agent active client application',
             ),
             resolution: context.entitlementResolution ?? { kind: 'unresolved', reason: 'lifecycle' },
+            readResolution: () => context.entitlementResolution ?? { kind: 'unresolved', reason: 'lifecycle' },
             ...input,
             commit,
         }).catch(translateActiveClientPolicyError);

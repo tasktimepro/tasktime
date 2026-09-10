@@ -195,6 +195,21 @@ describe('TaskModal', () => {
         expect(onClose).toHaveBeenCalled()
     })
 
+    it.each([true, false])('does not submit stale recurrence controls from the task editor (paused: %s)', async (paused) => {
+        const user = userEvent.setup()
+        render(<TaskModal isOpen onClose={vi.fn()} editingTask={{
+            id: 't1', title: 'Recurring task', projectId: 'p1',
+            recurring: { type: 'weekly', weeklyDays: [1], paused, resumeFrom: '2026-09-01' }
+        }} />)
+
+        await user.type(screen.getByLabelText(/Task Title/i), ' renamed')
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(taskMocks.updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({
+            recurring: { type: 'weekly', weeklyDays: [1] }
+        }))
+    })
+
     it('disables start date when recurring is set', async () => {
 
         const user = userEvent.setup()

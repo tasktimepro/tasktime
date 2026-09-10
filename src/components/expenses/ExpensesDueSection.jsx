@@ -3,6 +3,7 @@ import { addDays } from 'date-fns';
 import { useToast } from '@/hooks/useToast.ts';
 import { useExpenses } from '@/hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '@/hooks/useExpenseRecurrences.ts';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
 import ExpenseDueCard from './ExpenseDueCard';
@@ -13,6 +14,7 @@ import ExpenseDueCard from './ExpenseDueCard';
 const ExpensesDueSection = ({ openExpenseView }) => {
     const { expenses, markAsPaid } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
     const { showError, showSuccess } = useToast();
 
     const recurrencesById = useMemo(() => {
@@ -22,6 +24,9 @@ const ExpensesDueSection = ({ openExpenseView }) => {
         });
         return map;
     }, [recurrences]);
+    const expenseCategoriesById = useMemo(() => new Map(
+        allExpenseCategories.map((category) => [category.id, category])
+    ), [allExpenseCategories]);
 
     const { overdue, today, upcoming } = useMemo(() => {
         const todayStr = toStorageDate(new Date()) || '';
@@ -171,6 +176,7 @@ const ExpensesDueSection = ({ openExpenseView }) => {
                         <ExpenseDueCard
                             key={expense.id}
                             expense={expense}
+                            category={expense.categoryId ? expenseCategoriesById.get(expense.categoryId) : null}
                             isOverdue={isOverdue}
                             isToday={isToday}
                             isPreview={expense.isPreview}

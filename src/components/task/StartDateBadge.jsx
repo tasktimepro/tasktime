@@ -6,6 +6,7 @@ import { ArrowPathIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/badge';
 import { getTodayString, toDisplayDate } from '@/utils/dateUtils.ts';
 import { formatRecurringLabel } from '@/utils/recurringUtils.ts';
+import TaskRecurrenceDisabledBadge from './TaskRecurrenceDisabledBadge';
 
 const getRelativeLabel = (dateString) => {
     if (!dateString) return '';
@@ -35,6 +36,10 @@ const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = fa
     const today = getTodayString();
 
     if (recurring) {
+        if (recurring.paused) {
+            return <TaskRecurrenceDisabledBadge />;
+        }
+
         if (recurringOverdue && !completed) {
             return (
                 <Badge variant="warning">

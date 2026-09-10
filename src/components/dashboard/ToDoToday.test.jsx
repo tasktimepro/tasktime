@@ -9,6 +9,7 @@ const hookMocks = {
     expenses: [],
     markAsPaid: vi.fn(),
     recurrences: [],
+    expenseCategories: [],
     getTimerForTask: vi.fn(() => null),
     showSuccess: vi.fn(),
     showError: vi.fn(),
@@ -33,6 +34,13 @@ vi.mock('../../hooks/useExpenseRecurrences.ts', () => ({
     })
 }))
 
+vi.mock('../../hooks/useExpenseCategories.ts', () => ({
+    useExpenseCategories: () => ({
+        expenseCategories: hookMocks.expenseCategories,
+        allExpenseCategories: hookMocks.expenseCategories,
+    })
+}))
+
 vi.mock('../../hooks/useToast.ts', () => ({
     useToast: () => ({
         showError: hookMocks.showError,
@@ -45,9 +53,10 @@ vi.mock('../TimeEntriesModal', () => ({
 }))
 
 vi.mock('../expenses/ExpenseDueCard', () => ({
-    default: ({ expense, isOverdue, isToday, isPreview, onView, onMarkPaid }) => (
+    default: ({ expense, category, isOverdue, isToday, isPreview, onView, onMarkPaid }) => (
         <div data-testid={`expense-${expense.id}`}>
             <span>{expense.title}</span>
+            {category && <span>Category {category.name}</span>}
             {isOverdue && <span>Overdue expense</span>}
             {isToday && <span>Today expense</span>}
             {isPreview && <span>Preview expense</span>}
@@ -90,6 +99,7 @@ describe('ToDoToday', () => {
         setMatchMedia(false)
         hookMocks.expenses = []
         hookMocks.recurrences = []
+        hookMocks.expenseCategories = []
         hookMocks.markAsPaid = vi.fn()
         hookMocks.getTimerForTask = vi.fn(() => null)
         hookMocks.showSuccess = vi.fn()
@@ -175,7 +185,8 @@ describe('ToDoToday', () => {
         const upcoming = screen.getByRole('region', { name: 'Upcoming' })
         expect(within(today).queryByText('Upcoming Task')).not.toBeInTheDocument()
         expect(within(upcoming).getByText('Upcoming Task')).toBeInTheDocument()
-        expect(within(upcoming).getByText('Next 7 days')).toBeInTheDocument()
+        expect(within(upcoming).queryByText('Next 7 days')).not.toBeInTheDocument()
+        expect(screen.queryByTestId(`task-row-content-${upcomingTask.id}`)).not.toBeInTheDocument()
     })
 
     it('stacks task metadata and actions below the title content', () => {
@@ -282,12 +293,50 @@ describe('ToDoToday', () => {
             taskId: 'different-task',
             isPaused: false,
         }))
+        const renderTaskTitle = vi.fn((task) => <span>{task.title}</span>)
 
-        renderComponent({ upcomingTasks: [] })
+        renderComponent({ renderTaskTitle })
 
+        expect(renderTaskTitle).toHaveBeenCalledWith(
+            expect.objectContaining({ id: overdueTask.id }),
+            false,
+            { disabled: true },
+        )
+        expect(renderTaskTitle).toHaveBeenCalledWith(
+            expect.objectContaining({ id: upcomingTask.id }),
+            false,
+            { disabled: true },
+        )
+        expect(screen.queryByRole('button', { name: 'Open task details' })).not.toBeInTheDocument()
         expect(screen.queryByTitle('Add time entry')).not.toBeInTheDocument()
         expect(screen.queryByText('Edit task')).not.toBeInTheDocument()
         expect(screen.queryByText('Delete task')).not.toBeInTheDocument()
+    })
+
+    it.each([
+        ['the task that owns the running timer', { taskId: overdueTask.id, isPaused: false }],
+        ['a different task when its project timer is paused', { taskId: 'different-task', isPaused: true }],
+    ])('keeps task details available for %s', async (_label, timer) => {
+        const user = userEvent.setup()
+        hookMocks.getTimerForTask = vi.fn(() => timer)
+        const renderTaskTitle = vi.fn((task) => (
+            <button type="button" onClick={() => props.onTaskTitleClick(task)}>{task.title}</button>
+        ))
+        const props = renderComponent({
+            overdueTasks: [overdueTask],
+            tasksForToday: [],
+            upcomingTasks: [],
+            renderTaskTitle,
+        })
+
+        expect(renderTaskTitle).toHaveBeenCalledWith(
+            expect.objectContaining({ id: overdueTask.id }),
+            false,
+            { disabled: false },
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Overdue Task' }))
+        expect(props.onTaskTitleClick).toHaveBeenCalledWith(expect.objectContaining({ id: overdueTask.id }))
     })
 
     it('shows recurring-overdue tasks as overdue even without a past start date', async () => {

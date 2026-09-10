@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import PropTypes from 'prop-types';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
-import { BanknotesIcon } from '@/components/ui/icons';
+import { BanknotesIcon, ChevronDownIcon } from '@/components/ui/icons';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
@@ -119,6 +119,34 @@ function buildChangedProjectUpdates(editingProject, formData) {
     return changedUpdates;
 }
 
+/** Keep form controls mounted so collapsing never discards values or validation. */
+function ProjectSection({ title, summary, children, expanded, setExpanded, sectionRef }) {
+    const id = useId();
+    return (
+        <div ref={sectionRef} className="rounded-lg border border-border" onInvalidCapture={event => {
+            if (expanded) return;
+            event.preventDefault();
+            setExpanded(true);
+            const input = event.target;
+            requestAnimationFrame(() => {
+                input.focus();
+                input.reportValidity();
+            });
+        }}>
+            <button type="button" aria-label={title} aria-expanded={expanded} aria-controls={id}
+                onClick={() => setExpanded(value => !value)}
+                className={`w-full px-4 py-3 text-left cursor-pointer bg-muted/50 hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}>
+                <span className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">{title}</span>
+                    <ChevronDownIcon aria-hidden="true" className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                </span>
+                <span className="sensitive-data mt-1 block text-xs text-muted-foreground">{summary}</span>
+            </button>
+            <div id={id} hidden={!expanded} className="p-4 space-y-4">{children}</div>
+        </div>
+    );
+}
+
 /**
  * ProjectModal component - Modal for creating and editing projects
  */
@@ -133,6 +161,10 @@ const ProjectModal = ({
     clearSavedState
 }) => {
     const [selectedClientRate, setSelectedClientRate] = useState(null);
+    const [billingExpanded, setBillingExpanded] = useState(false);
+    const [planningExpanded, setPlanningExpanded] = useState(false);
+    const [rateError, setRateError] = useState(null);
+    const billingSectionRef = useRef(null);
     const lastInitKeyRef = useRef(null);
     const { showSuccess } = useToast();
     const { createProject, updateProject } = useProjects();
@@ -141,9 +173,7 @@ const ProjectModal = ({
     const isClientSelectDisabled = !!modalOptions?.preselectedClientId || activeClients.length === 0;
 
     const [formData, setFormData] = useState(() => createEmptyProjectFormData(modalOptions));
-    const showClientPlanningFields = !formData.isPersonal && Boolean(
-        formData.preferredClientId || modalOptions?.preselectedClientId || editingProject?.preferredClientId
-    );
+    const showClientPlanningFields = !formData.isPersonal && Boolean(formData.preferredClientId);
 
     // Initialize form data when opening or changing context
     useEffect(() => {
@@ -161,6 +191,9 @@ const ProjectModal = ({
         }
 
         lastInitKeyRef.current = initKey;
+        setBillingExpanded(false);
+        setPlanningExpanded(false);
+        setRateError(null);
 
         if (editingProject) {
             // Find the client for this project
@@ -269,6 +302,7 @@ const ProjectModal = ({
      */
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+        setRateError(null);
 
         setFormData(prev => ({
             ...prev,
@@ -306,6 +340,7 @@ const ProjectModal = ({
      * Handle override rate checkbox
      */
     const handleOverrideRateChange = (checked) => {
+        setRateError(null);
         setFormData(prev => ({
             ...prev,
             overrideRate: checked,
@@ -315,6 +350,19 @@ const ProjectModal = ({
                 flatRate: selectedClientRate.flatRate || false
             } : {})
         }));
+    };
+
+    /** Reveal the billing controls when the inherited rate cannot be saved. */
+    const validateHourlyRate = () => {
+        if (formData.isPersonal || formData.flatRate || parseOptionalPositiveNumberInput(formData.hourlyRate) !== null) {
+            return true;
+        }
+        setBillingExpanded(true);
+        setRateError('Enter an hourly rate greater than 0. Override the client rate here, or choose flat rate pricing.');
+        requestAnimationFrame(() => {
+            billingSectionRef.current?.querySelector(formData.overrideRate ? '#hourlyRate' : '#overrideRate')?.focus();
+        });
+        return false;
     };
 
     /**
@@ -332,9 +380,7 @@ const ProjectModal = ({
         }
         
         // If not flat rate and not personal, hourly rate is required (either from client or override)
-        if (!formData.isPersonal && !formData.flatRate && parseOptionalPositiveNumberInput(formData.hourlyRate) === null) {
-            return; // Hourly rate is required when not using flat rate for billable projects
-        }
+        if (!validateHourlyRate()) return;
 
         const createdProject = createProject({
             id: generateSlugId(formData.title),
@@ -373,9 +419,7 @@ const ProjectModal = ({
         }
         
         // If not flat rate and not personal, hourly rate is required (either from client or override)
-        if (!formData.isPersonal && !formData.flatRate && parseOptionalPositiveNumberInput(formData.hourlyRate) === null) {
-            return; // Hourly rate is required when not using flat rate for billable projects
-        }
+        if (!validateHourlyRate()) return;
 
         const changedUpdates = buildChangedProjectUpdates(editingProject, formData);
 
@@ -399,6 +443,11 @@ const ProjectModal = ({
         // Reset form data
         setFormData(createEmptyProjectFormData(modalOptions));
         setSelectedClientRate(null);
+
+        if (clearSavedState) {
+            clearSavedState();
+        }
+
         onClose();
     };
 
@@ -545,104 +594,113 @@ const ProjectModal = ({
                     </div>
                 )}
 
-                {/* Rate Information from Client */}
-                {selectedClientRate && !formData.overrideRate && !formData.isPersonal && (
-                    <Notice
-                        title="Rate from Client"
-                        description={
-                            selectedClientRate.flatRate
-                                ? "This client uses flat rate pricing (non-hourly basis)"
-                                : selectedClientRate.hourlyRate
-                                    ? <span className="sensitive-data">Hourly Rate: {selectedClientRate.hourlyRate}/hour</span>
-                                    : "No default rate set for this client"
-                        }
-                    />
-                )}
+                {showClientPlanningFields && (
+                    <ProjectSection key={`billing:${editingProject?.id || 'new'}:${isOpen}`} title="Billing & Timer Rules"
+                        expanded={billingExpanded} setExpanded={setBillingExpanded} sectionRef={billingSectionRef}
+                        summary={`${formData.overrideRate ? 'Project rate override' : 'Client rate'} · ${formData.flatRate ? 'Flat rate' : `${formData.hourlyRate || 'No rate set'}${formData.hourlyRate ? '/hour' : ''} · ${BILLABLE_TIME_INCREMENT_OPTIONS.find(option => option.value === formData.billableTimeIncrementMinutes)?.label || 'Exact worked time'}`} `}>
+                        {rateError && <div role="alert"><Notice variant="warning" title={rateError} /></div>}
+                        {/* Rate Information from Client */}
+                        {selectedClientRate && !formData.overrideRate && !formData.isPersonal && (
+                            <Notice
+                                title="Rate from Client"
+                                description={
+                                    selectedClientRate.flatRate
+                                        ? "This client uses flat rate pricing (non-hourly basis)"
+                                        : selectedClientRate.hourlyRate
+                                            ? <span className="sensitive-data">Hourly Rate: {selectedClientRate.hourlyRate}/hour</span>
+                                            : "No default rate set for this client"
+                                }
+                            />
+                        )}
 
-                {/* Override Rate Checkbox */}
-                {selectedClientRate && !formData.isPersonal && (
-                    <div className="flex items-center space-x-3">
-                        <CustomCheckbox
-                            checked={formData.overrideRate}
-                            onChange={handleOverrideRateChange}
-                            label="Override client rate for this project"
-                            labelClassName="text-sm font-medium text-foreground"
-                            id="overrideRate"
-                        />
-                    </div>
-                )}
+                        {/* Override Rate Checkbox */}
+                        {selectedClientRate && !formData.isPersonal && (
+                            <div className="flex items-center space-x-3">
+                                <CustomCheckbox
+                                    checked={formData.overrideRate}
+                                    onChange={handleOverrideRateChange}
+                                    label="Override client rate for this project"
+                                    labelClassName="text-sm font-medium text-foreground"
+                                    id="overrideRate"
+                                />
+                            </div>
+                        )}
 
-                {/* Rate Override Section */}
-                {formData.overrideRate && !formData.isPersonal && (
-                    <div className="border border-border rounded-lg p-4 bg-card">
-                        <h4 className="text-sm font-medium text-foreground mb-3">Project Rate Override</h4>
+                        {/* Rate Override Section */}
+                        {formData.overrideRate && !formData.isPersonal && (
+                            <div className="border border-border rounded-lg p-4 bg-card">
+                                <h4 className="text-sm font-medium text-foreground mb-3">Project Rate Override</h4>
                         
-                        <div className="flex items-center space-x-3 mb-4">
-                            <CustomCheckbox
-                                checked={formData.flatRate}
-                                onChange={(checked) => setFormData(prev => ({ ...prev, flatRate: checked }))}
-                                label="Flat rate project (non-hourly basis)"
-                                labelClassName="text-sm font-medium text-foreground"
-                                id="flatRate"
-                            />
-                        </div>
+                                <div className="flex items-center space-x-3 mb-4">
+                                    <CustomCheckbox
+                                        checked={formData.flatRate}
+                                        onChange={(checked) => { setRateError(null); setFormData(prev => ({ ...prev, flatRate: checked })); }}
+                                        label="Flat rate project (non-hourly basis)"
+                                        labelClassName="text-sm font-medium text-foreground"
+                                        id="flatRate"
+                                    />
+                                </div>
 
-                        <div className={formData.flatRate ? "hidden" : ""}>
-                            <Label htmlFor="hourlyRate">
-                                Hourly Rate {!formData.flatRate && <span className="text-destructive-strong">*</span>}
-                            </Label>
+                                <div className={formData.flatRate ? "hidden" : ""}>
+                                    <Label htmlFor="hourlyRate">
+                                        Hourly Rate {!formData.flatRate && <span className="text-destructive-strong">*</span>}
+                                    </Label>
 
-                            <Input
-                                type="number"
-                                id="hourlyRate"
-                                name="hourlyRate"
-                                value={formData.hourlyRate}
-                                onChange={handleInputChange}
-                                min="0"
-                                step="0.01"
-                                className="mt-1 sensitive-data"
-                                placeholder="0.00"
-                                required={!formData.flatRate && formData.overrideRate}
-                            />
-                        </div>
-                    </div>
-                )}
+                                    <Input
+                                        type="number"
+                                        id="hourlyRate"
+                                        name="hourlyRate"
+                                        value={formData.hourlyRate}
+                                        onChange={handleInputChange}
+                                        min="0.01"
+                                        step="0.01"
+                                        disabled={formData.flatRate}
+                                        className="mt-1 sensitive-data"
+                                        placeholder="0.00"
+                                        required={!formData.flatRate && formData.overrideRate}
+                                    />
+                                </div>
+                            </div>
+                        )}
 
-                {!formData.isPersonal && !formData.flatRate && (
-                    <div className="border border-border rounded-lg p-4 bg-card space-y-3">
-                        <h4 className="text-sm font-medium text-foreground">Billing & Timer Rules</h4>
-                        <div>
-                            <Label htmlFor="billableTimeIncrementMinutes">
-                                Minimum billed time increment
-                            </Label>
-                            <Select
-                                value={formData.billableTimeIncrementMinutes}
-                                onValueChange={(value) => setFormData(prev => ({
-                                    ...prev,
-                                    billableTimeIncrementMinutes: value,
-                                }))}
-                            >
-                                <SelectTrigger id="billableTimeIncrementMinutes" className="mt-1">
-                                    <SelectValue placeholder="Select minimum billed time increment" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {BILLABLE_TIME_INCREMENT_OPTIONS.map(option => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground mt-2">
-                                Applies when stopping timers for this project. Time entries keep the actual worked timestamps, while billing and invoices use the rounded project minimum.
-                            </p>
-                        </div>
-                    </div>
+                        {!formData.isPersonal && !formData.flatRate && (
+                            <div className="space-y-3">
+                                <div>
+                                    <Label htmlFor="billableTimeIncrementMinutes">
+                                        Minimum billed time increment
+                                    </Label>
+                                    <Select
+                                        value={formData.billableTimeIncrementMinutes}
+                                        onValueChange={(value) => setFormData(prev => ({
+                                            ...prev,
+                                            billableTimeIncrementMinutes: value,
+                                        }))}
+                                    >
+                                        <SelectTrigger id="billableTimeIncrementMinutes" className="mt-1">
+                                            <SelectValue placeholder="Select minimum billed time increment" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {BILLABLE_TIME_INCREMENT_OPTIONS.map(option => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Applies when stopping timers for this project. Time entries keep the actual worked timestamps, while billing and invoices use the rounded project minimum.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                    </ProjectSection>
                 )}
 
                 {showClientPlanningFields && (
-                    <div className="border border-border rounded-lg p-4 bg-card space-y-4">
-                        <h4 className="text-sm font-medium text-foreground">Project Planning</h4>
+                    <ProjectSection key={`planning:${editingProject?.id || 'new'}:${isOpen}`} title="Project Planning"
+                        expanded={planningExpanded} setExpanded={setPlanningExpanded}
+                        summary={[formData.statusMode === 'quote' ? 'Quote' : 'Active', formData.deadline && `Due ${formData.deadline}`, formData.budgetAmount && `Budget ${formData.budgetAmount}`].filter(Boolean).join(' · ')}>
 
                         <div>
                             <Label htmlFor="statusMode">
@@ -705,7 +763,7 @@ const ProjectModal = ({
                                 Compares planned and actual earnings against this target.
                             </p>
                         </div>
-                    </div>
+                    </ProjectSection>
                 )}
 
                 <div>

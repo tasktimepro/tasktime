@@ -127,6 +127,75 @@ describe('ClientDashboard', () => {
         expect(screen.queryByRole('button', { name: 'New Invoice' })).toBeNull();
     });
 
+    it('uses the client icon with the saved client color in the dashboard heading', () => {
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', color: '#ef4444', defaultCurrency: 'USD' }}
+                projects={[]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        const heading = screen.getByRole('heading', { name: 'Acme' });
+        const icon = screen.getByTestId('client-color-icon');
+
+        expect(icon).toHaveClass('lucide-user');
+        expect(icon).toHaveStyle({ color: '#ef4444' });
+        expect(heading.parentElement).toContainElement(icon);
+    });
+
+    it('uses the same icon and content columns for Unbilled as the other metric cards', () => {
+        render(
+            <ClientDashboard
+                client={{ id: 'client-1', title: 'Acme', defaultCurrency: 'USD' }}
+                projects={[]}
+                tasks={[]}
+                timeEntries={[]}
+                onBackToClients={vi.fn()}
+                paymentMethods={[]}
+                businessInfos={[]}
+                clients={[]}
+                invoices={[]}
+                invoiceTemplates={[]}
+                activeModal={null}
+                navigateToProject={vi.fn()}
+                openClientModal={vi.fn()}
+                openProjectModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                openTemplateModal={vi.fn()}
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+            />
+        );
+
+        const content = screen.getByTestId('client-unbilled-metric-content');
+        const [iconColumn, detailsColumn] = content.children;
+
+        expect(content).toHaveClass('flex', 'items-center', 'w-full');
+        expect(iconColumn).toHaveClass('flex-shrink-0');
+        expect(iconColumn.querySelector('svg')).toHaveClass('lucide-dollar-sign', 'h-5', 'w-5');
+        expect(detailsColumn).toHaveClass('ml-4', 'w-0', 'flex-1');
+        expect(detailsColumn).toContainElement(screen.getByText('Unbilled'));
+        expect(detailsColumn.querySelector('dd')).toHaveClass('font-semibold', 'text-foreground', 'text-lg');
+    });
+
     it('keeps the projects title and new project action inline on mobile until wrapping is needed', () => {
         setMatchMedia(true);
 
@@ -371,6 +440,16 @@ describe('ClientDashboard', () => {
         await waitFor(() => {
             expect(screen.getByText('CHF3038.26')).toBeInTheDocument();
         });
+
+        const detailsLayout = screen.getByTestId('project-card-details');
+        const detailText = screen.getByTestId('project-card-detail-text');
+        const pills = screen.getByTestId('project-card-pills');
+
+        expect(detailsLayout).toHaveClass('flex-wrap', 'items-end');
+        expect(detailText.nextElementSibling).toBe(pills);
+        expect(pills).toHaveClass('ml-auto', 'justify-end');
+        expect(pills).toContainElement(screen.getByText('CHF3038.26').closest('button'));
+        expect(pills).not.toHaveClass('mt-auto', 'pt-4');
     });
 
     it('formats large paid revenue totals with grouping separators', () => {

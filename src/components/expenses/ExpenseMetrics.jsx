@@ -1,3 +1,4 @@
+import { CategoryLabel } from './CategoryLabel';
 import { ArrowPathIcon, ArrowDownRightIcon, ArrowUpRightIcon, CalendarDaysIcon, HandCoinsIcon, MinusIcon, TagsIcon } from '@/components/ui/icons';
 import { toDisplayDate } from '@/utils/dateUtils';
 import ExpenseAmount from './ExpenseAmount';
@@ -17,7 +18,7 @@ export default function ExpenseMetrics({ overview, currency, periodLabel, loadin
             note: overview.unknownRecurringCount ? overview.unknownRecurringCount + ' variable without an estimate' : null, action: onRecurring, actionLabel: 'Manage recurring expenses' },
         { label: 'Upcoming payments', icon: CalendarDaysIcon, value: <><span className="sensitive-data">{overview.upcomingEstimated ? '~' : ''}</span><ExpenseAmount money={overview.upcoming} currency={currency} /></>,
             detail: overview.upcomingCount + ' scheduled · next occurrences', note: overview.nextDate ? 'Next ' + toDisplayDate(overview.nextDate) : 'None in this period', action: onUpcoming, actionLabel: 'View upcoming expenses' },
-        { label: 'Top category', icon: TagsIcon, value: top?.name || (Object.keys(overview.spent.amounts).length > 1 ? 'Multiple currencies' : 'No spending yet'),
+        { label: 'Top category', icon: TagsIcon, value: (top ? <CategoryLabel category={top} /> : null) || (Object.keys(overview.spent.amounts).length > 1 ? 'Multiple currencies' : 'No spending yet'),
             detail: top ? Math.round(top.percentage) + '% of period spend' : 'Paid expenses in this period',
             visual: top && <svg viewBox="0 0 64 64" className="sensitive-data h-14 w-14 shrink-0 -rotate-90" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="hsl(var(--muted))" strokeWidth="5" /><circle cx="32" cy="32" r="26" fill="none" stroke="hsl(var(--status-info-accent))" strokeWidth="5" pathLength="100" strokeDasharray={top.percentage + ' 100'} strokeLinecap="round" /></svg> },
     ];

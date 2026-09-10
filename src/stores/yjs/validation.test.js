@@ -461,3 +461,20 @@ describe('Yjs validation', () => {
         )).toThrow(/time entry entry-missing-task references missing task missing-task/)
     })
 })
+
+
+it('preserves optional recurrence pause and category color through Yjs sync and legacy validation', () => {
+    const source = new Y.Doc();
+    const task = { id: 'weekly', title: 'Weekly', recurring: { type: 'weekly', weeklyDays: [1], paused: true, resumeFrom: '2026-09-08' }, completedDatesByYear: { '2026': { '9': [1] } } };
+    const category = { id: 'category', name: 'Tools', color: '#3b82f6', isDefault: false, archived: true };
+    source.getMap('tasks').set(task.id, objectToYMap(task));
+    source.getMap('expenseCategories').set(category.id, objectToYMap(category));
+    const target = new Y.Doc();
+    Y.applyUpdate(target, Y.encodeStateAsUpdate(source));
+    expect(validateCollectionEntity('tasks', target.getMap('tasks').get(task.id).toJSON(), 'sync')).toEqual(task);
+    expect(validateCollectionEntity('expenseCategories', target.getMap('expenseCategories').get(category.id).toJSON(), 'sync')).toEqual(category);
+    expect(validateCollectionEntity('tasks', { id: 'legacy', title: 'Legacy', recurring: { type: 'weekly', weeklyDays: [1] } }, 'legacy').recurring).toEqual({ type: 'weekly', weeklyDays: [1] });
+    expect(validateCollectionEntity('expenseCategories', { id: 'legacy', name: 'Legacy' }, 'legacy')).toEqual({ id: 'legacy', name: 'Legacy', isDefault: false, archived: false });
+    source.destroy();
+    target.destroy();
+});

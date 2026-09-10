@@ -110,6 +110,7 @@ const yjsHookState = vi.hoisted(() => ({
     isCloudConnected: undefined,
     activeStorageProvider: null,
     activeStorageSessionId: null,
+    hadPreviousCloudSession: false,
     isConnecting: false,
     hasSynced: false,
     manualSyncInProgress: false,
@@ -428,6 +429,7 @@ describe('App component', () => {
         yjsHookState.isReady = true
         yjsHookState.isSyncing = false
         yjsHookState.syncState = 'idle'
+        yjsHookState.hadPreviousCloudSession = false
         yjsHookState.syncPhase = 'idle'
         yjsHookState.isDriveConnected = false
         yjsHookState.isCloudConnected = undefined
@@ -858,7 +860,7 @@ describe('App component', () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
-        googleAuthHookState.hadPreviousSession = true
+        yjsHookState.hadPreviousCloudSession = true
 
         render(<App />)
 
@@ -866,20 +868,20 @@ describe('App component', () => {
         expect(screen.getByTestId('mobile-more-status-dot').className.includes('status-danger-fill')).toBe(true)
     })
 
-    it('passes the sidebar reconnect state to Plan & Billing', () => {
-        googleAuthHookState.hadPreviousSession = true
+    it('keeps the shared reconnect state out of the Account component props', () => {
+        yjsHookState.hadPreviousCloudSession = true
         urlHookState.urlParams = { view: 'account', projectId: null, clientId: null }
 
         render(<App />)
 
-        expect(accountComponentState.props?.cloudSyncNeedsReconnect).toBe(true)
+        expect(accountComponentState.props).not.toHaveProperty('cloudSyncNeedsReconnect')
     })
 
     it('does not show a red More-button dot while a previous auth session is still restoring', () => {
         window.matchMedia = createMatchMedia({
             '(max-width: 767px)': true,
         })
-        googleAuthHookState.hadPreviousSession = true
+        yjsHookState.hadPreviousCloudSession = true
         googleAuthHookState.isSignedIn = true
 
         render(<App />)

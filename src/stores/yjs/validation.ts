@@ -115,6 +115,8 @@ const safeProjectNotesSchema = z.preprocess((value) => {
 }, projectNotesSchema.nullable().optional());
 
 const recurringConfigSchema = z.object({
+    paused: z.boolean().optional(),
+    resumeFrom: storageDateSchema.optional(),
     type: z.enum(['weekly', 'monthly', 'yearly']),
     weeklyDays: z.array(z.number().int().min(0).max(6)).optional(),
     monthlyType: z.enum(['first', 'last', 'specific']).optional(),
@@ -572,6 +574,7 @@ const expenseRecurrenceSchema = z.object({
 }).passthrough() satisfies z.ZodType<ExpenseRecurrence>;
 
 const expenseCategorySchema = z.object({
+    color: z.string().nullable().optional(),
     id: nonEmptyStringSchema,
     name: nonEmptyStringSchema,
     group: z.string().nullable().optional(),

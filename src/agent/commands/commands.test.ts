@@ -8272,3 +8272,20 @@ describe('agent commands', () => {
         expect(definitions.every((definition) => !('handler' in definition))).toBe(true);
     });
 });
+
+
+it('lets agents pause and resume recurrence and manage category colors through the shared contracts', async () => {
+    const context = createContext();
+    const now = new Date(2026, 8, 8, 12).getTime();
+    context.now = () => now;
+    const task = createTaskCommand(context, { id: 'pause-agent', title: 'Recurring', recurring: { type: 'weekly', weeklyDays: [1] } });
+    context.maps.timers.set('standalone', objectToYMap({ projectId: 'standalone', taskId: task.id, startTime: now - 60_000, paused: false }));
+    const timersBefore = context.maps.timers.toJSON();
+    await updateTaskCommand(context, { taskId: task.id, updates: { recurring: { ...task.recurring!, paused: true } } });
+    const resumed = await updateTaskCommand(context, { taskId: task.id, updates: { recurring: { ...task.recurring!, paused: false } } });
+    expect(resumed.recurring).toEqual({ type: 'weekly', weeklyDays: [1], paused: false, resumeFrom: '2026-09-08' });
+    expect(context.maps.timers.toJSON()).toEqual(timersBefore);
+    const category = createExpenseCategoryCommand(context, { name: 'Tools', color: '#3b82f6' });
+    expect(category.color).toBe('#3b82f6');
+    expect(updateExpenseCategoryCommand(context, { expenseCategoryId: category.id, updates: { color: null } }).color).toBeNull();
+});

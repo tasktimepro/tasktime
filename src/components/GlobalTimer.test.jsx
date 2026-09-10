@@ -133,9 +133,39 @@ describe('GlobalTimer', () => {
         )
 
         const taskTitleButton = screen.getByRole('button', { name: 'Task One' })
+        const timerIndicator = screen.getByLabelText('Timer active')
 
         expect(taskTitleButton.className).toContain('text-foreground')
         expect(taskTitleButton.className).not.toContain('status-danger-text-strong')
+        expect(timerIndicator).toHaveClass('status-danger-fill', 'animate-pulse')
+    })
+
+    it('keeps a disabled recurring task status out of the active timer title', () => {
+        mockTasks = [{
+            id: 'task-1',
+            title: 'Task One',
+            projectId: 'project-1',
+            recurring: { type: 'weekly', weeklyDays: [1], paused: true }
+        }]
+        mockTimers = [{
+            projectId: 'project-1',
+            taskId: 'task-1',
+            startTime: Date.now() - 10000,
+            elapsedTime: 10000,
+            isPaused: false,
+            note: ''
+        }]
+
+        renderWithToast(
+            <GlobalTimer
+                navigateToProject={vi.fn()}
+                onClose={vi.fn()}
+            />
+        )
+
+        const taskTitleButton = screen.getByRole('button', { name: 'Task One' })
+        expect(taskTitleButton).toHaveClass('flex-1')
+        expect(screen.queryByLabelText('Recurring task disabled')).not.toBeInTheDocument()
     })
 
     it('truncates the title while keeping the pulse dot and timer controls from shrinking', () => {

@@ -155,8 +155,10 @@ describe('ProjectList', () => {
         expect(projectsHookMocks.deleteProject).toHaveBeenCalledWith('project-1')
     })
 
-    it('shows client context and opens the project on card click', () => {
+    it('opens the client from its project-card link without opening the project', async () => {
+        const user = userEvent.setup()
         const onSelectProject = vi.fn()
+        const navigateToClient = vi.fn()
 
         projectsHookMocks.projects = [
             {
@@ -174,11 +176,19 @@ describe('ProjectList', () => {
                 clients={[{ id: 'client-1', title: 'Acme Co' }]}
                 openProjectModal={vi.fn()}
                 editProjectModal={vi.fn()}
+                navigateToClient={navigateToClient}
             />
         )
 
         expect(screen.getByText('Client:')).toBeInTheDocument()
-        expect(screen.getByText('Acme Co')).toBeInTheDocument()
+        const clientLink = screen.getByRole('button', { name: 'Open client Acme Co' })
+
+        expect(clientLink).toHaveClass('cursor-pointer', 'hover:underline')
+
+        await user.click(clientLink)
+
+        expect(navigateToClient).toHaveBeenCalledWith('client-1')
+        expect(onSelectProject).not.toHaveBeenCalled()
 
         fireEvent.click(screen.getByText('Project One'))
 
@@ -231,6 +241,67 @@ describe('ProjectList', () => {
         expect(actions?.className).toContain('flex-wrap')
     })
 
+    it('identifies the page with one project icon and matches the client-card grid gap', () => {
+        render(
+            <ProjectList
+                onSelectProject={vi.fn()}
+                clients={[]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        const pageHeading = screen.getByRole('heading', { name: 'Projects (1)' })
+        const projectHeading = screen.getByRole('heading', { name: 'Project One' })
+        const projectsGrid = projectHeading.closest('.grid')
+        const count = pageHeading.querySelector('span')
+
+        expect(pageHeading.querySelector('svg')).toHaveClass('lucide-folder-closed', 'text-muted-foreground')
+        expect(pageHeading.querySelector('svg')).not.toHaveClass('status-info-text-strong')
+        expect(count).toHaveClass('hidden', 'sm:inline')
+        expect(projectHeading.querySelector('svg')).toBeNull()
+        expect(projectsGrid).toHaveClass('gap-6')
+        expect(projectsGrid).not.toHaveClass('gap-4')
+    })
+
+    it('matches client card padding and places personal status immediately beside the title', () => {
+        projectsHookMocks.projects = [
+            {
+                id: 'project-1',
+                title: 'Personal Project',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                archived: false,
+                isPersonal: true,
+            }
+        ]
+
+        render(
+            <ProjectList
+                onSelectProject={vi.fn()}
+                clients={[]}
+                openProjectModal={vi.fn()}
+                editProjectModal={vi.fn()}
+            />
+        )
+
+        const projectHeading = screen.getByRole('heading', { name: 'Personal Project' })
+        const cardContent = projectHeading.closest('.rounded-xl')?.firstElementChild
+        const titleGroup = screen.getByTestId('project-card-title-group')
+        const personalBadge = screen.getByText('Personal')
+        const menuButton = screen.getByRole('button', { name: 'More actions' })
+
+        expect(cardContent).toHaveClass('p-4', 'md:p-6', 'md:pt-5')
+        expect(titleGroup).toHaveClass('flex-wrap', 'items-center')
+        expect(titleGroup).toContainElement(projectHeading)
+        expect(projectHeading.nextElementSibling).toBe(personalBadge)
+        expect(titleGroup.parentElement).toContainElement(menuButton)
+        expect(menuButton.parentElement).toBe(titleGroup.parentElement)
+        expect(titleGroup.parentElement).toHaveClass('items-center')
+        expect(screen.getByText(/Created /)).toBeInTheDocument()
+        expect(screen.queryByText(/Most recent /)).not.toBeInTheDocument()
+    })
+
     it('renders archived project menu triggers with the same styling as active project cards', async () => {
         const user = userEvent.setup()
 
@@ -251,9 +322,11 @@ describe('ProjectList', () => {
         await user.click(screen.getByRole('button', { name: /Archived Projects/i }))
 
         const menuButtons = screen.getAllByRole('button', { name: 'More actions' })
+        const archivedGrid = screen.getByRole('heading', { name: 'Archived Project' }).closest('.grid')
 
         expect(menuButtons).toHaveLength(2)
         expect(menuButtons[0].className).toBe(menuButtons[1].className)
+        expect(archivedGrid).toHaveClass('gap-6')
     })
 
     it('shows quote stage and deadline context for quoted client projects', () => {
@@ -288,7 +361,7 @@ describe('ProjectList', () => {
         vi.useRealTimers()
     })
 
-    it('shows an overdue deadline badge in the project card footer', () => {
+    it('shows an overdue deadline badge beside the project details', () => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-03-24T12:00:00Z'))
 
@@ -314,6 +387,16 @@ describe('ProjectList', () => {
 
         expect(screen.getByText('Overdue')).toBeInTheDocument()
         expect(screen.getByText(/4 days overdue/i)).toBeInTheDocument()
+
+        const detailsLayout = screen.getByTestId('project-card-details')
+        const detailText = screen.getByTestId('project-card-detail-text')
+        const pills = screen.getByTestId('project-card-pills')
+
+        expect(detailsLayout).toHaveClass('flex-wrap', 'items-end')
+        expect(detailText.nextElementSibling).toBe(pills)
+        expect(pills).toHaveClass('ml-auto', 'justify-end')
+        expect(pills).toContainElement(screen.getByText('Overdue'))
+        expect(pills).not.toHaveClass('mt-auto', 'pt-4')
 
         vi.useRealTimers()
     })

@@ -54,8 +54,8 @@ export function buildExpenseOverview({ expenses, recurrences, upcoming, categori
     const months = Array.from({ length: 6 }, (_, index) => ({ date: toStorageDate(startOfMonth(subMonths(anchor, 5 - index)))!, money: emptyMoney() }));
     const spent = emptyMoney();
     const previous = emptyMoney();
-    const categoryMap = new Map<string, { id: string; name: string; money: ExpenseOverviewMoney }>();
-    const categoryNames = new Map(categories.map(category => [category.id, category.name]));
+    const categoryMap = new Map<string, { id: string; name: string; color?: string | null; money: ExpenseOverviewMoney }>();
+    const categoryNames = new Map(categories.map(category => [category.id, category]));
     expenses.forEach(expense => {
         if (expense.isPreview || expense.paymentStatus !== 'paid' || expense.date > today || !parseStoredDate(expense.date)) return;
         const amount = resolveAmount(expense, currency, convert);
@@ -65,7 +65,7 @@ export function buildExpenseOverview({ expenses, recurrences, upcoming, categori
         if (!invalidRange && inRange(expense.date, range)) {
             add(spent, amount.amounts, amount.hadConversionError);
             const id = expense.categoryId || '';
-            if (!categoryMap.has(id)) categoryMap.set(id, { id, name: categoryNames.get(id) || 'Uncategorized', money: emptyMoney() });
+            if (!categoryMap.has(id)) categoryMap.set(id, { id, name: categoryNames.get(id)?.name || 'Uncategorized', color: categoryNames.get(id)?.color, money: emptyMoney() });
             add(categoryMap.get(id)!.money, amount.amounts, amount.hadConversionError);
         }
     });
@@ -104,10 +104,10 @@ export function buildExpenseOverview({ expenses, recurrences, upcoming, categori
         const paidOn = expense.paymentStatus === 'paid' && expense.date <= today && parseStoredDate(expense.paidOn) && expense.paidOn! <= today ? expense.paidOn : null;
         const created = Number.isFinite(expense.createdAt) ? toStorageDate(new Date(expense.createdAt!)) : null;
         const date = paidOn || (created && created <= today ? created : null);
-        return date && inRange(date, activityRange) ? [{ expense, date, label: paidOn ? 'Marked paid' : 'New expense', kind: paidOn ? 'paid' : 'created' }] : [];
+        return date && inRange(date, activityRange) ? [{ expense, category: expense.categoryId ? categoryNames.get(expense.categoryId) : undefined, date, label: paidOn ? 'Marked paid' : 'New expense', kind: paidOn ? 'paid' : 'created' }] : [];
     }).sort((a, b) => b.date.localeCompare(a.date) || (b.expense.createdAt || 0) - (a.expense.createdAt || 0));
     const next = scheduled[0];
-    const activity = [...(next ? [{ expense: next, date: next.date, label: 'Upcoming payment', kind: 'upcoming' }] : []), ...events.filter(item => item.expense.id !== next?.id)];
+    const activity = [...(next ? [{ expense: next, category: next.categoryId ? categoryNames.get(next.categoryId) : undefined, date: next.date, label: 'Upcoming payment', kind: 'upcoming' }] : []), ...events.filter(item => item.expense.id !== next?.id)];
     return {
         spent, previous, trend, comparison, invalidRange,
         months: months.map(month => ({ ...month, value: chartCurrency ? month.money.amounts[chartCurrency] || 0 : null })),

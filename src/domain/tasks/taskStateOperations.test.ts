@@ -105,3 +105,28 @@ describe('task state operations', () => {
         })).toThrow(/occurrence/i);
     });
 });
+
+
+describe('recurrence pause lifecycle', () => {
+    const now = new Date(2026, 8, 8, 12).getTime();
+    const task = { id: 't', title: 'Weekly', recurring: { type: 'weekly' as const, weeklyDays: [1], paused: true }, completedDatesByYear: { '2026': { '8': [31] } } };
+    it('resumes with a local date boundary and leaves completion and skip history untouched', () => {
+        const patch = buildTaskStatePatchUpdates({ task, updates: { recurring: { ...task.recurring, paused: false } }, now });
+        expect(patch).toEqual({ recurring: { ...task.recurring, paused: false, resumeFrom: '2026-09-08' } });
+        expect(task.completedDatesByYear).toEqual({ '2026': { '8': [31] } });
+        expect(buildTaskStatePatchUpdates({ task: { ...task, ...patch }, updates: { recurring: patch.recurring }, now: now + 86400000 })).toEqual(patch);
+    });
+    it('preserves pause when a schedule-only edit replaces recurrence configuration', () => {
+        expect(buildTaskStatePatchUpdates({ task, updates: { recurring: { type: 'monthly', monthlyType: 'first' } }, now }).recurring)
+            .toEqual({ type: 'monthly', monthlyType: 'first', paused: true });
+    });
+    it('retains the current resume boundary when a stale task editor saves its schedule', () => {
+        const resumedTask = { ...task, recurring: { ...task.recurring, paused: false, resumeFrom: '2026-09-08' } };
+        expect(buildTaskStatePatchUpdates({ task: resumedTask, updates: { recurring: { type: 'weekly', weeklyDays: [2] } }, now }).recurring)
+            .toEqual({ type: 'weekly', weeklyDays: [2], paused: false, resumeFrom: '2026-09-08' });
+    });
+    it('rejects invalid pause state and recurring subtasks', () => {
+        expect(() => buildTaskStatePatchUpdates({ task, updates: { recurring: { ...task.recurring, paused: 'yes' as never } }, now })).toThrow(/paused/);
+        expect(() => buildTaskStatePatchUpdates({ task: { ...task, parentTaskId: 'parent' }, updates: { recurring: { ...task.recurring, paused: false } }, now })).toThrow(/Subtasks/);
+    });
+});

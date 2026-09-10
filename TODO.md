@@ -4,21 +4,20 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
-[ ] Check lightsail and all the necessary meta and SEO/AEO stuff before launching
+[x] Fix the issue with disabling a task under the same project when another task of the same project is running, I am still able to open the view task modal of other supposedly disabled tasks from the dashboard - so please just make sure that we can't click on or open the view task modal if it's in a disabled state
 
 [x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository
 
 [ ] In the homepage, should we mention the direct sending and reminder email features as well?
 
-[ ] In the reports page I would add a get pro button aligned to the right with the title in the overview with the rocket icon
-
 [ ] Showcase one mobile screenshot for an "on-the go" section that mentions that the app looks and works as good as it does on your computer
 
-[ ] We should have the ability to pause recurring tasks
-[ ] Also have a look at expense categories, how we add and edit them, and include color tags that show in the UI that color rather than the inheritted project/client
-[ ] When we expand the sidebar, make sure to TaskTime Pro title doesn't drop until it full expands but rather has an ellipses and stays inline
-[ ] Should improve a bit the "account" sign-in in a way and not limit it to must go to cloud sync because the UX here is not really fitting and can be confusing - this could be as simple as always showing the sign in in the same place we have sign out that would show a modal with the two cloud sync options available .. I think this could already improve the experience much better
-[ ] Project modal Billing & Timer Rules and Project Planning should be in a collapsible section like we have in other modals. I would also consider moving the trate notice and override client rate checkbox within the billing & timer rules as well if you agree
+[ ] Check dev console lightsail report and all the necessary meta and SEO/AEO stuff before launching
+    [ ] Also test mobile views before publishing
+
+...
+
+[ ] Considering we now have a dedicated "public site" and a separate "app", should we reflect this in the code as well and repo restructuring? For example, an update in public site pages does not necessarily need to update the app and vice versa...
 
 [ ] Coordinated license, app-origin migration, homepage, and production-launch program
     - Dependency rule: complete and locally verify Program Phase 1 before implementing Program Phase 2. Phase 1 may prepare origin-neutral contracts and configuration seams, but neither phase publishes or changes production by itself.
@@ -59,6 +58,7 @@
         [ ] Hold the documented rollback window, then separately approve removal of the old Worker origin, OAuth callbacks, temporary preview authority/canaries, and routine combined deployment path; capture a final inventory proving exactly two intended Pages projects, one shared Worker, and no orphan migration resources
         [ ] With general Checkout still off, complete separately approved live `EUR 39/year` founding and `EUR 59/year` standard canaries; verify the founding purchase consumes exactly one permanent allocation and the standard purchase consumes none
         [ ] Enable approved billing UI, trial, Checkout, active-client enforcement, advanced-Reports enforcement, and hosted-email enforcement as separate reversible steps with live canaries
+        [ ] Make sure to publish any packages such as MCP etc if they were modified in this launch update
 
 [x] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
@@ -102,6 +102,8 @@
 ## Ideas
 
 [ ] Global search
+
+[ ] Include theme color options in settings, default could be neutral
 
 [ ] Timed sessions with sound alerts - I want to work on this for 1hour
     - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on

@@ -13,11 +13,15 @@ const toastMocks = vi.hoisted(() => ({
 const expensesMocks = vi.hoisted(() => ({
 
     expenses: [],
+    getExpense: vi.fn(),
     createExpense: vi.fn(),
     createExpenseWithPaymentSnapshot: vi.fn(),
     updateExpense: vi.fn(),
     updateExpenseWithPaymentSnapshot: vi.fn(),
-    deleteExpense: vi.fn()
+    deleteExpense: vi.fn(),
+    isLoading: false,
+    error: null,
+    retryHistory: vi.fn()
 }))
 
 const recurrencesMocks = vi.hoisted(() => ({
@@ -73,11 +77,15 @@ vi.mock('../../hooks/useExpenses.ts', () => ({
 
     useExpenses: () => ({
         expenses: expensesMocks.expenses,
+        getExpense: expensesMocks.getExpense,
         createExpense: expensesMocks.createExpense,
         createExpenseWithPaymentSnapshot: expensesMocks.createExpenseWithPaymentSnapshot,
         updateExpense: expensesMocks.updateExpense,
         updateExpenseWithPaymentSnapshot: expensesMocks.updateExpenseWithPaymentSnapshot,
-        deleteExpense: expensesMocks.deleteExpense
+        deleteExpense: expensesMocks.deleteExpense,
+        isLoading: expensesMocks.isLoading,
+        error: expensesMocks.error,
+        retryHistory: expensesMocks.retryHistory
     })
 }))
 
@@ -161,6 +169,9 @@ describe('ExpenseModal', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         expensesMocks.expenses = []
+        expensesMocks.getExpense.mockImplementation((id) => expensesMocks.expenses.find((expense) => expense.id === id))
+        expensesMocks.isLoading = false
+        expensesMocks.error = null
         expensesMocks.createExpenseWithPaymentSnapshot.mockImplementation(async (expense) => expense)
         expensesMocks.updateExpenseWithPaymentSnapshot.mockImplementation(async (id, updates) => ({ id, ...updates }))
         expensesMocks.deleteExpense.mockReturnValue(true)
@@ -297,6 +308,245 @@ describe('ExpenseModal', () => {
         expect(onClose).toHaveBeenCalled()
 
         vi.useRealTimers();
+    })
+
+    it('saves the current expense draft before opening the category manager', async () => {
+        const user = userEvent.setup()
+        const saveFormState = vi.fn()
+        const openExpenseCategoriesModal = vi.fn()
+        expenseCategoriesMocks.expenseCategories = [
+            { id: 'software', name: 'Software & subscriptions', color: '#ef4444', archived: false },
+        ]
+
+        render(<ExpenseModal
+            isOpen
+            onClose={vi.fn()}
+            saveFormState={saveFormState}
+            getSavedState={() => null}
+            openExpenseCategoriesModal={openExpenseCategoriesModal}
+        />)
+
+        await user.type(screen.getByLabelText(/Title/i), 'Draft subscription')
+        await user.clear(screen.getByLabelText(/Amount/i))
+        await user.type(screen.getByLabelText(/Amount/i), '19')
+        await chooseSelectOption(user, 'Category', 'Software & subscriptions')
+        await user.click(screen.getByRole('button', { name: 'Manage categories' }))
+
+        expect(saveFormState).toHaveBeenLastCalledWith(expect.objectContaining({
+            title: 'Draft subscription',
+            amount: '19',
+            categoryId: 'software',
+            editingExpenseId: null,
+            editingRecurrenceId: null,
+        }))
+        expect(openExpenseCategoriesModal).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not restore a saved draft from a different recurring expense', () => {
+        recurrencesMocks.getRecurrence.mockImplementation((id) => id === 'recurrence-2' ? {
+            id: 'recurrence-2',
+            title: 'Second recurring expense',
+            currency: 'EUR',
+            amount: 24,
+            amountType: 'fixed',
+            paymentMode: 'auto',
+            repeat: 'monthly',
+            monthlyType: 'specific',
+            monthlyDay: 2,
+            startDate: '2026-02-02',
+            categoryId: 'office',
+            isPersonal: true,
+            billable: false,
+            isTaxExempt: false,
+            active: true,
+        } : null)
+
+        render(<ExpenseModal
+            isOpen
+            onClose={vi.fn()}
+            modalOptions={{ recurrenceId: 'recurrence-2' }}
+            getSavedState={() => ({
+                title: 'Previous recurring expense',
+                editingExpenseId: null,
+                editingRecurrenceId: 'recurrence-1',
+            })}
+        />)
+
+        expect(screen.getByLabelText(/Title/i)).toHaveValue('Second recurring expense')
+    })
+
+    it('offers to apply a changed recurring category only to matching existing expenses', async () => {
+        const onClose = vi.fn()
+        const clearSavedState = vi.fn()
+        const user = userEvent.setup()
+        const recurrence = {
+            id: 'recurrence-1',
+            title: 'Streaming service',
+            currency: 'EUR',
+            amount: 12,
+            amountType: 'fixed',
+            paymentMode: 'auto',
+            repeat: 'monthly',
+            monthlyType: 'specific',
+            monthlyDay: 1,
+            startDate: '2026-01-01',
+            categoryId: null,
+            isPersonal: true,
+            billable: false,
+            isTaxExempt: false,
+            active: true,
+        }
+        expenseCategoriesMocks.expenseCategories = [
+            { id: 'software', name: 'Software & subscriptions', color: '#ef4444', archived: false },
+            { id: 'office', name: 'Office supplies', color: '#3b82f6', archived: false },
+        ]
+        expensesMocks.expenses = [
+            { id: 'matching', recurrenceId: recurrence.id, categoryId: null },
+            { id: 'manually-categorized', recurrenceId: recurrence.id, categoryId: 'office' },
+            { id: 'other-recurrence', recurrenceId: 'recurrence-2', categoryId: null },
+        ]
+        expensesMocks.updateExpense.mockImplementation((id, updates) => ({ id, ...updates }))
+        recurrencesMocks.getRecurrence.mockReturnValue(recurrence)
+
+        render(<ExpenseModal
+            isOpen
+            onClose={onClose}
+            modalOptions={{ recurrenceId: recurrence.id }}
+            clearSavedState={clearSavedState}
+        />)
+
+        await chooseSelectOption(user, 'Category', 'Software & subscriptions')
+        await user.click(screen.getByRole('button', { name: 'Save Expense' }))
+
+        expect(recurrencesMocks.updateRecurrence).toHaveBeenCalledWith(recurrence.id, expect.objectContaining({
+            categoryId: 'software',
+        }))
+        expect(await screen.findByRole('heading', { name: 'Update existing expenses?' })).toBeInTheDocument()
+        expect(screen.getByText(/1 existing expense from this recurrence still has no category/i)).toBeInTheDocument()
+        expect(onClose).not.toHaveBeenCalled()
+
+        await user.click(screen.getByRole('button', { name: 'Update 1 existing expense' }))
+
+        expect(expensesMocks.updateExpense).toHaveBeenCalledTimes(1)
+        expect(expensesMocks.updateExpense).toHaveBeenCalledWith('matching', { categoryId: 'software' })
+        expect(clearSavedState).toHaveBeenCalledTimes(2)
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps existing expenses unchanged when future-only is chosen after a category change', async () => {
+        const onClose = vi.fn()
+        const user = userEvent.setup()
+        const recurrence = {
+            id: 'recurrence-1',
+            title: 'Streaming service',
+            currency: 'EUR',
+            amount: 12,
+            amountType: 'fixed',
+            paymentMode: 'auto',
+            repeat: 'monthly',
+            monthlyType: 'specific',
+            monthlyDay: 1,
+            startDate: '2026-01-01',
+            categoryId: 'office',
+            isPersonal: true,
+            billable: false,
+            isTaxExempt: false,
+            active: true,
+        }
+        expenseCategoriesMocks.expenseCategories = [
+            { id: 'software', name: 'Software & subscriptions', color: '#ef4444', archived: false },
+            { id: 'office', name: 'Office supplies', color: '#3b82f6', archived: false },
+        ]
+        expensesMocks.expenses = [
+            { id: 'matching', recurrenceId: recurrence.id, categoryId: 'office' },
+        ]
+        recurrencesMocks.getRecurrence.mockReturnValue(recurrence)
+
+        render(<ExpenseModal isOpen onClose={onClose} modalOptions={{ recurrenceId: recurrence.id }} />)
+
+        await chooseSelectOption(user, 'Category', 'Software & subscriptions')
+        await user.click(screen.getByRole('button', { name: 'Save Expense' }))
+        await user.click(await screen.findByRole('button', { name: 'Future expenses only' }))
+
+        expect(expensesMocks.updateExpense).not.toHaveBeenCalled()
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not offer category propagation when only other recurring fields change', async () => {
+        const onClose = vi.fn()
+        const user = userEvent.setup()
+        const recurrence = {
+            id: 'recurrence-1',
+            title: 'Streaming service',
+            currency: 'EUR',
+            amount: 12,
+            amountType: 'fixed',
+            paymentMode: 'auto',
+            repeat: 'monthly',
+            monthlyType: 'specific',
+            monthlyDay: 1,
+            startDate: '2026-01-01',
+            categoryId: 'software',
+            isPersonal: true,
+            billable: false,
+            isTaxExempt: false,
+            active: true,
+        }
+        expenseCategoriesMocks.expenseCategories = [
+            { id: 'software', name: 'Software & subscriptions', color: '#ef4444', archived: false },
+        ]
+        expensesMocks.expenses = [
+            { id: 'matching', recurrenceId: recurrence.id, categoryId: 'software' },
+        ]
+        recurrencesMocks.getRecurrence.mockReturnValue(recurrence)
+
+        render(<ExpenseModal isOpen onClose={onClose} modalOptions={{ recurrenceId: recurrence.id }} />)
+
+        const titleInput = screen.getByLabelText(/Title/i)
+        await user.clear(titleInput)
+        await user.type(titleInput, 'Updated streaming service')
+        await user.click(screen.getByRole('button', { name: 'Save Expense' }))
+
+        expect(recurrencesMocks.updateRecurrence).toHaveBeenCalledWith(recurrence.id, expect.objectContaining({
+            title: 'Updated streaming service',
+            categoryId: 'software',
+        }))
+        expect(screen.queryByRole('heading', { name: 'Update existing expenses?' })).not.toBeInTheDocument()
+        expect(expensesMocks.updateExpense).not.toHaveBeenCalled()
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('waits for complete expense history before saving a recurring category change', async () => {
+        const user = userEvent.setup()
+        expensesMocks.isLoading = true
+        expenseCategoriesMocks.expenseCategories = [
+            { id: 'software', name: 'Software & subscriptions', color: '#ef4444', archived: false },
+        ]
+        recurrencesMocks.getRecurrence.mockReturnValue({
+            id: 'recurrence-1',
+            title: 'Streaming service',
+            currency: 'EUR',
+            amount: 12,
+            amountType: 'fixed',
+            paymentMode: 'auto',
+            repeat: 'monthly',
+            monthlyType: 'specific',
+            monthlyDay: 1,
+            startDate: '2026-01-01',
+            categoryId: null,
+            isPersonal: true,
+            billable: false,
+            isTaxExempt: false,
+            active: true,
+        })
+
+        render(<ExpenseModal isOpen onClose={vi.fn()} modalOptions={{ recurrenceId: 'recurrence-1' }} />)
+
+        await chooseSelectOption(user, 'Category', 'Software & subscriptions')
+        await user.click(screen.getByRole('button', { name: 'Save Expense' }))
+
+        expect(toastMocks.showError).toHaveBeenCalledWith('Expense history is still loading. Try saving again in a moment.')
+        expect(recurrencesMocks.updateRecurrence).not.toHaveBeenCalled()
     })
 
     it('keeps the modal open when a paid expense payment snapshot cannot be prepared', async () => {

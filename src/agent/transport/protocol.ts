@@ -530,6 +530,9 @@ export async function handleAgentAppSessionRequest(
 
     const response = await executeAgentCommand({
         ...baseContext,
+        // Object spread would freeze the browser's live plan getter before a
+        // queued domain write acquires its application lock.
+        get entitlementResolution() { return baseContext.entitlementResolution; },
         permissions: session.scopes,
     }, rawRequest.command, rawRequest.input ?? {});
 

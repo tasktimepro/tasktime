@@ -268,11 +268,19 @@ const TaskModal = ({
                 ? editingTask.estimatedFlatAmount
                 : null);
 
+        // Only the recurrence menu owns pause/resume. An open editor may hold
+        // older control state; omit it so the shared update rule retains the latest.
+        const recurring = formData.recurring ? { ...formData.recurring } : null;
+        if (recurring) {
+            delete recurring.paused;
+            delete recurring.resumeFrom;
+        }
+
         const payload = {
             title: formData.title.trim(),
             projectId: formData.projectId === NO_PROJECT_VALUE ? null : formData.projectId,
             startDate: formData.recurring ? null : (formData.startDate || null),
-            recurring: formData.recurring || null,
+            recurring,
             promptTimeEntry: formData.promptTimeEntry,
             note: formData.note.trim() ? formData.note.trim() : null,
             estimatedHours: showEstimateFields ? estimatedHoursValue : null,

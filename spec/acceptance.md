@@ -25,16 +25,112 @@
 - Stop creates one entry for the selected task, including the correct interval/note, and clears only that timer.
 - Repeating a recovered stop operation does not create a duplicate entry.
 
+## Task and account polish
+
+- Disable recurrence/Enable recurrence is available only in recurring-task
+  three-dot menus, using calendar-off/calendar-check icons without timer pause/play
+  icons. It survives reload/provider sync, excludes missed
+  dates after resume, and leaves completion/skip/timer/billing history intact.
+  Both actions use the same menu-item alignment and icon spacing as Edit/Delete.
+  Disabled recurrence leaves task titles unchanged. Task list surfaces replace
+  their normal recurrence schedule tag with a neutral calendar-off `Disabled` tag,
+  and task details show the same tag inline with the repeat description in the
+  Schedule section.
+  An open editor cannot overwrite newer pause/resume state, and a stale menu
+  action cannot reverse an already completed action.
+- Category add/edit uses a separate modal and the existing Color Tag picker.
+  Its action is aligned opposite the active-category heading and the form is
+  wider than a standard small form. Original colors and neutral fallbacks are
+  consistent across selectors, expenses, Planner, reports, and category summaries;
+  expense cards use the category-colored left border without a duplicate dot.
+  Compact category labels stay within fixed card/row widths, ellipsize when needed,
+  and retain the full name in a native title tooltip.
+  Uncategorized Planner expenses retain a neutral left border without falling
+  back to project or client colors, while expense rows without that border use
+  an 8px category dot. Archived
+  history retains identity. Deleting a referenced category opens an immediate
+  dialog with its usage and Archive guidance rather than placing feedback at the
+  top of the scrollable manager.
+- Expense records store `categoryId`; changing the referenced category's name,
+  group, or color updates every rendered reference without rewriting expenses.
+  Saving an edited recurring expense prompts about existing instances only when
+  its category changed. `Future expenses only` leaves them unchanged; the
+  counted update changes only instances from that recurrence that still match
+  the previous category, preserving manual category overrides. Other recurrence
+  field edits stay future-only and never open this prompt.
+- Expense forms show `Manage categories` beside Category. Opening and closing
+  the nested manager restores the same expense editor and all unsaved form
+  values. Drafts are matched to the exact expense or recurrence and are cleared
+  after save, delete, intentional close, or the category-propagation choice;
+  opening another recurring expense starts from that recurrence's saved data.
+- Sidebar expansion never wraps the title; the full title fits once expanded.
+- Shared three-dot action menus leave page scrolling available while open. They
+  remain open through up to 8px of incidental movement, close after the trigger's
+  scroll position moves farther, and retain normal keyboard and focus behavior.
+- Account Sign in includes the standard sign-in icon and its provider choices
+  use the same primary buttons as Cloud Sync.
+- Project Billing & Timer Rules and Project Planning remain hidden until a
+  client is selected.
+- Account sign-in opens provider choices without requiring a Cloud Sync tab
+  visit. Progress, errors, offline/duplicate attempts, retained-provider recovery,
+  successful connection, and keyboard focus return are covered.
+  Retained Dropbox retries preserve the session and update the sync consumer;
+  errors after successful authentication remain visible.
+- Project billing/planning sections collapse without losing values; hidden
+  validation errors expand the section. Flat-rate overrides remain reachable.
+  Missing inherited hourly rates show guidance and focus the override control;
+  zero hourly overrides cannot silently block a collapsed form.
+
 ## Dashboard regression boundary
 
-- Project names show an 8px dot in the original project color, inheriting the
-  client color when absent and otherwise falling back to neutral. Dots are
-  decorative; project-name click and keyboard navigation remain intact in both
-  themes and on phones. Existing client links, pending values, search/filter
-  behavior, and empty states remain intact.
+- Project names show a 14px folder outline in the original project color,
+  inheriting the client color when absent and otherwise falling back to neutral.
+  Icons are decorative, and the client/pending-time line aligns with their left
+  edge; project-name click and keyboard navigation remain intact in both themes
+  and on phones. Existing client links, pending values, search/filter behavior,
+  and empty states remain intact.
+- Planner project attachments use the closed-folder project icon while deadline
+  markers retain the flag icon. Planner projects without a resolved project or
+  client color keep the same 4px left accent using the neutral border token.
+  Expense items use a left-only dotted 4px accent while every other card edge
+  remains solid; category colors and the neutral fallback remain unchanged.
+  The Projects page has one decorative project
+  icon beside its main heading using the neutral muted-foreground token, keeps
+  individual card headings text-only, and
+  uses the same 24px active/archived grid gap as Clients. Project detail shows a
+  folder beside its title using project color, inherited client color, or the
+  neutral fallback, without changing persisted data.
+- Project cards match Client card padding at phone and desktop breakpoints.
+  Status tags sit immediately after the title, while the vertically aligned
+  three-dot action remains at the far right. The creation date remains visible, while the Most recent
+  label/date is omitted without removing recent-activity sorting. Project-list
+  and client-dashboard project cards place details in a flexible left column
+  and invoice/deadline pills in a right-aligned column on the same row, wrapping
+  only when the available card width requires it.
+- The Clients page shows the shared users icon beside its main heading using the
+  neutral muted-foreground token. Client
+  detail shows the Planner's single-user icon beside the client title using the
+  client's valid color or the neutral fallback. Client names inside project cards are keyboard and
+  pointer accessible, underline on hover/focus, and navigate to the client
+  without opening the surrounding project card.
+- Project and client list headings hide only their parenthesized totals below
+  the `sm` breakpoint while preserving their icons, titles, sort controls, and
+  create actions.
+- Project and client dashboard Unbilled cards match the leading-icon,
+  title/value alignment, typography, padding, and responsive behavior of the
+  adjacent metric cards. An available unbilled-expense total remains a secondary
+  line within that same content column.
 
 - Today and Upcoming retain task/recurrence/timer/expense actions. Upcoming is
-  visible without expanding Today; more than five items remain accessible.
+  visible without expanding Today, its header omits a redundant seven-day
+  subtitle, and more than five items remain accessible.
+- When one task has an unpaused timer, other tasks in the same project cannot
+  open the task-details modal from Today, Upcoming, or the Dashboard Tasks card.
+  Their title controls are natively disabled and overdue dates do not remain an
+  alternate details link. The timer-owning task, other projects, and paused
+  project timers remain interactive.
+- A running task timer uses the same animated danger-color dot in Planner and
+  the global timer; the indicator exposes a non-color accessible label.
 - At phone widths, Today and Upcoming precede horizontally scrollable summary
   cards in DOM order, with no page overflow. Desktop uses adjacent action panels.
 - Daily billable plus non-billable actual duration equals the selected-period
@@ -85,6 +181,8 @@
 - The existing Outstanding/Upcoming/Paid tabs, expense rows, sorting, date/status
   scopes, and payment/edit flows retain their behavior and presentation. Older
   unpaid expenses remain visible in Outstanding when a newer period is selected.
+  The desktop status-tab strip retains horizontal overflow without a vertical
+  scrollbar.
 - Selected-period spend, category amounts, and matching monthly bars reconcile
   saved paid expenses by expense date, excluding future automatic payments and
   previews. Marking an older expense paid does not move its expense date.
@@ -214,19 +312,37 @@
   exports. Dashboard, client/project/unbilled views, invoices/PDFs, Expenses/tax
   bookkeeping, email preparation/manual delivery, portability, supported cloud
   behavior, Web Push, and core agents remain usable.
+  On Overview, a rocket-led **Get Pro** action aligns opposite the title only
+  when the same shared decision used by Plan & Billing exposes a purchase or
+  fresh-account comparison path. It is absent for verified Pro, reconnecting,
+  offline, unresolved connected-account, suspended, and permanent-grant states.
+  Each locked advanced preview consumes that same decision and the shared plan-
+  plus-connection state: a fresh account-free browser says **Get Pro to unlock**
+  the selected report and routes **Get Pro** to Plan & Billing; an earlier
+  account that needs manual reconnection routes **Reconnect Cloud Sync** to the
+  sync section; automatic reconnection shows non-actionable progress; and an
+  offline browser asks the user to go online. None of those temporary states is
+  flattened into a generic account-confirmation prompt.
 - `get_report_summary({scope:"basic-current-month"})` is Free and returns only
   the closed versioned three-metric Overview contract. Omitted scope compatibility-defaults to
   `advanced`; advanced summary and all report CSV/PDF/accountant-pack exports
   require `reports.access`, branching before `collectReportsData()`. All seven
   tax-period/expense-claim commands remain Free and expose no report aggregate
   through that path.
-- Free allows a first active client. At the limit, every browser and agent
+- Free allows a first active client, including in a fresh browser before plan
+  status resolves because that slot is available on every plan. At the limit, every browser and agent
   create/unarchive path refuses only the net-increasing transition with the same
   typed policy; archiving frees a slot and upgrading never auto-replays the
   action. Idempotent replay is resolved before counting. Downgraded, imported,
   restored, synced, or concurrently merged over-limit clients remain visible,
   editable, usable, archivable, deletable, exportable, and recoverable without
   silent correction.
+  A queued browser or agent create/unarchive re-reads the current entitlement
+  after taking the application lock, so a downgrade, expiry, or account change
+  cannot authorize a second client using an earlier Pro snapshot. Client-limit
+  and hosted-email notices use the same upgrade/status/reconnect/offline
+  recovery classification as the locked Reports previews; the fresh browser's
+  second client offers Pro rather than asking to confirm a nonexistent account.
 - A compact Expenses-side browser surface likewise keeps tax-period list/create/
   update/mark-filed/mark-paid and expense claim/unclaim operations Free while
   exposing no Reports aggregate, filter, or export.
@@ -257,6 +373,9 @@
   signed Free/Pro selection and never erase it merely because transport is not
   ready. Online status refresh and Stripe actions wait separately for the
   provider connection to settle.
+  Every page reads the same derived plan-plus-connection state, so temporary
+  transport loss changes online-action guidance without changing a still-valid
+  Free/Pro selection or creating a repurchase prompt.
 - A provider-disconnected user can inspect the current catalog without implying
   a separate TaskTime login. Trial eligibility remains unknown until a selected
   Google Drive or Dropbox session resolves canonical status. Checkout displays the exact
@@ -308,6 +427,15 @@
   confirmation to hosted Checkout. Hosted-email
   quota authority remains at the hosted Send action and is not presented as a
   standalone billing-dashboard card.
+- A verified local plan expires at its signed deadline even in an already-open
+  tab. Foreground wake rechecks suspended timers, clock rollback deselects the
+  cached binding, and in-flight response/key verification time cannot extend
+  access. Non-finite clocks fail closed. Offline verification keeps bounded
+  cached public keys beyond HTTP freshness without bypassing signature, subject,
+  or expiry checks. Failed/offline/disconnected status reads remove stale
+  Checkout/trial/Portal/usage projections but preserve valid local Pro. A late
+  account response, billing redirect, or cache cleanup cannot affect a newly
+  selected account.
 - A permanent complimentary grant renders the Pro card as **Current plan** with
   **Complimentary Pro**, no charge/renewal wording, and no founding-price,
   Checkout-tax, **Get Pro**, or **Manage billing** controls. It remains a normal
@@ -357,6 +485,11 @@
   action. Trial/purchase return restores the draft but never sends
   automatically; a fresh Send uses one durable request key and exact primary/
   forward units.
+  When a still-valid Pro assertion is available but the hosted-service lifecycle
+  is not ready, the modal identifies Pro as available instead of prompting for
+  an upgrade. An offline browser says to go online without offering an unnecessary
+  reconnect; an automatic reconnect shows non-actionable progress; an absent,
+  manually disconnected, or mismatched lifecycle offers **Reconnect Cloud Sync**.
 - Public catalog/JWKS caching is isolated from private no-store billing/email
   responses. Status and the signed license share one canonical entitlement
   revision; a mismatch is unavailable/retryable and never a repurchase prompt.

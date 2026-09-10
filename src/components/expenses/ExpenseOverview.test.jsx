@@ -47,8 +47,8 @@ it('discloses unknown estimates and original currencies without inventing a top 
 
 it('offers complete category and activity detail and opens the exact source expense', async () => {
     const expenses = Array.from({ length: 7 }, (_, index) => ({ ...baseExpense, id: 'e' + index, title: 'Expense ' + index, amount: index + 1, categoryId: 'c' + index }));
-    const categories = expenses.map((item, index) => ({ id: item.categoryId, name: 'Category ' + index }));
-    const result = overview({ expenses, categories, upcoming: [{ ...baseExpense, id: 'next', title: 'Upcoming renewal', date: '2026-09-20' }] });
+    const categories = expenses.map((item, index) => ({ id: item.categoryId, name: 'Category ' + index, color: index === 0 ? '#ef4444' : null }));
+    const result = overview({ expenses, categories, upcoming: [{ ...baseExpense, id: 'next', title: 'Upcoming renewal', date: '2026-09-20', categoryId: 'c0' }] });
     const onView = vi.fn();
     const { rerender } = render(<ExpenseInsights overview={result} currency="EUR" periodLabel="This month" onView={onView} />);
     fireEvent.click(screen.getByRole('button', { name: 'View full breakdown' }));
@@ -57,6 +57,7 @@ it('offers complete category and activity detail and opens the exact source expe
     expect(screen.queryByText('Category 0')).not.toBeInTheDocument();
     const activityCard = screen.getByRole('region', { name: 'Recent activity' });
     expect(within(activityCard).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(activityCard).getAllByTestId('category-color-dot')[0]).toHaveStyle({ backgroundColor: '#ef4444' });
     fireEvent.click(screen.getByText('Upcoming renewal').closest('button'));
     expect(onView).toHaveBeenCalledWith(result.activity[0].expense);
     fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
@@ -84,4 +85,14 @@ it('makes monthly amounts available in an accessible table and keyboard tooltip'
     act(() => screen.getByRole('application', { name: 'Monthly paid expenses' }).focus());
     await user.keyboard('{ArrowRight}');
     expect(screen.getAllByText('May 2026')).toHaveLength(2);
+});
+
+
+it('keeps archived category identity in historical summaries', () => {
+    const result = overview({ expenses: [{ ...baseExpense, categoryId: 'software' }], categories: [{ id: 'software', name: 'Software', color: '#3b82f6', archived: true }] });
+    render(<ExpenseInsights overview={result} currency="EUR" periodLabel="This month" />);
+    screen.getAllByTestId('category-color-dot').forEach(dot => {
+        expect(dot).toHaveStyle({ backgroundColor: '#3b82f6' });
+    });
+    expect(screen.getByText('Software')).toBeVisible();
 });

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { deriveEntitlementState } from '@/domain/entitlements/entitlementPolicy';
 import { BillingClientError } from '@/services/billingClient';
 
 const state = vi.hoisted(() => ({
@@ -94,7 +95,7 @@ const testCatalog = {
 };
 
 function billingValue(overrides: Record<string, unknown> = {}) {
-    return {
+    const value = {
         resolution: { kind: 'canonical', snapshot: freeSnapshot },
         status: {
             account: {
@@ -139,6 +140,7 @@ function billingValue(overrides: Record<string, unknown> = {}) {
         isCloudAccountLoading: false,
         isBillingConnectionReady: true,
         isBillingReconnecting: false,
+        needsCloudReconnect: false,
         refresh: vi.fn(async () => undefined),
         startTrial: vi.fn(async () => undefined),
         createCheckout: vi.fn(),
@@ -146,6 +148,18 @@ function billingValue(overrides: Record<string, unknown> = {}) {
         handleCheckoutReturn: vi.fn(async () => undefined),
         handlePortalReturn: vi.fn(async () => undefined),
         ...overrides,
+    };
+    return {
+        ...value,
+        entitlementState: overrides.entitlementState ?? deriveEntitlementState({
+            resolution: value.resolution as Parameters<typeof deriveEntitlementState>[0]['resolution'],
+            offline: value.offline as boolean,
+            hasActiveCloudAccount: value.hasActiveCloudAccount as boolean,
+            isCloudAccountLoading: value.isCloudAccountLoading as boolean,
+            isBillingConnectionReady: value.isBillingConnectionReady as boolean,
+            isBillingReconnecting: value.isBillingReconnecting as boolean,
+            needsCloudReconnect: value.needsCloudReconnect as boolean,
+        }),
     };
 }
 
@@ -167,6 +181,7 @@ describe('BillingPanel shadow-mode UX', () => {
             status: null,
             resolution: { kind: 'unresolved', reason: 'lifecycle' },
             hasActiveCloudAccount: false,
+            isBillingConnectionReady: false,
             startTrial,
             createCheckout,
         });
@@ -207,15 +222,14 @@ describe('BillingPanel shadow-mode UX', () => {
         state.value = billingValue({
             status: null,
             resolution: { kind: 'unresolved', reason: 'lifecycle' },
-            hasActiveCloudAccount: false,
+            hasActiveCloudAccount: true,
+            needsCloudReconnect: true,
+            isBillingConnectionReady: false,
         });
-        render(<BillingPanel onOpenSync={onOpenSync} cloudSyncNeedsReconnect />);
+        render(<BillingPanel onOpenSync={onOpenSync} />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Get Pro' }));
-
-        expect(screen.getByText('Reconnect Cloud Sync to continue with Pro')).toBeInTheDocument();
-        expect(screen.getByText(/Cloud Sync is already set up/)).toBeInTheDocument();
-        expect(screen.queryByText(/Set up Cloud Sync to continue/)).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Get Pro' })).toBeNull();
+        expect(screen.getByText(/Reconnect Cloud Sync to confirm the plan already associated with this browser/)).toBeInTheDocument();
         const reconnectButton = screen.getByRole('button', { name: 'Reconnect Cloud Sync' });
         expect(reconnectButton).toHaveClass('bg-primary');
 
@@ -235,11 +249,10 @@ describe('BillingPanel shadow-mode UX', () => {
         });
         render(<BillingPanel onOpenSync={onOpenSync} />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Get Pro' }));
-
-        expect(screen.getByText('Refresh billing status to continue with Pro')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Get Pro' })).toBeNull();
+        expect(screen.getByText(/could not confirm this cloud account's current plan/)).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Set up Cloud Sync' })).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: 'Refresh billing status' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
 
         await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
         expect(onOpenSync).not.toHaveBeenCalled();

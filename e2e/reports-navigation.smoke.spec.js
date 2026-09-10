@@ -13,6 +13,7 @@ const test = base.extend({
             define: {
                 'import.meta.env.VITE_REPORTS_ENTITLEMENT_ENFORCEMENT': JSON.stringify('true'),
                 'import.meta.env.VITE_BILLING_UI_ENABLED': JSON.stringify('true'),
+                'import.meta.env.VITE_ACTIVE_CLIENT_LIMIT_ENFORCEMENT': JSON.stringify('true'),
             },
             server: { host: '127.0.0.1', port: 0, strictPort: true, open: false },
         });
@@ -107,4 +108,40 @@ test('retains billing and agent providers on first Account navigation after a sh
     await page.getByRole('tab', { name: 'Agent Access', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Agent Access', exact: true })).toBeVisible();
     expect(errors).toEqual([]);
+});
+
+test('keeps fresh-client and report acquisition distinct from offline recovery', async ({ page, context }) => {
+    const privateRequests = [];
+    page.on('request', request => {
+        if (/\/billing\/(status|trial|checkout|portal|refresh)/.test(request.url())) privateRequests.push(request.url());
+    });
+    await page.getByRole('button', { name: 'Clients', exact: true }).click();
+    await page.getByRole('button', { name: 'Create First Client' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Create New Client' });
+    await expect(dialog.getByLabel(/Client Title/i)).toBeVisible();
+    await expect(dialog.getByText('Plan status needs confirmation')).toHaveCount(0);
+    await dialog.getByLabel(/Client Title/i).fill('First Free Client');
+    await dialog.getByLabel(/Business\/Name/i).fill('First Free Business');
+    await dialog.getByRole('button', { name: /Pricing & Taxes/i }).click();
+    await dialog.getByLabel(/Hourly Rate/i).fill('100');
+    await dialog.getByRole('button', { name: 'Create Client', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByText('First Free Client', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'New Client', exact: true }).click();
+    await expect(dialog.getByText('Free includes one active client')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Unlock unlimited clients' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+
+    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Get Pro', exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'Monthly', exact: true }).click();
+    await expect(page.getByText('Get Pro to unlock Monthly Summary.')).toBeVisible();
+    await context.setOffline(true);
+    await expect(page.getByText("You're offline. Go online to check Pro access.")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Get Pro', exact: true })).toHaveCount(0);
+    await context.setOffline(false);
+    await expect(page.getByRole('button', { name: 'Get Pro', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Get Pro', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Plan & Billing', exact: true })).toBeVisible();
+    expect(privateRequests).toEqual([]);
 });

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
     conservativeEntitlement,
+    deriveEntitlementState,
+    evaluateGetProAction,
     evaluateEntitlementFeature,
+    getEntitlementRecovery,
     parseEntitlementSnapshot,
 } from './entitlementPolicy';
 
@@ -38,6 +41,23 @@ const FREE = {
 };
 
 describe('client entitlement policy', () => {
+    it('shares upgrade, verification, connection and billing recovery without granting access', () => {
+        const unknown = { plan: 'unknown', accessStatus: 'unresolved', verified: false } as const;
+        for (const [connection, kind, section] of [
+            ['ready', 'status', 'billing'],
+            ['disconnected', 'upgrade', 'billing'],
+            ['reconnecting', 'reconnecting', null],
+            ['reconnect_required', 'reconnect', 'sync'],
+            ['offline', 'offline', null],
+        ] as const) {
+            expect(getEntitlementRecovery({ ...unknown, connection })).toMatchObject({ kind, section });
+        }
+        expect(getEntitlementRecovery({ plan: 'free', accessStatus: 'free', verified: true, connection: 'ready' }))
+            .toMatchObject({ kind: 'upgrade', section: 'billing' });
+        expect(getEntitlementRecovery({ plan: 'pro', accessStatus: 'suspended', verified: true, connection: 'ready' }))
+            .toMatchObject({ kind: 'billing', section: 'billing' });
+    });
+
     it('strictly validates Free and access-granting limit combinations', () => {
         expect(parseEntitlementSnapshot(FREE)).toMatchObject({ accessStatus: 'free' });
         expect(() => parseEntitlementSnapshot({
@@ -84,5 +104,117 @@ describe('client entitlement policy', () => {
             expect(evaluateEntitlementFeature({ kind: 'canonical', snapshot }, 'reports.access'))
                 .toEqual({ allowed: true, reason: 'entitled', upgradeEligible: false });
         }
+    });
+
+    it('derives one verified plan and connection state for every UI surface', () => {
+        const pro = parseEntitlementSnapshot({
+            ...FREE,
+            plan: 'pro',
+            accessStatus: 'active',
+            billingStatus: 'active',
+            source: 'subscription',
+            trialStatus: 'used',
+            entitlements: ['reports.access', 'invoice.email.send'],
+            limits: { ...FREE.limits, activeClients: null, invoiceEmailSendsPerMonth: 100 },
+            subscriptionCurrentPeriodStart: '2026-08-01T00:00:00.000Z',
+            subscriptionCurrentPeriodEnd: '2027-08-01T00:00:00.000Z',
+        });
+
+        expect(deriveEntitlementState({
+            resolution: { kind: 'canonical', snapshot: pro },
+            offline: false,
+            hasActiveCloudAccount: true,
+            isCloudAccountLoading: false,
+            isBillingConnectionReady: false,
+            isBillingReconnecting: true,
+            needsCloudReconnect: false,
+        })).toEqual({
+            plan: 'pro',
+            accessStatus: 'active',
+            verified: true,
+            connection: 'reconnecting',
+        });
+
+        expect(deriveEntitlementState({
+            resolution: conservativeEntitlement('lifecycle'),
+            offline: true,
+            hasActiveCloudAccount: false,
+            isCloudAccountLoading: false,
+            isBillingConnectionReady: false,
+            isBillingReconnecting: false,
+            needsCloudReconnect: false,
+        })).toEqual({
+            plan: 'unknown',
+            accessStatus: 'unresolved',
+            verified: false,
+            connection: 'offline',
+        });
+    });
+
+    it('shows Get Pro only for a canonical Checkout or a fresh account-free comparison', () => {
+        const fresh = deriveEntitlementState({
+            resolution: conservativeEntitlement('lifecycle'),
+            offline: false,
+            hasActiveCloudAccount: false,
+            isCloudAccountLoading: false,
+            isBillingConnectionReady: false,
+            isBillingReconnecting: false,
+            needsCloudReconnect: false,
+        });
+        expect(evaluateGetProAction({
+            entitlementState: fresh,
+            hasCanonicalStatus: false,
+            hasCheckoutOffer: false,
+            catalogPurchaseEnabled: true,
+            proOfferCount: 2,
+            isPermanentComplimentaryPro: false,
+        })).toEqual({ visible: true, mode: 'deferred' });
+
+        const unresolvedAccount = { ...fresh, connection: 'ready' as const };
+        expect(evaluateGetProAction({
+            entitlementState: unresolvedAccount,
+            hasCanonicalStatus: false,
+            hasCheckoutOffer: false,
+            catalogPurchaseEnabled: true,
+            proOfferCount: 2,
+            isPermanentComplimentaryPro: false,
+        })).toEqual({ visible: false, mode: null });
+
+        const free = deriveEntitlementState({
+            resolution: { kind: 'canonical', snapshot: parseEntitlementSnapshot(FREE) },
+            offline: false,
+            hasActiveCloudAccount: true,
+            isCloudAccountLoading: false,
+            isBillingConnectionReady: true,
+            isBillingReconnecting: false,
+            needsCloudReconnect: false,
+        });
+        expect(evaluateGetProAction({
+            entitlementState: free,
+            hasCanonicalStatus: true,
+            hasCheckoutOffer: true,
+            catalogPurchaseEnabled: true,
+            proOfferCount: 2,
+            isPermanentComplimentaryPro: false,
+        })).toEqual({ visible: true, mode: 'checkout' });
+
+        expect(evaluateGetProAction({
+            entitlementState: { ...free, connection: 'offline' },
+            hasCanonicalStatus: true,
+            hasCheckoutOffer: true,
+            catalogPurchaseEnabled: true,
+            proOfferCount: 2,
+            isPermanentComplimentaryPro: false,
+        })).toEqual({ visible: false, mode: null });
+
+        expect(deriveEntitlementState({
+            resolution: conservativeEntitlement('lifecycle'),
+            offline: false,
+            hasActiveCloudAccount: false,
+            isCloudAccountLoading: false,
+            isBillingConnectionReady: false,
+            isBillingReconnecting: false,
+            needsCloudReconnect: true,
+        }).connection).toBe('reconnect_required');
     });
 });

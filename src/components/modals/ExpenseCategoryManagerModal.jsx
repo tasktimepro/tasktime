@@ -1,3 +1,5 @@
+import { ColorPicker } from '@/components/ui/color-picker';
+import { CategoryLabel } from '@/components/expenses/CategoryLabel';
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import Modal from '../Modal';
@@ -47,6 +49,7 @@ const getCategoryGroupLabel = (group) => {
 const createEmptyDraft = () => ({
     name: '',
     group: '',
+    color: null,
 });
 
 const getUsageLabel = (usage) => {
@@ -83,6 +86,7 @@ const ExpenseCategoryManagerModal = ({
     const { expenses } = useExpenses({ includeArchived: true });
     const { recurrences } = useExpenseRecurrences();
 
+    const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingCategoryId, setEditingCategoryId] = useState(null);
     const [draft, setDraft] = useState(createEmptyDraft);
     const [pendingDeleteCategoryId, setPendingDeleteCategoryId] = useState(null);
@@ -90,6 +94,7 @@ const ExpenseCategoryManagerModal = ({
 
     useEffect(() => {
         if (!isOpen) {
+            setIsFormOpen(false);
             setEditingCategoryId(null);
             setDraft(createEmptyDraft());
             setPendingDeleteCategoryId(null);
@@ -129,6 +134,7 @@ const ExpenseCategoryManagerModal = ({
         : null;
 
     const resetDraft = () => {
+        setIsFormOpen(false);
         setEditingCategoryId(null);
         setDraft(createEmptyDraft());
     };
@@ -146,25 +152,32 @@ const ExpenseCategoryManagerModal = ({
         const payload = {
             name: trimmedName,
             group: draft.group || null,
+            color: draft.color || null,
         };
 
-        if (editingCategoryId) {
-            updateExpenseCategory(editingCategoryId, payload);
-            showSuccess('Category updated');
-        } else {
-            createExpenseCategory(payload);
-            showSuccess('Category created');
-        }
+        try {
+            if (editingCategoryId) {
+                updateExpenseCategory(editingCategoryId, payload);
+                showSuccess('Category updated');
+            } else {
+                createExpenseCategory(payload);
+                showSuccess('Category created');
+            }
 
-        setDeleteBlockedNotice(null);
-        resetDraft();
+            setDeleteBlockedNotice(null);
+            resetDraft();
+        } catch (error) {
+            showError(error instanceof Error ? error.message : 'Unable to save category');
+        }
     };
 
     const handleEdit = (category) => {
+        setIsFormOpen(true);
         setEditingCategoryId(category.id);
         setDraft({
             name: category.name || '',
             group: category.group || '',
+            color: category.color || null,
         });
     };
 
@@ -231,7 +244,7 @@ const ExpenseCategoryManagerModal = ({
             <div key={category.id} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">{category.name}</p>
+                        <p className="text-sm font-semibold text-foreground"><CategoryLabel category={category} /></p>
                         {category.group ? <Badge variant="outline">{getCategoryGroupLabel(category.group)}</Badge> : null}
                         {category.archived ? <Badge variant="secondary">Archived</Badge> : null}
                     </div>
@@ -293,27 +306,49 @@ const ExpenseCategoryManagerModal = ({
                 footer={modalFooter}
             >
                 <div className="space-y-6">
-                    <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-border p-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground">
-                                    {editingCategoryId ? 'Edit category' : 'Add category'}
-                                </h3>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    Keep this short and obvious for filters and reports.
-                                </p>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-semibold text-foreground">Active categories</h3>
+                                <p className="mt-1 text-xs text-muted-foreground">{activeCategories.length} available for new expenses</p>
                             </div>
-                            {editingCategoryId ? (
-                                <Button type="button" variant="outline" size="sm" onClick={resetDraft}>
-                                    Cancel
-                                </Button>
-                            ) : null}
+                            <Button type="button" className="shrink-0" leadingIcon={PlusIcon} onClick={() => { resetDraft(); setIsFormOpen(true); }}>
+                                Add category
+                            </Button>
                         </div>
+                        <div className="space-y-3">
+                            {activeCategories.map(renderCategoryRow)}
+                        </div>
+                    </div>
 
+                    {archivedCategories.length > 0 ? (
+                        <div className="space-y-3">
+                            <div>
+                                <h3 className="text-sm font-semibold text-foreground">Archived categories</h3>
+                                <p className="mt-1 text-xs text-muted-foreground">Hidden from new entries but preserved for older records</p>
+                            </div>
+                            <div className="space-y-3">
+                                {archivedCategories.map(renderCategoryRow)}
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+            </Modal>
+
+            <Modal isOpen={isOpen && isFormOpen} onClose={resetDraft}
+                title={editingCategoryId ? 'Edit category' : 'Add category'}
+                description="Choose a name, optional group, and color tag."
+                size="lg"
+                footer={<div className="flex justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={resetDraft}>Cancel</Button>
+                    <Button type="submit" form="expense-category-form">{editingCategoryId ? 'Update Category' : 'Add Category'}</Button>
+                </div>}>
+                    <form id="expense-category-form" onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
                                 <Label htmlFor="expense-category-name">Name</Label>
                                 <Input
+                                    required
                                     id="expense-category-name"
                                     value={draft.name}
                                     onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
@@ -341,46 +376,36 @@ const ExpenseCategoryManagerModal = ({
                             </div>
                         </div>
 
-                        <div className="flex justify-end">
-                            <Button type="submit" leadingIcon={PlusIcon}>
-                                {editingCategoryId ? 'Update Category' : 'Add Category'}
-                            </Button>
+                        <div className="space-y-2">
+                            <Label>Color Tag</Label>
+                            <ColorPicker value={draft.color} onChange={color => setDraft(current => ({ ...current, color }))} />
                         </div>
                     </form>
+            </Modal>
 
-                    {deleteBlockedNotice ? (
-                        <Notice
-                            title={`Can't delete "${deleteBlockedNotice.categoryName}"`}
-                            description={getUsageLabel({
-                                expenses: deleteBlockedNotice.expenses,
-                                recurrences: deleteBlockedNotice.recurrences,
-                            }) + '. Archive it instead if you want to hide it from new expenses.'}
-                            variant="warning"
-                        />
-                    ) : null}
-
-                    <div className="space-y-3">
-                        <div>
-                            <h3 className="text-sm font-semibold text-foreground">Active categories</h3>
-                            <p className="mt-1 text-xs text-muted-foreground">{activeCategories.length} available for new expenses</p>
-                        </div>
-                        <div className="space-y-3">
-                            {activeCategories.map(renderCategoryRow)}
-                        </div>
+            <Modal
+                isOpen={Boolean(deleteBlockedNotice)}
+                onClose={() => setDeleteBlockedNotice(null)}
+                title={deleteBlockedNotice ? `Can't delete "${deleteBlockedNotice.categoryName}"` : "Can't delete category"}
+                description="This category is currently in use and cannot be permanently deleted."
+                size="md"
+                footer={(
+                    <div className="flex justify-end">
+                        <Button type="button" variant="outline" onClick={() => setDeleteBlockedNotice(null)}>
+                            Close
+                        </Button>
                     </div>
-
-                    {archivedCategories.length > 0 ? (
-                        <div className="space-y-3">
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground">Archived categories</h3>
-                                <p className="mt-1 text-xs text-muted-foreground">Hidden from new entries but preserved for older records</p>
-                            </div>
-                            <div className="space-y-3">
-                                {archivedCategories.map(renderCategoryRow)}
-                            </div>
-                        </div>
-                    ) : null}
-                </div>
+                )}
+            >
+                <Notice
+                    description={deleteBlockedNotice
+                        ? getUsageLabel({
+                            expenses: deleteBlockedNotice.expenses,
+                            recurrences: deleteBlockedNotice.recurrences,
+                        }) + '. Archive it instead if you want to hide it from new expenses.'
+                        : undefined}
+                    variant="warning"
+                />
             </Modal>
 
             <Modal

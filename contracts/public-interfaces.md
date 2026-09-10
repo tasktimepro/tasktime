@@ -294,6 +294,18 @@ and subscription webhooks remains authoritative. Browser-offline presentation
 requires the browser network state to be offline rather than any retryable
 billing transport or session error.
 
+Signed expiry remains enforced in an already-open tab, including foreground
+wake after browser suspension. Elapsed response/verification time is included
+conservatively in the trusted clock; invalid numeric clocks fail verification.
+Clock rollback or expiry deselects the matching device binding without deleting
+license history or product data. Public JWKS freshness remains one hour for a
+new online status read, but offline verification may reuse its bounded cached
+keys for the maximum seven-day license lifetime beyond that freshness deadline;
+signature, subject, source cap, and exact token expiry still apply. Failed or
+disconnected canonical reads discard online action/usage projections while a
+still-valid exact-bound signed plan remains usable locally. Deferred responses,
+Checkout recovery writes, and cleanup are fenced to their initiating lifecycle.
+
 The explicit **Refresh status** action is stronger than an ordinary foreground
 status check: after provider reconnection is ready, it requests canonical billing
 reconciliation with reason `user_retry` and then forces a fresh signed status

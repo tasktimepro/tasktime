@@ -222,6 +222,7 @@ export async function verifyBillingLicense(token: string, options: {
     // Origin is deliberately not part of license verification. The Worker CORS
     // allowlist independently authorizes browser origins.
     void options.browserOrigin;
+    if (!Number.isFinite(options.nowMs)) return { ok: false, code: 'INVALID_CLAIMS' };
     if (typeof token !== 'string' || token.length < 16 || token.length > MAX_TOKEN_BYTES) {
         return { ok: false, code: 'INVALID_FORMAT' };
     }

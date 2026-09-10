@@ -15,6 +15,47 @@ const SOURCES = new Set(['subscription', 'trial', 'grant', 'free']);
 const TRIAL_STATUSES = new Set(['eligible', 'active', 'used']);
 const KNOWN_ENTITLEMENTS = new Set<PaidEntitlement>(['reports.access', 'invoice.email.send']);
 
+export type EntitlementConnectionState = 'ready' | 'reconnecting' | 'reconnect_required' | 'offline' | 'disconnected';
+
+export type EntitlementState = {
+    plan: 'free' | 'pro' | 'unknown';
+    accessStatus: BillingAccessStatus | 'unresolved';
+    verified: boolean;
+    connection: EntitlementConnectionState;
+};
+
+export type GetProAction = {
+    visible: boolean;
+    mode: 'checkout' | 'deferred' | null;
+};
+
+/** Shared recovery presentation only; it never grants a protected capability. */
+export function getEntitlementRecovery(state: EntitlementState): {
+    kind: 'upgrade' | 'billing' | 'status' | 'reconnect' | 'reconnecting' | 'offline';
+    title: string;
+    actionLabel: string;
+    section: 'billing' | 'sync' | null;
+} {
+    if (state.accessStatus === 'suspended') return {
+        kind: 'billing', title: 'Resolve billing to restore Pro', actionLabel: 'Manage billing', section: 'billing',
+    };
+    if (state.connection === 'offline') return {
+        kind: 'offline', title: 'Go online to check Pro access', actionLabel: 'Offline', section: null,
+    };
+    if (state.connection === 'reconnecting') return {
+        kind: 'reconnecting', title: 'Reconnecting and checking your plan', actionLabel: 'Reconnecting…', section: null,
+    };
+    if (state.connection === 'reconnect_required') return {
+        kind: 'reconnect', title: 'Reconnect Cloud Sync to confirm your plan', actionLabel: 'Reconnect Cloud Sync', section: 'sync',
+    };
+    if (state.plan === 'free' || (!state.verified && state.connection === 'disconnected')) return {
+        kind: 'upgrade', title: 'Unlock more with Pro', actionLabel: 'View Pro options', section: 'billing',
+    };
+    return {
+        kind: 'status', title: 'Plan status needs confirmation', actionLabel: 'Check plan status', section: 'billing',
+    };
+}
+
 function fail(): never {
     throw new Error('INVALID_ENTITLEMENT');
 }
@@ -134,6 +175,83 @@ export function conservativeEntitlement(
     reason: 'conflict' | 'lifecycle' | 'network' | 'unsupported_version',
 ): EntitlementResolution {
     return { kind: 'unresolved', reason };
+}
+
+/**
+ * Derive the shared display state without conflating a verified plan with the
+ * temporary readiness of its online billing transport.
+ */
+export function deriveEntitlementState(input: {
+    resolution: EntitlementResolution;
+    offline: boolean;
+    hasActiveCloudAccount: boolean;
+    isCloudAccountLoading: boolean;
+    isBillingConnectionReady: boolean;
+    isBillingReconnecting: boolean;
+    needsCloudReconnect: boolean;
+}): EntitlementState {
+    const accessStatus = input.resolution.kind === 'canonical'
+        ? input.resolution.snapshot.accessStatus
+        : 'unresolved';
+    const plan = accessStatus === 'unresolved'
+        ? 'unknown'
+        : accessStatus === 'free'
+            ? 'free'
+            : 'pro';
+    const connection: EntitlementConnectionState = input.offline
+        ? 'offline'
+        : input.isBillingConnectionReady
+            ? 'ready'
+            : input.needsCloudReconnect
+                ? 'reconnect_required'
+                : input.isCloudAccountLoading
+                    || input.isBillingReconnecting
+                    || input.hasActiveCloudAccount
+                    ? 'reconnecting'
+                    : 'disconnected';
+    return {
+        plan,
+        accessStatus,
+        verified: input.resolution.kind === 'canonical',
+        connection,
+    };
+}
+
+/**
+ * Keep every Get Pro entry point aligned with Plan & Billing. A canonical
+ * Checkout offer may be used only while its account transport is ready. The
+ * deferred comparison action is reserved for a genuinely fresh, online,
+ * account-free browser; reconnect and unresolved-account states use recovery
+ * copy instead of inviting a possibly existing Pro user to purchase again.
+ */
+export function evaluateGetProAction(input: {
+    entitlementState: EntitlementState;
+    hasCanonicalStatus: boolean;
+    hasCheckoutOffer: boolean;
+    catalogPurchaseEnabled: boolean;
+    proOfferCount: number;
+    isPermanentComplimentaryPro: boolean;
+}): GetProAction {
+    if (input.entitlementState.connection !== 'ready'
+        && input.entitlementState.connection !== 'disconnected') {
+        return { visible: false, mode: null };
+    }
+    if (input.hasCanonicalStatus) {
+        if (input.entitlementState.connection !== 'ready'
+            || !input.hasCheckoutOffer
+            || input.entitlementState.accessStatus === 'suspended'
+            || input.isPermanentComplimentaryPro) {
+            return { visible: false, mode: null };
+        }
+        return { visible: true, mode: 'checkout' };
+    }
+    if (input.entitlementState.connection !== 'disconnected'
+        || input.entitlementState.plan === 'pro'
+        || !input.catalogPurchaseEnabled
+        || input.proOfferCount < 1) {
+        return { visible: false, mode: null };
+    }
+    return { visible: true, mode: 'deferred' };
 }
 
 export function evaluateEntitlementFeature(

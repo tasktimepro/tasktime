@@ -64,15 +64,23 @@ describe('ExpenseCategoryManagerModal', () => {
         recurrencesState.recurrences = [];
     });
 
-    it('creates a category from the top form', () => {
+    it('creates a colored category in a separate modal', () => {
         render(<ExpenseCategoryManagerModal isOpen onClose={vi.fn()} />);
 
+        expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+        const activeHeading = screen.getByText('Active categories');
+        const categoryHeader = activeHeading.parentElement?.parentElement;
+        expect(categoryHeader).toHaveClass('flex', 'items-center', 'justify-between');
+        fireEvent.click(screen.getByRole('button', { name: 'Add category' }));
+        expect(screen.getByRole('dialog', { name: 'Add category' })).toHaveClass('sm:max-w-lg');
         fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Travel' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Select Blue color' }));
         fireEvent.click(screen.getByRole('button', { name: 'Add Category' }));
 
         expect(expenseCategoriesState.createExpenseCategory).toHaveBeenCalledWith({
             name: 'Travel',
             group: null,
+            color: '#3b82f6',
         });
         expect(toastState.showSuccess).toHaveBeenCalledWith('Category created');
     });
@@ -90,6 +98,7 @@ describe('ExpenseCategoryManagerModal', () => {
         expect(expenseCategoriesState.updateExpenseCategory).toHaveBeenCalledWith('category-1', {
             name: 'Software',
             group: 'software',
+            color: null,
         });
         expect(toastState.showSuccess).toHaveBeenCalledWith('Category updated');
     });
@@ -111,7 +120,10 @@ describe('ExpenseCategoryManagerModal', () => {
 
         expect(expenseCategoriesState.deleteExpenseCategory).not.toHaveBeenCalled();
         expect(toastState.showError).not.toHaveBeenCalled();
-        expect(screen.getByText(`Can't delete "Software & subscriptions"`)).toBeInTheDocument();
-        expect(screen.getByText('1 expense. Archive it instead if you want to hide it from new expenses.')).toBeInTheDocument();
+        const blockedDialog = screen.getByRole('dialog', { name: `Can't delete "Software & subscriptions"` });
+        expect(blockedDialog).toBeInTheDocument();
+        expect(blockedDialog).toHaveTextContent('1 expense. Archive it instead if you want to hide it from new expenses.');
+        await user.click(screen.getByRole('button', { name: 'Close' }));
+        expect(screen.queryByRole('dialog', { name: `Can't delete "Software & subscriptions"` })).not.toBeInTheDocument();
     });
 });

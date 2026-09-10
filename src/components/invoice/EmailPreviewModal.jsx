@@ -38,7 +38,7 @@ import { getInvoiceTotal, isInvoiceCanceled } from '@/utils/invoiceUtils.ts';
 import { toDisplayDate } from '@/utils/dateUtils.ts';
 import { useBilling } from '@/contexts/BillingContext';
 import { BILLING_FEATURES } from '@/config/billingFeatures';
-import { evaluateEntitlementFeature } from '@/domain/entitlements/entitlementPolicy';
+import { evaluateEntitlementFeature, getEntitlementRecovery } from '@/domain/entitlements/entitlementPolicy';
 import { EntitlementNotice } from '@/components/billing/EntitlementNotice';
 import { useUrlState } from '@/hooks/useUrlState';
 import {
@@ -86,7 +86,8 @@ const EmailPreviewModal = ({
         activeStorageGeneration,
         activeStorageSessionId,
     } = useYjs();
-    const { resolution, status } = useBilling();
+    const billing = useBilling();
+    const { resolution, status, entitlementState } = billing;
     const { updateUrl } = useUrlState();
     const { businessBrandAssets } = useBusinessBrandAssets();
     const { invoices: currentInvoices = [], updateInvoice } = useInvoices();
@@ -146,6 +147,7 @@ const EmailPreviewModal = ({
     const emailAccess = BILLING_FEATURES.emailEntitlementEnforcement
         ? evaluateEntitlementFeature(resolution, 'invoice.email.send')
         : { allowed: true, reason: 'entitled', upgradeEligible: false };
+    const entitlementRecovery = getEntitlementRecovery(entitlementState);
     const entitlementActionRequired = BILLING_FEATURES.emailEntitlementEnforcement
         && !emailAccess.allowed
         && !pendingAttemptId;
@@ -169,6 +171,15 @@ const EmailPreviewModal = ({
             sessionId: activeStorageSessionId,
         }
         : null, [activeStorageGeneration, activeStorageProvider, activeStorageSessionId, hostedServiceSessionId]);
+    const hostedSendReconnectRequired = BILLING_FEATURES.emailEntitlementEnforcement
+        && emailAccess.allowed
+        && !pendingAttemptId
+        && (entitlementState.connection !== 'ready'
+            || !hostedServiceSessionId
+            || !billingLifecycle);
+    const hostedSendConnectionState = hostedSendReconnectRequired
+        ? entitlementState.connection
+        : null;
 
     const templateValues = useMemo(() => ({
         invoiceNumber: invoice?.invoiceNumber || '',
@@ -859,11 +870,17 @@ const EmailPreviewModal = ({
     }, [onClose]);
 
     const handleEntitlementAction = () => {
+        if (!entitlementRecovery.section) return;
         handleClose();
         updateUrl({
             view: 'account',
-            section: emailAccess.reason === 'status_unavailable' ? 'sync' : 'billing',
+            section: entitlementRecovery.section,
         });
+    };
+
+    const handleHostedSendReconnect = () => {
+        handleClose();
+        updateUrl({ view: 'account', section: 'sync' });
     };
 
     if (!invoice) return null;
@@ -903,12 +920,25 @@ const EmailPreviewModal = ({
                 <Button variant="outline" onClick={handleClose} disabled={sending}>
                     Cancel
                 </Button>
-                {entitlementActionRequired ? (
+                {hostedSendReconnectRequired && hostedSendConnectionState === 'offline' ? (
+                    <Button variant="secondary" disabled>
+                        Offline
+                    </Button>
+                ) : hostedSendReconnectRequired && hostedSendConnectionState === 'reconnecting' ? (
+                    <Button variant="secondary" disabled>
+                        Reconnecting…
+                    </Button>
+                ) : hostedSendReconnectRequired ? (
+                    <Button leadingIcon={Cloud} onClick={handleHostedSendReconnect}>
+                        Reconnect Cloud Sync
+                    </Button>
+                ) : entitlementActionRequired ? (
                     <Button
-                        leadingIcon={emailAccess.reason === 'status_unavailable' ? Cloud : Rocket}
+                        leadingIcon={entitlementRecovery.kind === 'upgrade' ? Rocket : Cloud}
+                        disabled={!entitlementRecovery.section}
                         onClick={handleEntitlementAction}
                     >
-                        {emailAccess.reason === 'status_unavailable' ? 'Check cloud account' : 'View Pro options'}
+                        {entitlementRecovery.actionLabel}
                     </Button>
                 ) : (
                     pendingAttemptId ? (
@@ -950,7 +980,7 @@ const EmailPreviewModal = ({
             >
                 <div className="space-y-4">
                 {/* Precondition warnings */}
-                {!hostedServiceSessionId && (
+                {!hostedServiceSessionId && !BILLING_FEATURES.emailEntitlementEnforcement && (
                     <Notice variant="warning" title="Cloud provider required">
                         Connect Google Drive or Dropbox in Account settings to enable {documentLabel} emailing.
                     </Notice>
@@ -958,12 +988,26 @@ const EmailPreviewModal = ({
 
                 {BILLING_FEATURES.emailEntitlementEnforcement && !emailAccess.allowed && (
                     <EntitlementNotice
-                        title={emailAccess.reason === 'status_unavailable'
-                            ? 'Plan status needs confirmation'
-                            : 'Hosted Send is a Pro feature'}
+                        title={entitlementRecovery.kind === 'upgrade'
+                            ? 'Hosted Send is a Pro feature'
+                            : entitlementRecovery.title}
                     >
                         Your email draft, template editing, forwarding choice, PDF preparation, download,
                         and manual delivery workflow remain available. Starting a trial or purchase never sends this draft automatically.
+                    </EntitlementNotice>
+                )}
+
+                {hostedSendReconnectRequired && (
+                    <EntitlementNotice title={hostedSendConnectionState === 'offline'
+                        ? 'Pro is available; go online to send'
+                        : hostedSendConnectionState === 'reconnecting'
+                            ? 'Pro is available; reconnecting to send'
+                            : 'Pro is available; reconnect to send'}>
+                        {hostedSendConnectionState === 'offline'
+                            ? 'TaskTime-hosted Send needs an online connection. Your draft, PDF, and manual delivery options remain available.'
+                            : hostedSendConnectionState === 'reconnecting'
+                                ? 'TaskTime is restoring the cloud connection needed for hosted Send. Your draft, PDF, and manual delivery options remain available.'
+                                : 'Your verified Pro access remains available on this device. Reconnect Cloud Sync before using TaskTime-hosted Send; your draft, PDF, and manual delivery options remain available.'}
                     </EntitlementNotice>
                 )}
 

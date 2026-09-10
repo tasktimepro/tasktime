@@ -18,7 +18,7 @@ async function seedExpenses(page) {
         store.expenseRecurrences.clear();
         store.preferences.set('currency', 'EUR');
         store.preferences.set('theme', 'dark');
-        for (const [id, name] of [['software', 'Software'], ['hardware', 'Hardware']]) store.expenseCategories.set(id, { id, name, isDefault: false, archived: false });
+        for (const [id, name] of [['software', 'Software & subscriptions'], ['hardware', 'Hardware']]) store.expenseCategories.set(id, { id, name, isDefault: false, archived: false });
         const base = { currency: 'EUR', amount: 100, paymentStatus: 'paid', paidOn: '2026-09-04', date: '2026-09-03', isPersonal: true, billable: false, billingStatus: 'unbilled', isRecurring: false, isTaxExempt: true, paymentMode: 'manual', amountType: 'fixed', createdAt: new Date('2026-09-01T12:00:00').getTime() };
         const records = [
             { id: 'software', title: 'Design software', categoryId: 'software', supplierName: 'Design Tools' },
@@ -44,6 +44,13 @@ test('reconciles spend, schedules, filters and recorded payment actions', async 
     await page.setViewportSize({ width: 1440, height: 1100 });
     await seedExpenses(page);
     const summary = page.getByRole('region', { name: 'Expense summary' });
+    const topCategoryCard = summary.getByRole('heading', { name: 'Top category', exact: true }).locator('..');
+    const topCategoryName = topCategoryCard.getByText('Software & subscriptions', { exact: true });
+    const topCategoryRing = topCategoryCard.locator('svg[viewBox="0 0 64 64"]');
+    await expect(topCategoryName).toHaveCSS('text-overflow', 'ellipsis');
+    expect(await topCategoryName.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+    const [nameBox, ringBox] = await Promise.all([topCategoryName.boundingBox(), topCategoryRing.boundingBox()]);
+    expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(ringBox.x);
     const recurringCard = summary.getByRole('button', { name: 'Manage recurring expenses' });
     expect((await recurringCard.boundingBox()).height).toBeGreaterThan(60);
     await recurringCard.focus();
@@ -54,6 +61,9 @@ test('reconciles spend, schedules, filters and recorded payment actions', async 
     await expect(summary.getByRole('heading', { name: 'Recurring expenses', exact: true }).locator('..')).toContainText('€59.00');
     await expect(summary.getByRole('heading', { name: 'Upcoming payments', exact: true }).locator('..')).toContainText('€69.00');
     await expect(page.getByRole('tab', { name: 'Outstanding (1)' })).toBeVisible();
+    const expenseStatusTabs = page.getByRole('tab', { name: 'Outstanding (1)' }).locator('xpath=ancestor::*[@role="tablist"][1]');
+    await expect(expenseStatusTabs).toHaveCSS('overflow-x', 'auto');
+    await expect(expenseStatusTabs).toHaveCSS('overflow-y', 'hidden');
     await expect(page.getByRole('row', { name: 'September 2026 €180.00' })).toHaveCount(1);
     const chart = page.getByRole('application', { name: 'Monthly paid expenses' });
     await chart.focus();

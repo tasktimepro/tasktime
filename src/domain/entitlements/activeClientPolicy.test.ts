@@ -46,7 +46,15 @@ describe('active-client transition policy', () => {
             .toMatchObject({ allowed: false, activeCount: 2 });
     });
 
-    it('returns recovery—not purchase—for unresolved entitlement', () => {
+    it('allows the universally Free first slot while entitlement is unresolved', () => {
+        expect(evaluateActiveClientTransition({
+            clients: [],
+            entitlement: { kind: 'unresolved', reason: 'network' },
+            transition: 'create',
+        })).toEqual({ allowed: true, reason: 'under_limit' });
+    });
+
+    it('returns recovery—not purchase—for an unresolved net increase beyond the Free slot', () => {
         expect(evaluateActiveClientTransition({
             clients,
             entitlement: { kind: 'unresolved', reason: 'network' },
@@ -59,4 +67,3 @@ describe('active-client transition policy', () => {
         });
     });
 });
-

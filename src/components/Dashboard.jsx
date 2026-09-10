@@ -723,7 +723,7 @@ const Dashboard = ({
     /**
      * Render task title with navigation
      */
-    const renderTaskTitle = useCallback((task, isCompleted) => {
+    const renderTaskTitle = useCallback((task, isCompleted, { disabled = false } = {}) => {
         const baseClasses = `block w-full text-sm font-medium text-left transition-colors whitespace-normal break-words sm:truncate ${
             isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
         }`;
@@ -745,11 +745,17 @@ const Dashboard = ({
         return (
             <div className="space-y-1">
                 <button
+                    type="button"
                     onClick={() => handleTaskTitleClick(task)}
-                    className={`${baseClasses} cursor-pointer ${
-                        isCompleted ? 'hover:text-muted-foreground' : 'hover-status-info-text-strong'
+                    disabled={disabled}
+                    className={`${baseClasses} ${
+                        disabled
+                            ? 'cursor-not-allowed text-muted-foreground'
+                            : `cursor-pointer ${isCompleted ? 'hover:text-muted-foreground' : 'hover-status-info-text-strong'}`
                     }`}
-                    title="Open task details"
+                    title={disabled
+                        ? 'Another task in this project is currently running'
+                        : 'Open task details'}
                 >
                     {title}
                 </button>

@@ -116,3 +116,27 @@ describe('recurringUtils', () => {
         });
     });
 });
+
+
+describe('paused recurrence scheduling', () => {
+    it.each([
+        { type: 'weekly', weeklyDays: [1] },
+        { type: 'monthly', monthlyType: 'specific', monthlyDay: 7 },
+        { type: 'yearly', yearlyDate: '2026-09-07' },
+    ])('suppresses due, previous, and next dates while paused for $type', schedule => {
+        const date = new Date(2026, 8, 7);
+        const config = { ...schedule, paused: true };
+        expect(isRecurringTaskDueOnDate(date, config)).toBe(false);
+        expect(findPreviousRecurringDueDate(date, config)).toBeNull();
+        expect(findNextRecurringDueDate(date, config)).toBeNull();
+    });
+
+    it('resumes on the current schedule without reviving missed occurrences', () => {
+        const config = { type: 'weekly', weeklyDays: [1], paused: false, resumeFrom: '2026-09-08' };
+        expect(isRecurringTaskDueOnDate(new Date(2026, 8, 7), config)).toBe(false);
+        expect(findPreviousRecurringDueDate(new Date(2026, 8, 8), config)).toBeNull();
+        expect(findNextRecurringDueDate(new Date(2026, 8, 8), config)).toEqual(new Date(2026, 8, 14));
+        expect(isRecurringTaskDueOnDate(new Date(2026, 8, 14), config)).toBe(true);
+        expect(findPreviousRecurringDueDate(new Date(2026, 8, 15), config)).toEqual(new Date(2026, 8, 14));
+    });
+});

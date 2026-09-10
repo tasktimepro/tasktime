@@ -165,7 +165,11 @@ const GlobalTimer = ({
             <div className="flex min-w-0 items-center justify-between gap-3">
                 {/* Left column: dot + task title */}
                 <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                    <div className={`h-3 w-3 shrink-0 ${dotColor} rounded-full ${dotAnimation}`}></div>
+                    <div
+                        aria-label="Timer active"
+                        title="Timer active"
+                        className={`h-3 w-3 shrink-0 ${dotColor} rounded-full ${dotAnimation}`}
+                    />
                     <button
                         onClick={handleTaskTitleClick}
                         className="min-w-0 flex-1 cursor-pointer truncate text-left text-sm font-medium text-foreground transition-colors hover:underline"

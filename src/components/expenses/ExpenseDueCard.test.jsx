@@ -65,6 +65,17 @@ describe('ExpenseDueCard', () => {
         expect(screen.getByText(/USD/)).toBeInTheDocument()
     })
 
+    it('shows the original category color as a dot because the due row has no colored border', () => {
+        render(
+            <ExpenseDueCard
+                expense={{ id: 'category-expense', title: 'Software', date: '2026-02-06', amount: 12, amountType: 'fixed', currency: 'USD' }}
+                category={{ id: 'software', name: 'Software', color: '#ef4444' }}
+            />
+        )
+
+        expect(screen.getByTestId('category-color-dot')).toHaveStyle({ backgroundColor: '#ef4444' })
+    })
+
     it('hides check action for variable expense without amount', async () => {
         const expense = {
             id: 'exp-2',

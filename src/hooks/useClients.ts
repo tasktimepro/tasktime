@@ -4,7 +4,7 @@
  * Provides reactive client data and CRUD operations
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import { useYjs } from '@/contexts/YjsContext';
 import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
@@ -22,6 +22,9 @@ import { collectValidatedEntities } from '@/stores/yjs/validation';
 export function useClients() {
     const { store, isReady } = useYjs();
     const { resolution } = useBilling();
+    // A queued Web Lock must not retain Pro from before expiry/account change.
+    const currentResolution = useRef(resolution);
+    currentResolution.current = resolution;
     const { items, isLoading, get, create, update, remove } = useYjsCollection<Client>(
         (store) => store.clients,
         { collectionName: 'clients' }
@@ -50,13 +53,13 @@ export function useClients() {
             assertActiveClientApplication({
                 enforcementEnabled: true,
                 clients: readCurrentClients(),
-                resolution,
+                resolution: currentResolution.current,
                 transition: 'create',
             });
         }
         const id = data.id || generateId();
         return create(buildClientEntity({ data, id, now: Date.now() }));
-    }, [create, readCurrentClients, resolution]);
+    }, [create, readCurrentClients]);
 
     const updateClient = useCallback((id: string, updates: Partial<Client>) => {
         const existing = get(id);
@@ -65,7 +68,7 @@ export function useClients() {
             assertActiveClientApplication({
                 enforcementEnabled: true,
                 clients: readCurrentClients(),
-                resolution,
+                resolution: currentResolution.current,
                 transition: 'update',
                 existingClientId: id,
                 nextArchived: false,
@@ -77,13 +80,14 @@ export function useClients() {
             : updates;
         const { id: _immutableId, ...persistedUpdates } = normalizedUpdates;
         return update(id, persistedUpdates);
-    }, [get, readCurrentClients, resolution, update]);
+    }, [get, readCurrentClients, update]);
 
     const createClientWithPolicyLock = useCallback((data: Omit<Client, 'id'> & { id?: string }) => (
         runActiveClientApplication({
             enforcementEnabled: BILLING_FEATURES.clientLimitEnforcement,
             readClients: readCurrentClients,
             resolution,
+            readResolution: () => currentResolution.current,
             transition: 'create',
             commit: () => createClient(data),
         })
@@ -94,6 +98,7 @@ export function useClients() {
             enforcementEnabled: BILLING_FEATURES.clientLimitEnforcement,
             readClients: readCurrentClients,
             resolution,
+            readResolution: () => currentResolution.current,
             transition: 'update',
             existingClientId: id,
             nextArchived: updates.archived,

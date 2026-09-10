@@ -175,9 +175,43 @@ describe('billingStorage', () => {
         await writeCachedBillingJwks(jwks);
         await expect(readCachedBillingJwks(199)).resolves.toEqual(jwks);
         await expect(readCachedBillingJwks(200)).resolves.toBeNull();
+        // A key's HTTP freshness is distinct from an already issued license's lifetime.
+        await expect(readCachedBillingJwks(201, { forOfflineLicense: true })).resolves.toEqual(jwks);
+        await expect(readCachedBillingJwks(100 + 8 * 24 * 60 * 60 * 1000, {
+            forOfflineLicense: true,
+        })).resolves.toBeNull();
 
         stores.get('public-resources')?.set('jwks-v1', { ...jwks, keys: [] });
         await expect(readCachedBillingJwks(100)).resolves.toBeNull();
+    });
+
+    it('does not let delayed cleanup or writes replace a different account binding', async () => {
+        const lifecycle = { provider: 'dropbox' as const, generation: 9, sessionId: 'current' };
+        const oldLifecycle = { ...lifecycle, generation: 8, sessionId: 'previous' };
+        const input = {
+            lifecycle, subject: payload.subject, payload, token: 'current-token', keyId: 'key-1',
+            serverTime: 1_787_140_800_000, wallTime: 1_787_140_800_000,
+        };
+        await writeVerifiedBillingCache(input);
+        await clearActiveBillingBinding(oldLifecycle);
+        await writeVerifiedBillingCache({ ...input, lifecycle: oldLifecycle, isCurrent: () => false });
+        await expect(readBoundBillingCache(lifecycle, input.wallTime)).resolves.toMatchObject({
+            kind: 'hit', license: { token: 'current-token' },
+        });
+        await clearActiveBillingBinding(lifecycle);
+        await expect(readBoundBillingCache(lifecycle, input.wallTime)).resolves.toEqual({ kind: 'missing' });
+    });
+
+    it('does not let stale Checkout cleanup or writes affect a different account', async () => {
+        const lifecycle = { provider: 'dropbox' as const, generation: 9, sessionId: 'current' };
+        const oldLifecycle = { ...lifecycle, generation: 8, sessionId: 'previous' };
+        const attemptId = '0c57f1be-0dc8-4ec1-867e-84e7278fd0c6';
+        await writePendingBillingCheckout({ lifecycle, attemptId });
+        await clearPendingBillingCheckout(oldLifecycle);
+        await writePendingBillingCheckout({ lifecycle: oldLifecycle, attemptId, isCurrent: () => false });
+        await expect(readPendingBillingCheckout(lifecycle)).resolves.toMatchObject({ attemptId });
+        await clearPendingBillingCheckout(lifecycle);
+        await expect(readPendingBillingCheckout(lifecycle)).resolves.toBeNull();
     });
 
     it('rejects invalid Checkout recovery writes and treats storage failures as misses', async () => {

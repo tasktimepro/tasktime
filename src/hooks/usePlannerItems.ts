@@ -18,6 +18,7 @@ import { useTimers } from './useTimers';
 import { useTimeEntries } from './useTimeEntries';
 import { useExpenses } from './useExpenses';
 import { useExpenseRecurrences } from './useExpenseRecurrences';
+import { useExpenseCategories } from './useExpenseCategories';
 import { useTodayDate, useTodayString } from './useDayRollover';
 import { useDailyGoals } from './useDailyGoals';
 import { usePreferences } from './usePreferences';
@@ -26,6 +27,7 @@ import { toStorageDate } from '@/utils/dateUtils';
 import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
 import { buildExpenseFromRecurrence, isRecurringExpenseDueOnDate } from '@/utils/expenseUtils';
 import { convertCurrency, fetchExchangeRates, normalizeCurrencyCode } from '@/utils/currencyUtils';
+import { getExpenseCategoryColor } from '@/components/expenses/CategoryLabel';
 import type { Task, Project, Client, PlannerAttachment, TimeEntry, DailyGoal, Expense } from '@/stores/yjs/types';
 
 // ============================================================================
@@ -39,7 +41,7 @@ export interface PlannerItemBase {
     title: string;
     /** Whether item shows strikethrough (completed) */
     isCompleted: boolean;
-    /** Color tag (inherited from client → project → task) */
+    /** Color tag resolved for the item type; expenses use their category only */
     color?: string | null;
     /** Estimated hours for this item (from attachment) */
     estimatedHours?: number | null;
@@ -136,6 +138,11 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     const { timers } = useTimers();
     const { expenses } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
+    const {
+        expenseCategories,
+        allExpenseCategories = expenseCategories,
+        isLoading: expenseCategoriesLoading = false,
+    } = useExpenseCategories();
     const { preferences } = usePreferences();
     const { getGoalForDate } = useDailyGoals();
     const today = useTodayDate();
@@ -175,7 +182,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         endDate: endOfDay(weekEnd).getTime(),
     });
 
-    const isLoading = attachmentsLoading || tasksLoading || projectsLoading || clientsLoading;
+    const isLoading = attachmentsLoading || tasksLoading || projectsLoading || clientsLoading || expenseCategoriesLoading;
 
     const weekStartStr = useMemo(() => format(weekStart, 'yyyy-MM-dd'), [weekStart]);
 
@@ -205,6 +212,11 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         projects.forEach((p) => map.set(p.id, p));
         return map;
     }, [projects]);
+
+    const expenseCategoriesById = useMemo(() => {
+        const map = new Map(allExpenseCategories.map((category) => [category.id, category]));
+        return map;
+    }, [allExpenseCategories]);
 
     // Check if a task is completed for a specific date
     const isTaskCompletedOnDate = useCallback((task: Task, dateStr: string): boolean => {
@@ -287,16 +299,9 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
     }, [projectsById, getProjectColor]);
 
     const getExpenseColor = useCallback((expense: Expense): string | null => {
-        if (expense.projectId) {
-            const project = projectsById.get(expense.projectId);
-            if (project) return getProjectColor(project);
-        }
-        if (expense.clientId) {
-            const client = clientsById.get(expense.clientId);
-            return client?.color || null;
-        }
-        return null;
-    }, [projectsById, clientsById, getProjectColor]);
+        if (!expense.categoryId) return null;
+        return getExpenseCategoryColor(expenseCategoriesById.get(expense.categoryId));
+    }, [expenseCategoriesById]);
 
     const expenseDatesByRecurrence = useMemo(() => {
         const map = new Map<string, Set<string>>();
@@ -565,7 +570,7 @@ export function usePlannerItems(weekOffset: number = 0): UsePlannerItemsResult {
         // 5. Recurring tasks matching this day (sorted alphabetically)
         const recurringTasks = tasks
             .filter((t) => t.recurring && !addedTaskIds.has(t.id))
-            .filter((t) => isTaskVisibleOnDate(t, dateStr) && isRecurringTaskDueOnDate(date, t.recurring))
+            .filter((t) => isTaskVisibleOnDate(t, dateStr) && (isTaskCompletedOnDate(t, dateStr) || isRecurringTaskDueOnDate(date, t.recurring)))
             .sort((a, b) => a.title.localeCompare(b.title));
 
         recurringTasks.forEach((task) => {

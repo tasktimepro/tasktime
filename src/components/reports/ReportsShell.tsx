@@ -1,13 +1,18 @@
 import { useEffect } from 'react';
+import { Rocket } from 'lucide-react';
 import { ChartBarIcon, ClockIcon, DocumentTextIcon, HandCoinsIcon, ReceiptTextIcon, SheetIcon } from '@/components/ui/icons';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUrlState } from '@/hooks/useUrlState';
 import useIsMobileLayout from '@/hooks/useIsMobileLayout';
 import type { EntitlementResolution } from '@/domain/entitlements/entitlementTypes';
-import { evaluateEntitlementFeature } from '@/domain/entitlements/entitlementPolicy';
+import {
+    evaluateEntitlementFeature,
+    type EntitlementState,
+} from '@/domain/entitlements/entitlementPolicy';
 import { cn } from '@/lib/utils';
 import { ReportsOverview } from './ReportsOverview';
 import { ReportsProPreview } from '@/components/billing/ReportsProPreview';
+import { Button } from '@/components/ui/button';
 
 export const REPORT_SECTIONS = [
     { value: 'overview', label: 'Overview', icon: ChartBarIcon },
@@ -26,12 +31,16 @@ const ALLOWED = new Set(REPORT_SECTIONS.map(section => section.value));
 
 export function ReportsShell({
     resolution,
+    entitlementState,
     onReadyChange,
     renderAdvanced,
+    showGetPro = false,
 }: {
     resolution: EntitlementResolution;
+    entitlementState: EntitlementState;
     onReadyChange?: ((ready: boolean) => void) | null;
     renderAdvanced: () => React.ReactNode;
+    showGetPro?: boolean;
 }) {
     const { urlParams, updateUrl } = useUrlState();
     const isMobileLayout = useIsMobileLayout();
@@ -86,19 +95,34 @@ export function ReportsShell({
                     </TabsList>
                 </div>
             </Tabs>
-            <div>
-                <h1 className="text-2xl font-bold text-foreground">Reports</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Review the current month or open an advanced Pro report.
-                </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">Reports</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Review the current month or open an advanced Pro report.
+                    </p>
+                </div>
+                {!advanced && showGetPro ? (
+                    <Button
+                        leadingIcon={Rocket}
+                        onClick={() => updateUrl({
+                            view: 'account', section: 'billing', create: null, tab: null,
+                        })}
+                    >
+                        Get Pro
+                    </Button>
+                ) : null}
             </div>
             {!advanced ? <ReportsOverview onReadyChange={onReadyChange} /> : null}
             {advanced ? (
                 <ReportsProPreview
                     section={activeSection}
                     resolution={resolution}
+                    entitlementState={entitlementState}
+                    showGetPro={showGetPro}
                     onReadyChange={onReadyChange}
                     onOpenBilling={() => updateUrl({ view: 'account', section: 'billing', create: null, tab: null })}
+                    onOpenSync={() => updateUrl({ view: 'account', section: 'sync', create: null, tab: null })}
                     onBackToOverview={() => updateUrl({ section: 'overview', create: null, tab: null })}
                 />
             ) : null}

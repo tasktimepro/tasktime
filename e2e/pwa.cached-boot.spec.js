@@ -5,7 +5,7 @@ const publicRouteExpectations = [
     {
         path: '/product/',
         title: 'TaskTime Pro — Local-first work and invoicing for freelancers',
-        heading: 'Run your freelance work. From task to invoice.',
+        heading: 'Run your freelance business. From task to invoice.',
     },
     {
         path: '/pricing/',
@@ -65,8 +65,8 @@ test.describe('PWA smoke', () => {
         const hero = page.locator('.product-hero');
 
         await expect(page.getByText('Built for independent professionals', { exact: true })).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Run your freelance work. From task to invoice.', level: 1 })).toBeVisible();
-        await expect(hero).toContainText('with optional help from your own AI assistant');
+        await expect(page.getByRole('heading', { name: 'Run your freelance business. From task to invoice.', level: 1 })).toBeVisible();
+        await expect(hero).toContainText('Get optional help from your own AI assistant');
         await expect(hero.getByRole('link', { name: 'Open TaskTime Pro', exact: true })).toBeVisible();
         await expect(hero.getByRole('link', { name: /GitHub/i })).toHaveCount(0);
         await expect(hero).toContainText('Start free. No signup.');

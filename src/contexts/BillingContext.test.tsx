@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
@@ -7,9 +7,13 @@ const state = vi.hoisted(() => ({
     billingRefresh: vi.fn(async () => undefined),
     createCheckout: vi.fn(),
     writePending: vi.fn(async () => undefined),
+    sessionId: 'session-fixture',
+    hostedSessionId: undefined as string | null | undefined,
     isCloudConnected: true,
     isConnecting: false,
     isCloudIdentityLoading: false,
+    hadPreviousCloudSession: true,
+    movedToStorageProvider: null as 'google-drive' | 'dropbox' | null,
     billingStatusOptions: null as Record<string, unknown> | null,
 }));
 
@@ -24,12 +28,14 @@ vi.mock('@/config/billingFeatures', () => ({
 vi.mock('./YjsContext', () => ({
     useYjs: () => ({
         activeStorageProvider: 'dropbox',
-        activeStorageSessionId: 'session-fixture',
+        activeStorageSessionId: state.sessionId,
         activeStorageGeneration: 3,
-        hostedServiceSessionId: 'session-fixture',
+        hostedServiceSessionId: state.hostedSessionId === undefined ? state.sessionId : state.hostedSessionId,
         isCloudConnected: state.isCloudConnected,
         isConnecting: state.isConnecting,
         isCloudIdentityLoading: state.isCloudIdentityLoading,
+        hadPreviousCloudSession: state.hadPreviousCloudSession,
+        movedToStorageProvider: state.movedToStorageProvider,
     }),
 }));
 vi.mock('@/hooks/useBillingStatus', () => ({
@@ -92,6 +98,8 @@ function CheckoutProbe({ billingContactEmail }: { billingContactEmail?: string }
             <p>{message}</p>
             <p data-testid="cloud-account">{String(billing.hasActiveCloudAccount)}</p>
             <p data-testid="billing-ready">{String(billing.isBillingConnectionReady)}</p>
+            <p data-testid="entitlement-plan">{billing.entitlementState.plan}</p>
+            <p data-testid="entitlement-connection">{billing.entitlementState.connection}</p>
         </>
     );
 }
@@ -118,8 +126,12 @@ describe('BillingProvider Checkout continuity', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         state.isCloudConnected = true;
+        state.sessionId = 'session-fixture';
+        state.hostedSessionId = undefined;
         state.isConnecting = false;
         state.isCloudIdentityLoading = false;
+        state.hadPreviousCloudSession = true;
+        state.movedToStorageProvider = null;
         state.billingStatusOptions = null;
     });
 
@@ -149,6 +161,8 @@ describe('BillingProvider Checkout continuity', () => {
         render(<BillingProvider><CheckoutProbe /></BillingProvider>);
 
         expect(screen.getByTestId('cloud-account')).toHaveTextContent('true');
+        expect(screen.getByTestId('entitlement-plan')).toHaveTextContent('free');
+        expect(screen.getByTestId('entitlement-connection')).toHaveTextContent('ready');
 
         fireEvent.click(screen.getByRole('button', { name: 'Start Checkout' }));
 
@@ -217,6 +231,7 @@ describe('BillingProvider Checkout continuity', () => {
                 sessionId: 'session-fixture',
             },
             attemptId: 'replacement-attempt',
+            isCurrent: expect.any(Function),
         });
         expect(screen.queryByText(/CHECKOUT_EXPIRED/)).toBeNull();
     });
@@ -278,6 +293,7 @@ describe('BillingProvider Checkout continuity', () => {
 
         expect(screen.getByTestId('cloud-account')).toHaveTextContent('true');
         expect(screen.getByTestId('billing-ready')).toHaveTextContent('false');
+        expect(screen.getByTestId('entitlement-connection')).toHaveTextContent('reconnecting');
         expect(state.billingStatusOptions).toMatchObject({
             lifecycle: {
                 provider: 'dropbox',
@@ -293,7 +309,17 @@ describe('BillingProvider Checkout continuity', () => {
 
         expect(screen.getByTestId('cloud-account')).toHaveTextContent('true');
         expect(screen.getByTestId('billing-ready')).toHaveTextContent('true');
+        expect(screen.getByTestId('entitlement-connection')).toHaveTextContent('ready');
         expect(state.billingStatusOptions).toMatchObject({ onlineRefreshEnabled: true });
+    });
+
+    it('publishes a distinct reconnect-required state after automatic restoration settles', () => {
+        state.isCloudConnected = false;
+
+        render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+
+        expect(screen.getByTestId('entitlement-plan')).toHaveTextContent('free');
+        expect(screen.getByTestId('entitlement-connection')).toHaveTextContent('reconnect_required');
     });
 
     it('keeps the billing cache intact while provider identity is still loading', () => {
@@ -301,5 +327,34 @@ describe('BillingProvider Checkout continuity', () => {
         render(<BillingProvider><CheckoutProbe /></BillingProvider>);
 
         expect(state.billingStatusOptions).toMatchObject({ lifecycleLoading: true });
+    });
+
+    it('treats a moved-source device as needing reconnection, not as a fresh purchase prospect', () => {
+        state.isCloudConnected = false;
+        state.movedToStorageProvider = 'google-drive';
+        render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+        expect(screen.getByTestId('entitlement-connection')).toHaveTextContent('reconnect_required');
+    });
+
+    it('never treats a partial or mismatched hosted identity as a fresh account-free browser', () => {
+        state.hostedSessionId = 'mismatched-session';
+        const view = render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+        expect(state.billingStatusOptions).toMatchObject({ lifecycle: null, onlineRefreshEnabled: false });
+        expect(screen.getByTestId('entitlement-connection')).toHaveTextContent('reconnect_required');
+        state.isConnecting = true;
+        view.rerender(<BillingProvider><CheckoutProbe /></BillingProvider>);
+        expect(screen.getByTestId('entitlement-connection')).toHaveTextContent('reconnecting');
+    });
+
+    it('does not publish or hand off a delayed Checkout for the previous cloud account', async () => {
+        let resolve!: (value: unknown) => void;
+        state.createCheckout.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+        const view = render(<BillingProvider><CheckoutProbe /></BillingProvider>);
+        fireEvent.click(screen.getByRole('button', { name: 'Start Checkout' }));
+        state.sessionId = 'different-session';
+        view.rerender(<BillingProvider><CheckoutProbe /></BillingProvider>);
+        await act(async () => resolve({ url: 'https://checkout.stripe.com/old', attemptId: 'old-attempt' }));
+        expect(screen.getByText(/cloud account changed/i)).toBeInTheDocument();
+        expect(state.writePending).not.toHaveBeenCalled();
     });
 });

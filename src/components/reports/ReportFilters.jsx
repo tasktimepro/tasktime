@@ -1,3 +1,4 @@
+import { CategoryLabel } from '@/components/expenses/CategoryLabel';
 import PropTypes from 'prop-types';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -154,7 +155,7 @@ function ReportFilters({
                                     <SelectItem value="all">All categories</SelectItem>
                                     {categories.map((category) => (
                                         <SelectItem key={category.id} value={category.id}>
-                                            {category.name}
+                                            <CategoryLabel category={category} />
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

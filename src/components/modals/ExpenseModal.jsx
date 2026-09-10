@@ -1,3 +1,4 @@
+import { CategoryLabel } from '@/components/expenses/CategoryLabel';
 /**
  * ExpenseModal component - Modal for creating and editing expenses
  */
@@ -11,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Notice } from '@/components/ui/notice';
+import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import CustomCheckbox from '../CustomCheckbox';
 import RecurringPicker from '../task/RecurringPicker';
 import CurrencySelect from '@/components/ui/currency-select';
@@ -293,6 +295,7 @@ const applyScopedProjectContext = (nextFormData, scopedProject, businessInfos, d
  * @param {Function} props.saveFormState
  * @param {Function} props.getSavedState
  * @param {Function} props.clearSavedState
+ * @param {Function} props.openExpenseCategoriesModal
  */
 const ExpenseModal = ({
     isOpen,
@@ -302,19 +305,25 @@ const ExpenseModal = ({
     saveFormState,
     getSavedState,
     clearSavedState,
+    openExpenseCategoriesModal,
 }) => {
     const { showSuccess, showError } = useToast();
     const {
         expenses,
+        getExpense,
         createExpenseWithPaymentSnapshot,
+        updateExpense,
         updateExpenseWithPaymentSnapshot,
         deleteExpense,
+        isLoading: expensesLoading,
+        error: expensesError,
+        retryHistory,
     } = useExpenses({ includeArchived: true });
     const { createRecurrence, getRecurrence, updateRecurrence, deleteRecurrence } = useExpenseRecurrences();
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
     const { businessInfos, defaultBusinessInfo } = useBusinessInfos();
-    const { expenseCategories } = useExpenseCategories({ seedDefaults: true });
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories({ seedDefaults: true });
     const { preferences } = usePreferences();
     const { paymentMethods, defaultPaymentMethod } = usePaymentMethods();
 
@@ -353,6 +362,8 @@ const ExpenseModal = ({
     const defaultCurrency = preferences.currency || DEFAULT_CURRENCY;
     const emptyFormData = useMemo(() => buildEmptyFormData(todayString, defaultCurrency), [defaultCurrency, todayString]);
     const [confirmDialog, setConfirmDialog] = useState(null);
+    const [categoryPropagation, setCategoryPropagation] = useState(null);
+    const [isApplyingCategory, setIsApplyingCategory] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const saveInFlightRef = useRef(false);
     const [activeSuggestionField, setActiveSuggestionField] = useState(null);
@@ -436,10 +447,17 @@ const ExpenseModal = ({
         const currentEditingRecurrenceId = modalOptions?.recurrenceId || null;
         const savedState = getSavedState ? getSavedState() : null;
         const savedEditingExpenseId = savedState?.editingExpenseId || null;
+        const savedEditingRecurrenceId = savedState?.editingRecurrenceId || null;
 
-        if (savedState && savedEditingExpenseId === currentEditingExpenseId) {
+        if (
+            savedState
+            && savedEditingExpenseId === currentEditingExpenseId
+            && savedEditingRecurrenceId === currentEditingRecurrenceId
+        ) {
             const restoredFormData = { ...savedState };
             delete restoredFormData.editingExpenseId;
+            delete restoredFormData.editingRecurrenceId;
+            delete restoredFormData.timestamp;
 
             return {
                 key: draftStateKey,
@@ -662,6 +680,8 @@ const ExpenseModal = ({
 
     useEffect(() => {
         if (!isOpen) {
+            setCategoryPropagation(null);
+            setIsApplyingCategory(false);
             setDraftState({
                 key: 'closed',
                 formData: emptyFormData,
@@ -729,7 +749,7 @@ const ExpenseModal = ({
     }, [isOpen, missingRecurrenceId, showError]);
 
     useEffect(() => {
-        if (!saveFormState || !isOpen) {
+        if (!saveFormState || !isOpen || isSaving || categoryPropagation) {
             return;
         }
 
@@ -737,11 +757,12 @@ const ExpenseModal = ({
             saveFormState({
                 ...formData,
                 editingExpenseId: editingExpense?.id || null,
+                editingRecurrenceId: editingRecurrenceId || null,
             });
         }, 400);
 
         return () => clearTimeout(timeoutId);
-    }, [formData, saveFormState, editingExpense, isOpen]);
+    }, [categoryPropagation, editingExpense, editingRecurrenceId, formData, isOpen, isSaving, saveFormState]);
 
     const resolvedPaidBy = formData.paidBy || (!editingExpense && !editingRecurrenceId
         ? (defaultPaymentMethod?.id || '')
@@ -1164,11 +1185,46 @@ const ExpenseModal = ({
         setIsSaving(true);
 
         try {
+            let categoryPropagationRequest = null;
+
             if (isEditingTemplate) {
                 const existing = getRecurrence(editingRecurrenceId);
                 if (!existing) {
                     showError('Recurring expense not found');
                     return;
+                }
+
+                const previousCategoryId = existing.categoryId || null;
+                const nextCategoryId = payload.categoryId || null;
+                const categoryChanged = previousCategoryId !== nextCategoryId;
+
+                if (categoryChanged && expensesError) {
+                    retryHistory();
+                    showError('Expense history could not be loaded. Try saving again after it reloads.');
+                    return;
+                }
+
+                if (categoryChanged && expensesLoading) {
+                    showError('Expense history is still loading. Try saving again in a moment.');
+                    return;
+                }
+
+                if (categoryChanged) {
+                    const expenseIds = expenses
+                        .filter((expense) => (
+                            expense.recurrenceId === existing.id
+                            && (expense.categoryId || null) === previousCategoryId
+                        ))
+                        .map((expense) => expense.id);
+
+                    if (expenseIds.length > 0) {
+                        categoryPropagationRequest = {
+                            recurrenceId: existing.id,
+                            previousCategoryId,
+                            nextCategoryId,
+                            expenseIds,
+                        };
+                    }
                 }
 
                 updateRecurrence(editingRecurrenceId, {
@@ -1198,6 +1254,10 @@ const ExpenseModal = ({
                     taxRate: payload.taxRate,
                 });
                 showSuccess('Recurring expense updated');
+
+                if (categoryPropagationRequest) {
+                    setCategoryPropagation(categoryPropagationRequest);
+                }
             } else if (editingExpense) {
                 const updatedExpense = await updateExpenseWithPaymentSnapshot(editingExpense.id, payload);
                 if (!updatedExpense) {
@@ -1260,7 +1320,9 @@ const ExpenseModal = ({
                 clearSavedState();
             }
 
-            onClose();
+            if (!categoryPropagationRequest) {
+                onClose();
+            }
         } catch (error) {
             showError(error instanceof Error ? error.message : 'Unable to save expense');
         } finally {
@@ -1270,12 +1332,68 @@ const ExpenseModal = ({
     };
 
     const handleClose = () => {
+        setCategoryPropagation(null);
+        setIsApplyingCategory(false);
+
         if (clearSavedState) {
             clearSavedState();
         }
 
         onClose();
     };
+
+    const finishCategoryPropagation = () => {
+        setCategoryPropagation(null);
+        setIsApplyingCategory(false);
+
+        if (clearSavedState) {
+            clearSavedState();
+        }
+
+        onClose();
+    };
+
+    const applyCategoryToExistingExpenses = () => {
+        if (!categoryPropagation || isApplyingCategory) return;
+
+        setIsApplyingCategory(true);
+
+        try {
+            let updatedCount = 0;
+
+            categoryPropagation.expenseIds.forEach((expenseId) => {
+                const current = getExpense(expenseId);
+                if (
+                    !current
+                    || current.recurrenceId !== categoryPropagation.recurrenceId
+                    || (current.categoryId || null) !== categoryPropagation.previousCategoryId
+                ) {
+                    return;
+                }
+
+                if (updateExpense(expenseId, { categoryId: categoryPropagation.nextCategoryId })) {
+                    updatedCount += 1;
+                }
+            });
+
+            showSuccess(`${updatedCount} existing ${updatedCount === 1 ? 'expense' : 'expenses'} updated`);
+            finishCategoryPropagation();
+        } catch (error) {
+            setIsApplyingCategory(false);
+            showError(error instanceof Error ? error.message : 'Unable to update existing expense categories');
+        }
+    };
+
+    const categoryNameById = useMemo(() => new Map(
+        allExpenseCategories.map((category) => [category.id, category.name])
+    ), [allExpenseCategories]);
+    const propagatedCategoryName = categoryPropagation?.nextCategoryId
+        ? categoryNameById.get(categoryPropagation.nextCategoryId) || 'the selected category'
+        : 'no category';
+    const previousCategoryName = categoryPropagation?.previousCategoryId
+        ? categoryNameById.get(categoryPropagation.previousCategoryId) || 'its previous category'
+        : 'no category';
+    const propagationExpenseCount = categoryPropagation?.expenseIds.length || 0;
 
     const availableProjects = useMemo(() => {
         if (hasSelectedClient(formData.clientId)) {
@@ -1377,7 +1495,7 @@ const ExpenseModal = ({
                     {editingRecurrenceId && (
                         <Notice
                             title="Editing recurring expense"
-                            description="Changes apply to future expenses only."
+                            description="Changes apply to future expenses. If the category changes, you can also apply it to matching existing expenses after saving."
                         />
                     )}
 
@@ -1856,7 +1974,31 @@ const ExpenseModal = ({
                                 </Select>
                             </div>
                             <div className={`space-y-2 ${!formData.isPersonal ? 'md:col-span-2' : ''}`}>
-                                <Label htmlFor="expense-category">Category</Label>
+                                <InlineFieldHeader
+                                    className="mb-0"
+                                    action={openExpenseCategoriesModal ? (
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto p-0"
+                                            onClick={() => {
+                                                if (saveFormState) {
+                                                    saveFormState({
+                                                        ...formData,
+                                                        editingExpenseId: editingExpense?.id || null,
+                                                        editingRecurrenceId: editingRecurrenceId || null,
+                                                    });
+                                                }
+                                                openExpenseCategoriesModal();
+                                            }}
+                                        >
+                                            Manage categories
+                                        </Button>
+                                    ) : null}
+                                >
+                                    <Label htmlFor="expense-category">Category</Label>
+                                </InlineFieldHeader>
                                 <Select
                                     value={formData.categoryId || ''}
                                     onValueChange={(value) => handleChange('categoryId', value === NO_CATEGORY_VALUE ? '' : value)}
@@ -1868,9 +2010,9 @@ const ExpenseModal = ({
                                         {formData.categoryId && (
                                             <SelectItem value={NO_CATEGORY_VALUE}>No category</SelectItem>
                                         )}
-                                        {expenseCategories.map((category) => (
+                                        {allExpenseCategories.filter(category => !category.archived || category.id === formData.categoryId).map((category) => (
                                             <SelectItem key={category.id} value={category.id}>
-                                                {category.name}
+                                                <CategoryLabel category={category} />
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -2001,6 +2143,31 @@ const ExpenseModal = ({
                     ? `Deleting "${editingExpense.title}" cannot be undone.`
                     : 'Deleting this expense cannot be undone.'}
                 variant="destructive"
+            />
+        </Modal>
+
+        <Modal
+            isOpen={Boolean(categoryPropagation)}
+            onClose={finishCategoryPropagation}
+            title="Update existing expenses?"
+            description="The recurring expense was saved. Choose whether its category should also update matching existing expenses."
+            size="md"
+            footer={(
+                <div className="flex flex-row flex-wrap justify-end gap-2">
+                    <Button variant="outline" disabled={isApplyingCategory} onClick={finishCategoryPropagation}>
+                        Future expenses only
+                    </Button>
+                    <Button disabled={isApplyingCategory} onClick={applyCategoryToExistingExpenses}>
+                        {isApplyingCategory
+                            ? 'Updating…'
+                            : `Update ${propagationExpenseCount} existing ${propagationExpenseCount === 1 ? 'expense' : 'expenses'}`}
+                    </Button>
+                </div>
+            )}
+        >
+            <Notice
+                title={`Category changed to ${propagatedCategoryName}`}
+                description={`${propagationExpenseCount} existing ${propagationExpenseCount === 1 ? 'expense' : 'expenses'} from this recurrence still ${propagationExpenseCount === 1 ? 'has' : 'have'} ${previousCategoryName}. Individually changed categories will be preserved.`}
             />
         </Modal>
         </>

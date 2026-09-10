@@ -78,6 +78,44 @@ Approval-gated Phase 4 production target
   and task controls. Invoice claim checks and persisted snapshots remain separate.
   Invoice previews/selectors and report eligibility evaluate complete legacy
   source evidence before filtering to the current project or visible period.
+- `taskStateOperations` owns persisted recurrence pause/resume normalization for browser
+  hooks and agent updates; `recurringUtils` applies it to scheduling consumers.
+  `TaskRecurrenceMenuItem` exposes explicit Disable recurrence/Enable recurrence
+  actions with calendar-off/calendar-check icons through
+  both task menu variants. `TaskModal` saves schedule settings without the
+  menu-owned control fields. `StartDateBadge` swaps a disabled task's recurrence
+  schedule tag for the shared calendar-off `TaskRecurrenceDisabledBadge`; task
+  details reuse that badge inline with the repeat description in Schedule while
+  keeping task titles free of status decoration.
+- `CategoryLabel` and `CategoryColorDot` render optional expense-category identity
+  using the existing color-picker palette and compact dashboard expense-dot pattern; expense
+  cards use the same validated color on their left border without a duplicate dot,
+  and Planner expense items resolve that category color dynamically while retaining
+  a neutral border when no valid category color exists. Expense accents never fall
+  back to their associated project or client. Category records remain in the core
+  Yjs collection. Expenses and recurrences
+  reference those records by ID. `ExpenseModal` limits optional recurrence
+  propagation to linked instances that still match the prior category and uses
+  `ModalManager`'s existing modal stack and saved form state for its inline
+  category manager. Stack drafts are transient refs scoped by entity/template
+  identity, restored only across nested-modal returns, and cleared at completed
+  or intentionally closed root boundaries. Account sign-in reuses the provider auth hooks.
+  Retained Dropbox retries publish their auth result to other mounted consumers
+  through the existing auth-change channel so the Yjs connection also recovers.
+- `ProjectColorIcon` owns the read-only project-color precedence used by the
+  Dashboard Projects widget and project-detail heading: project color, associated
+  client color, then the neutral UI token. Planner and the Projects index use the
+  shared closed-folder `ProjectIcon` for project semantics without adding stored
+  fields or duplicating card-level color markers; the index heading explicitly
+  uses the neutral muted-foreground token rather than the dashboard info accent.
+- `ClientColorIcon` owns the matching read-only single-user identity in the client
+  dashboard heading: saved valid client color, then the neutral UI token. The
+  Clients index uses the shared `UserGroupIcon` with the same neutral heading
+  treatment; project-card client controls route through `navigateToClient`
+  without changing the project relationship.
+- `ProjectCardDetailsLayout` owns the responsive lower-card split shared by
+  `ProjectList` and `ClientDashboard`: project details flex on the left while
+  compact invoice and deadline pills align on the right and wrap when required.
 - Domain modules remain UI-independent and receive explicit inputs/dependencies.
 - Expenses `expenseOverviewMetrics.ts` derives read-only projections from
   `useExpenses({ includeArchived: true })`, existing recurrence previews, and
@@ -103,6 +141,15 @@ Approval-gated Phase 4 production target
   Google requirement when Dropbox is active.
 - Agent commands call the same store/domain behaviors as the UI and never expose raw Yjs access to MCP clients.
 - Locally implemented Pro enforcement is action-based through one pure entitlement policy; production switches remain false.
+  `BillingContext` publishes its derived `entitlementState` with independent plan
+  and connection dimensions, and the shared Get Pro action policy drives both
+  Plan & Billing and Reports presentation. The Reports shell passes both into
+  locked advanced previews so fresh acquisition, offline, automatic reconnect,
+  and explicit reconnect remain distinct UI states.
+  The shared recovery classifier also owns client-limit and hosted-email
+  notices. `useBillingStatus` enforces open-tab expiry/clock safety, separates
+  offline key lifetime from HTTP freshness, and removes stale online actions;
+  billing storage and action callbacks fence delayed work to its exact account.
   It gates only transitions that create or restore another active client,
   advanced Reports/exports, and TaskTime-hosted Send—not `/reports`, its current-
   month Overview, visible static tab previews, shared calculations, or underlying
@@ -110,7 +157,8 @@ Approval-gated Phase 4 production target
   section-specific preview, or a lazy advanced module before protected history or
   report data is collected. Browser and agent adapters share client transition
   and report-scope policy; Worker-cost email rechecks canonical server state and
-  quota independently. Only a verified lifecycle-bound assertion authorizes an
+  quota independently. The first client is safe under every plan even while
+  status is unresolved; only a verified lifecycle-bound assertion authorizes an
   unlimited-client transition or advanced Reports.
 - The operator checkout's default `make dev` stack supplies an explicitly
   flagged Vite-development and loopback-only input to `BillingContext`. It keeps

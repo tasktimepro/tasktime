@@ -44,9 +44,11 @@ const expenseCategoryState = vi.hoisted(() => ({
     ],
 }));
 
+const urlState = vi.hoisted(() => ({ section: 'all' }));
+
 vi.mock('@/hooks/useUrlState.ts', () => ({
     useUrlState: () => ({
-        urlParams: { section: 'all', create: null },
+        urlParams: { section: urlState.section, create: null },
         updateUrl: vi.fn(),
     }),
 }));
@@ -62,7 +64,7 @@ vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
 vi.mock('@/hooks/useClients.ts', () => ({
     useClients: () => ({
         clients: [
-            { id: 'client-1', title: 'Acme Co', archived: false },
+            { id: 'client-1', title: 'Acme Co', archived: false, color: '#3b82f6' },
         ],
     }),
 }));
@@ -70,10 +72,10 @@ vi.mock('@/hooks/useClients.ts', () => ({
 vi.mock('@/hooks/useProjects.ts', () => ({
     useProjects: () => ({
         projects: [
-            { id: 'project-1', title: 'Website', archived: false, preferredClientId: 'client-1' },
+            { id: 'project-1', title: 'Website', archived: false, preferredClientId: 'client-1', color: '#22c55e' },
         ],
         getProjectsByClient: vi.fn(() => [
-            { id: 'project-1', title: 'Website', archived: false, preferredClientId: 'client-1' },
+            { id: 'project-1', title: 'Website', archived: false, preferredClientId: 'client-1', color: '#22c55e' },
         ]),
     }),
 }));
@@ -122,8 +124,33 @@ describe('Expenses', () => {
         expensesState.expenses = [];
         expensesState.isLoading = false;
         expensesState.error = null;
+        recurrenceState.recurrences = [];
         expenseCategoryState.allExpenseCategories = undefined;
+        urlState.section = 'all';
         window.matchMedia = createMatchMedia();
+    });
+
+    it('uses the expense category color for recurring cards instead of project or client colors', () => {
+        urlState.section = 'recurring';
+        expenseCategoryState.allExpenseCategories = [{ id: 'software', name: 'Software', color: '#ef4444', archived: false }];
+        recurrenceState.recurrences = [{
+            id: 'recurrence-1',
+            title: 'Monthly Hosting',
+            categoryId: 'software',
+            clientId: 'client-1',
+            projectId: 'project-1',
+            repeat: 'monthly',
+            startDate: '2026-09-01',
+            amount: 20,
+            amountType: 'fixed',
+            currency: 'EUR',
+            active: true,
+        }];
+
+        render(<Expenses openExpenseModal={vi.fn()} openExpenseView={vi.fn()} />);
+
+        const card = screen.getByText('Monthly Hosting').closest('.border-l-4');
+        expect(card).toHaveStyle({ borderLeftColor: '#ef4444' });
     });
 
     it('adds paid spending summaries while keeping old outstanding expenses visible', () => {
@@ -200,6 +227,22 @@ describe('Expenses', () => {
         );
 
         expect(screen.getByRole('tab', { name: 'Outstanding (1)' }).className.includes('status-warning-tab')).toBe(false);
+    });
+
+    it('keeps desktop status tabs horizontally scrollable without vertical overflow', () => {
+        render(
+            <Expenses
+                openExpenseModal={vi.fn()}
+                openExpenseView={vi.fn()}
+                openPaymentMethodModal={vi.fn()}
+                editPaymentMethodModal={vi.fn()}
+                openBusinessModal={vi.fn()}
+                editBusinessModal={vi.fn()}
+            />
+        );
+
+        const tabList = screen.getByRole('tab', { name: 'Outstanding (0)' }).closest('[role="tablist"]');
+        expect(tabList).toHaveClass('overflow-x-auto', 'overflow-y-hidden');
     });
 
     it('uses the invoice-style pill tabs on mobile without the scroll-strip classes', () => {

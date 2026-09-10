@@ -22,6 +22,7 @@ import { DEFAULT_CURRENCY, formatCurrency, getProjectCurrency } from '@/utils/cu
 import { differenceInCalendarDays, endOfDay, parseISO, startOfDay } from 'date-fns';
 import TimerControls from '../TimerControls';
 import TaskActionsMenu from '../task/TaskActionsMenu';
+import TaskRecurrenceDisabledBadge from '../task/TaskRecurrenceDisabledBadge';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useTimers } from '@/hooks/useTimers';
 import { linkifyNodes } from '@/utils/linkifyUtils';
@@ -725,7 +726,12 @@ const TaskViewModal = ({
                                     <p>Start date: {startDateLabel}</p>
                                 )}
                                 {currentTask.recurring && (
-                                    <p>Repeats: {recurringLabel}</p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span>Repeats: {recurringLabel}</span>
+                                        {currentTask.recurring.paused && (
+                                            <TaskRecurrenceDisabledBadge />
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>

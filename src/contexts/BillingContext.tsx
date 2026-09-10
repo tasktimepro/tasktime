@@ -1,8 +1,12 @@
-import React, { useCallback, useContext, useEffect, useMemo } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { BillingContext } from './BillingContext.shared';
 import { BILLING_FEATURES } from '@/config/billingFeatures';
 import { buildLocalReviewBillingCatalog } from '@/config/localReviewPricing';
 import type { EntitlementResolution } from '@/domain/entitlements/entitlementTypes';
+import {
+    deriveEntitlementState,
+    type EntitlementState,
+} from '@/domain/entitlements/entitlementPolicy';
 import { useBillingStatus } from '@/hooks/useBillingStatus';
 import {
     billingClient,
@@ -31,6 +35,7 @@ export type BillingContextValue = {
     isBillingConnectionReady: boolean;
     isBillingReconnecting: boolean;
     connectedAccountReference: string | null;
+    entitlementState: EntitlementState;
     refresh: () => Promise<void>;
     startTrial: () => Promise<void>;
     createCheckout: (
@@ -57,6 +62,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         isCloudConnected,
         isConnecting,
         isCloudIdentityLoading,
+        hadPreviousCloudSession,
     } = useYjs();
     const lifecycle = useMemo(() => {
         // The exact persisted account binding remains usable for signed offline
@@ -83,8 +89,14 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         && !isCloudIdentityLoading,
     );
     const isBillingReconnecting = Boolean(
-        lifecycle
-        && (isConnecting || isCloudIdentityLoading),
+        isConnecting || isCloudIdentityLoading,
+    );
+    const needsCloudReconnect = Boolean(
+        !isConnecting
+        && !isCloudIdentityLoading
+        && ((hadPreviousCloudSession && !isCloudConnected)
+            // Partial/mismatched account evidence is not a pristine browser.
+            || (!lifecycle && (activeStorageSessionId || hostedServiceSessionId || isCloudConnected))),
     );
     const localCatalogFallback = useMemo<BillingCatalogV1 | null>(() => (
         BILLING_FEATURES.localCatalogFallback
@@ -101,6 +113,30 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
     });
     const billing = liveBilling;
     const { refresh, status } = billing;
+    const activeActionLifecycle = useRef(lifecycle);
+    activeActionLifecycle.current = lifecycle;
+    const assertCurrentAccount = useCallback(() => {
+        if (activeActionLifecycle.current !== lifecycle) {
+            throw new Error('The cloud account changed. Review the current plan before continuing.');
+        }
+    }, [lifecycle]);
+    const entitlementState = useMemo(() => deriveEntitlementState({
+        resolution: billing.resolution,
+        offline: billing.offline,
+        hasActiveCloudAccount: Boolean(lifecycle),
+        isCloudAccountLoading: isCloudIdentityLoading,
+        isBillingConnectionReady,
+        isBillingReconnecting,
+        needsCloudReconnect,
+    }), [
+        billing.offline,
+        billing.resolution,
+        isBillingConnectionReady,
+        isBillingReconnecting,
+        isCloudIdentityLoading,
+        lifecycle,
+        needsCloudReconnect,
+    ]);
     const announceRefresh = useCallback(() => {
         if (typeof BroadcastChannel === 'undefined') return;
         const channel = new BroadcastChannel('tasktime-billing-refresh-v1');
@@ -116,25 +152,30 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         return () => channel.close();
     }, [refresh]);
     const refreshCanonicalStatus = useCallback(async () => {
+        assertCurrentAccount();
         if (!lifecycle || !isBillingConnectionReady) throw new Error('BILLING_DISABLED');
         await billingClient.refresh(lifecycle.sessionId, 'user_retry');
+        assertCurrentAccount();
         announceRefresh();
         await refresh();
-    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh]);
+    }, [announceRefresh, assertCurrentAccount, isBillingConnectionReady, lifecycle, refresh]);
     const startTrial = useCallback(async () => {
+        assertCurrentAccount();
         if (!BILLING_FEATURES.trialActivation
             || !lifecycle
             || !isBillingConnectionReady
             || !status?.actions.trialActivationEnabled) throw new Error('BILLING_DISABLED');
         await billingClient.startTrial(lifecycle.sessionId);
+        assertCurrentAccount();
         announceRefresh();
         await refresh();
-    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh, status]);
+    }, [announceRefresh, assertCurrentAccount, isBillingConnectionReady, lifecycle, refresh, status]);
     const createCheckout = useCallback(async (
         offerId: string,
         planConfigVersion: string,
         billingContactEmail?: string,
     ) => {
+        assertCurrentAccount();
         if (!BILLING_FEATURES.checkout
             || !lifecycle
             || !isBillingConnectionReady
@@ -156,11 +197,14 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         try {
             result = await openCheckout();
         } catch (error) {
+            assertCurrentAccount();
             if (error instanceof BillingClientError && error.code === 'CHECKOUT_EXPIRED') {
                 await refresh();
+                assertCurrentAccount();
                 try {
                     result = await openCheckout();
                 } catch (retryError) {
+                    assertCurrentAccount();
                     if (isChangedCheckoutOffer(retryError)) {
                         await refresh();
                         announceRefresh();
@@ -177,35 +221,48 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
                 throw error;
             }
         }
-        await writePendingBillingCheckout({ lifecycle, attemptId: result.attemptId });
+        assertCurrentAccount();
+        await writePendingBillingCheckout({
+            lifecycle, attemptId: result.attemptId,
+            isCurrent: () => activeActionLifecycle.current === lifecycle,
+        });
+        assertCurrentAccount();
         announceRefresh();
         return result;
-    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh, status]);
+    }, [announceRefresh, assertCurrentAccount, isBillingConnectionReady, lifecycle, refresh, status]);
     const openPortal = useCallback(async () => {
+        assertCurrentAccount();
         if (!lifecycle
             || !isBillingConnectionReady
             || !status?.actions.portalAvailable) throw new Error('BILLING_DISABLED');
         const result = await billingClient.createPortal(lifecycle.sessionId);
+        assertCurrentAccount();
         return result.url;
-    }, [isBillingConnectionReady, lifecycle, status]);
+    }, [assertCurrentAccount, isBillingConnectionReady, lifecycle, status]);
     const handleCheckoutReturn = useCallback(async (outcome: 'success' | 'cancel') => {
+        assertCurrentAccount();
         if (!lifecycle || !isBillingConnectionReady) throw new Error('BILLING_DISABLED');
         const pending = await readPendingBillingCheckout(lifecycle);
+        assertCurrentAccount();
         if (outcome === 'cancel' && pending) {
             await billingClient.abandonCheckout(lifecycle.sessionId, pending.attemptId);
         } else if (outcome === 'success') {
             await billingClient.refresh(lifecycle.sessionId, 'checkout_return');
         }
-        await clearPendingBillingCheckout();
+        assertCurrentAccount();
+        await clearPendingBillingCheckout(lifecycle);
+        assertCurrentAccount();
         announceRefresh();
         await refresh();
-    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh]);
+    }, [announceRefresh, assertCurrentAccount, isBillingConnectionReady, lifecycle, refresh]);
     const handlePortalReturn = useCallback(async () => {
+        assertCurrentAccount();
         if (!lifecycle || !isBillingConnectionReady) throw new Error('BILLING_DISABLED');
         await billingClient.refresh(lifecycle.sessionId, 'portal_return');
+        assertCurrentAccount();
         announceRefresh();
         await refresh();
-    }, [announceRefresh, isBillingConnectionReady, lifecycle, refresh]);
+    }, [announceRefresh, assertCurrentAccount, isBillingConnectionReady, lifecycle, refresh]);
     const value = useMemo<BillingContextValue>(() => ({
         ...billing,
         refresh: refreshCanonicalStatus,
@@ -214,6 +271,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         isBillingConnectionReady,
         isBillingReconnecting,
         connectedAccountReference: billing.status?.account.accountReference ?? null,
+        entitlementState,
         startTrial,
         createCheckout,
         openPortal,
@@ -226,6 +284,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         isCloudIdentityLoading,
         isBillingConnectionReady,
         isBillingReconnecting,
+        entitlementState,
         startTrial,
         createCheckout,
         openPortal,

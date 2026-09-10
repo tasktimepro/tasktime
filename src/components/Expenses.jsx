@@ -46,6 +46,7 @@ import ExpenseFilters from '@/components/expenses/ExpenseFilters';
 import PaymentMethods from '@/components/PaymentMethods';
 import BusinessInfo from '@/components/BusinessInfo';
 import ExpenseCategoryManagerModal from '@/components/modals/ExpenseCategoryManagerModal';
+import { getExpenseCategoryColor } from '@/components/expenses/CategoryLabel';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { FilterIcon, MagnifyingGlassIcon, XMarkIcon } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
@@ -600,11 +601,11 @@ const Expenses = ({
     }, [projects]);
     const expenseCategoriesById = useMemo(() => {
         const map = new Map();
-        expenseCategories.forEach((category) => {
+        allExpenseCategories.forEach((category) => {
             map.set(category.id, category);
         });
         return map;
-    }, [expenseCategories]);
+    }, [allExpenseCategories]);
 
     const handleTogglePaid = async (expense) => {
         if (expense.paymentStatus === 'paid') {
@@ -848,7 +849,7 @@ const Expenses = ({
                                     'w-full bg-transparent rounded-none',
                                     isMobileLayout
                                         ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
-                                        : 'h-auto justify-start gap-2 overflow-x-auto whitespace-nowrap border-b border-border p-0'
+                                        : 'h-auto justify-start gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-border p-0'
                                 )}>
                                     <TabsTrigger
                                         value="outstanding"
@@ -940,9 +941,8 @@ const Expenses = ({
                                 {sortedRecurrences.map((recurrence) => {
                                     const clientLabel = recurrence.clientId && clientsById.get(recurrence.clientId)?.title;
                                     const projectLabel = recurrence.projectId && projectsById.get(recurrence.projectId)?.title;
-                                    const client = recurrence.clientId ? clientsById.get(recurrence.clientId) : null;
-                                    const project = recurrence.projectId ? projectsById.get(recurrence.projectId) : null;
-                                    const borderColor = project?.color || client?.color || null;
+                                    const category = recurrence.categoryId ? expenseCategoriesById.get(recurrence.categoryId) : null;
+                                    const borderColor = getExpenseCategoryColor(category);
                                     const contextLabel = recurrence.isPersonal
                                         ? 'Personal'
                                         : (projectLabel || clientLabel || 'Assigned');

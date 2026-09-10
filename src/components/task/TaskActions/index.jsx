@@ -130,6 +130,7 @@ const TaskActions = ({
 
                     {onDelete && !hideNonTimerActions && (
                         <TaskDropdown
+                            task={task}
                             onEdit={onEdit}
                             onDelete={onDelete}
                         />

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { useClients } from '@/hooks/useClients';
 import { countActiveClients } from '@/domain/entitlements/activeClientPolicy';
+import { evaluateGetProAction } from '@/domain/entitlements/entitlementPolicy';
 
 function trialRemaining(endsAt: string | null): string | null {
     if (!endsAt) return null;
@@ -49,11 +50,9 @@ function billingActionErrorMessage(error: unknown): string {
 
 export function BillingPanel({
     onOpenSync,
-    cloudSyncNeedsReconnect = false,
     connectedAccountEmail = null,
 }: {
     onOpenSync: () => void;
-    cloudSyncNeedsReconnect?: boolean;
     connectedAccountEmail?: string | null;
 }) {
     const billing = useBilling();
@@ -77,8 +76,9 @@ export function BillingPanel({
     const trialTime = trialRemaining(snapshot?.trialEndsAt ?? null);
     const activeClientCount = countActiveClients(clients);
     const activeClientLimit = snapshot?.limits?.activeClients;
-    const currentPlan = snapshot
-        ? (snapshot.accessStatus === 'free' ? 'free' : 'pro')
+    const currentPlan = billing.entitlementState.verified
+        && billing.entitlementState.plan !== 'unknown'
+        ? billing.entitlementState.plan
         : null;
     const isComplimentaryPro = currentPlan === 'pro'
         && snapshot?.source === 'grant'
@@ -156,10 +156,10 @@ export function BillingPanel({
 
     const actionPhrase = deferredAction ? deferredActionPhrase(deferredAction) : null;
     const foundingAvailability = foundingOffer?.founding?.availability ?? null;
-    const cloudActionLabel = billing.hasActiveCloudAccount
-        ? 'Refresh billing status'
-        : cloudSyncNeedsReconnect
-            ? 'Reconnect Cloud Sync'
+    const cloudActionLabel = billing.entitlementState.connection === 'reconnect_required'
+        ? 'Reconnect Cloud Sync'
+        : billing.hasActiveCloudAccount
+            ? 'Refresh billing status'
             : 'Set up Cloud Sync';
     const canRenderPlans = Boolean((freePlan && proPlan) || status);
     const freePlanName = freePlan?.displayName ?? 'Free';
@@ -195,9 +195,16 @@ export function BillingPanel({
     const trialEligible = status
         && snapshot?.accessStatus === 'free'
         && snapshot.trialStatus === 'eligible';
-    const checkoutAvailable = Boolean(status
-        && currentOffer
-        && !(snapshot?.source === 'grant' && snapshot.sourceExpiresAt === null));
+    const getProAction = evaluateGetProAction({
+        entitlementState: billing.entitlementState,
+        hasCanonicalStatus: Boolean(status),
+        hasCheckoutOffer: Boolean(currentOffer),
+        catalogPurchaseEnabled: billing.catalog?.purchaseEnabled === true,
+        proOfferCount: proPlan?.offers.length ?? 0,
+        isPermanentComplimentaryPro: isComplimentaryPro,
+    });
+    const checkoutAvailable = getProAction.mode === 'checkout';
+    const deferredGetProAvailable = getProAction.mode === 'deferred';
     const canManageBilling = Boolean(
         status?.actions.portalAvailable
         && currentPlan === 'pro'
@@ -354,17 +361,35 @@ export function BillingPanel({
                                 {!status ? (
                                     <>
                                         {currentPlan === 'pro' ? (
-                                            <>
+                                            <div className="space-y-3">
                                                 <p className="text-sm text-muted-foreground">
                                                     This device has a verified Pro plan. Pro remains available while TaskTime reconnects;
                                                     online billing controls return after the connected account is ready.
                                                 </p>
-                                            </>
-                                        ) : billing.isCloudAccountLoading
-                                            || (billing.hasActiveCloudAccount
-                                                && !billing.isBillingConnectionReady) ? (
+                                                {billing.entitlementState.connection === 'reconnect_required' ? (
+                                                    <Button leadingIcon={RefreshCw} onClick={onOpenSync}>
+                                                        Reconnect Cloud Sync
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        ) : billing.entitlementState.connection === 'reconnect_required' ? (
+                                                <div className="space-y-3">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Reconnect Cloud Sync to confirm the plan already associated with this browser before starting a new trial or purchase.
+                                                    </p>
+                                                    <Button leadingIcon={RefreshCw} onClick={onOpenSync}>
+                                                        Reconnect Cloud Sync
+                                                    </Button>
+                                                </div>
+                                            ) : billing.isCloudAccountLoading
+                                                || (billing.hasActiveCloudAccount
+                                                    && !billing.isBillingConnectionReady) ? (
                                                 <p className="text-sm text-muted-foreground" aria-live="polite">
                                                     Reconnecting your TaskTime cloud account and confirming its plan. Nothing has changed on this device.
+                                                </p>
+                                            ) : billing.hasActiveCloudAccount ? (
+                                                <p className="text-sm text-muted-foreground">
+                                                    TaskTime could not confirm this cloud account's current plan. Refresh billing status before starting a trial or purchase.
                                                 </p>
                                             ) : (
                                             <>
@@ -386,7 +411,7 @@ export function BillingPanel({
                                                         className="ml-auto flex flex-wrap justify-end gap-2"
                                                         data-testid="pro-plan-actions-right"
                                                     >
-                                                        {billing.catalog?.purchaseEnabled && (proPlan?.offers.length ?? 0) > 0 ? (
+                                                        {deferredGetProAvailable ? (
                                                             <Button
                                                                 leadingIcon={Rocket}
                                                                 onClick={() => setDeferredAction('checkout')}
@@ -407,15 +432,11 @@ export function BillingPanel({
                                                             <p>
                                                                 {billing.hasActiveCloudAccount
                                                                     ? 'Cloud Sync is connected, but TaskTime could not confirm the current plan. Nothing has started yet. Refresh billing status, then try again.'
-                                                                    : cloudSyncNeedsReconnect
-                                                                        ? 'Cloud Sync is already set up. Reconnect it to confirm your TaskTime account for trials and subscriptions. Nothing has started yet, and your chosen sync mode stays unchanged.'
-                                                                        : 'TaskTime uses your selected Google Drive or Dropbox connection to identify the account for trials and subscriptions. Nothing has started yet. Set up Cloud Sync, then return here; your chosen sync mode stays unchanged.'}
+                                                                    : 'TaskTime uses your selected Google Drive or Dropbox connection to identify the account for trials and subscriptions. Nothing has started yet. Set up Cloud Sync, then return here; your chosen sync mode stays unchanged.'}
                                                             </p>
                                                             <Button
                                                                 variant={billing.hasActiveCloudAccount ? 'secondary' : 'default'}
-                                                                leadingIcon={billing.hasActiveCloudAccount || cloudSyncNeedsReconnect
-                                                                    ? RefreshCw
-                                                                    : Cloud}
+                                                                leadingIcon={billing.hasActiveCloudAccount ? RefreshCw : Cloud}
                                                                 disabled={busyAction !== null}
                                                                 onClick={billing.hasActiveCloudAccount
                                                                     ? () => void run('refresh', billing.refresh)

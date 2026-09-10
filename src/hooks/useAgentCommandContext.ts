@@ -24,6 +24,8 @@ export function useAgentCommandContext(): AgentCommandContext {
     } = useYjs();
     const { revokeAccess } = useGoogleAuth();
     const { resolution: entitlementResolution } = useBilling();
+    const currentResolution = useRef(entitlementResolution);
+    currentResolution.current = entitlementResolution;
     const idempotencyRef = useRef(new Map<string, unknown>());
 
     return useMemo(() => ({
@@ -39,9 +41,9 @@ export function useAgentCommandContext(): AgentCommandContext {
         },
         driveSessionId,
         hostedServiceSessionId,
-        entitlementResolution,
+        get entitlementResolution() { return currentResolution.current; },
         activeStorageProvider,
         activeStorageGeneration,
         activeStorageSessionId,
-    }), [store, isReady, clearAllData, restoreBackupData, disconnectActiveCloudSession, revokeAccess, driveSessionId, hostedServiceSessionId, entitlementResolution, activeStorageProvider, activeStorageGeneration, activeStorageSessionId]);
+    }), [store, isReady, clearAllData, restoreBackupData, disconnectActiveCloudSession, revokeAccess, driveSessionId, hostedServiceSessionId, activeStorageProvider, activeStorageGeneration, activeStorageSessionId]);
 }

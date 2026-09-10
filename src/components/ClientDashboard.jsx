@@ -36,6 +36,8 @@ import ClientDeleteDialog from './modals/ClientDeleteDialog';
 import ClientArchiveDialog from './modals/ClientArchiveDialog';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
+import ProjectCardDetailsLayout from './ProjectCardDetailsLayout';
+import ClientColorIcon from './ClientColorIcon';
 
 /**
  * ClientDashboard component - Main dashboard view for a selected client
@@ -505,45 +507,49 @@ const ClientDashboard = ({
                 onClick={() => navigateToProject(project.id)}
             >
                 <CardContent className={cn('flex min-h-full flex-1 flex-col', isMobileLayout ? 'p-4' : 'p-4 pt-5')}>
-                    <div className="space-y-2">
-                        <div className="flex min-w-0 flex-wrap items-start gap-2">
-                            <h3 className="min-w-0 flex-1 whitespace-normal break-words [overflow-wrap:anywhere] font-medium leading-tight text-foreground">{project.title}</h3>
-                            {isProjectInQuoteMode(project) && (
-                                <span className="inline-flex items-center whitespace-nowrap rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                                    Quote stage
-                                </span>
-                            )}
-                            {archived && (
-                                <span className="inline-flex items-center whitespace-nowrap rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                                    Archived
-                                </span>
-                            )}
-                        </div>
-                        {project.hourlyRate && !project.flatRate && (
-                            <p className="text-sm text-muted-foreground">
-                                <span className="sensitive-data">
-                                    {getCurrencySymbol(getProjectCurrency(project, clients, preferences.currency))}
-                                    {project.hourlyRate}/{getProjectCurrency(project, clients, preferences.currency)} per hour
-                                </span>
-                            </p>
+                    <div className="flex min-w-0 flex-wrap items-start gap-2">
+                        <h3 className="min-w-0 flex-1 whitespace-normal break-words [overflow-wrap:anywhere] font-medium leading-tight text-foreground">{project.title}</h3>
+                        {isProjectInQuoteMode(project) && (
+                            <span className="inline-flex items-center whitespace-nowrap rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                Quote stage
+                            </span>
                         )}
-                        <div className="text-sm text-muted-foreground">
-                            <p>{projectTasksForCard.filter((task) => !task.completed && !task.archived).length} active tasks</p>
-                            <p>{formatDuration(totalTime)} total time</p>
-                        </div>
-                        {deadlineStatus.hasDeadline && (
-                            <p className="text-sm text-muted-foreground">
-                                Deadline <span className="font-medium text-foreground">{toDisplayDate(deadlineStatus.deadline, { month: 'short', day: 'numeric' })}</span>
-                                {deadlineSummary ? ` · ${deadlineSummary}` : ''}
-                            </p>
+                        {archived && (
+                            <span className="inline-flex items-center whitespace-nowrap rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                Archived
+                            </span>
                         )}
                     </div>
-                    {(deadlineBadge || actionChip) && (
-                        <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-4">
-                            {deadlineBadge}
-                            {actionChip}
+
+                    <ProjectCardDetailsLayout
+                        pills={(deadlineBadge || actionChip) ? (
+                            <>
+                                {deadlineBadge}
+                                {actionChip}
+                            </>
+                        ) : null}
+                    >
+                        <div className="space-y-2">
+                            {project.hourlyRate && !project.flatRate && (
+                                <p className="text-sm text-muted-foreground">
+                                    <span className="sensitive-data">
+                                        {getCurrencySymbol(getProjectCurrency(project, clients, preferences.currency))}
+                                        {project.hourlyRate}/{getProjectCurrency(project, clients, preferences.currency)} per hour
+                                    </span>
+                                </p>
+                            )}
+                            <div className="text-sm text-muted-foreground">
+                                <p>{projectTasksForCard.filter((task) => !task.completed && !task.archived).length} active tasks</p>
+                                <p>{formatDuration(totalTime)} total time</p>
+                            </div>
+                            {deadlineStatus.hasDeadline && (
+                                <p className="text-sm text-muted-foreground">
+                                    Deadline <span className="font-medium text-foreground">{toDisplayDate(deadlineStatus.deadline, { month: 'short', day: 'numeric' })}</span>
+                                    {deadlineSummary ? ` · ${deadlineSummary}` : ''}
+                                </p>
+                            )}
                         </div>
-                    )}
+                    </ProjectCardDetailsLayout>
                 </CardContent>
             </Card>
         );
@@ -568,13 +574,11 @@ const ClientDashboard = ({
 
                     <div>
                         <div className="flex items-center flex-wrap gap-2">
-                            {client.color && (
-                                <div
-                                    className="w-4 h-4 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: client.color }}
-                                    title="Client color"
-                                />
-                            )}
+                            <ClientColorIcon
+                                client={client}
+                                className="h-6 w-6"
+                                title={client.color ? 'Client color' : 'Client'}
+                            />
                             <h1 className="text-2xl font-bold text-foreground">{client.title}</h1>
                             {client.archived && (
                                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
@@ -731,27 +735,27 @@ const ClientDashboard = ({
 
                 <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
                     <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
-                        <div className="flex items-center w-full">
-                            <div className="w-full">
+                        <div data-testid="client-unbilled-metric-content" className="flex items-center w-full">
+                            <div className="flex-shrink-0">
+                                <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <div className="ml-4 w-0 flex-1">
                                 <dl>
                                     <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
-                                </dl>
-                                <div className="mt-2 space-y-1">
-                                    <div className="flex items-center text-sm text-muted-foreground">
-                                        <CurrencyDollarIcon className="h-4 w-4 mr-2" />
-                                        <span className="sensitive-data text-foreground font-semibold">
+                                    <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
+                                        <span className="sensitive-data">
                                             {formatCurrency(clientMetrics.potentialRevenue, clientCurrency)}
                                         </span>
+                                    </dd>
+                                </dl>
+                                {clientExpenses.length > 0 && (
+                                    <div className="mt-1 flex items-center text-sm text-muted-foreground">
+                                        <HandCoinsIcon className="h-4 w-4 mr-2" />
+                                        <span className="sensitive-data font-semibold text-foreground">
+                                            {formatAmounts(unbilledExpenseTotalsByCurrency)}
+                                        </span>
                                     </div>
-                                    {clientExpenses.length > 0 && (
-                                        <div className="flex items-center text-sm text-muted-foreground">
-                                            <HandCoinsIcon className="h-4 w-4 mr-2" />
-                                            <span className="sensitive-data text-foreground font-semibold">
-                                                {formatAmounts(unbilledExpenseTotalsByCurrency)}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
+                                )}
                             </div>
                         </div>
                     </CardContent>

@@ -8,12 +8,14 @@ import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
 import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { getOrdinalSuffix } from '@/utils/recurringUtils.ts';
+import { CategoryColorDot } from './CategoryLabel';
 
 /**
  * ExpenseDueCard - Compact expense card with quick pay action
  */
 const ExpenseDueCard = ({
     expense,
+    category,
     onView,
     onMarkPaid,
     isOverdue = false,
@@ -120,8 +122,11 @@ const ExpenseDueCard = ({
                                 className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer"
                                 title="Open expense details"
                             >
-                                <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
-                                    {expense.title}
+                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                    <CategoryColorDot category={category} />
+                                    <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
+                                        {expense.title}
+                                    </span>
                                 </span>
                                 {amountLabel && (
                                     <span className="ml-2 text-sm text-muted-foreground sensitive-data whitespace-nowrap">
@@ -131,8 +136,11 @@ const ExpenseDueCard = ({
                             </button>
                         ) : (
                             <div className="text-left text-sm font-medium text-foreground">
-                                <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
-                                    {expense.title}
+                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                    <CategoryColorDot category={category} />
+                                    <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
+                                        {expense.title}
+                                    </span>
                                 </span>
                                 {amountLabel && (
                                     <span className="ml-2 text-sm text-muted-foreground sensitive-data whitespace-nowrap">
@@ -179,7 +187,10 @@ const ExpenseDueCard = ({
                                 className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer truncate"
                                 title="Open expense details"
                             >
-                                <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                    <CategoryColorDot category={category} />
+                                    <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                </span>
                                 {amountLabel && (
                                     <span className="ml-2 text-sm text-muted-foreground sensitive-data">
                                         {amountLabel}
@@ -188,7 +199,10 @@ const ExpenseDueCard = ({
                             </button>
                         ) : (
                             <div className="text-sm font-medium text-foreground truncate">
-                                <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                    <CategoryColorDot category={category} />
+                                    <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                </span>
                                 {amountLabel && (
                                     <span className="ml-2 text-sm text-muted-foreground sensitive-data">
                                         {amountLabel}

@@ -7,9 +7,14 @@ const accountLayoutMocks = vi.hoisted(() => ({
     isMobileLayout: false,
     isDriveConnected: false,
     isCloudConnected: false,
+    isOffline: false,
+    syncState: 'idle',
     activeStorageProvider: null,
     googleUser: null,
     dropboxAccountEmail: null,
+    dropboxSessionId: null,
+    dropboxSignedIn: false,
+    dropboxError: null,
     activeSection: 'preferences',
     clearAllData: vi.fn(),
     forceSyncDrive: vi.fn(),
@@ -19,6 +24,9 @@ const accountLayoutMocks = vi.hoisted(() => ({
     wipeDriveData: vi.fn(),
     wipeCloudData: vi.fn(),
     deleteAllBackups: vi.fn(),
+    signIn: vi.fn(),
+    signInDropbox: vi.fn(),
+    refreshDropbox: vi.fn(),
     signOut: vi.fn(),
     revokeAccess: vi.fn(),
     showSuccess: vi.fn(),
@@ -51,6 +59,8 @@ vi.mock('../contexts/YjsContext', () => ({
         clearAllData: accountLayoutMocks.clearAllData,
         isDriveConnected: accountLayoutMocks.isDriveConnected,
         isCloudConnected: accountLayoutMocks.isCloudConnected,
+        isOffline: accountLayoutMocks.isOffline,
+        syncState: accountLayoutMocks.syncState,
         activeStorageProvider: accountLayoutMocks.activeStorageProvider,
         forceSyncDrive: accountLayoutMocks.forceSyncDrive,
         forceSyncCloud: accountLayoutMocks.forceSyncCloud,
@@ -65,6 +75,7 @@ vi.mock('../contexts/YjsContext', () => ({
 vi.mock('../hooks/useGoogleAuth', () => ({
     useGoogleAuth: () => ({
         user: accountLayoutMocks.googleUser,
+        signIn: accountLayoutMocks.signIn,
         signOut: accountLayoutMocks.signOut,
         revokeAccess: accountLayoutMocks.revokeAccess,
     }),
@@ -73,6 +84,11 @@ vi.mock('../hooks/useGoogleAuth', () => ({
 vi.mock('../hooks/useDropboxAuth.ts', () => ({
     useDropboxAuth: () => ({
         accountEmail: accountLayoutMocks.dropboxAccountEmail,
+        sessionId: accountLayoutMocks.dropboxSessionId,
+        isSignedIn: accountLayoutMocks.dropboxSignedIn,
+        error: accountLayoutMocks.dropboxError,
+        signIn: accountLayoutMocks.signInDropbox,
+        refresh: accountLayoutMocks.refreshDropbox,
     }),
 }));
 
@@ -142,9 +158,14 @@ beforeEach(() => {
     accountLayoutMocks.isMobileLayout = false;
     accountLayoutMocks.isDriveConnected = false;
     accountLayoutMocks.isCloudConnected = false;
+    accountLayoutMocks.isOffline = false;
+    accountLayoutMocks.syncState = 'idle';
     accountLayoutMocks.activeStorageProvider = null;
     accountLayoutMocks.googleUser = null;
     accountLayoutMocks.dropboxAccountEmail = null;
+    accountLayoutMocks.dropboxSessionId = null;
+    accountLayoutMocks.dropboxSignedIn = false;
+    accountLayoutMocks.dropboxError = null;
     accountLayoutMocks.activeSection = 'preferences';
 
     accountLayoutMocks.clearAllData.mockReset();
@@ -155,6 +176,9 @@ beforeEach(() => {
     accountLayoutMocks.wipeDriveData.mockReset();
     accountLayoutMocks.wipeCloudData.mockReset();
     accountLayoutMocks.deleteAllBackups.mockReset();
+    accountLayoutMocks.signIn.mockReset();
+    accountLayoutMocks.signInDropbox.mockReset();
+    accountLayoutMocks.refreshDropbox.mockReset();
     accountLayoutMocks.signOut.mockReset();
     accountLayoutMocks.revokeAccess.mockReset();
     accountLayoutMocks.showSuccess.mockReset();
@@ -329,4 +353,91 @@ describe('Account', () => {
         expect(screen.getByRole('button', { name: 'Delete All Data' })).toBeDisabled();
         expect(accountLayoutMocks.clearAllData).not.toHaveBeenCalled();
     });
+});
+
+
+it('opens provider sign-in from Account without leaving the current tab', async () => {
+    renderAccount();
+    const signInButton = screen.getByRole('button', { name: 'Sign in' });
+    expect(signInButton.querySelector('svg')).not.toBeNull();
+    fireEvent.click(signInButton);
+    expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeVisible();
+    const googleButton = screen.getByRole('button', { name: 'Continue with Google Drive' });
+    const dropboxButton = screen.getByRole('button', { name: 'Continue with Dropbox' });
+    expect(googleButton).toHaveClass('bg-primary', 'text-primary-foreground');
+    expect(dropboxButton).toHaveClass('bg-primary', 'text-primary-foreground');
+    fireEvent.click(dropboxButton);
+    await waitFor(() => expect(accountLayoutMocks.signInDropbox).toHaveBeenCalledTimes(1));
+    expect(accountLayoutMocks.updateUrl).not.toHaveBeenCalled();
+    expect(accountLayoutMocks.signIn).not.toHaveBeenCalled();
+});
+
+it('keeps a failed sign-in open for retry', async () => {
+    accountLayoutMocks.signIn.mockRejectedValue(new Error('Popup closed'));
+    renderAccount();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with Google Drive' }));
+    expect(await screen.findByText('Popup closed')).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeVisible();
+});
+
+it('explains a storage connection failure after authentication and offers connection details', () => {
+    accountLayoutMocks.activeStorageProvider = 'google-drive';
+    accountLayoutMocks.syncState = 'error';
+    renderAccount();
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Your account could not connect.');
+    fireEvent.click(screen.getByRole('button', { name: 'View connection details' }));
+    expect(accountLayoutMocks.updateUrl).toHaveBeenCalledWith(expect.objectContaining({ section: 'sync' }));
+});
+
+it('reconnects the known provider without offering a provider switch', () => {
+    accountLayoutMocks.activeStorageProvider = 'dropbox';
+    renderAccount();
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    expect(screen.queryByRole('button', { name: 'Continue with Google Drive' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue with Dropbox' })).toBeVisible();
+});
+
+it('rechecks a retained Dropbox session after a temporary outage without starting another OAuth session', async () => {
+    accountLayoutMocks.activeStorageProvider = 'dropbox';
+    accountLayoutMocks.dropboxSessionId = 'retained-session';
+    accountLayoutMocks.dropboxError = 'The Dropbox connection service is temporarily unavailable.';
+    renderAccount();
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(accountLayoutMocks.dropboxError);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Dropbox connection' }));
+    await waitFor(() => expect(accountLayoutMocks.refreshDropbox).toHaveBeenCalledOnce());
+    expect(accountLayoutMocks.signInDropbox).not.toHaveBeenCalled();
+    expect(accountLayoutMocks.disconnectActiveCloudSession).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Reconnect account' })).toBeVisible();
+});
+
+
+it('blocks duplicate sign-in attempts and closes only once connected', async () => {
+    let finish;
+    accountLayoutMocks.signIn.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const { rerender } = renderAccount();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    const google = screen.getByRole('button', { name: 'Continue with Google Drive' });
+    fireEvent.click(google);
+    fireEvent.click(google);
+    expect(accountLayoutMocks.signIn).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Continue with Dropbox' })).toBeDisabled();
+    finish();
+    await waitFor(() => expect(google).not.toBeDisabled());
+    expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeVisible();
+    accountLayoutMocks.isCloudConnected = true;
+    rerender(<Account projects={[]} tasks={[]} timeEntries={[]} invoices={[]} paymentMethods={[]} businessInfos={[]} clients={[]} invoiceTemplates={[]} emailTemplates={[]} expenses={[]} />);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sign in' })).not.toBeInTheDocument());
+});
+
+it('keeps sign-in discoverable offline without attempting authentication', () => {
+    accountLayoutMocks.isOffline = true;
+    renderAccount();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(screen.getByText("You're offline")).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Continue with Google Drive' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Continue with Dropbox' })).toBeDisabled();
+    expect(accountLayoutMocks.signIn).not.toHaveBeenCalled();
 });

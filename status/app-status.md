@@ -2,6 +2,116 @@
 
 ## Current focus
 
+- [x] Task/account/category UI polish (2026-09-09, uncommitted): recurring tasks
+  offer Disable recurrence / Enable recurrence only in their three-dot menus,
+  with calendar-off/calendar-check icons
+  instead of timer pause/play icons. Shared browser/agent state rules retain history and
+  establish a local resume boundary without catch-up; scheduling and notification
+  consumers honor it, and planner completion history remains visible.
+  Expense category add/edit uses a wider separate modal, the existing Color Tag
+  picker, and a right-aligned action opposite Active categories. Category color
+  is now the only expense accent source: cards use it on the left border without
+  a repeated dot, while dashboard/due/activity rows use original-color 8px dots
+  with neutral fallbacks. This is covered across the main and recurring expense
+  views, dashboard, Planner, client/project sections, reports, and invoice selection.
+  Compact category labels now constrain and ellipsize long names before adjacent
+  visuals, while keeping the complete name available through the title tooltip.
+  The desktop expense status tabs retain horizontal overflow while explicitly
+  clipping the unnecessary vertical scrollbar.
+  Dashboard project rows use compact colored folder outlines and align their
+  metadata with the row edge to distinguish them from expense category dots.
+  Planner project attachments now use the folder glyph as well. The Projects
+  page places one neutral project icon at the main heading, keeps card titles clean, and
+  matches the Clients page's 24px active/archived grid gap. Project detail
+  replaces its color dot with the shared folder treatment using project color,
+  inherited client color, or a neutral fallback. Project cards also match Client
+  card padding, place status tags immediately after the title with the aligned
+  menu at the far right, and omit the
+  redundant Most recent display while retaining recent-activity sorting. Their
+  details and invoice/deadline pills now share a flexible two-column row on both
+  the Projects page and Client Dashboard, wrapping only when space runs out.
+  Client identity now uses the shared neutral users icon in the Clients heading and a
+  client-color/neutral single-user version beside the Client Dashboard title. Project-card
+  client names provide isolated pointer and keyboard navigation to that client.
+  Planner projects now retain a 4px neutral left identity border when neither
+  the project nor its client supplies a color.
+  Planner expense items now use a dotted left accent only, retaining their
+  category color or neutral fallback while the other card edges remain solid.
+  Project and Client list entity totals hide below the `sm` breakpoint to keep
+  the existing phone header actions on the same compact row.
+  Unbilled metrics in both client and project dashboards now use the same leading
+  icon and content columns as Pending, Expenses, and Paid Revenue; the optional
+  unbilled-expense total remains a secondary line.
+  Shared three-dot action menus are non-modal and no longer lock page scrolling;
+  they close once their trigger moves past an 8px scroll threshold. Unit and
+  cross-browser wheel-scroll regressions cover the common primitive.
+  The recurrence actions use the same icon spacing as adjacent menu items.
+  Disabled schedules replace list recurrence tags with a neutral calendar-off
+  `Disabled` tag and show the same tag inline with the repeat description under
+  Schedule in task details; task titles stay clean.
+  Planner and the global timer now share the animated danger-color running dot.
+  Archived category identity is retained, including live color updates in open
+  expense details; expenses and recurrence templates reference category IDs, so
+  category name/group/color changes render dynamically. Recurrence category edits
+  offer an optional counted update for existing linked expenses that still match
+  the previous category, preserving individual overrides and every other saved
+  field. Referenced-category delete failures open a visible dialog with usage and
+  Archive guidance. The inline Manage categories action uses the existing modal stack and
+  restores the expense draft and edit context. A follow-up fix scopes that draft
+  to the exact expense/recurrence, stops post-save re-persistence, and clears all
+  task/project/expense stack drafts at their intentional close boundaries.
+  Optional fields survive Yjs
+  transfer and legacy records still validate. Sidebar expansion uses one-line ellipsis
+  and displays the full title when expanded. Account offers provider sign-in with
+  an icon in the header and the same primary provider buttons as Cloud Sync, with
+  retained-provider recovery, duplicate/offline guards and
+  focus restoration across viewport changes. Project billing/planning sections
+  appear only once a client is selected, collapse with summaries, and expand/focus
+  invalid fields; flat-rate overrides remain reachable. Dashboard invoice links
+  show a pointer when actionable and apply danger text only to overdue invoices;
+  Upcoming reuses the vertically centered Today desktop row. Specs, contracts,
+  overview/map, and TODOs are reconciled.
+  Follow-up review corrected stale task-editor pause/resume fields and stale
+  menu actions, missing/zero rate validation in collapsed billing, retained
+  Dropbox status retry and cross-consumer auth recovery, and visible errors
+  after authentication succeeds but storage connection fails. Red/green
+  regressions cover stale recurrence, collapsed billing, and retained-session
+  recovery; browser cases also preserve a
+  running timer, skip state, and completion history through an open task edit.
+  Final review checks before the neutral index-icon follow-up: 277 files / 2,639
+  unit tests with per-file coverage, lint, and typecheck passed. All nine affected
+  task/account/category/project/sidebar scenarios passed in Chromium, Firefox, and
+  WebKit after the complete 59-scenario Chromium smoke gate.
+  Light/dark category dialogs, recurring-category propagation, phone sign-in,
+  dashboard alignment/category color, and project/sidebar visuals were inspected
+  during implementation. Six PWA tests
+  and the full production build passed on that
+  reviewed baseline. Typecheck, lint, and agent bridge/bundle smoke passed; the
+  generated agent artifacts were rebuilt during implementation.
+  The follow-up neutral Projects/Clients index headings pass 21 focused component
+  tests, their focused Chromium scenario, full lint, and scoped diff checks. The
+  broader cross-browser, coverage, PWA, typecheck, and build gates were not rerun
+  after this two-class visual refinement.
+  The Dashboard running-project lock now reaches every task-details entry point:
+  other tasks in the same project use native-disabled title controls across
+  Today, Upcoming, and Tasks, and overdue dates no longer remain clickable while
+  the row is disabled. The timer-owning task and paused timers remain interactive.
+  Red/green validation passes 31 focused component tests. The broader Dashboard
+  unit gate passes all 100 tests across 16 files, and all seven Chromium Dashboard
+  scenarios pass, including the lock at 1440px and 390px. The focused interaction
+  also passes in Firefox and WebKit. Full lint, typecheck, and scoped diff checks
+  pass; coverage, PWA, and build were not rerun for this interaction fix.
+  A text-only follow-up removes the redundant `Next 7 days` subtitle from the
+  Upcoming header while retaining the same scheduling window. All 18 focused
+  unit tests, the Chromium multi-width Dashboard scenario, and full lint pass.
+  The final review remains local; no OAuth account
+  login, provider transfer, publication, version bump, commit, or deployment.
+  Release scope: core Phase 3 remains the planned 1.6.0 train. Agent bridge and
+  OpenClaw shipped tool metadata now also change (category color and recurrence
+  pause); the vendored bridge is regenerated. Assess their release versions at
+  the next requested commit/push. Unchanged Claude/ClawHub wrappers need no
+  content update for these fields.
+
 - [x] Correct no-client billability and preserve billing through task moves (2026-09-08,
   uncommitted): saved/live dashboard hours, dashboard unbilled estimates and
   project filtering, browser Hours/work-summary/export calculations, and agent
@@ -82,19 +192,48 @@
   Visual review is left to the user as requested; no automated checks were run
   for this styling-only adjustment. Included in the Phase 3 continuation checkpoint; undeployed.
 
-- [x] Add project color dots to the Dashboard Projects widget (2026-09-08):
-  8px dots beside project names preserve the original project color, inherit
-  the associated client color when absent, and otherwise fall back to neutral.
-  Dots are decorative within the project-name button, with no extra keyboard
-  stop. Client links, pending values, filters and row padding are preserved;
-  long names truncate. No data fields or other project lists changed.
-  Red/green coverage passes: 24 focused tests, 100% widget line/function
-  coverage and 77.27% branch coverage. The focused Chromium dot/navigation
-  scenario passes; captures were reviewed at 1440/390/320px in light/dark mode.
-  Focused lint and diff checks pass. Before this cosmetic adjustment, all six
-  Dashboard/Reports Chromium scenarios, full lint, typecheck and production
-  app compilation passed. Design and acceptance notes are updated.
+- [x] Refine project identity in the Dashboard Projects widget (2026-09-09):
+  14px folder outlines beside project names preserve the original project color,
+  inherit the associated client color when absent, and otherwise fall back to
+  neutral. The client/pending-time line now aligns with the folder's left edge,
+  matching expense metadata alignment while distinguishing projects from expense
+  category dots. Icons remain decorative within the project-name button, with no
+  extra keyboard stop. Client links, pending values, filters and row padding are
+  preserved; long names truncate. No data fields or other project lists changed.
+  Red/green component coverage passes. The focused project navigation/layout
+  scenario passes in Chromium, Firefox and WebKit at 1440/390/320px in light and
+  dark mode, including exact/inherited colors, 14px sizing and metadata alignment.
   Included in the Phase 3 continuation checkpoint; undeployed.
+
+- [x] Extend project identity across Planner, Projects, and project detail
+  (2026-09-10): Planner project attachments use the closed-folder glyph while
+  deadline markers retain their flag. The Projects page uses one section-level
+  neutral project icon, text-only card titles, and the same 24px active/archived grid
+  spacing as Clients. Project detail replaces the title dot with the shared
+  project-color folder, preserving project-first, inherited-client, and neutral
+  fallback behavior. Cards match Client padding, group their status badge and
+  title together while keeping the aligned menu at the far right, and omit the recent-activity label/date while
+  retaining the existing sort input. Project-list and client-dashboard cards
+  share one responsive details row with text on the left and invoice/deadline
+  pills on the right, removing the separate empty footer space while preserving
+  narrow-card wrapping. This changes no persisted records. All 59 focused
+  component checks, lint, typecheck, and the full 50-page production
+  build pass. The initial project-icon/spacing Chromium scenario passed before
+  the user reserved further visual review; the final card and column refinements were not
+  browser-reviewed. The work remains uncommitted and undeployed.
+
+- [x] Extend matching identity and navigation to clients (2026-09-10): the
+  Clients page places the shared users glyph in neutral muted-foreground beside
+  its heading, while Client
+  Dashboard replaces the former color dot with the Planner's single-user icon using the exact saved
+  client color or the neutral fallback. Associated client names in project cards
+  are native navigation controls with pointer, underline, focus, and isolated
+  click behavior so they open the client without opening the project. No stored
+  relationship or color data changes. All 68 related component checks, lint,
+  typecheck, and the full 50-page production build pass. The client-name hover
+  treatment matches the existing Project Dashboard link without a custom
+  underline offset. Final browser review remains with the user. The work remains
+  uncommitted and undeployed.
 
 - [x] Trace the Dashboard scrolling console error (2026-09-08): opened the
   user's exact `VM2292:2:19429` source in Edge DevTools. The failing
@@ -390,6 +529,55 @@
   presentation during that reconnect. The explicit **Refresh status** action now
   requests canonical `user_retry` reconciliation and forces the following signed
   status read so the ordinary foreground cooldown cannot hide a provider change.
+- [x] Align entitlement presentation and universally Free client capacity across
+  product surfaces (2026-09-10, uncommitted). `BillingContext` now publishes one
+  verified plan plus connection-readiness state, while a shared Get Pro policy
+  drives both Plan & Billing and the new rocket-led Reports Overview action.
+  Cached Pro remains Pro while reconnecting; Reports stays locally available and
+  hosted Send distinguishes offline, automatic reconnect, and explicit Cloud
+  Sync recovery instead of showing an upgrade prompt.
+  Locked advanced Reports previews now use that same state rather than one
+  generic account-confirmation fallback: a fresh account-free browser offers
+  **Get Pro to unlock** the selected report, explicit reconnect opens Cloud
+  Sync, automatic reconnect shows progress, and offline asks the user to go
+  online.
+  Fresh unresolved browsers can create their first client in both browser and
+  agent paths, while a second active client still requires verified Pro status.
+  The focused Reports entry-point/preview/policy slice passes 18 tests; the
+  complete coverage gate passes 278 files / 2,668 tests with all thresholds,
+  plus lint, typecheck, and the 50-page production build. Fresh isolated local
+  browser checks confirm the Reports title-row action, the unblocked first-client
+  form, and the Monthly preview's new Get Pro state. Production controls remain
+  unchanged; no account, provider, billing, deployment, commit, or publication
+  action occurred.
+- [x] Harden billing-state lifecycle before launch preparation (2026-09-10,
+  uncommitted). The pre-ship/security review found and fixed open-tab license
+  expiry, response/sleep latency extending signed time, non-finite verification
+  clocks, and offline public keys expiring at their one-hour HTTP freshness
+  boundary instead of the signed-license window. Expiry/rollback deselects only
+  the matching cache binding and leaves product data/license history intact.
+  Failed/disconnected canonical status clears stale online actions and usage
+  while retaining valid exact-bound Pro. Account-switch guards cover render-time
+  plan selection, deferred Checkout/Portal/trial responses, and conditional cache
+  writes/cleanup. Moved-source and partial/mismatched hosted identities retain
+  reconnect guidance instead of being mistaken for fresh account-free browsers.
+  Client-limit, hosted-email, and locked-report notices now share recovery
+  classification. Queued client creates/restores re-read the current plan after
+  acquiring the lock in both browser and agent paths, including the app-session
+  scope adapter. No persisted schema, public wire shape, pricing, trial policy,
+  production switch, Worker implementation, or live provider state changed.
+  Final app coverage passes 278 files / 2,694 tests with all per-file thresholds;
+  lint and app/Worker typechecks pass. Cross-browser Reports/client/account
+  checks pass nine scenarios across Chromium, Firefox, and WebKit. The final
+  50-page production build and all six PWA checks pass. The unchanged private
+  Worker suite passes 37 files / 355 tests with `--maxWorkers=1
+  --testTimeout=15000`; the default five-second local D1 test budget timed out
+  during preceding runs, so the passing result uses an explicit larger budget
+  without changing source or assertions. This is local implementation evidence,
+  not production launch approval: exact live configuration/signing/Stripe and
+  webhook/return-route validation plus the supervised license/recovery/hosted-
+  email canary remain separate release gates. No commit, publish, deployment,
+  live billing mutation, or user-data reset occurred.
 - [x] Add the locally verified permanent complimentary-Pro path. Plan & Billing
   shows the opaque account reference after the provider email and renders a
   grant-backed plan as **Complimentary Pro** with no paid pricing, tax, purchase,

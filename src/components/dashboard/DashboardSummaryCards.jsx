@@ -16,7 +16,7 @@ export default function DashboardSummaryCards({ currentMonth, todayTime, todayLi
         { count: currentMonth.overdueCount, label: 'overdue', tab: 'overdue' },
     ].filter(item => item.count > 0);
     const invoiceDetail = invoiceLinks.length ? <span className="flex flex-wrap gap-x-3">{invoiceLinks.map(item => (
-        <button key={item.tab} type="button" className="rounded-sm py-1 underline decoration-border underline-offset-4 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" disabled={!navigateToInvoices} aria-label={`${item.count} ${item.label} ${item.count === 1 ? 'invoice' : 'invoices'}`} onClick={() => navigateToInvoices?.({ section: 'invoices', tab: item.tab })}>{item.count} {item.label}</button>
+        <button key={item.tab} type="button" className={`rounded-sm py-1 underline decoration-border underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${navigateToInvoices ? 'cursor-pointer hover:text-foreground' : 'cursor-not-allowed'} ${item.tab === 'overdue' ? 'status-danger-text-strong' : ''}`} disabled={!navigateToInvoices} aria-label={`${item.count} ${item.label} ${item.count === 1 ? 'invoice' : 'invoices'}`} onClick={() => navigateToInvoices?.({ section: 'invoices', tab: item.tab })}>{item.count} {item.label}</button>
     ))}</span> : 'No unpaid invoices';
     const cards = [
         { title: 'Tracked today', value: formatDurationWithSeconds(todayTime), detail: todayLiveTime > 0 ? 'Incl. active · last 7 days' : 'Saved time · last 7 days', icon: ClockIcon, sparkline: true },

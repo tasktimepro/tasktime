@@ -8,6 +8,11 @@ import { createTestYMap } from '@/test/yjs-test-helpers'
 
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
+const billing = vi.hoisted(() => ({ enabled: false, resolution: { kind: 'unresolved', reason: 'lifecycle' } }))
+vi.mock('@/config/billingFeatures', () => ({ BILLING_FEATURES: {
+    get clientLimitEnforcement() { return billing.enabled },
+} }))
+vi.mock('@/contexts/BillingContext', () => ({ useBilling: () => ({ resolution: billing.resolution }) }))
 
 const mockUseYjsCollection = useYjsCollection
 const mockUseYjs = useYjs
@@ -31,6 +36,7 @@ function setupMocks({ items = [], remove = vi.fn(() => true), plannerAttachments
 describe('useClients', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        billing.enabled = false
     })
 
     it('sorts clients by title', () => {
@@ -44,6 +50,34 @@ describe('useClients', () => {
         const { result } = renderHook(() => useClients())
 
         expect(result.current.sortedClients.map((c) => c.id)).toEqual(['c1', 'c2'])
+    })
+
+    it('rechecks the current plan after waiting for the client mutation lock', async () => {
+        billing.enabled = true
+        billing.resolution = { kind: 'canonical', snapshot: { accessStatus: 'active' } }
+        const clients = createTestYMap({ c1: { id: 'c1', title: 'Existing' } })
+        setupMocks()
+        mockUseYjs.mockReturnValue({ store: { clients }, isReady: true })
+        const create = mockUseYjsCollection().create
+        let apply
+        const previousLocks = Object.getOwnPropertyDescriptor(navigator, 'locks')
+        Object.defineProperty(navigator, 'locks', { configurable: true, value: {
+            request: vi.fn((_name, _options, callback) => new Promise((resolve, reject) => {
+                apply = () => Promise.resolve().then(callback).then(resolve, reject)
+            })),
+        } })
+        try {
+            const hook = renderHook(() => useClients())
+            const pending = hook.result.current.createClientWithPolicyLock({ title: 'Second' })
+            const rejected = expect(pending).rejects.toThrow('ENTITLEMENT_STATUS_UNAVAILABLE')
+            billing.resolution = { kind: 'unresolved', reason: 'lifecycle' }
+            hook.rerender()
+            await act(async () => { await apply(); await rejected })
+            expect(create).not.toHaveBeenCalled()
+        } finally {
+            if (previousLocks) Object.defineProperty(navigator, 'locks', previousLocks)
+            else Reflect.deleteProperty(navigator, 'locks')
+        }
     })
 
     it('finds client by name case-insensitively', () => {

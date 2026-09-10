@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EntitlementSnapshotV1 } from '@/domain/entitlements/entitlementTypes';
 import { BillingClientError } from '@/services/billingClient';
 import { useBillingStatus } from './useBillingStatus';
@@ -83,6 +83,10 @@ const lifecycle = {
 };
 
 describe('useBillingStatus', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
     beforeEach(() => {
         vi.clearAllMocks();
         storage.readBoundBillingCache.mockResolvedValue({ kind: 'missing' });
@@ -114,6 +118,130 @@ describe('useBillingStatus', () => {
         }));
         expect(result.current.resolution).toEqual({ kind: 'unresolved', reason: 'lifecycle' });
         expect(client.getStatus).not.toHaveBeenCalled();
+    });
+
+    it('keeps an offline fresh browser offline when its lifecycle changes', async () => {
+        vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+        const client = { getStatus: vi.fn(), getJwks: vi.fn(), getCatalog: vi.fn() };
+        const hook = renderHook(({ value }) => useBillingStatus({
+            enabled: true, catalogEnabled: false, lifecycle: value,
+            onlineRefreshEnabled: false, client: client as never,
+        }), { initialProps: { value: lifecycle as typeof lifecycle | null } });
+        await act(async () => Promise.resolve());
+        hook.rerender({ value: null });
+        expect(hook.result.current.offline).toBe(true);
+    });
+
+    it('expires an already-open Pro session at the signed deadline without a network event', async () => {
+        vi.useFakeTimers();
+        const response = status('principal-1', 'active');
+        verify.mockResolvedValue({
+            ok: true,
+            payload: { ...response.entitlement, iat: response.serverTime / 1000,
+                exp: response.serverTime / 1000 + 2, jti: 'short-license' },
+            keyId: 'key-1',
+        });
+        const client = {
+            getStatus: vi.fn().mockResolvedValueOnce(response)
+                .mockRejectedValue(new BillingClientError('NETWORK_ERROR', null, true)),
+            getJwks: vi.fn(), getCatalog: vi.fn(),
+        };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true, catalogEnabled: false, lifecycle, client: client as never,
+        }));
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        expect(hook.result.current.resolution.kind).toBe('canonical');
+        await act(async () => { await vi.advanceTimersByTimeAsync(2_001); });
+        expect(hook.result.current.resolution.kind).toBe('unresolved');
+        expect(hook.result.current.status).toBeNull();
+        hook.unmount();
+    });
+
+    it('drops stale online actions after a failed refresh while retaining the verified license', async () => {
+        const client = {
+            getStatus: vi.fn().mockResolvedValueOnce(status('principal-1'))
+                .mockRejectedValue(new BillingClientError('BILLING_UNAVAILABLE', 503, true)),
+            getJwks: vi.fn(), getCatalog: vi.fn(),
+        };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true, catalogEnabled: false, lifecycle, client: client as never,
+        }));
+        await waitFor(() => expect(hook.result.current.status).not.toBeNull());
+        await act(async () => { await hook.result.current.refresh(); });
+        expect(hook.result.current.resolution.kind).toBe('canonical');
+        expect(hook.result.current.status).toBeNull();
+        hook.unmount();
+    });
+
+    it.each(['monotonic', 'wall'])('rejects a license that expires in flight on the %s clock', async clock => {
+        vi.useFakeTimers();
+        const response = status('principal-1');
+        const startedAt = performance.now();
+        const monotonic = vi.spyOn(performance, 'now').mockReturnValue(startedAt);
+        let deliver!: (value: unknown) => void;
+        verify.mockImplementation(async (_token, options) => options.nowMs >= response.serverTime + 2000
+            ? { ok: false, code: 'EXPIRED' }
+            : { ok: true, keyId: 'key-1', payload: {
+                ...response.entitlement, iat: response.serverTime / 1000,
+                exp: response.serverTime / 1000 + 2, jti: 'short-license',
+            } });
+        const client = { getStatus: vi.fn(() => new Promise(resolve => { deliver = resolve; })),
+            getJwks: vi.fn(), getCatalog: vi.fn() };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true, catalogEnabled: false, lifecycle, client: client as never,
+        }));
+        await act(async () => Promise.resolve());
+        if (clock === 'monotonic') monotonic.mockReturnValue(startedAt + 3000);
+        else vi.setSystemTime(Date.now() + 3000);
+        await act(async () => deliver(response));
+        expect(hook.result.current.resolution.kind).toBe('unresolved');
+        expect(storage.writeVerifiedBillingCache).not.toHaveBeenCalled();
+    });
+
+    it('invalidates an open-tab clock rollback and deselects the cached binding', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-08-19T12:00:00.000Z'));
+        const response = status('principal-1');
+        const client = { getStatus: vi.fn().mockResolvedValueOnce(response)
+            .mockRejectedValue(new BillingClientError('NETWORK_ERROR', null, true)),
+        getJwks: vi.fn(), getCatalog: vi.fn() };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true, catalogEnabled: false, lifecycle, client: client as never,
+        }));
+        await act(async () => Promise.resolve());
+        expect(hook.result.current.resolution.kind).toBe('canonical');
+        vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+        vi.setSystemTime(new Date('2026-08-19T11:54:00.000Z'));
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        expect(hook.result.current.resolution.kind).toBe('unresolved');
+        expect(hook.result.current.clockUntrusted).toBe(true);
+        expect(storage.clearActiveBillingBinding).toHaveBeenCalled();
+        expect(client.getStatus).toHaveBeenCalledOnce();
+    });
+
+    it('tracks browser offline state even before a cloud lifecycle exists', () => {
+        let online = true;
+        const onlineSpy = vi.spyOn(window.navigator, 'onLine', 'get')
+            .mockImplementation(() => online);
+        const client = { getStatus: vi.fn(), getJwks: vi.fn(), getCatalog: vi.fn() };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true,
+            catalogEnabled: false,
+            lifecycle: null,
+            client: client as never,
+        }));
+
+        online = false;
+        act(() => window.dispatchEvent(new Event('offline')));
+        expect(hook.result.current.offline).toBe(true);
+
+        online = true;
+        act(() => window.dispatchEvent(new Event('online')));
+        expect(hook.result.current.offline).toBe(false);
+        expect(client.getStatus).not.toHaveBeenCalled();
+
+        hook.unmount();
+        onlineSpy.mockRestore();
     });
 
     it('does not erase the device binding while cloud identity is still loading', async () => {
@@ -390,9 +518,9 @@ describe('useBillingStatus', () => {
             client: client as never,
         }));
         await waitFor(() => expect(result.current.offline).toBe(true));
-        expect(result.current.resolution).toMatchObject({
+        await waitFor(() => expect(result.current.resolution).toMatchObject({
             kind: 'canonical', snapshot: { accessStatus: 'active' },
-        });
+        }));
         unmount();
 
         storage.readBoundBillingCache.mockResolvedValueOnce({ kind: 'clock_untrusted' });

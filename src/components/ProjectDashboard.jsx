@@ -35,6 +35,7 @@ import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProjectNotesEditor from './ProjectNotesEditor';
+import ProjectColorIcon from './ProjectColorIcon';
 import {
     getProjectDeadlineStatus,
     getProjectEstimateSummary,
@@ -417,13 +418,13 @@ const ProjectDashboard = ({
 
                     <div>
                         <div className="flex items-center flex-wrap gap-2">
-                            {(project.color || projectClient?.color) && (
-                                <div
-                                    className="w-4 h-4 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: project.color || projectClient?.color }}
-                                    title={project.color ? "Project color" : "Client inherited color"}
-                                />
-                            )}
+                            <ProjectColorIcon
+                                project={project}
+                                client={projectClient}
+                                className="h-6 w-6"
+                                testId="project-dashboard-icon"
+                                title={project.color ? 'Project color' : projectClient?.color ? 'Client inherited color' : 'Project'}
+                            />
                             <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
                             {projectIsQuoteMode && (
                                 <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
@@ -594,27 +595,27 @@ const ProjectDashboard = ({
                 >
                     <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
                         <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
-                            <div className="flex items-center w-full">
-                                <div className="w-full">
+                            <div data-testid="project-unbilled-metric-content" className="flex items-center w-full">
+                                <div className="flex-shrink-0">
+                                    <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <div className="ml-4 w-0 flex-1">
                                     <dl>
                                         <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
-                                    </dl>
-                                    <div className="mt-2 space-y-1">
-                                        <div className="flex items-center text-sm text-muted-foreground">
-                                            <CurrencyDollarIcon className="h-4 w-4 mr-2" />
-                                            <span className="sensitive-data text-foreground font-semibold">
+                                        <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
+                                            <span className="sensitive-data">
                                                 {formatCurrency(projectMetrics.potentialRevenue, projectCurrency)}
                                             </span>
+                                        </dd>
+                                    </dl>
+                                    {projectExpenses.length > 0 && (
+                                        <div className="mt-1 flex items-center text-sm text-muted-foreground">
+                                            <HandCoinsIcon className="h-4 w-4 mr-2" />
+                                            <span className="sensitive-data font-semibold text-foreground">
+                                                {formatAmounts(unbilledExpenseTotalsByCurrency)}
+                                            </span>
                                         </div>
-                                        {projectExpenses.length > 0 && (
-                                            <div className="flex items-center text-sm text-muted-foreground">
-                                                <HandCoinsIcon className="h-4 w-4 mr-2" />
-                                                <span className="sensitive-data text-foreground font-semibold">
-                                                    {formatAmounts(unbilledExpenseTotalsByCurrency)}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

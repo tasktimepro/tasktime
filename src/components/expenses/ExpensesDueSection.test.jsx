@@ -8,6 +8,7 @@ const recurrencesMock = vi.hoisted(() => [])
 const markAsPaidMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
+const categoriesMock = vi.hoisted(() => [])
 
 vi.mock('@/hooks/useExpenses.ts', () => ({
 
@@ -32,11 +33,19 @@ vi.mock('@/hooks/useExpenseRecurrences.ts', () => ({
     })
 }))
 
+vi.mock('@/hooks/useExpenseCategories.ts', () => ({
+    useExpenseCategories: () => ({
+        expenseCategories: categoriesMock,
+        allExpenseCategories: categoriesMock,
+    })
+}))
+
 describe('ExpensesDueSection', () => {
 
     beforeEach(() => {
         expensesMock.length = 0
         recurrencesMock.length = 0
+        categoriesMock.length = 0
         markAsPaidMock.mockReset()
         markAsPaidMock.mockResolvedValue(undefined)
         showSuccessMock.mockReset()
@@ -67,6 +76,15 @@ describe('ExpensesDueSection', () => {
         expect(screen.getByText('Today Bill')).toBeInTheDocument()
         expect(screen.getByText('Upcoming Bill')).toBeInTheDocument()
         expect(screen.queryByText('Paid Bill')).not.toBeInTheDocument()
+    })
+
+    it('uses the category dot for due rows without a colored card border', () => {
+        categoriesMock.push({ id: 'software', name: 'Software', color: '#ef4444' })
+        expensesMock.push({ id: 'exp-category', title: 'Subscription', categoryId: 'software', date: '2026-02-06', paymentStatus: 'unpaid', amount: 10, amountType: 'fixed', currency: 'USD' })
+
+        render(<ExpensesDueSection openExpenseView={vi.fn()} />)
+
+        expect(screen.getByTestId('category-color-dot')).toHaveStyle({ backgroundColor: '#ef4444' })
     })
 
     it('hides section when there are no unpaid expenses', () => {

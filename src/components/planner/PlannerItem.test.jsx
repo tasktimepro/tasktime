@@ -18,6 +18,36 @@ describe('PlannerItem', () => {
         expect(screen.getByText('Test Task')).toBeInTheDocument();
     });
 
+    it('uses the running timer danger indicator for an active task timer', () => {
+        render(
+            <PlannerItem
+                type="task"
+                title="Timed task"
+                isTimerActive={true}
+                onClick={() => {}}
+            />
+        );
+
+        const timerIndicator = screen.getByLabelText('Timer active');
+
+        expect(timerIndicator).toHaveClass('status-danger-fill', 'animate-pulse');
+        expect(timerIndicator).not.toHaveClass('status-success-text-strong');
+    });
+
+    it('keeps disabled recurrence status out of Planner titles', () => {
+        render(
+            <PlannerItem
+                type="task"
+                title="Disabled weekly task"
+                recurring={{ type: 'weekly', weeklyDays: [1], paused: true }}
+                onClick={() => {}}
+            />
+        );
+
+        expect(screen.getByText('Disabled weekly task')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Recurring task disabled')).not.toBeInTheDocument();
+    });
+
     it('applies neutral styling for client type', () => {
         const { container } = render(
             <PlannerItem
@@ -43,9 +73,26 @@ describe('PlannerItem', () => {
             />
         );
 
-        // Should use neutral border styling
+        // Projects retain the same accent width as colored project cards.
         const item = container.firstChild;
-        expect(item).toHaveClass('border-border');
+        expect(item).toHaveClass('border-border', 'border-l-4', 'border-l-border');
+        expect(item.style.borderLeftColor).toBe('');
+    });
+
+    it('uses the project folder icon for project items', () => {
+        render(
+            <PlannerItem
+                type="project"
+                title="Folder project"
+                onClick={() => {}}
+            />
+        );
+
+        const item = screen.getByText('Folder project').closest('[role="button"]');
+        const icon = item?.querySelector('svg');
+
+        expect(icon).toHaveClass('lucide-folder-closed');
+        expect(icon).not.toHaveClass('lucide-file-text');
     });
 
     it('applies neutral styling for task type', () => {
@@ -61,6 +108,41 @@ describe('PlannerItem', () => {
         // Should use neutral border styling
         const item = container.firstChild;
         expect(item).toHaveClass('border-border');
+    });
+
+    it('always gives expenses a left accent border with a neutral fallback', () => {
+        const { container } = render(
+            <PlannerItem
+                type="expense"
+                title="Internet bills"
+                amount={30}
+                currency="EUR"
+                onClick={() => {}}
+            />
+        );
+
+        const item = container.firstChild;
+        expect(item).toHaveClass('border-l-4', 'border-l-border');
+        expect(item.style.borderLeftColor).toBe('');
+        expect(item.style.borderLeftStyle).toBe('dotted');
+    });
+
+    it('uses an expense category color for the left accent border', () => {
+        const { container } = render(
+            <PlannerItem
+                type="expense"
+                title="AWS"
+                amount={30}
+                currency="EUR"
+                color="#ef4444"
+                onClick={() => {}}
+            />
+        );
+
+        const item = container.firstChild;
+        expect(item).toHaveClass('border-l-4', 'border-l-border');
+        expect(item).toHaveStyle({ borderLeftColor: '#ef4444' });
+        expect(item.style.borderLeftStyle).toBe('dotted');
     });
 
     it('applies completed styling when isCompleted is true', () => {

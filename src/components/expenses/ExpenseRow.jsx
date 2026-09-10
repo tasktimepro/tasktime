@@ -1,3 +1,4 @@
+import { CategoryLabel, getExpenseCategoryColor } from '@/components/expenses/CategoryLabel';
 /**
  * ExpenseRow component - Single expense row
  */
@@ -45,7 +46,7 @@ const ExpenseRow = ({
                 : (isUpcoming ? '' : 'Enter amount');
         }
     }
-    const borderColor = project?.color || client?.color || null;
+    const borderColor = getExpenseCategoryColor(category);
     const clientName = client?.title || null;
     const projectName = project?.title || null;
     const isPreview = Boolean(expense.isPreview);
@@ -185,7 +186,7 @@ const ExpenseRow = ({
                                 {category?.name && (
                                     <p>
                                         Category: <span className="font-medium text-muted-foreground">
-                                            {category.name}
+                                            <CategoryLabel category={category} showColor={false} />
                                         </span>
                                     </p>
                                 )}

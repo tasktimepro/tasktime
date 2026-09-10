@@ -8,30 +8,108 @@ Minimize the distance from identifying work to tracking it accurately.
 - Project detail groups project context, notes, task list/kanban, estimates, and time actions.
 - The Dashboard Time Entries widget has no hidden date window. It shows the 10 newest available entries, loads the newest archived entry year when the active document is empty, and applies only the project filter exposed in the widget.
 - Task hierarchy remains scannable; subtask actions do not imply unsupported recurrence.
-- Planner organizes references by week/day and supports desktop columns plus mobile day navigation.
+- Planner organizes references by week/day and supports desktop columns plus mobile day navigation. Attached project items use the shared closed-folder project icon; project deadline markers retain their flag icon. Projects always retain the solid 4px left identity border, using the resolved project/client color when available and the normal neutral border token otherwise. Expense items use a dotted 4px left accent to distinguish them from tasks and projects while keeping the rest of the card border solid. They resolve that accent from the current category record by ID, including recurring previews and archived categories; uncategorized or colorless expenses retain a neutral left accent and never inherit project or client colors.
 - Global timers show project/task identity, elapsed state, and clear pause/resume/stop actions.
+
+## Recurrence controls and project settings
+
+- Disable recurrence and Enable recurrence appear only in recurring-task
+  three-dot menus used by task details and list views. Disable uses a calendar-off
+  icon and Enable uses a calendar-check icon, with the same alignment and spacing
+  as adjacent actions, avoiding the
+  pause/play icons reserved for timers. Disabled recurring tasks keep clean
+  titles. List rows replace the normal recurrence schedule tag with a neutral
+  calendar-off `Disabled` tag, and task details show that tag inline after the
+  repeat description under Schedule.
+  Subtasks and archived tasks do not offer them. Open task editors omit
+  menu-owned recurrence control fields when saving; menu actions
+  preserve their displayed intent if another device has already changed it.
+- Paused schedules remain in project recurring-task lists but do not produce
+  Today, Upcoming, overdue, planner due items, or notification schedules.
+  Existing completed occurrences and tracked work remain visible in history.
+- Resume follows the existing weekly/monthly/yearly schedule from the current
+  local date, with no catch-up for missed dates. Timer controls and historical
+  billing remain independent. See the optional fields in the data contract.
+- Project Billing & Timer Rules and Project Planning appear only after a client
+  is selected, then use collapsed sections
+  with effective-setting summaries. Billing contains the client-rate notice,
+  override checkbox/rate fields, and hourly-only rounding controls; flat-rate
+  projects retain access to their rate override. Planning contains project
+  status, deadline, and target budget. Collapsing preserves entered values;
+  invalid inputs open their section and receive focus. A missing inherited
+  hourly rate also opens Billing with an explanation and focuses the override
+  control. Hourly overrides must be positive; flat-rate pricing disables that
+  hourly input's validation.
 
 ## Critical interaction states
 
 - Starting when another timer exists for the same project must resolve through the established guard behavior.
+- While an unpaused timer is running, other task rows for that project on the
+  Dashboard are non-interactive across Today, Upcoming, and Tasks: completion
+  and row actions stay unavailable, the task-title button is natively disabled,
+  and an overdue date does not provide a second details-modal entry point. The
+  timer-owning task, tasks in other projects, and tasks behind a paused project
+  timer remain available.
 - Paused timers remain visibly distinct from running timers.
+- Planner and global running-timer indicators share the animated danger-color
+  dot and an accessible Timer active label.
 - Stop and manual-entry flows validate dates/times and preserve notes.
 - Empty projects, completed/archived tasks, recurring occurrences, and missing referenced entities have explicit presentations.
 - Automatic billable marking, task controls, and Kanban billing badges require
   a non-personal project with a client assignment. Existing task preferences are
   retained when moving work; current-context totals do not rewrite invoice claims.
 
+## Project and client identity
+
+- The Projects page identifies the section with the shared closed-folder icon
+  beside the main heading using the neutral muted-foreground token. The blue
+  info-accent treatment remains scoped to dashboard section icons. Project card titles stay text-only because their
+  existing left borders already carry project identity. Active and archived
+  project grids use the same 24px gap as the Clients page. Cards also match the
+  Clients page's responsive inset: 16px on phones, then 24px with a 20px top
+  inset on larger layouts. Personal, archived, and quote-stage tags sit directly
+  after the title; the vertically centered three-dot action remains at the far
+  right. Long titles may wrap before displacing either control.
+  Cards show their creation date without repeating the recent-activity date;
+  recent activity remains available to the existing sort option. The remaining
+  details occupy a flexible left column while invoice and deadline pills align
+  in a compact right column on the same row. The columns wrap only when a card
+  is too narrow, rather than reserving a separate footer. Client-dashboard
+  project cards use the same lower-card layout.
+- On phone widths, the Projects and Clients headings hide only their
+  parenthesized entity totals so the icon, title, sort control, and create action
+  remain on the compact header row. Totals return from the `sm` breakpoint.
+- Project detail replaces the former color dot beside the title with a closed
+  folder. The folder uses the project's exact color, inherits the associated
+  client's color when the project has none, and otherwise uses the neutral
+  muted-foreground token. This presentation is read-only and does not change
+  stored project or client records.
+- The Clients page identifies its section with the shared users icon beside the
+  main heading using the neutral muted-foreground token. Client detail replaces
+  its former color dot with the single-user
+  icon used by Planner client attachments, using the client's exact color or the
+  neutral muted-foreground fallback.
+- A project card's associated client name is an explicit navigation control.
+  It shows pointer and underline feedback on hover, a visible keyboard focus
+  state, and opens that client without also activating the surrounding project
+  card.
+
 ## Dashboard overview
 
-- Project names have a small 8px color dot, using the exact project color or
+- Project names use a small 14px folder outline in the exact project color or
   its associated client's color when the project has none, matching the project
-  list. Missing or invalid colors use the neutral muted-foreground token.
-  Dots are decorative and sit inside the existing project-name button, without
-  an extra keyboard stop. Names retain click/keyboard navigation and truncate
-  on narrow screens. Client links, financial values, filters and row padding
-  remain unchanged.
+  identity shown by the widget heading. Missing or invalid colors use the neutral
+  muted-foreground token. Folder icons are decorative and sit inside the existing
+  project-name button without an extra keyboard stop. The client and pending-time
+  line aligns with the folder's left edge, matching the Expenses widget's metadata
+  alignment. Names retain click/keyboard navigation and truncate on narrow screens.
+  Client links, financial values, filters and row padding remain unchanged.
 
 - Today and Upcoming use the shared compact 32px empty-state icon size.
+- Unbilled cards in client and project dashboards use the same leading-icon and
+  title/value columns as Pending, Expenses, and Paid Revenue. When unbilled
+  expenses exist, their total remains a secondary line inside the shared content
+  column without shifting the base alignment.
 
 - Desktop shows four summary cards above Today and Upcoming; the two action
   panels sit side by side at `xl` (3:2), stretching to equal height. Below `md`,
@@ -46,9 +124,11 @@ Minimize the distance from identifying work to tracking it accurately.
   period does not change these timeframes. Running/paused timers retain their
   existing controls. Only tracked-time displays include their elapsed time.
 - Upcoming moves the existing next-seven-day task/expense occurrences into its
-  own panel, ordered by date. Show five initially and expose all remaining items
-  through Show all/Show less. Completion, recurrence dates, timer guards, expense
-  previews and Mark paid continue through the existing action handlers.
+  own panel, ordered by date. Its header uses only the `Upcoming` title without
+  repeating the seven-day window as subtitle copy. Show five initially and expose
+  all remaining items through Show all/Show less. Completion, recurrence dates,
+  timer guards, expense previews and Mark paid continue through the existing
+  action handlers.
   Its empty state uses a compact 32px icon and “Nothing coming up” without a
   description, centered vertically in the available panel body.
 - Reports Overview has one preset selector: This Month, Last Month, Last 90 Days,

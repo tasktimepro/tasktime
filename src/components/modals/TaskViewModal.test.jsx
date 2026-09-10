@@ -188,6 +188,31 @@ describe('TaskViewModal recurring actions', () => {
         expect(hookMocks.useTasks).toHaveBeenCalledWith({ includeArchived: true })
     })
 
+    it('keeps the title clean and marks disabled recurrence under Schedule', () => {
+        const disabledTask = {
+            ...recurringTask,
+            recurring: { ...recurringTask.recurring, paused: true },
+        }
+        hookMocks.tasks = [disabledTask]
+
+        renderModal({ task: disabledTask })
+
+        const title = screen.getByRole('heading', { name: 'Recurring task' })
+        const schedule = screen.getByText('Schedule').parentElement
+        const disabledBadge = screen.getByLabelText('Recurring task disabled')
+        const repeatRow = screen.getByText('Repeats: Every Mo, We, Fr').parentElement
+
+        expect(title).toHaveTextContent(/^Recurring task$/)
+        expect(title.querySelector('[aria-label="Recurring task disabled"]')).not.toBeInTheDocument()
+        expect(schedule).toContainElement(disabledBadge)
+        expect(schedule).toHaveTextContent('Repeats: Every Mo, We, Fr')
+        expect(repeatRow).toContainElement(disabledBadge)
+        expect(repeatRow).toHaveClass('flex', 'flex-wrap', 'items-center')
+        expect(disabledBadge).toHaveTextContent('Disabled')
+        expect(disabledBadge).toHaveClass('w-fit')
+        expect(disabledBadge.querySelector('svg')).toHaveClass('lucide-calendar-off')
+    })
+
     it('hides skip button for already skipped occurrence and keeps date-specific done label', () => {
         hookMocks.recurringStatus = {
             isDueToday: false,

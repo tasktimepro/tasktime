@@ -23,6 +23,12 @@ let mockEmailEntitlementEnforcement = false;
 let mockBillingSandbox = false;
 let mockBillingResolution = { kind: 'unresolved', reason: 'lifecycle' };
 let mockBillingStatus = null;
+let mockEntitlementState = {
+    plan: 'unknown',
+    accessStatus: 'unresolved',
+    verified: false,
+    connection: 'ready',
+};
 let mockEmailTemplates = [];
 const mockUpdateUrl = vi.fn();
 const mockCheckEmailAttemptStatus = vi.fn();
@@ -98,7 +104,18 @@ vi.mock('@/contexts/YjsContext', () => ({
 }));
 
 vi.mock('@/contexts/BillingContext', () => ({
-    useBilling: () => ({ resolution: mockBillingResolution, status: mockBillingStatus }),
+    useBilling: () => ({
+        resolution: mockBillingResolution,
+        status: mockBillingStatus,
+        entitlementState: {
+            ...mockEntitlementState,
+            plan: mockBillingResolution.kind === 'canonical'
+                ? mockBillingResolution.snapshot.accessStatus === 'free' ? 'free' : 'pro'
+                : 'unknown',
+            accessStatus: mockBillingResolution.snapshot?.accessStatus ?? 'unresolved',
+            verified: mockBillingResolution.kind === 'canonical',
+        },
+    }),
 }));
 
 vi.mock('@/config/billingFeatures', () => ({
@@ -239,6 +256,12 @@ describe('EmailPreviewModal', () => {
         mockBillingSandbox = false;
         mockBillingResolution = { kind: 'unresolved', reason: 'lifecycle' };
         mockBillingStatus = null;
+        mockEntitlementState = {
+            plan: 'unknown',
+            accessStatus: 'unresolved',
+            verified: false,
+            connection: 'ready',
+        };
         mockEmailTemplates = [];
         mockSendInvoiceEmail.mockReset();
         mockCheckEmailAttemptStatus.mockReset();
@@ -823,9 +846,12 @@ describe('EmailPreviewModal', () => {
         mockActiveStorageSessionId = 'sess-reconnected';
 
         render(<EmailPreviewModal {...defaultProps} />);
-        await user.click(screen.getByRole('button', { name: 'Send Invoice' }));
 
-        expect(await screen.findByText(/reconnect cloud sync/i)).toBeInTheDocument();
+        expect(screen.getByText('Pro is available; reconnect to send')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Reconnect Cloud Sync' }));
+
+        expect(mockUpdateUrl).toHaveBeenCalledWith({ view: 'account', section: 'sync' });
         expect(mockFindUnreconciledEmailAttemptForRecovery).not.toHaveBeenCalled();
         expect(mockGeneratePDFBase64).not.toHaveBeenCalled();
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
@@ -864,6 +890,113 @@ describe('EmailPreviewModal', () => {
         expect(mockOnClose).toHaveBeenCalledOnce();
         expect(mockUpdateUrl).toHaveBeenCalledWith({ view: 'account', section: 'billing' });
         expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['disconnected', 'View Pro options', 'billing'],
+        ['ready', 'Check plan status', 'billing'],
+        ['reconnect_required', 'Reconnect Cloud Sync', 'sync'],
+        ['reconnecting', 'Reconnecting…', null],
+        ['offline', 'Offline', null],
+    ])('uses shared recovery for unverified hosted Send when %s', async (connection, label, section) => {
+        mockEmailEntitlementEnforcement = true;
+        mockEntitlementState.connection = connection;
+        mockHostedServiceSessionId = null;
+        mockEmailTemplates = [mockDefaultTemplate];
+        render(<EmailPreviewModal {...defaultProps} />);
+        const action = screen.getByRole('button', { name: label });
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Message')).not.toBeDisabled();
+        if (section) {
+            await userEvent.setup().click(action);
+            expect(mockUpdateUrl).toHaveBeenCalledWith({ view: 'account', section });
+        } else {
+            expect(action).toBeDisabled();
+        }
+        expect(mockSendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it('keeps cached Pro visible but asks for reconnection before hosted Send', async () => {
+        const user = userEvent.setup();
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEntitlementState = {
+            plan: 'pro',
+            accessStatus: 'active',
+            verified: true,
+            connection: 'reconnect_required',
+        };
+        mockHostedServiceSessionId = null;
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByText('Pro is available; reconnect to send')).toBeInTheDocument();
+        expect(screen.queryByText('Hosted Send is a Pro feature')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'View Pro options' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'Reconnect Cloud Sync' }));
+
+        expect(mockOnClose).toHaveBeenCalledOnce();
+        expect(mockUpdateUrl).toHaveBeenCalledWith({ view: 'account', section: 'sync' });
+    });
+
+    it('keeps hosted Send paused without a reconnect action while cached Pro reconnects automatically', () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEntitlementState = {
+            plan: 'pro',
+            accessStatus: 'active',
+            verified: true,
+            connection: 'reconnecting',
+        };
+        mockHostedServiceSessionId = null;
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByText('Pro is available; reconnecting to send')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Reconnecting…' })).toBeDisabled();
+        expect(screen.queryByRole('button', { name: 'Reconnect Cloud Sync' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'View Pro options' })).not.toBeInTheDocument();
+    });
+
+    it('keeps hosted Send paused without reconnecting an already connected cached Pro account while offline', () => {
+        mockEmailEntitlementEnforcement = true;
+        mockBillingResolution = {
+            kind: 'canonical',
+            snapshot: {
+                accessStatus: 'active',
+                entitlements: ['invoice.email.send'],
+            },
+        };
+        mockEntitlementState = {
+            plan: 'pro',
+            accessStatus: 'active',
+            verified: true,
+            connection: 'offline',
+        };
+        mockEmailTemplates = [mockDefaultTemplate];
+
+        render(<EmailPreviewModal {...defaultProps} />);
+
+        expect(screen.getByText('Pro is available; go online to send')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Offline' })).toBeDisabled();
+        expect(screen.queryByRole('button', { name: 'Reconnect Cloud Sync' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Send Invoice' })).not.toBeInTheDocument();
     });
 
     it('shows canonical remaining usage and disables the optional copy when only one send remains', () => {

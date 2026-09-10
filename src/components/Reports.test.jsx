@@ -99,6 +99,7 @@ const createDefaultExpenses = () => [
         billable: false,
         billingStatus: 'unbilled',
         isRecurring: false,
+        categoryId: 'category-1',
         isTaxExempt: false,
         amountExcludingTax: 100,
         taxRate: 20,
@@ -241,12 +242,14 @@ vi.mock('@/hooks/useExpenseCategories.ts', () => ({
             {
                 id: 'category-1',
                 name: 'Software & subscriptions',
+                color: '#ef4444',
             },
         ],
         allExpenseCategories: [
             {
                 id: 'category-1',
                 name: 'Software & subscriptions',
+                color: '#ef4444',
             },
         ],
     }),
@@ -999,6 +1002,9 @@ describe('Reports', () => {
         expect(screen.getByText('VAT amount')).toBeInTheDocument();
         expect(screen.getByText('Inc VAT')).toBeInTheDocument();
         expect(screen.getByText('Hosting')).toBeInTheDocument();
+        const expenseCard = screen.getByText('Hosting').closest('.border-l-4');
+        expect(expenseCard).toHaveStyle({ borderLeftColor: '#ef4444' });
+        expect(expenseCard?.querySelector('[data-testid="category-color-dot"]')).toBeNull();
     });
 
     it('uses the shared native date inputs in the claim period modal', async () => {

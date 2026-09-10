@@ -1,3 +1,4 @@
+import { CategoryLabel } from '@/components/expenses/CategoryLabel';
 /**
  * ExpenseFilters component - Filter controls for expenses list
  */
@@ -117,7 +118,7 @@ const ExpenseFilters = ({
                             <SelectItem value="all">All categories</SelectItem>
                             {categories.map((category) => (
                                 <SelectItem key={category.id} value={category.id}>
-                                    {category.name}
+                                    <CategoryLabel category={category} />
                                 </SelectItem>
                             ))}
                         </SelectContent>

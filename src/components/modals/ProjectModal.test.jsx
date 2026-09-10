@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProjectModal from './ProjectModal';
 
@@ -73,6 +73,25 @@ describe('ProjectModal', () => {
         expect(screen.getByRole('dialog').className.includes('sm:max-w-2xl')).toBe(true);
     });
 
+    it('clears a preserved new-project draft when the modal is intentionally closed', async () => {
+        const user = userEvent.setup();
+        const clearSavedState = vi.fn();
+        const onClose = vi.fn();
+
+        render(
+            <ProjectModal
+                isOpen={true}
+                onClose={onClose}
+                clearSavedState={clearSavedState}
+            />
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        expect(clearSavedState).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
     it('updates the personal project helper copy when the checkbox is toggled', async () => {
         const user = userEvent.setup();
 
@@ -90,6 +109,8 @@ describe('ProjectModal', () => {
         await user.click(checkbox);
 
         expect(screen.getByText('Check this for projects without clients or invoices.')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Billing & Timer Rules' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Project Planning' })).not.toBeInTheDocument();
     });
 
     it('keeps personal project unchecked when a client is preselected', () => {
@@ -137,6 +158,7 @@ describe('ProjectModal', () => {
         );
 
         await user.type(screen.getByLabelText('Project Title *'), 'Rounded Project');
+        await user.click(screen.getByRole('button', { name: 'Billing & Timer Rules' }));
         await user.click(screen.getByRole('combobox', { name: 'Minimum billed time increment' }));
         await user.click(await screen.findByRole('option', { name: 'Round up to 15 minutes' }));
         await user.click(screen.getByRole('button', { name: 'Create Project' }));
@@ -182,6 +204,7 @@ describe('ProjectModal', () => {
         );
 
         await user.type(screen.getByLabelText('Project Title *'), 'Quoted Project');
+        await user.click(screen.getByRole('button', { name: 'Project Planning' }));
         await user.click(screen.getByRole('combobox', { name: 'Project Status' }));
         await user.click(await screen.findByRole('option', { name: 'Quote' }));
         await user.clear(screen.getByLabelText('Deadline'));
@@ -307,4 +330,55 @@ describe('ProjectModal', () => {
             deadlineResolvedAt: null,
         }));
     });
+    it.each([false, true])('reveals how to fix a missing inherited hourly rate when saving (editing: %s)', async editing => {
+        const user = userEvent.setup();
+        clientState.clients = [{ id: 'c', title: 'Client', hourlyRate: null, flatRate: false }];
+        render(<ProjectModal isOpen onClose={vi.fn()} modalOptions={{ preselectedClientId: 'c' }}
+            editingProject={editing ? { id: 'p', title: 'Work', preferredClientId: 'c', hourlyRate: null, flatRate: false } : null} />);
+        if (!editing) await user.type(screen.getByLabelText(/Project Title/), 'Work');
+        await user.click(screen.getByRole('button', { name: editing ? 'Update Project' : 'Create Project' }));
+        expect(screen.getByRole('button', { name: 'Billing & Timer Rules' })).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('alert')).toHaveTextContent(/hourly rate greater than 0/i);
+        await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Override client rate for this project' })).toHaveFocus());
+        expect(projectHookMocks.createProject).not.toHaveBeenCalled();
+        expect(projectHookMocks.updateProject).not.toHaveBeenCalled();
+    });
+
+    it('opens a collapsed billing section for a zero override and permits correction', async () => {
+        const user = userEvent.setup();
+        clientState.clients = [{ id: 'c', title: 'Client', hourlyRate: 100, flatRate: false }];
+        render(<ProjectModal isOpen onClose={vi.fn()} modalOptions={{ preselectedClientId: 'c' }} />);
+        await user.type(screen.getByLabelText(/Project Title/), 'Work');
+        const billing = screen.getByRole('button', { name: 'Billing & Timer Rules' });
+        await user.click(billing);
+        await user.click(screen.getByRole('checkbox', { name: 'Override client rate for this project' }));
+        await user.clear(screen.getByLabelText(/Hourly Rate/));
+        await user.type(screen.getByLabelText(/Hourly Rate/), '0');
+        await user.click(billing);
+        await user.click(screen.getByRole('button', { name: 'Create Project' }));
+        expect(billing).toHaveAttribute('aria-expanded', 'true');
+        await waitFor(() => expect(screen.getByLabelText(/Hourly Rate/)).toHaveFocus());
+        expect(projectHookMocks.createProject).not.toHaveBeenCalled();
+        await user.type(screen.getByLabelText(/Hourly Rate/), '75');
+        await user.click(billing);
+        await user.click(screen.getByRole('button', { name: 'Create Project' }));
+        expect(projectHookMocks.createProject).toHaveBeenCalledWith(expect.objectContaining({ hourlyRate: 75 }));
+    });
+
+    it('keeps rate overrides available for flat-rate projects inside a collapsible section', async () => {
+        const user = userEvent.setup();
+        clientState.clients = [{ id: 'c', title: 'Client', flatRate: true }];
+        render(<ProjectModal isOpen onClose={vi.fn()} modalOptions={{ preselectedClientId: 'c' }} />);
+        const billing = screen.getByRole('button', { name: 'Billing & Timer Rules' });
+        expect(billing).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('checkbox', { name: 'Override client rate for this project' })).not.toBeInTheDocument();
+        await user.click(billing);
+        expect(screen.getByRole('checkbox', { name: 'Override client rate for this project' })).toBeVisible();
+        expect(screen.queryByRole('combobox', { name: 'Minimum billed time increment' })).not.toBeInTheDocument();
+        await user.click(screen.getByRole('checkbox', { name: 'Override client rate for this project' }));
+        await user.click(billing);
+        await user.click(billing);
+        expect(screen.getByRole('checkbox', { name: 'Override client rate for this project' })).toBeChecked();
+    });
+
 });

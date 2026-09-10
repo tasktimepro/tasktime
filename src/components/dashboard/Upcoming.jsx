@@ -18,20 +18,19 @@ export default function Upcoming({ tasks, expenses, renderTask, renderExpense })
     return (
         <Card role="region" aria-labelledby="dashboard-upcoming-title" className="flex h-full min-w-0 flex-col shadow-sm">
             <CardHeader className="px-3 pt-3 pb-2 sm:px-5 sm:pt-4 sm:pb-2.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
                     <h2 id="dashboard-upcoming-title" className="flex items-center text-lg font-semibold">
                         <CalendarDaysIcon className="status-info-text-strong mr-2 h-5 w-5" />
                         Upcoming
                     </h2>
-                    <span className="text-xs text-muted-foreground">Next 7 days</span>
                 </div>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col px-3 pb-3 pt-0 sm:px-5 sm:pb-4">
                 {items.length ? (
                     <div id="dashboard-upcoming-items" className="divide-y divide-border">
                         {visible.map(item => <Fragment key={`${item.kind}-${item.value.id}`}>{item.kind === 'task'
-                            ? renderTask(item.value, { compact: true })
-                            : renderExpense(item.value, { compact: true })}</Fragment>)}
+                            ? renderTask(item.value, { context: 'upcoming' })
+                            : renderExpense(item.value, { context: 'upcoming' })}</Fragment>)}
                     </div>
                 ) : (
                     <EmptyState icon={CalendarDaysIcon} iconSize="sm" title="Nothing coming up" className="my-auto py-6" />

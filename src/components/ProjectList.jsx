@@ -33,6 +33,7 @@ import { getProjectDeadlineStatus, isProjectInQuoteMode } from '@/utils/projectP
 import { getProjectInvoicePreview } from '../utils/invoicePreviewUtils.ts';
 
 import ProjectDeleteDialog from './modals/ProjectDeleteDialog';
+import ProjectCardDetailsLayout from './ProjectCardDetailsLayout';
 /**
  * ProjectList component - Displays and manages the list of projects
  */
@@ -40,7 +41,8 @@ const ProjectList = ({
     onSelectProject,
     clients = [],
     openProjectModal,
-    editProjectModal
+    editProjectModal,
+    navigateToClient
 }) => {
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -368,7 +370,6 @@ const ProjectList = ({
     const renderProjectCard = (project, { archived = false } = {}) => {
         const client = getProjectClient(project);
         const projectValueChip = renderProjectValueChip(project);
-        const lastActive = projectLastActiveMap.get(project.id);
         const deadlineStatus = getProjectDeadlineStatus(project);
         const deadlineSummary = deadlineStatus.hasDeadline
             ? (deadlineStatus.isResolved
@@ -397,50 +398,20 @@ const ProjectList = ({
                 style={getProjectBorderStyle(project)}
                 onClick={() => onSelectProject(project)}
             >
-                <CardContent className="flex min-h-full flex-1 flex-col p-4 sm:pt-5">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-start gap-2">
-                                <h3 className="min-w-0 flex-1 whitespace-normal break-words [overflow-wrap:anywhere] text-base font-medium leading-tight text-foreground sm:text-lg">
-                                    {project.title}
-                                </h3>
-                                {archived && (
-                                    <Badge variant="secondary">Archived</Badge>
-                                )}
-                                {project.isPersonal && (
-                                    <Badge variant="secondary">Personal</Badge>
-                                )}
-                                {!project.isPersonal && isProjectInQuoteMode(project) && (
-                                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Quote stage</Badge>
-                                )}
-                            </div>
-
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground sm:text-sm">
-                                <span>Created {toDisplayDate(project.createdAt)}</span>
-                                {lastActive ? (
-                                    <span>Most recent {toDisplayDate(lastActive)}</span>
-                                ) : null}
-                            </div>
-
-                            {client?.title && !project.isPersonal && (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Client: <span className="font-medium text-foreground">{client.title}</span>
-                                </p>
+                <CardContent className="flex min-h-full flex-1 flex-col p-4 md:p-6 md:pt-5">
+                    <div className="flex items-center justify-between gap-3">
+                        <div data-testid="project-card-title-group" className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                            <h3 className="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere] text-base font-medium leading-tight text-foreground sm:text-lg">
+                                {project.title}
+                            </h3>
+                            {archived && (
+                                <Badge variant="secondary" className="whitespace-nowrap">Archived</Badge>
                             )}
-
-                            {project.hourlyRate && !project.flatRate && (
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    <span className="sensitive-data">
-                                        {`${getCurrencySymbol(getProjectCurrency(project, clients, preferences.currency))}${project.hourlyRate}/${getProjectCurrency(project, clients, preferences.currency)} per hour`}
-                                    </span>
-                                </p>
+                            {project.isPersonal && (
+                                <Badge variant="secondary" className="whitespace-nowrap">Personal</Badge>
                             )}
-
-                            {deadlineStatus.hasDeadline && (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Deadline <span className="font-medium text-foreground">{toDisplayDate(deadlineStatus.deadline, { month: 'short', day: 'numeric' })}</span>
-                                    {deadlineSummary ? ` · ${deadlineSummary}` : ''}
-                                </p>
+                            {!project.isPersonal && isProjectInQuoteMode(project) && (
+                                <Badge className="whitespace-nowrap bg-amber-100 text-amber-800 hover:bg-amber-100">Quote stage</Badge>
                             )}
                         </div>
 
@@ -488,12 +459,54 @@ const ProjectList = ({
                         </DropdownMenu>
                     </div>
 
-                    {(deadlineBadge || projectValueChip) && (
-                        <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-4">
-                            {deadlineBadge}
-                            {projectValueChip}
+                    <ProjectCardDetailsLayout
+                        pills={(deadlineBadge || projectValueChip) ? (
+                            <>
+                                {deadlineBadge}
+                                {projectValueChip}
+                            </>
+                        ) : null}
+                    >
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground sm:text-sm">
+                            <span>Created {toDisplayDate(project.createdAt)}</span>
                         </div>
-                    )}
+
+                        {client?.title && !project.isPersonal && (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Client:{' '}
+                                {typeof navigateToClient === 'function' ? (
+                                    <button
+                                        type="button"
+                                        aria-label={`Open client ${client.title}`}
+                                        className="hover:text-foreground hover:underline cursor-pointer focus-visible:text-foreground focus-visible:underline"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            navigateToClient(client.id);
+                                        }}
+                                    >
+                                        {client.title}
+                                    </button>
+                                ) : (
+                                    <span className="font-medium text-foreground">{client.title}</span>
+                                )}
+                            </p>
+                        )}
+
+                        {project.hourlyRate && !project.flatRate && (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                <span className="sensitive-data">
+                                    {`${getCurrencySymbol(getProjectCurrency(project, clients, preferences.currency))}${project.hourlyRate}/${getProjectCurrency(project, clients, preferences.currency)} per hour`}
+                                </span>
+                            </p>
+                        )}
+
+                        {deadlineStatus.hasDeadline && (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Deadline <span className="font-medium text-foreground">{toDisplayDate(deadlineStatus.deadline, { month: 'short', day: 'numeric' })}</span>
+                                {deadlineSummary ? ` · ${deadlineSummary}` : ''}
+                            </p>
+                        )}
+                    </ProjectCardDetailsLayout>
                 </CardContent>
             </Card>
         );
@@ -544,9 +557,10 @@ const ProjectList = ({
         <div className="space-y-8">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="min-w-0 flex-1 text-2xl font-bold text-foreground">
+                <h2 className="flex min-w-0 flex-1 items-center gap-2 text-2xl font-bold text-foreground">
+                    <ProjectIcon aria-hidden="true" className="h-6 w-6 shrink-0 text-muted-foreground" />
                     Projects {activeProjects.length > 0 && (
-                        <span>
+                        <span className="hidden sm:inline">
                             ({activeProjects.length})
                         </span>
                     )}
@@ -599,7 +613,7 @@ const ProjectList = ({
                 <>
                     {/* Active Projects */}
                     {sortedActiveProjects.length > 0 && (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {sortedActiveProjects.map((project) => renderProjectCard(project))}
                 </div>
                     )}
@@ -620,7 +634,7 @@ const ProjectList = ({
                             </button>
 
                             {showArchivedProjects && (
-                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                                         {sortedArchivedProjects.map((project) => renderProjectCard(project, { archived: true }))}
                                 </div>
                             )}

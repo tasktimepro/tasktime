@@ -16,6 +16,7 @@ import ExpenseDueCard from '../expenses/ExpenseDueCard';
 import { useTimers } from '../../hooks/useTimers';
 import { useExpenses } from '../../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../../hooks/useExpenseRecurrences.ts';
+import { useExpenseCategories } from '../../hooks/useExpenseCategories.ts';
 import { useToast } from '../../hooks/useToast.ts';
 import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 import { advanceByRepeat, buildExpenseFromRecurrence, getNextRecurringDate } from '@/utils/expenseUtils';
@@ -55,6 +56,7 @@ const ToDoToday = ({
     const { getTimerForTask } = useTimers();
     const { expenses, markAsPaid } = useExpenses();
     const { recurrences } = useExpenseRecurrences();
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
     const { showError, showSuccess } = useToast();
     const isMobileLayout = useIsMobileLayout();
     const [selectedTask, setSelectedTask] = useState(null);
@@ -87,6 +89,9 @@ const ToDoToday = ({
         });
         return map;
     }, [recurrences]);
+    const expenseCategoriesById = useMemo(() => new Map(
+        allExpenseCategories.map((category) => [category.id, category])
+    ), [allExpenseCategories]);
 
     const { overdueExpenses, todayExpenses, upcomingExpenses } = useMemo(() => {
         const todayDate = parseStoredDate(todayStr);
@@ -234,6 +239,7 @@ const ToDoToday = ({
     };
 
     const renderTaskRow = (task, options = {}) => {
+        const rowContext = options.context === 'upcoming' ? 'upcoming' : 'today';
         const timer = getTimerForTask(task.id, task.projectId);
         const isTimerActive = !!timer && timer.taskId === task.id;
         const shouldDisable = !!timer && !timer.isPaused && !isTimerActive;
@@ -243,7 +249,7 @@ const ToDoToday = ({
             Boolean(task.recurringStatus?.isOverdue) ||
             (task.startDate && task.startDate < todayStr)
         );
-        const canOpenDetails = Boolean(onTaskTitleClick);
+        const canOpenDetails = Boolean(onTaskTitleClick) && !shouldDisable;
 
         const dateBadge = (
             <StartDateBadge
@@ -270,10 +276,10 @@ const ToDoToday = ({
 
         return (
             <div key={task.id} className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${shouldDisable ? 'opacity-50' : ''}`}>
-                {isMobileLayout || options.compact ? (
+                {isMobileLayout ? (
                     <div className="flex items-start gap-3">
                         <CustomCheckbox
-                            id={`dashboard-${options.compact ? 'upcoming' : 'today'}-${task.id}`}
+                            id={`dashboard-${rowContext}-${task.id}`}
                             label={`Complete ${task.title}`}
                             labelClassName="sr-only"
                             checked={isCompleted}
@@ -281,7 +287,7 @@ const ToDoToday = ({
                             disabled={shouldDisable}
                         />
                         <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden" data-testid={`task-row-content-${task.id}`}>
-                            {renderTaskTitle(task, isCompleted)}
+                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable })}
                             <div
                                 className="flex w-full flex-wrap items-center justify-end gap-2"
                                 data-testid={`task-row-secondary-${task.id}`}
@@ -322,7 +328,7 @@ const ToDoToday = ({
                 ) : (
                     <div className="flex items-center gap-3">
                         <CustomCheckbox
-                            id={`dashboard-${options.compact ? 'upcoming' : 'today'}-${task.id}`}
+                            id={`dashboard-${rowContext}-${task.id}`}
                             label={`Complete ${task.title}`}
                             labelClassName="sr-only"
                             checked={isCompleted}
@@ -330,7 +336,7 @@ const ToDoToday = ({
                             disabled={shouldDisable}
                         />
                         <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
-                            {renderTaskTitle(task, isCompleted)}
+                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable })}
                         </div>
                         {dateBadgeNode}
                         {(task.recentTime || 0) > 0 && (
@@ -381,10 +387,10 @@ const ToDoToday = ({
         <ExpenseDueCard
             key={expense.id}
             expense={expense}
+            category={expense.categoryId ? expenseCategoriesById.get(expense.categoryId) : null}
             isOverdue={options.isOverdue}
             isToday={options.isToday}
             isPreview={expense.isPreview}
-            compact={options.compact}
             recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
             onView={() => openExpenseView?.(expense)}
             onMarkPaid={expense.isPreview

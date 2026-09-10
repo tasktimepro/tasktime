@@ -7,6 +7,15 @@ import {
 const baseDate = new Date(2026, 4, 30, 10, 0, 0, 0);
 
 describe('todoNotificationSchedule', () => {
+    it('does not schedule notifications for paused tasks or dates before resume', () => {
+        const schedules = buildTodoNotificationSchedules({ startDate: baseDate, horizonDays: 7,
+            tasks: [
+                { id: 'paused', title: 'Paused', recurring: { type: 'weekly', weeklyDays: [1], paused: true } },
+                { id: 'resumed', title: 'Resumed', recurring: { type: 'weekly', weeklyDays: [1], resumeFrom: '2026-06-02' } },
+            ], expenses: [], expenseRecurrences: [] });
+        expect(schedules).toEqual([]);
+    });
+
     it('builds date-level digest rows for due tasks and expenses', () => {
         const schedules = buildTodoNotificationSchedules({
             startDate: baseDate,

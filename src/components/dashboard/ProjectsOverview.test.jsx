@@ -5,7 +5,7 @@ import ProjectsOverview from './ProjectsOverview';
 
 vi.mock('../../hooks/useIsMobileLayout', () => ({ default: () => false }));
 
-describe('dashboard project color dots', () => {
+describe('dashboard project color icons', () => {
     it.each([
         { title: '', color: null, background: '' },
         { title: '  E\u0301quipe', color: 'invalid', background: '' },
@@ -19,11 +19,14 @@ describe('dashboard project color dots', () => {
             setProjectFilter={vi.fn()} setProjectSearchQuery={vi.fn()}
             navigateToProject={vi.fn()} handleClientTitleClick={vi.fn()}
         />);
-        const button = screen.getByTestId('project-color-dot');
-        expect(button).toHaveAttribute('aria-hidden', 'true');
-        if (background) expect(button).toHaveStyle({ backgroundColor: background });
-        else expect(button.style.backgroundColor).toBe('');
-        expect(button).toHaveClass('bg-muted-foreground');
+        const dashboardHeaderIcon = screen.getByRole('region', { name: 'Projects' })
+            .querySelector('.status-info-text-strong');
+        expect(dashboardHeaderIcon).toHaveClass('lucide-folder-closed');
+        const icon = screen.getByTestId('project-color-icon');
+        expect(icon).toHaveAttribute('aria-hidden', 'true');
+        expect(icon).toHaveClass('lucide-folder-closed', 'text-muted-foreground');
+        if (background) expect(icon).toHaveStyle({ color: background });
+        else expect(icon.style.color).toBe('');
         expect(screen.getByText(/Personal/)).toBeInTheDocument();
     });
 
@@ -42,8 +45,9 @@ describe('dashboard project color dots', () => {
         />);
         const blue = screen.getByRole('button', { name: 'DebugBundle App', exact: true });
         const inherited = screen.getByRole('button', { name: 'Équipe', exact: true });
-        expect(blue.querySelector('[data-testid=project-color-dot]')).toHaveStyle({ backgroundColor: '#3b82f6' });
-        expect(inherited.querySelector('[data-testid=project-color-dot]')).toHaveStyle({ backgroundColor: '#ef4444' });
+        expect(blue.querySelector('[data-testid=project-color-icon]')).toHaveStyle({ color: '#3b82f6' });
+        expect(inherited.querySelector('[data-testid=project-color-icon]')).toHaveStyle({ color: '#ef4444' });
+        expect(blue.parentElement.querySelector('[data-testid=project-metadata]')).not.toHaveClass('pl-4');
         fireEvent.click(blue);
         expect(navigateToProject).toHaveBeenLastCalledWith('blue');
         fireEvent.click(inherited);
