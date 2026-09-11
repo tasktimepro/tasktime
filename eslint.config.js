@@ -23,7 +23,7 @@ const REACT_HOOKS_COMPILER_RULES = {
 }
 
 export default [
-  { ignores: ['.tasktime-build', 'coverage', 'dist', 'dist-app', 'dist-site', 'test-results', 'tasktime-infra/**'] },
+  { ignores: ['.tasktime-build', 'coverage', 'dist', 'dist-app', 'dist-site', 'artifacts', 'test-results', 'tasktime-infra/**', 'tasktime-site/**', 'blog/**'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {

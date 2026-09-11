@@ -15,16 +15,21 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
-- **Public site and build outputs:** Astro content under `blog/` builds the
-  product overview, local-review pricing comparison, blog, legal pages, agent
-  documentation, discovery metadata, and generated tool references. `make build`
-  now produces isolated `dist-app` and `dist-site` release inputs plus the
-  current `dist` compatibility surface, which deliberately retains the app at
-  `/`. The pricing route and split deployment remain unpublished until their
-  launch gates are approved. The Phase 4 target reuses the existing root Pages
-  project for `dist-site`, adds one permanent Pages project for `dist-app`, and
-  shares the single Worker and its stateful services; combined `dist` becomes a
-  pinned root rollback artifact rather than a routine deployment.
+- **Public site and build outputs:** The independent, locally nested and ignored
+  `tasktime-site/` repository owns Astro homepage/product/pricing/blog/legal/agent
+  pages and public discovery. Core builds only `dist-app`; site builds its own
+  `dist`. A reviewed JSON snapshot carries core public tool/discovery metadata
+  into site without parent-source imports or coupled release cycles. See
+  `contracts/site-distribution.md`. Phase 4 reuses the existing root Pages
+  project for site and adds one permanent app project, sharing the existing
+  Worker/services. The actual pre-cutover combined artifact remains the pinned
+  root rollback source. Extraction, pricing, and split deployment are local and
+  unpublished until their separate launch gates are approved.
+- **Publication isolation:** Only the app owns PWA installation and offline
+  caching. Site ships a static non-indexable 404 to disable implicit host SPA
+  fallback, plus complete public metadata/sitemap checks. App noindex metadata
+  remains crawlable. Each repository's release gate independently blocks on
+  high/critical dependency findings; functional green is not security approval.
 - **Origin roles:** `src/config/origins.ts` explicitly distinguishes the
   marketing/documentation, application, optional
   Worker, and agent-documentation origins. Production values are exact HTTPS
@@ -48,9 +53,10 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Production-like local stack:** In an operator checkout, the default
   `make dev` command applies an explicit Vite-development flag on a loopback
   hostname and runs the app, local Worker/D1, scheduled recovery runner, and
-  Dockerized Stripe test webhook listener as one attached Compose stack under a
-  dedicated Compose project, so
-  one-off Docker validation commands cannot join its lifecycle or stop it. The
+  Dockerized Stripe test webhook listener, plus the optional site on port 3102,
+  as one detached `tasktime` Compose group. The app stays on port 3101. Stop
+  preserves the prepared containers for Docker Desktop Play; validation commands
+  use `tasktime-tools` and cannot join its lifecycle or stop it. The
   local overlay cannot turn off a
   Worker control enabled in tracked production configuration, while guarded
   unreleased billing controls may be enabled against Stripe test mode. Product

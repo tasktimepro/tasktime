@@ -5,57 +5,12 @@ import path from 'path'
 import { readFileSync } from 'fs'
 import { PUBLIC_STATIC_ROUTE_DENYLIST } from './src/config/publicRoutes.js'
 import { syncWorkerCspPlugin } from './src/config/syncWorkerCsp.js'
+import { publicSitePlugin } from './src/config/publicSitePlugin.js'
 
 const packageJson = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url))
 )
 const appBuildVersion = `${packageJson.version}-${Date.now()}`
-
-const isPreviewCommand = process.argv.includes('preview')
-const publicRouteProxy = isPreviewCommand
-  ? undefined
-  : {
-      '/blog': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/product': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/pricing': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/agents': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/llms.txt': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/privacy': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/contact': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/terms': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '/src/styles/global.css': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-      '^/@fs/app/blog/': {
-        target: 'http://127.0.0.1:4321',
-        changeOrigin: false,
-      },
-    }
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -64,6 +19,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       syncWorkerCspPlugin(env.VITE_SYNC_WORKER_URL),
+      publicSitePlugin(env.VITE_MARKETING_ORIGIN),
       react(),
       VitePWA({
         strategies: 'injectManifest',
@@ -107,9 +63,8 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true, // Exit if port is already in use instead of automatically trying the next available port
       host: 'localhost',
-      proxy: publicRouteProxy,
       watch: {
-        ignored: ['**/coverage/**', '**/dist/**', '**/blog/dist/**'],
+        ignored: ['**/coverage/**', '**/dist/**', '**/tasktime-site/**', '**/tasktime-infra/**'],
       },
       // Handle SPA routing - redirect all requests to index.html
       historyApiFallback: true
@@ -120,6 +75,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true
     },
     build: {
+      outDir: 'dist-app',
       rollupOptions: {
         output: {
           manualChunks(id) {

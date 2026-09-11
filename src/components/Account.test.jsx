@@ -209,8 +209,8 @@ describe('Account', () => {
         expect(githubLink).not.toHaveClass('hover:text-primary');
         expect(privacyLink).toHaveClass('text-muted-foreground', 'hover:text-foreground');
         expect(privacyLink).not.toHaveClass('underline');
-        expect(privacyLink.getAttribute('href')).toBe('/privacy/');
-        expect(termsLink.getAttribute('href')).toBe('/terms/');
+        expect(privacyLink.getAttribute('href')).toBe('https://tasktime.pro/privacy/');
+        expect(termsLink.getAttribute('href')).toBe('https://tasktime.pro/terms/');
         expect(privacyLink.getAttribute('target')).toBe('_blank');
         expect(termsLink.getAttribute('target')).toBe('_blank');
     });

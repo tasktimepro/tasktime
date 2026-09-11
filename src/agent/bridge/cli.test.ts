@@ -207,7 +207,7 @@ describe('TaskTime Pro agent bridge CLI', () => {
 
     it('keeps the static discovery manifest aligned with the CLI manifest', () => {
         const staticManifest = JSON.parse(readFileSync(
-            'public/.well-known/tasktime-agent.json',
+            'agent-bridge/discovery/tasktime-agent.json',
             'utf8'
         ));
 

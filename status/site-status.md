@@ -2,6 +2,43 @@
 
 ## Current focus
 
+- [x] Reconcile historical Free/Pro, reports, hosted-email and legal/pricing
+  claims locally (2026-09-11, uncommitted). Free-first copy preserves invoices,
+  PDFs/manual delivery and workspace ownership; optional Pro and Stripe billing
+  are disclosed without inventing live quotas or legal policy. Root Privacy
+  and README agree with site; article URLs and the old email section anchor
+  remain stable. The independent site gate passes: zero audit findings,
+  7 native tests, 52 HTML pages and 6 Chromium tests. Core security remediation
+  also passes; remaining program work is UI plus Phase 4 review/promotion and
+  commercial/legal/operational approval. Details: `tasktime-site/STATUS.md` and
+  `docs/subscription-claim-inventory.md`.
+- [x] Complete the local final migration sweep (2026-09-11, uncommitted): static
+  404, all-page metadata/assets/sitemap checks, app-only PWA ownership and install
+  guidance, preserved canonicals and matching square-image cards. Site gate:
+  zero audit findings, 4 native tests, 52 HTML pages, 6 Chromium checks. Detailed
+  evidence and unresolved content/SEO/publication gates live in the site's
+  `STATUS.md`. The follow-up above resolves the core security and historical
+  copy blockers; real screenshots/UI and Phase 4 approvals remain open.
+- [x] Include the optional site's own Compose service in the core `tasktime`
+  local group on port 3102 beside app 3101 (2026-09-11, uncommitted). Builds and
+  releases remain independent. Site `STATUS.md` and core `app-status.md` record
+  isolated generated-state validation and the data-preserving group restart.
+- [x] Remediate the extracted site's inherited Astro advisories locally
+  (2026-09-11, uncommitted): Astro 7.3.2, zero known audit findings, independent
+  release gate and 51-page upgrade parity verified. No core dependency/runtime
+  changes. `tasktime-site/STATUS.md` owns detailed evidence; Phase 4 still requires
+  a fresh candidate audit, remote monitoring/CI activation and content approvals.
+- [x] Extract the site into the independent ignored `tasktime-site/` repository
+  (2026-09-11, uncommitted). The active site work register is now that checkout's
+  `STATUS.md`; core retains this coordination pointer and historical evidence.
+  Ownership and snapshot compatibility are defined in
+  `contracts/site-distribution.md`. Core/site gates pass independently; remote
+  creation, initial commit, main promotion, security/content approval and live
+  launch are still pending in Program Phase 4. Entries below predate extraction;
+  their references to shared icons and core-owned `blog/` describe that history.
+
+## Historical local checkpoints before repository extraction
+
 - [x] Standardize homepage, pricing, shared site-description, and onboarding
   backup copy on the full TaskTime Pro product name. App-opening homepage/pricing
   CTAs read “Open TaskTime Pro”; pricing keeps Free and Pro as plan labels and

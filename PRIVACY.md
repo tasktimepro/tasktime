@@ -1,10 +1,10 @@
 # Privacy Policy
 
-Last updated: September 2, 2026
+Last updated: September 11, 2026
 
 This repository-level policy summarizes how TaskTime Pro handles privacy in the public app, public source repository, packages, and same-device agent bridge. The canonical product policy is published at https://tasktime.pro/privacy/.
 
-TaskTime Pro is built around a simple principle: your work data should remain yours. The app is local-first, avoids account-based data collection, and is designed so project, client, invoice, expense, task, time-entry, and report content does not live in a TaskTime Pro database.
+TaskTime Pro is built around a simple principle: your work data should remain yours. The app is local-first, requires no account for core use, and is designed so project, client, invoice, expense, task, time-entry, and report content does not live in a TaskTime Pro database. Optional connected services and Pro billing use the limited records described below.
 
 ## What TaskTime Pro Stores Locally
 
@@ -24,7 +24,7 @@ Cloud sync is optional. If you connect Google Drive or Dropbox, TaskTime Pro sto
 
 The public app uses a small edge authentication service at `sync.tasktime.pro` to securely maintain the selected provider connection. It stores the session record and encrypted OAuth refresh token needed for that connection, issues short-lived provider access tokens only to an authorized browser connection, and supports revocation. Routine sync file requests travel directly between your browser and Google Drive or Dropbox. The access token stays only in active-browser memory, and the edge service does not receive or retain routine sync file bodies or your work records as a TaskTime-hosted workspace.
 
-Google Drive and Dropbox sync use the minimum practical provider scopes for application-folder storage and account identification. Dropbox grants include account-information read access so your browser can retrieve the verified account email directly from Dropbox and show which account is connected. That email is stored only in the local browser authentication record; it is excluded from work-data sync, backups, exports, aggregate metrics, and the edge service. The edge service continues to identify Dropbox storage through a TaskTime-scoped account pseudonym and does not receive or retain the Dropbox profile response. The selected provider's own terms and privacy policy apply to your account and cloud storage.
+Google Drive and Dropbox sync use the minimum practical provider scopes for application-folder storage and account identification. Dropbox grants include account-information read access so your browser can retrieve the verified account email directly from Dropbox and show which account is connected. That email stays in the local browser authentication record unless you choose to share it for billing at checkout; it is excluded from work-data sync, backups, exports, and aggregate metrics. The edge service identifies Dropbox storage through a TaskTime-scoped account pseudonym rather than retaining the Dropbox profile response. The selected provider's own terms and privacy policy apply to your account and cloud storage.
 
 You can disconnect cloud sync without deleting the provider files. You can also explicitly wipe validated TaskTime Pro sync files and backups from the selected provider, revoke access, and disconnect the browser.
 
@@ -34,11 +34,15 @@ The TaskTime Pro agent bridge is same-device only. The bridge does not read brow
 
 Agent access requires explicit local pairing and scoped permissions. Revoking access in TaskTime Pro stops the paired bridge from using the app. Agent tools should not be used to bypass app validation, mutate raw storage, or extract sensitive data outside the user's intent.
 
+## Optional Pro Billing
+
+Optional Pro uses a billing profile linked to your connected Google Drive or Dropbox identity, with plan, trial, and usage records. [Stripe](https://stripe.com/privacy) processes payments and the contact and tax details supplied at checkout. TaskTime Pro does not store full card details. Billing records are separate from your workspace and are not included in work-data sync or backups.
+
 ## Invoice Email Sending
 
-If you use the Send Invoice feature, your browser generates the invoice PDF and sends the email content and recipient information to Resend for delivery. Resend is a third-party email delivery provider, and its privacy policy applies to that delivery step.
+If you use optional Pro hosted sending, your browser generates the invoice or quote PDF and sends it with the email content and recipient information through TaskTime Pro's edge service to Resend for delivery. Resend is a third-party email delivery provider, and its privacy policy applies to that delivery step. PDF downloads and manual delivery remain Free.
 
-TaskTime Pro stores only minimal server-side audit data for this feature, such as hashed identifiers and timestamps used to enforce monthly send limits and reduce duplicate sends. Invoice content, PDF data, and email bodies are not kept as a TaskTime Pro server-side archive.
+TaskTime Pro keeps minimal delivery and usage records, such as account references, hashed recipient identifiers, status, and timestamps, to enforce send limits and reduce duplicate sends. Invoice content, PDF data, and email bodies are not kept as a TaskTime Pro server-side archive.
 
 ## Notifications And Reminders
 
@@ -86,7 +90,8 @@ TaskTime Pro may interact with:
 - Google Drive, when you enable sync
 - Dropbox, when you enable sync
 - Cloudflare, for public edge services such as OAuth/session control, metrics, notification scheduling, and related app endpoints
-- Resend, when you send invoice email
+- Stripe, when you purchase or manage optional Pro
+- Resend, when you use hosted email sending
 - DebugBundle, when runtime diagnostics are configured
 - GitHub and npm, for public source, issue tracking, packages, and release artifacts
 
@@ -96,7 +101,7 @@ These providers process data according to their own policies. TaskTime Pro shoul
 
 TaskTime Pro is designed without advertising cookies, tracking pixels, or cross-site ad tracking. The app uses browser storage for the app itself and for local preferences.
 
-The public website and app should not use third-party analytics to profile users or inspect private work content.
+The public website and app should not use third-party analytics to profile users or inspect private work content. Stripe's checkout and billing pages use storage and cookies under Stripe's own policy.
 
 ## Retention And Deletion
 
@@ -105,6 +110,8 @@ Local app data remains in your browser until you delete it, clear browser storag
 Cloud sync data remains in your Google Drive or Dropbox account until you remove it through TaskTime Pro controls or your provider account. Encrypted OAuth refresh tokens are retained only while the related provider authorization remains active.
 
 Aggregate metrics and operational audit data may be retained for abuse prevention, reliability analysis, and product maintenance. They should be minimized and should not contain private app records.
+
+Billing records are retained as needed to manage subscriptions, prevent abuse, and meet accounting obligations. Contact support@tasktime.pro about billing-record access or deletion. Deleting local workspace data does not cancel a subscription; manage Pro separately in the app's billing settings.
 
 ## User Control
 

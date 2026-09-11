@@ -10,7 +10,58 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Program Phase 3 UI polishing in progress locally**
 
-- Local checkpoint (2026-09-11): this commit includes all pending app, billing,
+- Three-repository local checkpoint (2026-09-11, user approved): this commit
+  retains the core site extraction, grouped development, dependency remediation
+  and copy/metadata reconciliation. Site source is retained in its own initial
+  local commit `5a366f2` before core records the old `blog/` removal; private deployment
+  preparation is checkpointed separately. Historical `uncommitted`/no-initial-
+  commit labels below describe validation before these checkpoints. No remote
+  creation, push, main promotion, version bump, tag, publication or deployment
+  is included. The broader core `1.6.0` and affected-agent train below remains
+  the planned release scope; this slice adds no agent runtime/schema changes.
+  Phase 4 still requires remote source retention and a clean approved public
+  contract; the site's pinned dirty candidate is not publication provenance.
+  Pre-commit rerun passes with CI settings: zero core audit findings, 2,709
+  unit tests with coverage, all 63 Chromium smokes and 5 PWA checks. The full
+  site gate and private assembler tests/workflow YAML checks also pass.
+
+- Core dependency and Free/Pro copy follow-up (2026-09-11, uncommitted) resolves
+  both additional migration blockers locally. Core's 57 audit findings are now
+  **zero** after a coordinated same-major dependency update and clean install;
+  both audit-first release gates remain enforced. Core release checks pass
+  (2,709 unit, 62 browser, 5 PWA), plus a real-PDF regression and agent gates.
+  The running local app also uses the patched dependencies. Site independently
+  passes audit, 7 native tests, 52-page validation and 6 browser checks.
+  Historical no-paid-tier claims, advanced-report metadata and legal/pricing
+  copy now preserve Free core and disclose optional Pro/Stripe concisely.
+  Remaining program work is Phase 3 UI/visual review and Phase 4 approvals,
+  source/provenance, legal/commercial sign-off and controlled launch—not an
+  authorization to publish. Details: `app-status.md`, `tasktime-site/STATUS.md`
+  and `docs/subscription-claim-inventory.md`.
+- Local Docker orchestration (2026-09-11, uncommitted) now uses a persistent
+  `tasktime` group: app 3101, optional site 3102, and existing local private
+  services. Stop/Play retains the prepared containers; `tasktime-tools` isolates
+  validation. The rename preserved Worker state, browser origin and volumes.
+  Core/site gates and grouped stop/start health checks pass; see `app-status.md`.
+  This does not couple repository builds/releases or change production.
+
+- Public site repository extraction (2026-09-11, uncommitted) is locally
+  validated. `tasktime-site/` is an independent ignored checkout with its own
+  lockfile/Docker/CI/artifact; core builds only `dist-app`. Public metadata uses
+  an explicitly reviewed schema-1 snapshot. App public links/redirects and PWA
+  exclusion preserve the boundary without changing Yjs, sync, billing, or agent
+  runtime contracts. See `contracts/site-distribution.md`, `app-status.md`, and
+  the nested site's `STATUS.md`. Full core and site gates passed. Phase 4 now
+  tracks three-repo main promotion, clean snapshot, protected independent
+  deployments, security/content approval and retained rollback bytes. Site
+  remote and all deployments remain pending; the initial local source checkpoint
+  is recorded above and live state is unchanged.
+  The follow-up site-only Astro 7.3.2 remediation clears all 13 inherited audit
+  findings locally; the standalone gate and 51-page parity checks pass. Required
+  high/critical audit enforcement is prepared, with fresh candidate evidence and
+  remote dependency-monitoring activation still tracked in Phase 4.
+
+- Earlier local checkpoint `e867ac8` (2026-09-11) includes the preceding app, billing,
   UI, site, test, documentation, and generated OpenClaw changes. Dated validation
   entries below retain their original pre-commit evidence; their `uncommitted`
   labels describe that earlier state. Release scope is core minor `1.6.0` plus

@@ -2,6 +2,84 @@
 
 ## Current focus
 
+- [x] Remediate core dependency advisories (2026-09-11, local/uncommitted).
+  Fresh full audit falls from 57 entries (3 critical, 17 high, 36 moderate,
+  1 low) to **zero**, including development dependencies. Patched locked
+  versions: Tiptap family 3.31.3, jsPDF 4.2.1, DOMPurify 3.4.15,
+  Vitest/coverage 4.1.11, Vite 7.3.6, PostCSS 8.5.28, uuid 13.0.2 and
+  compatible transitive fixes (including Workbox 7.4.1, Rollup 4.63.1 and
+  brace-expansion 1.1.18). Coverage is now correctly a development dependency.
+  Direct major versions are unchanged; no forced fix, peer bypass, override,
+  advisory suppression or coverage-floor reduction was used. Stale Tiptap lock
+  entries required coordinated regeneration; clean `npm ci` and `npm ls --all`
+  pass without peer conflicts.
+  The real installed editor first failed the upstream prototype-key regression
+  on the old version, then passed after updating. Historical version-1 notes
+  open without a rewrite, retain task/link formatting, and support edit/undo/redo.
+  The full core release gate passes: audit, lint/typecheck, 6 artifact tests,
+  **280 files / 2,709 unit tests**, 93.16% statements / 84.61% branches /
+  94.35% functions / 94.49% lines, **62 Chromium smokes and 5 production-PWA
+  checks**. An additional real-PDF blob/sanitization browser regression and
+  fresh lint pass (63 browser scenarios total); invoice/quote downloads remain
+  covered. Agent builds, managed bundles and isolated live MCP workflow pass;
+  the pinned site contract still matches public semantics.
+  A fresh standalone Docker image also audits clean and builds `dist-app`
+  without host source mounts, the retired blog, or either nested repository.
+  Only the local app was stopped for `npm ci` and restarted: its same container
+  and dependency volume now use the patched packages, app/site return HTTP 200,
+  and site/Worker/scheduler/Stripe listener containers were not replaced.
+  No user-data/schema/sync/entitlement contract or production state changed.
+  Evidence: `/private/tmp/tasktime-core-security-copy.fyomiq/` (temporary).
+  Exact release-candidate audits and promotion approvals remain in Phase 4.
+- [x] Verify app ownership during the final site-migration sweep (2026-09-11,
+  uncommitted): manifest/start identity/icons and same-origin worker scope remain
+  intact; five production-PWA checks cover installation metadata, offline boot
+  and public-route escape. Robots now permits crawling so the existing noindex
+  metadata is observable. No app data/sync/runtime dependency changes.
+  Lint/typecheck, 6 artifact/security-entry tests, 279 files / 2,707 unit tests
+  (93.2% statements) and 62 Chromium smokes pass. Site independently passes its
+  full gate. Details: `tasktime-site/STATUS.md`.
+- [x] Group local development under `tasktime` for Docker Desktop Stop/Play
+  (2026-09-11, uncommitted). The detached group includes app 3101, optional site
+  3102, and the existing Worker/scheduler/Stripe test listener. The site's own
+  Compose definition is included only when available; app/site links use the
+  local pair, with a coordinated `TASKTIME_SITE_PORT` host override. Core tooling
+  uses `tasktime-tools`, without optional checkouts or shared runtime dependencies.
+  The old `tasktime-dev` containers/network were replaced without deleting
+  volumes; Worker bind-mounted state and browser origin remain unchanged. A
+  stopped-state backup is retained in `/private/tmp/tasktime-compose-group.mZLMlc/`.
+  Stop/start preserved all five containers and restored app/site/Worker HTTP 200;
+  this was verified through Compose, not Docker Desktop UI automation (unavailable).
+  Red/green covers the old lifecycle and all four optional-checkout combinations.
+  Full core release gate passes: lint/typecheck, 5 artifact/export tests, 279 files
+  / 2,707 unit tests with coverage (93.2% statements), 62 browser and 4 PWA tests.
+  Independent site gate passes, including concurrent validation with container-local
+  Astro generated state. No app-domain behavior, persisted schema, dependency
+  version, production configuration, commit, push or deployment changed.
+
+- [x] Separate the core build from the public-site repository (2026-09-11,
+  uncommitted). Core install/build/test needs neither nested checkout. Astro and
+  public assets/content moved to ignored `tasktime-site/`; core retains the
+  discovery source and exports an explicitly versioned/checksummed public JSON
+  snapshot. Core emits only `dist-app`, with non-indexable metadata/robots,
+  generated site-origin redirects and the unchanged app SPA/PWA ownership.
+  Legal/account/onboarding links use the exact marketing origin. No persisted
+  shape, sync behavior, domain mutation, hosted API or agent runtime changed.
+  Pre-ship review caught the partial service-worker public-route exclusion;
+  the shared route list now also protects pricing, agents, sitemap and discovery
+  from poisoning the offline app shell.
+  Final Docker `npm run release`: lint/typecheck, 5 artifact/export tests,
+  279 Vitest files / 2,703 tests, 93.2% statements / 84.61% branches / 94.35%
+  functions / 94.49% lines with configured coverage floors, 62 browser smoke
+  tests and 4 production-PWA tests all passed. A clean app image builds without
+  site, infra, the retired blog or host source mounts. Standalone site passes
+  its own gate; public generated catalog/discovery/skill bytes match baseline.
+  Private assembler has 2 passing negative/compatibility tests and new workflows
+  parse locally, but no remote workflow was dispatched. Phase 4 owns remaining
+  security/content reviews, source promotion, deployment and user migration.
+  This extraction adds no agent publication train beyond the already-planned
+  broader checkpoint. No commit/push/tag/remote creation/deploy occurred.
+
 - [x] Task/account/category UI polish (2026-09-09, uncommitted): recurring tasks
   offer Disable recurrence / Enable recurrence only in their three-dot menus,
   with calendar-off/calendar-check icons

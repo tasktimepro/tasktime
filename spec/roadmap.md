@@ -148,9 +148,11 @@ Program Phase 1 is the implementation dependency. It freezes a stable logical li
 Program Phase 2 is intentionally narrow for the two known users. It adds no
 general-purpose migration protocol or permanent migration UI. The existing
 validated complete backup/import and provider-neutral pristine-device bootstrap
-are the only data paths. The build emits isolated app and public-site artifacts
-plus the unchanged-root combined compatibility artifact, with fail-closed
-ownership, collision, canonical-link, and asset validation. Browser, agent,
+are the only data paths. Phase 3 now extracts the public site into an independent
+repository with its own artifact and CI; core emits only `dist-app`. The pinned
+actual pre-cutover combined artifact remains the rollback input. Ownership,
+canonical-link, asset, and pinned public-contract checks enforce separation.
+See `contracts/site-distribution.md`. Browser, agent,
 Google/Dropbox OAuth, email, Push, metrics, billing, and private Worker
 regressions cover the exact old/new overlap and explicit loopback development
 while rejecting malformed or inferred authority. No split artifact is deployed,

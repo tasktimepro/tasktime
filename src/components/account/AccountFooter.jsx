@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { TASKTIME_ORIGIN_CONFIG } from '@/config/syncWorker';
 
 const currentYear = new Date().getFullYear();
 
@@ -34,7 +35,7 @@ const AccountFooter = ({ className }) => {
                     </svg>
                 </a>
                 <a
-                    href="/blog/"
+                    href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/blog/`}
                     className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
@@ -42,7 +43,7 @@ const AccountFooter = ({ className }) => {
                     Blog
                 </a>
                 <a
-                    href="/contact/"
+                    href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/contact/`}
                     className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
@@ -50,7 +51,7 @@ const AccountFooter = ({ className }) => {
                     Contact
                 </a>
                 <a
-                    href="/privacy/"
+                    href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/privacy/`}
                     className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"
@@ -58,7 +59,7 @@ const AccountFooter = ({ className }) => {
                     Privacy Policy
                 </a>
                 <a
-                    href="/terms/"
+                    href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/terms/`}
                     className="text-muted-foreground hover:text-foreground"
                     target="_blank"
                     rel="noreferrer noopener"

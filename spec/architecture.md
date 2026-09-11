@@ -16,7 +16,7 @@ TaskTime Pro is a browser-owned local-first system with optional remote and loca
 | Agent commands | Scoped business-action facade used by browser bridge/MCP tooling |
 | Local bridge | Pairing, sessions, origins, scopes, approvals, rate limiting, command transport, and MCP protocol |
 | Managed agent plugin | Host-lifecycle ownership and generated tool adaptation around the existing local bridge; no product-data or business-logic ownership |
-| Public build | Astro content, generated agent artifacts, discovery files, and combined production output |
+| Public distribution | Independent `tasktime-site` Astro repository and artifact, consuming an explicitly reviewed core JSON contract; no routine combined build |
 
 ## Data distribution
 

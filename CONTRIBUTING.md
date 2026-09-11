@@ -28,17 +28,29 @@ make build
 ```
 
 An operator checkout with the private infrastructure repository uses `make dev`
-for the complete local Worker and Stripe test-mode stack. The public repository
-continues to start the core app when that private checkout is absent; use
+for the complete local Worker and Stripe test-mode stack. The optional site joins
+the same `tasktime` Docker Desktop group on port 3102, beside the app on 3101.
+Stop/Play controls the prepared group; `make stop` preserves containers, and
+`make logs` follows their detached output. Tooling uses `tasktime-tools` separately.
+The public repository continues to start the core app (and site when present)
+when the private checkout is absent; use
 `make dev-core` when you deliberately need that isolated path.
 
 Use `make npm CMD="<command>"` for arbitrary npm commands. Do not run `npm` directly on the host.
 
-The production build writes three ignored outputs: `dist-app` contains the app
-shell, PWA, and SPA fallback; `dist-site` contains Astro pages, public discovery,
-and robots/sitemap files; `dist` remains the combined compatibility output.
-Run `make npm CMD="run test:build-artifacts"` for the focused collision,
-ownership, canonical-link, fallback, and referenced-asset contract.
+Core builds only `dist-app` (app shell, PWA, public-route redirects, SPA fallback,
+and non-indexable robots). Public pages live in an independent, ignored
+`tasktime-site/` checkout with its own Docker commands, CI, and `dist` output.
+Use `make site-dev` to start its grouped service, or `make site-build` /
+`make site-test` for independent validation. Core builds never need it.
+Run `make npm CMD="run test:build-artifacts"` for
+core artifact/redirect and documentation-export checks. Site owns its page,
+link, canonical, discovery, and responsive browser tests.
+
+See [the distribution contract](./contracts/site-distribution.md) before changing
+shared public metadata. Copy-only site changes need no app release. Changes in
+the nested repositories must be reviewed and committed separately; core Git
+intentionally does not track them. Do not add a gitlink or force-add them.
 
 ## Pull Requests
 

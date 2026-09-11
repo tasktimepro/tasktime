@@ -1,3 +1,5 @@
+import { matchesPublicStaticRoute } from '../src/config/publicRoutes.js';
+
 const CACHE_NAME = 'tasktime-cache-v5';
 const APP_SHELL = [
     '/',
@@ -13,13 +15,6 @@ const APP_SHELL = [
     '/icons/web-app-manifest-512x512.png'
 ];
 const BUILD_ASSETS = self.__WB_MANIFEST || [];
-const STATIC_PUBLIC_PATHS = [
-    '/blog',
-    '/product',
-    '/contact',
-    '/privacy',
-    '/terms',
-];
 
 function getPrecacheUrls() {
     const precacheUrls = BUILD_ASSETS.map((entry) => {
@@ -201,7 +196,7 @@ self.addEventListener('fetch', (event) => {
         requestUrl
         && appOrigin
         && requestUrl.origin === appOrigin
-        && STATIC_PUBLIC_PATHS.some((pathname) => requestUrl.pathname === pathname || requestUrl.pathname.startsWith(`${pathname}/`))
+        && matchesPublicStaticRoute(requestUrl.pathname)
     ) {
         return;
     }

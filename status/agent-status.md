@@ -2,6 +2,25 @@
 
 ## Current focus
 
+- Core dependency remediation (2026-09-11, local/uncommitted) passes canonical
+  bridge/native OpenClaw builds, bridge and managed-bundle smokes, and the
+  isolated live browser/MCP timer/invoice/cancellation journey. Public tool,
+  discovery and version contracts are unchanged, and site snapshot parity
+  passes. The generated bridge still matches the existing OpenClaw vendor;
+  this dependency-only slice adds no agent publication beyond the broader
+  checkpoint train below. Its pre-existing Claude vendor refresh remains a
+  Phase 4 release-preparation step. No installed agent or published package was
+  changed. Core evidence is in `app-status.md`.
+
+- Public documentation distribution moved to independent `tasktime-site/`
+  (2026-09-11, uncommitted). Core retains all runtime/package sources and the
+  discovery manifest at `agent-bridge/discovery/tasktime-agent.json`; site pins
+  the generated public contract and owns domain-proof hosting. Tool catalog,
+  skill output, discovery and registry proof match the pre-extraction bytes.
+  This move alone requires no agent republish; the broader checkpoint release
+  assessment below still applies. See `contracts/site-distribution.md` and the
+  updated public-docs/key-rotation sections of `docs/agent-release-runbook.md`.
+
 - Local checkpoint release assessment (2026-09-11): the pending recurrence and
   expense-category work changes bridge tool schemas/descriptions and generated
   OpenClaw artifacts, so the broader checkpoint is not core-only. A future

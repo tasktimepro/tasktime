@@ -1,4 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -24,12 +26,18 @@ describe('billing sandbox development workflow', () => {
             '$(MAKE) -C tasktime-infra worker-billing-sandbox-prepare',
         );
         expect(makefile).toContain('TASKTIME_DEV_PROJECT=$(TASKTIME_DEV_PROJECT) sh ./scripts/run-billing-sandbox-stack.sh');
-        expect(makefile).toContain('DEV_COMPOSE = docker compose --project-name $(TASKTIME_DEV_PROJECT)');
-        expect(runner).toContain('project_name="${TASKTIME_DEV_PROJECT:-tasktime-dev}"');
-        expect(runner).toContain('docker compose --project-name "$project_name"');
-        expect(runner).toContain('up --abort-on-container-exit --remove-orphans');
-        expect(runner).toContain('down --remove-orphans');
-        expect(runner).toContain('trap');
+        expect(makefile).toContain('TASKTIME_DEV_PROJECT ?= tasktime\n');
+        expect(makefile).toContain('TOOLS_COMPOSE = docker compose --project-name tasktime-tools');
+        expect(readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8'))
+            .toContain('docker compose --project-name tasktime-tools run --rm app npm ci');
+        const siteOverlay = readFileSync(resolve(process.cwd(), 'docker-compose.site.yml'), 'utf8');
+        expect(siteOverlay).toContain('include:\n  - ./tasktime-site/docker-compose.yml');
+        expect(siteOverlay).toContain('VITE_MARKETING_ORIGIN: http://localhost:${TASKTIME_SITE_PORT:-3102}');
+        expect(makefile).toContain('stop:\n\t$(DEV_COMPOSE) stop');
+        expect(runner).toContain('exec sh ./scripts/dev-compose.sh up -d --build');
+        expect(runner).not.toContain('--abort-on-container-exit');
+        expect(runner).not.toContain('down');
+        expect(runner).not.toContain('trap');
 
         expect(compose).toContain('VITE_BILLING_SANDBOX_MODE: "true"');
         expect(compose).toContain('VITE_DROPBOX_CLOUD_UI_ENABLED: "true"');
@@ -59,6 +67,41 @@ describe('billing sandbox development workflow', () => {
             './tasktime-infra/cloudflare/.dev.vars.billing-sandbox.local',
         );
         expect(compose).not.toContain('--api-key');
+    });
+
+    it.each([
+        { infra: false, site: false },
+        { infra: true, site: false },
+        { infra: false, site: true },
+        { infra: true, site: true },
+    ])('selects only available local services without coupling core tooling: %j', ({ infra, site }) => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'tasktime-compose-test-'));
+        try {
+            mkdirSync(resolve(fixture, 'bin'));
+            writeFileSync(resolve(fixture, 'bin/docker'), '#!/bin/sh\nprintf "%s\\n" "$@"\n', { mode: 0o755 });
+            if (infra) {
+                mkdirSync(resolve(fixture, 'tasktime-infra'));
+                writeFileSync(resolve(fixture, 'tasktime-infra/Makefile'), '');
+            }
+            if (site) {
+                mkdirSync(resolve(fixture, 'tasktime-site'));
+                writeFileSync(resolve(fixture, 'tasktime-site/docker-compose.yml'), '');
+            }
+            const result = spawnSync('sh', [resolve(process.cwd(), 'scripts/dev-compose.sh'), 'up', '-d', '--build'], {
+                cwd: fixture,
+                env: { ...process.env, PATH: `${fixture}/bin:${process.env.PATH}`, TASKTIME_DEV_PROJECT: '' },
+                encoding: 'utf8',
+            });
+            expect(result.status, result.stderr).toBe(0);
+            expect(result.stdout.trim().split('\n')).toEqual([
+                'compose', '--project-name', 'tasktime', '-f', 'docker-compose.yml',
+                ...(infra ? ['-f', 'docker-compose.billing-sandbox.yml'] : []),
+                ...(site ? ['-f', 'docker-compose.site.yml'] : []),
+                'up', '-d', '--build',
+            ]);
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
     });
 
     it('keeps local sandbox implementation details out of product UI', () => {

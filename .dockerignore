@@ -6,3 +6,14 @@ dist
 .gitignore
 .vscode
 .env
+.env.*
+tasktime-site
+tasktime-infra
+blog
+artifacts
+dist-app
+dist-site
+.tasktime-build
+coverage
+test-results
+.debugbundle

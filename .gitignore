@@ -25,6 +25,8 @@ coverage
 playwright-report
 test-results
 tasktime-infra/
+tasktime-site/
+artifacts/
 agent-kit/
 
 # Local lint/report scratch files

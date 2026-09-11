@@ -22,13 +22,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Build app image
-        run: docker compose build app
+        run: docker compose --project-name tasktime-tools build app
 
       - name: Install dependencies
-        run: docker compose run --rm app npm ci
+        run: docker compose --project-name tasktime-tools run --rm app npm ci
 
       - name: Run release gate
         run: make release-gate APP_RUN_ENV="-e CI=true -e VITE_SYNC_WORKER_URL=http://127.0.0.1:8787"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: core-site-contract-${{ github.sha }}
+          path: artifacts/site-contract.json
+          if-no-files-found: error
+          retention-days: 30

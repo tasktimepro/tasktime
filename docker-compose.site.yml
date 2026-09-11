@@ -1,0 +1,8 @@
+# Optional local orchestration only. Site owns its service, build context and dependencies.
+include:
+  - ./tasktime-site/docker-compose.yml
+
+services:
+  app:
+    environment:
+      VITE_MARKETING_ORIGIN: http://localhost:${TASKTIME_SITE_PORT:-3102}

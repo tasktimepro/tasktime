@@ -1,5 +1,4 @@
 User-agent: *
+# Crawlers must reach the app shell to see its noindex metadata.
+# robots.txt is not an access-control or de-indexing mechanism.
 Allow: /
-Disallow: /auth/callback
-
-Sitemap: https://tasktime.pro/sitemap.xml

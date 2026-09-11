@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { isDropboxCloudUiEnabled } from '@/config/cloudProviders';
+import { TASKTIME_ORIGIN_CONFIG } from '@/config/syncWorker';
 import {
     ArrowUpTrayIcon,
     CheckIcon,
@@ -211,7 +212,7 @@ const OnboardingModal = ({
                                 TaskTime Pro is a local-first task and time management app that helps you plan your work, track your time and expenses, and easily generate invoices.
                             </p>
                             <a
-                                href="/product/"
+                                href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/product/`}
                                 target="_blank"
                                 rel="noreferrer noopener"
                                 aria-label="Learn more about TaskTime Pro (opens in a new tab)"

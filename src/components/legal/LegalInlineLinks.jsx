@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { cn } from '@/lib/utils';
+import { TASKTIME_ORIGIN_CONFIG } from '@/config/syncWorker';
 
 function LegalLink({ href, label, linkClassName, openInNewTab }) {
     return (
@@ -29,14 +30,14 @@ const LegalInlineLinks = ({ className, linkClassName, openInNewTab = true, prefi
         <p className={cn('text-sm leading-6 text-muted-foreground', className)}>
             <span>{prefix}</span>
             <LegalLink
-                href="/privacy/"
+                href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/privacy/`}
                 label="Privacy Policy"
                 linkClassName={linkClassName}
                 openInNewTab={openInNewTab}
             />
             <span> and </span>
             <LegalLink
-                href="/terms/"
+                href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/terms/`}
                 label="Terms & Conditions"
                 linkClassName={linkClassName}
                 openInNewTab={openInNewTab}

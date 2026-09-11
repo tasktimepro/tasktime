@@ -7,6 +7,8 @@
 
 TaskTime Pro is a free, open-source, local-first work manager for freelancers, covering tasks, timers, expenses, invoices, and reports. Core use requires no TaskTime account or cloud sync, works offline after the PWA is loaded or installed, and stores work records in the browser.
 
+Free includes one active client, unlimited projects and invoices, PDF downloads, and the current-month Reports Overview. The optional [Pro plan](https://tasktime.pro/pricing/) adds unlimited active clients, advanced reports, and hosted email sending.
+
 The app stores user work data locally with Yjs and IndexedDB, supports optional Google Drive or Dropbox sync, and exposes an optional first-party same-device MCP bridge for AI agents after explicit pairing. The production app sends limited aggregate usage metrics without project, task, client, invoice, expense, note, or time-entry content.
 
 - Production app: https://tasktime.pro
@@ -26,7 +28,7 @@ The app stores user work data locally with Yjs and IndexedDB, supports optional 
 
 Requirements:
 
-- Docker with Docker Compose
+- Docker with Docker Compose (2.20.3+ for the optional grouped site)
 - `make`
 
 All Node/npm commands run through Docker.
@@ -38,13 +40,16 @@ make dev
 
 Open http://localhost:3101.
 
-During local development, the public Astro pages are served through the same origin, so these URLs work from the app server:
-
-- http://localhost:3101/blog
-- http://localhost:3101/product
-- http://localhost:3101/pricing
-- http://localhost:3101/agents
-- http://localhost:3101/llms.txt
+The optional public site is a separate Git checkout at `tasktime-site/`, ignored
+by core just like `tasktime-infra/`. When present, `make dev` includes its own
+Compose service in the **tasktime** Docker Desktop group at http://localhost:3102.
+The app stays on port 3101, and app/site links point to each other locally.
+The group runs detached: Docker Desktop Stop/Play controls all prepared services;
+`make stop` also preserves the containers for Play. Use `make logs` to follow logs.
+`make site-dev` / `make site-stop` control only that grouped site service.
+For a different site host port, use `TASKTIME_SITE_PORT=3103 make dev`; its
+container still listens on 3102 and the app's site links follow the host override.
+Core builds and tooling never require either nested repository.
 
 ## Common Commands
 
@@ -60,7 +65,8 @@ make test-run                        # run Vitest once
 make test-coverage                   # run Vitest with coverage
 make test-e2e-smoke                  # run Playwright smoke tests in Chromium
 make test-e2e-drive-browsers         # run direct Drive smoke in Chromium, Firefox, and WebKit
-make build                           # build isolated app/site plus combined compatibility outputs
+make build                           # build the app only into dist-app
+make site-build                      # build the optional standalone site checkout
 make preview                         # build and preview production output
 make npm CMD="run build:agent-bridge" # build the agent bridge package
 ```
@@ -74,10 +80,11 @@ local state and Stripe test mode. `make dev-billing-sandbox` remains a compatibl
 explicit alias. A public checkout without the private infrastructure repository
 falls back to the core app; `make dev-core` selects that path explicitly.
 
-`make build` produces `dist-app` for the React PWA/SPA, `dist-site` for Astro
-public pages and discovery, and `dist` as the unchanged combined compatibility
-surface used by current release automation. The split outputs are local release
-inputs only until the app-subdomain cutover is separately approved.
+`make build` produces only `dist-app` for the React PWA/SPA. The site builds its
+own `dist` with independent dependencies, tests, and CI. There is no routine
+combined build. See [the distribution contract](./contracts/site-distribution.md)
+for snapshot updates and release ownership. These are local candidates until
+the app-subdomain cutover is separately approved; production is unchanged.
 
 Product screens remain visually production-like, without sandbox-only banners or
 developer-facing notices. Hosted Send and delivery-status requests use the normal
@@ -90,10 +97,10 @@ enabled in tracked production configuration must not be disabled by the local
 overlay; a contract test enforces that one-way parity.
 
 Start the complete local stack from the repository root. The command
-prepares local D1/configuration and starts the app, Worker, scheduled recovery
-runner, and Dockerized Stripe webhook listener together. Their logs remain attached, and `Ctrl+C`
-stops and removes the complete stack. The long-running services use a dedicated
-Compose project, so ordinary one-off validation commands cannot stop them:
+prepares local D1/configuration and starts the app, optional site, Worker, scheduled
+recovery runner, and Dockerized Stripe webhook listener together. The detached
+`tasktime` project remains available for Docker Desktop Stop/Play. Ordinary
+one-off validation uses `tasktime-tools` and cannot stop the running group:
 
 ```bash
 make dev
@@ -135,8 +142,8 @@ from leaving webhook verification out of sync. The lower-level private Worker
 commands remain available for diagnosing an individual service. Use only Stripe
 test cards and fictional customer details; never enter a real card or identity.
 
-The public comparison remains available from the same server at
-`http://localhost:3101/pricing/`. Ordinary loopback development can use the same
+With the site checkout present, `http://localhost:3101/pricing/` redirects to
+`http://localhost:3102/pricing/`. Ordinary loopback development can use the same
 bundled review prices while the live Worker catalog is unavailable. The billing
 sandbox deliberately disables that fallback so local Worker/configuration failures
 remain visible before any trial or test purchase.
@@ -162,8 +169,9 @@ src/                              App source, hooks, Yjs stores, utilities, test
 agent-bridge/                     Publishable @tasktimepro/agent-bridge package
 integrations/openclaw/tasktime/   OpenClaw/ClawHub skill and plugin bundle
 integrations/claude/tasktime/      Claude Code plugin bundle and MCP server config
-blog/                             Astro public site, blog, and agent docs
-public/.well-known/               Agent discovery manifest
+agent-bridge/discovery/           Core-owned public discovery source
+tasktime-site/                    Optional ignored independent Astro repository
+tasktime-infra/                   Optional ignored private operations repository
 e2e/                              Playwright browser tests
 test-data/backups/                Public backup fixtures for compatibility tests
 ```
@@ -202,7 +210,14 @@ When changing persisted data:
 
 ## Public Repository Boundary
 
-This repository contains the public app, public site, tests, agent bridge, and OpenClaw bundle. Private Cloudflare Worker source, deployment workflows, provider account IDs, production KV/D1 identifiers, secrets, and internal operational runbooks are intentionally managed outside this public source tree.
+This repository contains the public app, tests, agent bridge, and OpenClaw bundle. The public site has its own independent repository, optionally nested here as the ignored `tasktime-site/` checkout. Private Cloudflare Worker source, deployment workflows, provider account IDs, production KV/D1 identifiers, secrets, and internal operational runbooks are intentionally managed outside this public source tree.
+
+Both `make release-gate` and `npm run release` (through Docker) begin with
+`npm audit --audit-level=high`, including development/build dependencies.
+High/critical findings or an unavailable audit registry block release; a passing
+functional suite alone is not publication readiness. Use
+`make npm CMD="run audit:security"` for the standalone check. Do not force
+upgrades or suppress findings to make the gate pass.
 
 ## Agent Development Workflow
 

@@ -7,14 +7,24 @@
 - Offline use allows local work; unavailable cloud actions fail visibly without corrupting local state.
 - Reconnecting never silently replaces unsynced valid local work with an older remote snapshot.
 - Core use does not require a TaskTime account or cloud sync, and public discovery metadata states that work records use browser-local storage.
-- The production build emits an app-only artifact, a public-site-only artifact,
-  and the existing combined compatibility artifact. Only the app artifact owns
-  the PWA manifest, service worker, and SPA fallback; only the site artifact owns
-  Astro routes, robots/sitemap/`llms.txt`, and public discovery. The combined
-  artifact retains the application root until the separately approved cutover.
-- Build assembly fails on unequal path collisions, missing required outputs,
-  an incorrect `/product/` canonical URL, or a missing referenced site asset;
-  byte-identical shared brand assets remain valid.
+- Core and site install, test, and build independently, without either nested
+  checkout or shared node_modules. Only core owns the app PWA and SPA fallback;
+  only site owns Astro, public discovery, sitemap/feeds, and indexable public
+  pages. App crawling is allowed so its noindex metadata can be observed.
+- Public app-origin routes redirect to the exact site origin with query state
+  preserved and never replace the offline app shell. Core routes/OAuth stay
+  app-owned. Site app CTAs use the exact app origin; legacy public URLs remain.
+- Site rejects invalid pinned contracts, missing assets, incorrect canonicals,
+  or app-owned output. Core rejects missing PWA outputs or site-owned output.
+  A new source release cannot overwrite the other product's deployment.
+- Site ships a non-indexable top-level 404 without a canonical or SPA fallback;
+  unknown public paths and app-only PWA resources return 404. Every public page
+  has valid metadata/assets and sitemap coverage; unknown editorial modification
+  dates are omitted. Only the app manifest defines install identity and scope.
+- Both core release entry points and the independent site release gate stop on
+  high/critical dependency findings before producing a release-ready result.
+- The exact pre-cutover combined root artifact remains the rollback input.
+  Independent builds and local tests do not authorize a live origin change.
 
 ## Work and time
 
@@ -289,13 +299,15 @@
   sandbox.
 - In an operator checkout, the supported developer entrypoint is `make dev`. It prepares the
   ignored local test configuration and migrations, then runs the app, local
-  Worker, and Stripe test-webhook listener as one attached Docker Compose
-  stack. Every Worker control enabled in tracked production configuration stays
+  Worker, Stripe test-webhook listener and optional site as one detached
+  `tasktime` Docker Compose group (app 3101, site 3102). Every Worker control
+  enabled in tracked production configuration stays
   enabled locally, while guarded unreleased billing behavior may be enabled only
   against local state and Stripe test mode. Preparation fails with a sanitized,
   actionable error when the ignored local Resend credential is absent. Stopping
-  that command stops the complete stack. The billing-specific target remains a
-  compatibility alias; a public checkout without private infrastructure retains
+  the group preserves all containers and data for Docker Desktop Play. Independent
+  validation in `tasktime-tools` does not stop the group. The billing-specific
+  target remains a compatibility alias; a public checkout without private infrastructure retains
   an explicit core-app fallback. An expired or missing owner-controlled Stripe
   test login and locally stored service credentials remain external prerequisites.
 - A Free user can open `/reports` and use Overview for the current local calendar

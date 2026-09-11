@@ -8,33 +8,22 @@ The stable route surface is defined in `spec/routes.md`. Navigation uses History
 
 ## Build artifacts
 
-`make build` emits three deterministic, ignored release inputs:
+Core `make build` emits only `dist-app`: React entry/assets, manifest, service
+worker, non-indexable robots, public-route redirects, and the exact SPA fallback.
+It excludes Astro pages/assets, sitemap, and public discovery. The independent
+`tasktime-site` repository emits its own `dist`: public homepage/product/pricing,
+blog/legal/agent docs, indexable robots/sitemap/RSS, and discovery aliases. It
+excludes the app manifest, service worker, and SPA fallback.
 
-- `dist-app` contains the React application entry point, PWA manifest/service
-  worker, icons/assets, and the exact SPA fallback. It excludes Astro routes,
-  robots/sitemap, and public discovery manifests.
-- `dist-site` contains Astro public pages/assets, robots/sitemap/`llms.txt`,
-  brand assets, and both canonical and compatibility copies of `.well-known`
-  discovery. It excludes the application manifest, service worker, and SPA
-  fallback.
-- `dist` remains the production-compatible combined surface. It retains the
-  application root and legacy redirects while merging all non-root public-site
-  paths. A future Astro root can exist in `dist-site` without replacing this
-  compatibility root.
+Each build validates its ownership. Core and site install/test/build without
+each other's source or dependencies. The former combined core `dist` is no
+longer generated or a routine release input. Production stays unchanged until
+Phase 4 approval; retain the exact existing combined deployment and artifact
+for root rollback. Private compatibility assembly is rehearsal only, not a
+replacement for those rollback bytes.
 
-Assembly rejects unequal file collisions, missing required outputs, an invalid
-product canonical URL, or missing root-relative site assets. Byte-identical
-shared brand assets are permitted. Release automation must name the intended
-artifact explicitly once the live origins are split; the current deployment
-continues to use only the combined compatibility artifact.
-
-At the approved production split, routine application deployment selects only
-`dist-app` for the app Pages project and routine public-site deployment selects
-only `dist-site` for the existing root Pages project. `dist` is retained as an
-explicit, immutable root rollback input and must not remain the routine
-post-cutover production artifact. Each project has one deployment authority so
-an app release cannot replace the site and a site release cannot replace the
-app.
+Repository ownership, the pinned public documentation contract, compatibility,
+and independent release rules are defined in [site-distribution.md](./site-distribution.md).
 
 ## React data APIs
 

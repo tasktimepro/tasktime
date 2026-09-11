@@ -41,14 +41,13 @@ Managed OpenClaw Gateway
     ├── generated native tool registrations
     └── one Gateway-lifecycle packaged bridge child using the same enforcement/protocol
 
-Public web build
-└── blog/ + scripts/build-pages.mjs
-    ├── dist-app: React HTML/assets, manifest, service worker, SPA fallback
-    ├── dist-site: product/pricing/blog/legal/agents, discovery, sitemap, RSS, llms.txt
-    └── dist: current combined compatibility surface with app root preserved
+Independent builds (no parent-source dependencies)
+├── tasktime → dist-app: React, manifest, service worker, app redirects/fallback
+├── tasktime → public JSON contract → reviewed snapshot in tasktime-site/vendor
+└── tasktime-site → dist: homepage/product/pricing/blog/legal/agents, discovery, static 404 (no PWA)
 
 Approval-gated Phase 4 production target
-├── existing root Pages project → dist-site → tasktime.pro
+├── existing root Pages project → tasktime-site/dist → tasktime.pro
 ├── one permanent app Pages project → dist-app → app.tasktime.pro
 ├── one shared Worker + existing stateful bindings → both origins during overlap
 └── pinned dist artifact → root rollback only
@@ -162,7 +161,11 @@ Approval-gated Phase 4 production target
   unlimited-client transition or advanced Reports.
 - The operator checkout's default `make dev` stack supplies an explicitly
   flagged Vite-development and loopback-only input to `BillingContext`. It keeps
-  the normal Worker-backed
+  local services in the detached `tasktime` Docker Desktop group, optionally
+  including the site's own Compose definition on 3102 beside the app on 3101.
+  Stop preserves the group for Play; app tooling remains in `tasktime-tools`.
+  Repository builds, dependency volumes and release ownership stay separate.
+  It keeps the normal Worker-backed
   catalog, status, trial, Checkout, webhook, reconciliation, license, return,
   Portal, hosted Send, and email delivery-status paths. Hosted email uses the
   same Pro entitlement, local quota/idempotency state, and configured Resend
@@ -205,7 +208,7 @@ Approval-gated Phase 4 production target
 | Invoice or expense | domain operation, billing journal/Yjs collection, active/archive/history ownership, UI, reports, export/PDF/email, backup/restore, agent parity, replay/idempotency tests |
 | Route/navigation | `useUrlState.ts`, App rendering, mobile/desktop navigation, service-worker route exclusions, agent navigation |
 | Agent command | command registry/handler, scopes/approvals, bridge tool schema, public generated docs, smoke tests |
-| Public page/build | `blog/`, `scripts/build-artifacts.mjs`, app/site/combined ownership and collision tests, public manifests, route denylist, preview/build smoke |
+| Public page/build | Independent `tasktime-site/` checkout; `contracts/site-distribution.md`, `scripts/build-app.mjs`, `scripts/site-contract.mjs`, public routes/redirects, PWA isolation, site-owned browser tests |
 | Application origin | `src/config/origins.ts`, Worker exact CORS/OAuth/return configuration, metrics eligibility, PWA/Push scope, agent bridge defaults, supervised reconnect/import runbook, two-origin tests |
 | Sync behavior | store dirty-doc tracking, provider/manifest, auth hook, mode UI, offline/reconnect tests, historical Drive data |
 | Subscription/entitlement | public plan/status/license contracts, opaque account-reference display, owner-issued complimentary-access lifecycle, exact persisted lifecycle versus online provider-readiness separation, signed offline selection, Portal-return recovery, active-client transition/import-sync compatibility, Reports shell/Free Overview/lazy advanced modules, founding continuity and automatic standard-offer selection, report-agent scope compatibility, hosted-email policy, agent registry/artifacts, Privacy/Terms, offline/concurrency/recovery tests |

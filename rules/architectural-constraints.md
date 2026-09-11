@@ -33,5 +33,5 @@
 
 - React remains functional and hook-based; routing remains the custom path-based `useUrlState` model unless an approved migration preserves URLs and browser navigation.
 - Node/npm commands run in Docker through the existing Makefile.
-- The development app uses port `3101`; the public Astro development server uses `4321`.
+- The development app uses port `3101`; the public Astro development server uses `3102`. Local services share the detached `tasktime` Compose group without coupling repository builds or releases.
 - Dependencies require explicit justification and must not duplicate existing platform or project capabilities.

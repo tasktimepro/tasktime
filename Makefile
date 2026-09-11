@@ -2,19 +2,16 @@
 # Shorthand commands for common Docker operations
 
 APP_RUN_ENV ?=
-APP_RUN = docker compose run --rm $(APP_RUN_ENV) app
+TOOLS_COMPOSE = docker compose --project-name tasktime-tools
+APP_RUN = $(TOOLS_COMPOSE) run --rm $(APP_RUN_ENV) app
 
 .PHONY: help dev dev-core dev-billing-sandbox dev-push-local preview-push-local preview-push-cloud preview-cloud stop build preview preview-build install lint typecheck clean logs shell test test-run test-coverage test-e2e test-e2e-smoke release-gate blog-install blog-dev blog-build
 
 PREVIEW_PORT ?= 3101
 PRIVATE_INFRA_MAKEFILE := tasktime-infra/Makefile
-TASKTIME_DEV_PROJECT ?= tasktime-dev
+TASKTIME_DEV_PROJECT ?= tasktime
 
-ifneq ("$(wildcard $(PRIVATE_INFRA_MAKEFILE))","")
-DEV_COMPOSE = docker compose --project-name $(TASKTIME_DEV_PROJECT) -f docker-compose.yml -f docker-compose.billing-sandbox.yml
-else
-DEV_COMPOSE = docker compose
-endif
+DEV_COMPOSE = TASKTIME_DEV_PROJECT=$(TASKTIME_DEV_PROJECT) sh ./scripts/dev-compose.sh
 
 # Default target - show help
 help:
@@ -29,19 +26,19 @@ help:
 	@echo "  make preview-push-cloud - Build production preview using deployed Worker at https://sync.tasktime.pro"
 	@echo "  make preview-cloud - Build production preview using the deployed production Worker"
 	@echo "  make stop     - Stop development server"
-	@echo "  make build    - Build isolated app/site artifacts plus the production-compatible combined output"
-	@echo "  make preview  - Stop current dev containers, build merged app+blog output, and serve it locally on PREVIEW_PORT ($(PREVIEW_PORT))"
-	@echo "  make preview-build - Build merged app+blog output and serve it locally on PREVIEW_PORT ($(PREVIEW_PORT)); stop make dev first if needed"
-	@echo "  make blog-install - Install blog dependencies"
-	@echo "  make blog-dev  - Start Astro blog dev server (http://localhost:4321/blog)"
-	@echo "  make blog-build - Build the Astro blog"
+	@echo "  make build    - Build only the app into dist-app (no site checkout required)"
+	@echo "  make preview  - Build and preview the app on PREVIEW_PORT ($(PREVIEW_PORT))"
+	@echo "  make preview-build - Build and preview the app; stop make dev first if needed"
+	@echo "  make site-dev - Start site in the tasktime group on http://localhost:3102"
+	@echo "  make site-build - Build the nested public site independently"
+	@echo "  make site-contract - Export the public contract to artifacts/site-contract.json"
 	@echo "  make install  - Install all dependencies"
 	@echo "  make add PKG=<package>  - Add a new npm package"
 	@echo "  make lint     - Run ESLint"
 	@echo "  make typecheck - Run the repository-wide TypeScript check"
 	@echo "  make logs     - View container logs"
 	@echo "  make shell    - Open shell in container"
-	@echo "  make clean    - Remove containers and rebuild"
+	@echo "  make clean    - Stop services and rebuild the app image without deleting data"
 	@echo "  make test     - Run vitest in watch mode"
 	@echo "  make test-run - Run vitest once"
 	@echo "  make test-coverage - Run vitest with coverage"
@@ -49,7 +46,7 @@ help:
 	@echo "  make test-e2e-smoke - Run critical Playwright smoke tests in Chromium"
 	@echo "  make test-e2e-drive-browsers - Run direct Drive smoke in Chromium, Firefox, and WebKit"
 	@echo "  make test-e2e-pwa-smoke - Run production-preview PWA offline boot smoke test"
-	@echo "  make release-gate - Run lint, typecheck, coverage, browser/PWA smoke, and build"
+	@echo "  make release-gate - Run security audit, lint, typecheck, coverage, browser/PWA smoke, and build"
 	@echo ""
 
 # The operator checkout defaults to the complete local Worker, Stripe test-mode,
@@ -58,18 +55,22 @@ help:
 ifneq ("$(wildcard $(PRIVATE_INFRA_MAKEFILE))","")
 dev: dev-billing-sandbox
 else
-dev: dev-core
+dev: dev-local
 endif
+
+.PHONY: dev-local
+dev-local:
+	$(DEV_COMPOSE) up -d --build
 
 # Start only the public core development server. This is intentionally not the
 # default when the private production services are available locally.
 dev-core:
-	docker compose up -d
+	docker compose --project-name $(TASKTIME_DEV_PROJECT) up -d --build app
 	@echo "Core development server running at http://localhost:3101"
-	@echo "Blog dev server is available through the same origin at http://localhost:3101/blog"
+	@echo "Optional public site: make site-dev (http://localhost:3102)"
 
-# Prepare and start the app, local Worker, and Stripe test-webhook listener as
-# one attached Docker Compose stack. Ctrl+C stops the complete stack together.
+# Prepare and start the persistent Docker Desktop group, including the optional
+# site. Stop preserves containers for Play; preparation is not repeated by Play.
 dev-billing-sandbox:
 	@test -f $(PRIVATE_INFRA_MAKEFILE) || { echo "Error: tasktime-infra is required for the complete local stack; use make dev-core in a public checkout"; exit 1; }
 	$(MAKE) -C tasktime-infra worker-billing-sandbox-prepare
@@ -77,7 +78,7 @@ dev-billing-sandbox:
 
 # Start local app dev server wired to local Wrangler Worker with Dropbox UI.
 dev-push-local:
-	docker compose run --rm -p 3101:3101 \
+	$(TOOLS_COMPOSE) run --rm -p 3101:3101 \
 		-e VITE_SYNC_WORKER_URL=http://localhost:8787 \
 		-e VITE_DROPBOX_CLOUD_UI_ENABLED=true \
 		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
@@ -86,7 +87,7 @@ dev-push-local:
 # Build and preview production app wired to local Wrangler Worker with Dropbox UI.
 # Use this for service-worker/Web Push testing; Vite dev mode unregisters service workers.
 preview-push-local:
-	docker compose run --rm -p 3101:3101 \
+	$(TOOLS_COMPOSE) run --rm -p 3101:3101 \
 		-e VITE_SYNC_WORKER_URL=http://localhost:8787 \
 		-e VITE_DROPBOX_CLOUD_UI_ENABLED=true \
 		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
@@ -95,10 +96,8 @@ preview-push-local:
 # Build and preview production app wired to the deployed Cloudflare Worker.
 # This verifies the real edge route and browser CORS path before release.
 preview-push-cloud:
-	-docker compose down --remove-orphans
-	@leftovers=$$(docker ps -aq --filter "name=tasktime-app-run-"); \
-	if [ -n "$$leftovers" ]; then docker rm -f $$leftovers; fi
-	docker compose run --rm -p $(PREVIEW_PORT):$(PREVIEW_PORT) \
+	$(MAKE) stop
+	$(TOOLS_COMPOSE) run --rm -p $(PREVIEW_PORT):$(PREVIEW_PORT) \
 		-e VITE_SYNC_WORKER_URL=https://sync.tasktime.pro \
 		-e VITE_DROPBOX_CLOUD_UI_ENABLED=true \
 		-e VITE_PUSH_NOTIFICATIONS_ENABLED=true \
@@ -110,38 +109,44 @@ preview-cloud: preview-push-cloud
 
 # Stop development server
 stop:
-	$(DEV_COMPOSE) down --remove-orphans
+	$(DEV_COMPOSE) stop
 
 # Build for production
 build:
-	docker compose run --rm app npm run build
+	$(APP_RUN) npm run build
 
-# Stop current dev services, build merged app+blog output, and serve it locally
+# Stop current dev services, build the app, and serve it locally
 preview:
-	-docker compose down --remove-orphans
-	@leftovers=$$(docker ps -aq --filter "name=tasktime-app-run-"); \
-	if [ -n "$$leftovers" ]; then docker rm -f $$leftovers; fi
+	$(MAKE) stop
 	$(MAKE) preview-build
 
-# Build merged app+blog output and serve it locally
+# Build the standalone app and serve it locally
 preview-build:
-	docker compose run --rm -p $(PREVIEW_PORT):$(PREVIEW_PORT) app sh -lc 'npm run build && npm run preview -- --host 0.0.0.0 --port $(PREVIEW_PORT)'
+	$(TOOLS_COMPOSE) run --rm -p $(PREVIEW_PORT):$(PREVIEW_PORT) app sh -lc 'npm run build && npm run preview -- --host 0.0.0.0 --port $(PREVIEW_PORT)'
 
-# Install blog dependencies
+# Convenience commands delegate into an independent optional repository.
+.PHONY: site-dev site-build site-test site-stop site-contract
+site-dev:
+	@test -f tasktime-site/docker-compose.yml || { echo "Error: the optional tasktime-site checkout is missing"; exit 1; }
+	$(DEV_COMPOSE) up -d --build --no-deps site
+site-build:
+	$(MAKE) -C tasktime-site build
+site-test:
+	$(MAKE) -C tasktime-site release-gate
+site-stop:
+	$(DEV_COMPOSE) stop site
+site-contract:
+	$(APP_RUN) npm run export:site-contract
+
+# Historical convenience names keep working for existing local instructions.
 blog-install:
-	docker compose run --rm app sh -lc 'cd blog && npm ci'
-
-# Start Astro blog dev server
-blog-dev:
-	docker compose run --rm -p 4321:4321 app sh -lc 'cd blog && if [ ! -d node_modules ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port 4321'
-
-# Build the Astro blog
-blog-build:
-	docker compose run --rm app sh -lc 'cd blog && if [ ! -d node_modules ]; then npm ci; fi && npm run build'
+	$(MAKE) -C tasktime-site install
+blog-dev: site-dev
+blog-build: site-build
 
 # Install dependencies (useful after pulling changes)
 install:
-	docker compose run --rm app npm install
+	$(APP_RUN) npm install
 
 # Add a new package (usage: make add PKG=package-name)
 add:
@@ -149,7 +154,7 @@ add:
 		echo "Usage: make add PKG=<package-name>"; \
 		exit 1; \
 	fi
-	docker compose run --rm app npm install $(PKG)
+	$(APP_RUN) npm install $(PKG)
 	@echo "Remember to rebuild: make clean"
 
 # Run linter
@@ -175,37 +180,39 @@ lint:
 
 # Run tests
 typecheck:
-	docker compose run --rm app npm run typecheck
+	$(APP_RUN) npm run typecheck
 
 test:
-	docker compose run --rm app npm test
+	$(APP_RUN) npm test
 
 test-run:
-	docker compose run --rm app npm run test:run
+	$(APP_RUN) npm run test:run
 
 test-coverage:
-	docker compose run --rm app npm run test:coverage
+	$(APP_RUN) npm run test:coverage
 
 test-e2e:
-	docker compose run --rm app npm run test:e2e
+	$(APP_RUN) npm run test:e2e
 
 test-e2e-smoke:
-	docker compose run --rm app npm run test:e2e:smoke
+	$(APP_RUN) npm run test:e2e:smoke
 
 test-e2e-drive-browsers:
-	docker compose run --rm app npm run test:e2e:drive-browsers
+	$(APP_RUN) npm run test:e2e:drive-browsers
 
 test-e2e-pwa-smoke:
-	docker compose run --rm app npm run test:e2e:pwa:smoke
+	$(APP_RUN) npm run test:e2e:pwa:smoke
 
-# Release gate checks (lint + typecheck + coverage + browser/PWA smoke + build)
+# Release gate checks (security audit + lint + typecheck + coverage + browser/PWA smoke + build)
 release-gate:
+	$(APP_RUN) npm run audit:security
 	$(MAKE) lint
 	$(APP_RUN) npm run typecheck
+	$(APP_RUN) npm run test:build-artifacts
 	$(APP_RUN) npm run test:coverage
 	$(APP_RUN) npm run test:e2e:smoke
 	$(APP_RUN) npm run test:e2e:pwa:smoke
-	$(APP_RUN) npm run build
+	$(APP_RUN) npm run export:site-contract
 
 # View logs
 logs:
@@ -213,9 +220,9 @@ logs:
 
 # Open shell in container
 shell:
-	docker compose exec app sh
+	$(DEV_COMPOSE) exec app sh
 
-# Clean rebuild (removes containers and rebuilds image)
+# Clean rebuild (stops services and rebuilds the app image; keeps containers/data)
 clean:
 	$(MAKE) stop
 	docker compose build --no-cache
@@ -227,4 +234,4 @@ npm:
 		echo "Usage: make npm CMD=\"<npm command>\""; \
 		exit 1; \
 	fi
-	docker compose run --rm app npm $(CMD)
+	$(APP_RUN) npm $(CMD)

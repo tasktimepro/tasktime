@@ -222,3 +222,5 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **OPS-2:** Keep public/private repository boundaries and environment documentation accurate.
 - **OPS-3:** Run lint, repository-wide TypeScript checking, coverage, browser smoke, PWA smoke, and build checks as the broad release gate.
 - **OPS-4:** Review the persisted-data and cross-surface change impact matrix before completion; no consumer may be silently omitted.
+- **OPS-5:** Core and the public site must have independent repositories, dependencies, CI, artifacts, and release cycles. Optional local checkouts stay ignored; public metadata crosses through the reviewed versioned snapshot in `contracts/site-distribution.md`, not parent-source imports. Deployment authority remains private and requires explicit component, source revision, artifact, project, and promotion approval.
+- **OPS-6:** Prepare local services as a detached `tasktime` Docker Desktop group with app port 3101 and optional site port 3102. Stop must preserve containers and data for Play. Core tooling must stay isolated, and missing site/private checkouts must not block core-only development or builds.

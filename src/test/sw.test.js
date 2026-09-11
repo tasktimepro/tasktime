@@ -157,11 +157,11 @@ describe('service worker caching', () => {
         expect(globalThis.caches.open).not.toHaveBeenCalled()
     })
 
-    it('leaves the static product page outside the app-shell fallback', () => {
+    it.each(['/product/', '/pricing/', '/agents/tools/', '/llms.txt', '/sitemap.xml', '/.well-known/tasktime-agent.json'])('keeps public navigation network-only without replacing the offline shell: %s', (route) => {
 
         const event = createEvent()
         event.request = {
-            url: 'https://tasktime.pro/product/',
+            url: `https://tasktime.pro${route}`,
             mode: 'navigate',
             method: 'GET'
         }

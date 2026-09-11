@@ -237,13 +237,26 @@ Three auto-sync modes exist: `manual`, `backup`, `sync`. Each has distinct trigg
 
 ## 🐳 Docker Development Environment
 
+The optional `tasktime-site/` checkout is an independent, ignored Git repository
+like `tasktime-infra/`, not core source or a submodule. Core builds only
+`dist-app`; site owns Astro and builds its own `dist`. Use `make site-dev`,
+`make site-build`, and `make site-test` for that checkout and follow its own
+instructions. Core install/test/build must not require either nested repo.
+Public metadata crosses through the reviewed snapshot described in
+`contracts/site-distribution.md`; never import parent source into site. Keep
+each repo's reviews, commits, CI, and release scope independent. Phase 4 owns
+remote creation, main promotion, domain cutover, and production deployment.
+Local orchestration is shared: `make dev` includes the site's own Compose service
+when present, in the detached `tasktime` group (app 3101, site 3102). `make stop`
+preserves containers for Docker Desktop Play; one-off tooling uses `tasktime-tools`.
+
 **All npm/node commands run through Docker, NOT locally.**
 ### Quick Commands (Makefile)
 
 ```bash
 make dev          # Start the complete production-like local stack (http://localhost:3101)
 make dev-core     # Start only the public core app for isolated diagnostics
-make stop         # Stop dev server
+make stop         # Stop the group, preserving containers/data for Play
 make build        # Production build
 make install      # Install dependencies
 make add PKG=idb  # Add a package
@@ -265,13 +278,13 @@ than leaving a partially working product UI.
 ### Raw Docker Commands (if needed)
 ```bash
 # Install a package
-docker compose run --rm app npm install <package>
+docker compose --project-name tasktime-tools run --rm app npm install <package>
 
-# Run dev server
-docker compose up
+# Start the prepared local group (use make dev for first-time preparation)
+sh scripts/dev-compose.sh start
 
 # Run any npm script
-docker compose run --rm app npm run <script>
+docker compose --project-name tasktime-tools run --rm app npm run <script>
 ```
 
 **Do NOT run `npm` directly** — it won't work (npm not installed on host).
@@ -287,7 +300,7 @@ docker compose run --rm app npm run <script>
 5. **Don't break persisted data contracts** — Add compatibility handling or migrations
 6. **Don't use class components** — Functional only
 7. **Don't add new dependencies without justification** — Keep it lean
-8. **Don't run npm directly** — Use `docker compose run --rm app npm ...`
+8. **Don't run npm directly** — Use `make npm CMD="..."` or the isolated `tasktime-tools` Compose project
 9. **Use Yjs hooks** — `useProjects()`, `useTasks()`, etc. for all data access
 10. **Don't create new useIndexedDB calls** — All new state should use Yjs
 11. **File deletions must be triggered via CLI** — Use a terminal delete command so you can approve it
