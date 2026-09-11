@@ -15,7 +15,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
-- **Public site and build outputs:** The independent, locally nested and ignored
+- **Public site and build outputs:** The independent private, locally nested and ignored
   `tasktime-site/` repository owns Astro homepage/product/pricing/blog/legal/agent
   pages and public discovery. Core builds only `dist-app`; site builds its own
   `dist`. A reviewed JSON snapshot carries core public tool/discovery metadata
@@ -23,8 +23,8 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   `contracts/site-distribution.md`. Phase 4 reuses the existing root Pages
   project for site and adds one permanent app project, sharing the existing
   Worker/services. The actual pre-cutover combined artifact remains the pinned
-  root rollback source. Extraction, pricing, and split deployment are local and
-  unpublished until their separate launch gates are approved.
+  root rollback source. Site source is retained privately under `tasktimepro`;
+  website publication, pricing, and split deployment remain launch-gated.
 - **Publication isolation:** Only the app owns PWA installation and offline
   caching. Site ships a static non-indexable 404 to disable implicit host SPA
   fallback, plus complete public metadata/sitemap checks. App noindex metadata

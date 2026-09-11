@@ -244,8 +244,10 @@ like `tasktime-infra/`, not core source or a submodule. Core builds only
 instructions. Core install/test/build must not require either nested repo.
 Public metadata crosses through the reviewed snapshot described in
 `contracts/site-distribution.md`; never import parent source into site. Keep
-each repo's reviews, commits, CI, and release scope independent. Phase 4 owns
-remote creation, main promotion, domain cutover, and production deployment.
+each repo's reviews, commits, CI, and release scope independent. Core source is
+public; the site source is retained privately at `tasktimepro/tasktime-site`.
+Phase 4 owns remaining protection/CI access setup, main promotion, domain cutover,
+and production deployment.
 Local orchestration is shared: `make dev` includes the site's own Compose service
 when present, in the detached `tasktime` group (app 3101, site 3102). `make stop`
 preserves containers for Docker Desktop Play; one-off tooling uses `tasktime-tools`.

@@ -55,6 +55,9 @@ Approval-gated Phase 4 production target
 
 ## Dependency direction
 
+- Core source is public; site and infrastructure source are private. Repository
+  visibility does not change the independent builds or public website output;
+  see `contracts/site-distribution.md`.
 - Components call hooks or focused domain/application functions; they do not create parallel persistence paths.
 - Hooks expose Yjs-backed collections and mutations through `YjsContext`/`YjsStore`.
 - `YjsContext.shared.ts` and `BillingContext.shared.ts` own context identity with

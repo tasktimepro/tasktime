@@ -2,6 +2,11 @@
 
 ## Current focus
 
+- [x] Retain site source privately under `tasktimepro/tasktime-site` through the
+  user-approved transfer (2026-09-11); existing history, branches and PRs are
+  preserved and local `origin` is updated. Core remains public and independent.
+  Site `STATUS.md` records verification; Phase 4 retains protection/CI access,
+  clean provenance, main promotion and deployment approval.
 - [x] Reconcile historical Free/Pro, reports, hosted-email and legal/pricing
   claims locally (2026-09-11, uncommitted). Free-first copy preserves invoices,
   PDFs/manual delivery and workspace ownership; optional Pro and Stripe billing
@@ -32,9 +37,9 @@
   (2026-09-11, uncommitted). The active site work register is now that checkout's
   `STATUS.md`; core retains this coordination pointer and historical evidence.
   Ownership and snapshot compatibility are defined in
-  `contracts/site-distribution.md`. Core/site gates pass independently; remote
-  creation, initial commit, main promotion, security/content approval and live
-  launch are still pending in Program Phase 4. Entries below predate extraction;
+  `contracts/site-distribution.md`. Core/site gates pass independently; initial
+  source retention is complete. Main promotion, security/content approval and
+  live launch remain in Program Phase 4. Entries below predate extraction;
   their references to shared icons and core-owned `blog/` describe that history.
 
 ## Historical local checkpoints before repository extraction

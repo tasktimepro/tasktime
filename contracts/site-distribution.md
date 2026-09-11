@@ -8,6 +8,11 @@
 | `tasktime-site` | Astro homepage, product/pricing/blog/legal/agent docs, site styles/brand assets, SEO, domain verification | `dist/` within its own checkout |
 | Private infrastructure | Worker/services, deployment credentials, target selection, promotion and rollback evidence | Explicitly selected app or site artifact |
 
+Core source `tasktimepro/tasktime` is public for community use. Site source
+`tasktimepro/tasktime-site` and infrastructure are private. Public website and
+discovery output do not imply a public source repository; core must remain
+usable and buildable without access to either private repository.
+
 The optional local checkouts `tasktime-site/` and `tasktime-infra/` are ignored
 independent Git repositories, not submodules or workspace packages. Neither is
 needed to install, test, or build core. Site has its own lockfile, Docker image,

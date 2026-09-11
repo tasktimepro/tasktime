@@ -10,6 +10,14 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Program Phase 3 UI polishing in progress locally**
 
+- Site ownership transfer (2026-09-11, user approved): the existing private
+  site repository is now `tasktimepro/tasktime-site`, with its history, branches
+  and pull requests preserved and local `origin` updated. Core remains public;
+  site and infrastructure remain private. No new source push, main promotion
+  or deployment occurred. Ownership notes are reconciled locally; Phase 4
+  retains protection/access setup and clean approved publication provenance.
+  See `contracts/site-distribution.md`, `TODO.md` and site `STATUS.md`.
+
 - Three-repository local checkpoint (2026-09-11, user approved): this commit
   retains the core site extraction, grouped development, dependency remediation
   and copy/metadata reconciliation. Site source is retained in its own initial
@@ -19,8 +27,8 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   creation, push, main promotion, version bump, tag, publication or deployment
   is included. The broader core `1.6.0` and affected-agent train below remains
   the planned release scope; this slice adds no agent runtime/schema changes.
-  Phase 4 still requires remote source retention and a clean approved public
-  contract; the site's pinned dirty candidate is not publication provenance.
+  At that checkpoint, Phase 4 still required remote source retention and a clean
+  approved public contract; the pinned dirty candidate is not publication provenance.
   Pre-commit rerun passes with CI settings: zero core audit findings, 2,709
   unit tests with coverage, all 63 Chromium smokes and 5 PWA checks. The full
   site gate and private assembler tests/workflow YAML checks also pass.
@@ -54,8 +62,8 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   the nested site's `STATUS.md`. Full core and site gates passed. Phase 4 now
   tracks three-repo main promotion, clean snapshot, protected independent
   deployments, security/content approval and retained rollback bytes. Site
-  remote and all deployments remain pending; the initial local source checkpoint
-  is recorded above and live state is unchanged.
+  remote retention is now complete as recorded above; all deployments remain
+  pending and production state is unchanged.
   The follow-up site-only Astro 7.3.2 remediation clears all 13 inherited audit
   findings locally; the standalone gate and 51-page parity checks pass. Required
   high/critical audit enforcement is prepared, with fresh candidate evidence and
