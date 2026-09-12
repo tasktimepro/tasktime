@@ -56,6 +56,8 @@ describe('usePreferences', () => {
 
         await waitFor(() => expect(result.current.isLoading).toBe(false))
 
+        expect(result.current.preferences.autoSyncEnabled).toBe(false)
+        expect(result.current.preferences.autoSyncMode).toBe('sync')
         expect(result.current.preferences.currency).toBe('USD')
         expect(result.current.preferences.showCompletedTasks).toBe(false)
         expect(result.current.preferences.systemNotificationsEnabled).toBe(false)

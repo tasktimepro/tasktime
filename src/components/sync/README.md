@@ -141,6 +141,13 @@ Import:
 
 ## Wipe, Disconnect, And Delete-All
 
+- Account's Sign in/Sign out header follows the matching retained provider auth
+  session, independently of cloud transport readiness. Initial identity loading
+  is shown as disabled progress; recovery details remain in Cloud Sync.
+- Account sign-out clears local data only after its final sync leaves the live
+  store connected, idle and without pending uploads. A handled auth failure
+  that resolves the context sync call is not proof of successful sync.
+
 - Never auto-sync destructive resets across devices.
 - Every connected provider presents exactly two session-lifecycle choices:
   **Disconnect** and **Wipe data & disconnect**. Provider-specific auth details

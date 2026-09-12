@@ -8,6 +8,10 @@ const accountLayoutMocks = vi.hoisted(() => ({
     isDriveConnected: false,
     isCloudConnected: false,
     isOffline: false,
+    isCloudIdentityLoading: false,
+    isConnecting: false,
+    hostedServiceSessionId: null,
+    pendingChanges: false,
     syncState: 'idle',
     activeStorageProvider: null,
     googleUser: null,
@@ -59,7 +63,14 @@ vi.mock('../contexts/YjsContext', () => ({
         clearAllData: accountLayoutMocks.clearAllData,
         isDriveConnected: accountLayoutMocks.isDriveConnected,
         isCloudConnected: accountLayoutMocks.isCloudConnected,
-        isOffline: accountLayoutMocks.isOffline,
+        isCloudIdentityLoading: accountLayoutMocks.isCloudIdentityLoading,
+        isConnecting: accountLayoutMocks.isConnecting,
+        hostedServiceSessionId: accountLayoutMocks.hostedServiceSessionId,
+        store: {
+            isCloudConnected: () => accountLayoutMocks.isCloudConnected,
+            getSyncState: () => accountLayoutMocks.syncState,
+            hasPendingSyncChanges: () => accountLayoutMocks.pendingChanges,
+        },
         syncState: accountLayoutMocks.syncState,
         activeStorageProvider: accountLayoutMocks.activeStorageProvider,
         forceSyncDrive: accountLayoutMocks.forceSyncDrive,
@@ -159,6 +170,11 @@ beforeEach(() => {
     accountLayoutMocks.isDriveConnected = false;
     accountLayoutMocks.isCloudConnected = false;
     accountLayoutMocks.isOffline = false;
+    vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => !accountLayoutMocks.isOffline);
+    accountLayoutMocks.isCloudIdentityLoading = false;
+    accountLayoutMocks.isConnecting = false;
+    accountLayoutMocks.hostedServiceSessionId = null;
+    accountLayoutMocks.pendingChanges = false;
     accountLayoutMocks.syncState = 'idle';
     accountLayoutMocks.activeStorageProvider = null;
     accountLayoutMocks.googleUser = null;
@@ -217,6 +233,7 @@ describe('Account', () => {
 
     it('keeps the desktop subtitle visible', () => {
         accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.hostedServiceSessionId = 'active-session';
         accountLayoutMocks.activeStorageProvider = 'dropbox';
 
         renderAccount();
@@ -227,6 +244,7 @@ describe('Account', () => {
     it('hides the subtitle and keeps sign out inline on mobile', () => {
         accountLayoutMocks.isMobileLayout = true;
         accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.hostedServiceSessionId = 'active-session';
         accountLayoutMocks.activeStorageProvider = 'dropbox';
 
         renderAccount();
@@ -286,6 +304,7 @@ describe('Account', () => {
         ['dropbox', 'Dropbox'],
     ])('wipes and revokes the active %s provider before clearing account data', async (provider, providerName) => {
         accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.hostedServiceSessionId = 'active-session';
         accountLayoutMocks.activeStorageProvider = provider;
         accountLayoutMocks.activeSection = 'data';
 
@@ -322,6 +341,7 @@ describe('Account', () => {
 
     it('syncs Dropbox before signing out and clearing local data', async () => {
         accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.hostedServiceSessionId = 'active-session';
         accountLayoutMocks.activeStorageProvider = 'dropbox';
         accountLayoutMocks.forceSyncCloud.mockResolvedValue(undefined);
         accountLayoutMocks.disconnectActiveCloudSession.mockResolvedValue(undefined);
@@ -385,32 +405,32 @@ it('explains a storage connection failure after authentication and offers connec
     accountLayoutMocks.activeStorageProvider = 'google-drive';
     accountLayoutMocks.syncState = 'error';
     renderAccount();
-    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Your account could not connect.');
     fireEvent.click(screen.getByRole('button', { name: 'View connection details' }));
     expect(accountLayoutMocks.updateUrl).toHaveBeenCalledWith(expect.objectContaining({ section: 'sync' }));
 });
 
-it('reconnects the known provider without offering a provider switch', () => {
+it('signs into the selected provider without offering a provider switch', () => {
     accountLayoutMocks.activeStorageProvider = 'dropbox';
     renderAccount();
-    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(screen.queryByRole('button', { name: 'Continue with Google Drive' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue with Dropbox' })).toBeVisible();
 });
 
-it('rechecks a retained Dropbox session after a temporary outage without starting another OAuth session', async () => {
+it('keeps retained Dropbox session recovery in Cloud Sync without starting another OAuth session', () => {
     accountLayoutMocks.activeStorageProvider = 'dropbox';
+    accountLayoutMocks.hostedServiceSessionId = 'retained-session';
     accountLayoutMocks.dropboxSessionId = 'retained-session';
     accountLayoutMocks.dropboxError = 'The Dropbox connection service is temporarily unavailable.';
     renderAccount();
-    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
-    expect(screen.getByRole('alert')).toHaveTextContent(accountLayoutMocks.dropboxError);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry Dropbox connection' }));
-    await waitFor(() => expect(accountLayoutMocks.refreshDropbox).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(screen.getByRole('button', { name: 'Sync & Sign out' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'View connection details' }));
+    expect(accountLayoutMocks.updateUrl).toHaveBeenCalledWith(expect.objectContaining({ section: 'sync' }));
     expect(accountLayoutMocks.signInDropbox).not.toHaveBeenCalled();
     expect(accountLayoutMocks.disconnectActiveCloudSession).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'Reconnect account' })).toBeVisible();
 });
 
 
@@ -428,6 +448,7 @@ it('blocks duplicate sign-in attempts and closes only once connected', async () 
     await waitFor(() => expect(google).not.toBeDisabled());
     expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeVisible();
     accountLayoutMocks.isCloudConnected = true;
+    accountLayoutMocks.hostedServiceSessionId = 'active-session';
     rerender(<Account projects={[]} tasks={[]} timeEntries={[]} invoices={[]} paymentMethods={[]} businessInfos={[]} clients={[]} invoiceTemplates={[]} emailTemplates={[]} expenses={[]} />);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sign in' })).not.toBeInTheDocument());
 });
@@ -440,4 +461,98 @@ it('keeps sign-in discoverable offline without attempting authentication', () =>
     expect(screen.getByRole('button', { name: 'Continue with Google Drive' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Continue with Dropbox' })).toBeDisabled();
     expect(accountLayoutMocks.signIn).not.toHaveBeenCalled();
+});
+
+
+describe('Account session presentation', () => {
+    it.each(['google-drive', 'dropbox'])('keeps %s sign out stable through connection, sync and offline transitions', provider => {
+        accountLayoutMocks.activeStorageProvider = provider;
+        accountLayoutMocks.hostedServiceSessionId = 'retained-matching-session';
+        const { rerender } = renderAccount();
+        for (const state of [
+            { syncState: 'idle', isConnecting: true, isCloudConnected: false },
+            { syncState: 'syncing', isConnecting: false, isCloudConnected: false },
+            { syncState: 'idle', isCloudConnected: true },
+            { syncState: 'offline', isOffline: true, isCloudConnected: false },
+            { syncState: 'error', isOffline: false },
+            { syncState: 'idle', isCloudIdentityLoading: true },
+        ]) {
+            Object.assign(accountLayoutMocks, state);
+            rerender(<Account projects={[]} tasks={[]} timeEntries={[]} invoices={[]} paymentMethods={[]} businessInfos={[]} clients={[]} invoiceTemplates={[]} expenses={[]} />);
+            expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
+            expect(screen.queryByRole('button', { name: /Reconnect|Sign in|Checking account/ })).not.toBeInTheDocument();
+        }
+        expect(accountLayoutMocks.signIn).not.toHaveBeenCalled();
+        expect(accountLayoutMocks.signInDropbox).not.toHaveBeenCalled();
+    });
+
+    it('waits for identity loading and switches to sign in after session invalidation', () => {
+        accountLayoutMocks.isCloudIdentityLoading = true;
+        const { rerender } = renderAccount();
+        expect(screen.getByRole('button', { name: 'Checking account…' })).toBeDisabled();
+        expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+        accountLayoutMocks.isCloudIdentityLoading = false;
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
+        accountLayoutMocks.hostedServiceSessionId = 'selected-session';
+        rerender(<Account projects={[]} tasks={[]} timeEntries={[]} invoices={[]} paymentMethods={[]} businessInfos={[]} clients={[]} invoiceTemplates={[]} expenses={[]} />);
+        expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
+        accountLayoutMocks.hostedServiceSessionId = null;
+        // Stale transport/email/provider information cannot stand in for an auth session.
+        accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.dropboxAccountEmail = 'studio@example.test';
+        rerender(<Account projects={[]} tasks={[]} timeEntries={[]} invoices={[]} paymentMethods={[]} businessInfos={[]} clients={[]} invoiceTemplates={[]} expenses={[]} />);
+        expect(screen.getByRole('button', { name: 'Sign in' })).toBeVisible();
+        expect(screen.queryByRole('button', { name: /Reconnect|Sign out/ })).not.toBeInTheDocument();
+    });
+
+    it.each([
+        { isCloudConnected: false },
+        { isCloudConnected: true, isOffline: true },
+        { isCloudConnected: true, isConnecting: true },
+        { isCloudConnected: true, syncState: 'syncing' },
+    ])('keeps sign out safe while sync is unavailable: %j', state => {
+        Object.assign(accountLayoutMocks, state, {
+            activeStorageProvider: 'dropbox', hostedServiceSessionId: 'retained-session',
+        });
+        renderAccount();
+        fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+        expect(screen.getByRole('button', { name: 'Sync & Sign out' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'View connection details' }));
+        expect(accountLayoutMocks.updateUrl).toHaveBeenCalledWith(expect.objectContaining({ section: 'sync' }));
+        expect(accountLayoutMocks.forceSyncCloud).not.toHaveBeenCalled();
+        expect(accountLayoutMocks.clearAllData).not.toHaveBeenCalled();
+        expect(accountLayoutMocks.disconnectActiveCloudSession).not.toHaveBeenCalled();
+    });
+
+    it.each(['disconnected', 'offline', 'error', 'syncing', 'pending', 'rejected'])('preserves local data if final sync is %s', async outcome => {
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
+        accountLayoutMocks.hostedServiceSessionId = 'retained-session';
+        accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.forceSyncCloud.mockImplementation(async () => {
+            if (outcome === 'disconnected') accountLayoutMocks.isCloudConnected = false;
+            else if (outcome === 'pending') accountLayoutMocks.pendingChanges = true;
+            else if (outcome === 'rejected') throw new Error('Sync failed');
+            else accountLayoutMocks.syncState = outcome;
+        });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        renderAccount();
+        fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Sync & Sign out' }));
+        await waitFor(() => expect(accountLayoutMocks.showError).toHaveBeenCalledWith('Sync failed. Please resolve sync issues before signing out.'));
+        expect(accountLayoutMocks.clearAllData).not.toHaveBeenCalled();
+        expect(accountLayoutMocks.disconnectActiveCloudSession).not.toHaveBeenCalled();
+        expect(accountLayoutMocks.showSuccess).not.toHaveBeenCalled();
+    });
+});
+
+
+it('updates Account sign-in availability on browser offline and online events', () => {
+    renderAccount();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent(window, new Event('offline'));
+    expect(screen.getByText("You're offline")).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Continue with Google Drive' })).toBeDisabled();
+    fireEvent(window, new Event('online'));
+    expect(screen.queryByText("You're offline")).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue with Google Drive' })).toBeEnabled();
 });

@@ -85,13 +85,30 @@
   visit. Progress, errors, offline/duplicate attempts, retained-provider recovery,
   successful connection, and keyboard focus return are covered.
   Retained Dropbox retries preserve the session and update the sync consumer;
-  errors after successful authentication remain visible.
+  errors after successful authentication remain visible in Cloud Sync.
+- The Account header uses the lifecycle-bound retained authentication session,
+  independently of sync transport: it shows Sign out during connecting, syncing,
+  offline operation and temporary provider outages, and Sign in once the session
+  is absent or invalidated. A provider selection or cached email alone does not
+  establish sign-in. Initial unresolved identity shows disabled Checking account
+  progress; the header never substitutes Reconnect for Sign in or Sign out.
+- Account sign-out retains its sync-before-local-deletion requirement. While
+  sync is unavailable or busy, its confirmation is disabled with a path to Cloud
+  Sync. Before disconnecting or clearing local data, the final sync must leave
+  the live store connected, idle and without pending uploads, including when
+  context handles an authentication failure without rejecting the sync promise.
 - Project billing/planning sections collapse without losing values; hidden
   validation errors expand the section. Flat-rate overrides remain reachable.
   Missing inherited hourly rates show guidance and focus the override control;
   zero hourly overrides cannot silently block a collapsed form.
 
 ## Dashboard regression boundary
+
+- Long expense titles in Today, Upcoming and shared due-expense rows truncate
+  with an ellipsis on the title itself, including compact/mobile and non-clickable
+  rows. Category dots keep their size, full titles remain available to accessible
+  names/tooltips, and date/payment controls stay inside the row. The main expense
+  list retains the same ellipsis behavior.
 
 - Project names show a 14px folder outline in the original project color,
   inheriting the client color when absent and otherwise falling back to neutral.
@@ -100,7 +117,9 @@
   and on phones. Existing client links, pending values, search/filter behavior,
   and empty states remain intact.
 - Planner project attachments use the closed-folder project icon while deadline
-  markers retain the flag icon. Planner projects without a resolved project or
+  markers retain the flag icon. Attached project cards omit due-date, overdue,
+  and resolved-deadline badges on desktop and mobile; quote-stage badges remain.
+  Planner projects without a resolved project or
   client color keep the same 4px left accent using the neutral border token.
   Expense items use a left-only dotted 4px accent while every other card edge
   remains solid; category colors and the neutral fallback remain unchanged.
@@ -133,7 +152,15 @@
 
 - Today and Upcoming retain task/recurrence/timer/expense actions. Upcoming is
   visible without expanding Today, its header omits a redundant seven-day
-  subtitle, and more than five items remain accessible.
+  subtitle and shows the full task-plus-expense item count in parentheses,
+  including zero. The collapsed list shows at most five items; its button says
+  “Show N more” using the hidden-item count, then “Show less” when expanded.
+  Expanding or collapsing does not change the heading total.
+- Today keeps completed task rows and expenses paid today visible for confirmation,
+  without their date/recurrence/Overdue badges. Reopening a task or marking an
+  expense unpaid restores the applicable schedule/overdue badge. Future fixed
+  automatic expense occurrences retain their upcoming schedule even if stored
+  with a paid status. These display rules do not rewrite dates or payment history.
 - When one task has an unpaused timer, other tasks in the same project cannot
   open the task-details modal from Today, Upcoming, or the Dashboard Tasks card.
   Their title controls are natively disabled and overdue dates do not remain an

@@ -55,12 +55,108 @@ async function seedDashboard(page, liveClock = false) {
     });
     // Reopen against persisted source data, including the newly available archived year.
     await page.reload();
-    await expect(page.getByRole('region', { name: 'Upcoming' }).getByText('Software subscription')).toBeVisible();
+    await expect(page.getByRole('region', { name: /^Upcoming \(\d+\)$/ }).getByText('Software subscription')).toBeVisible();
     await expect(page.getByTestId('dashboard-hours-chart')).toBeVisible();
     expect(await page.evaluate(() => window.__TASKTIME_STORE__.activeTimeEntries.size)).toBe(51);
 }
 
 test.describe('Dashboard smoke', () => {
+    test('ellipsizes long expense titles in Today, Upcoming and expense lists', async ({ page }) => {
+        await seedDashboard(page);
+        const title = 'Prototyping subscription for the complete studio design and development workspace with an exceptionally long title '.repeat(2).trim();
+        await page.evaluate(async title => {
+            const store = window.__TASKTIME_STORE__;
+            const { objectToYMap } = await import('/src/stores/yjs/entityUtils.ts');
+            store.expenseCategories.set('purple', objectToYMap({ id: 'purple', name: 'Software', color: '#8b5cf6' }));
+            for (const [id, date] of [['long-overdue', '2026-09-24'], ['long-today', '2026-09-25'], ['long-upcoming', '2026-09-28']]) {
+                store.expenses.set(id, objectToYMap({
+                    id, date, title: `${title} ${id}`, supplierName: 'Flow Tools', categoryId: 'purple',
+                    amount: 29, currency: 'EUR', amountType: 'fixed', paymentMode: 'manual', paymentStatus: 'unpaid',
+                    isRecurring: false, isPersonal: false, billable: false, isTaxExempt: true,
+                }));
+            }
+            await store.docManager.flushPersistence();
+        }, title);
+        const assertEllipsis = async label => {
+            await expect(label).toBeVisible();
+            const dimensions = await label.evaluate(element => ({
+                overflow: getComputedStyle(element).overflowX,
+                textOverflow: getComputedStyle(element).textOverflow,
+                whiteSpace: getComputedStyle(element).whiteSpace,
+                width: element.clientWidth,
+                textWidth: element.scrollWidth,
+            }));
+            expect(dimensions).toMatchObject({ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+            expect(dimensions.width).toBeGreaterThan(0);
+            expect(dimensions.textWidth).toBeGreaterThan(dimensions.width);
+        };
+        for (const width of [1440, 1024, 390, 320]) {
+            await page.setViewportSize({ width, height: 1000 });
+            await page.goto('/');
+            for (const id of ['long-overdue', 'long-today', 'long-upcoming']) {
+                const region = page.getByRole('region', { name: id === 'long-upcoming' ? /^Upcoming/ : /^To Do Today/ });
+                const label = region.getByText(`${title} ${id}`, { exact: true });
+                await assertEllipsis(label);
+                await label.hover();
+                await assertEllipsis(label);
+                const row = region.locator('.px-2.py-2').filter({ hasText: `${title} ${id}` });
+                await expect(row.getByRole('button', { name: 'Mark as paid' })).toBeVisible();
+                expect(await row.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+            }
+            await page.goto('/expenses');
+            await assertEllipsis(page.getByRole('heading', { name: `${title} long-today`, exact: true }));
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+        }
+    });
+
+
+    test('clears resolved Today badges and restores overdue status when reopened', async ({ page }) => {
+        await seedDashboard(page);
+        await page.evaluate(async () => {
+            const store = window.__TASKTIME_STORE__;
+            const { objectToYMap } = await import('/src/stores/yjs/entityUtils.ts');
+            store.tasks.set('billable', objectToYMap({ ...store.tasks.get('billable'), startDate: '2026-09-24' }));
+            store.expenses.set('late-room', objectToYMap({ id: 'late-room', title: 'Client meeting room', date: '2026-09-24', paymentStatus: 'unpaid', paidOn: null, amount: 45, currency: 'EUR', paymentMode: 'manual', amountType: 'fixed', isPersonal: false, billable: false, isRecurring: false, isTaxExempt: true }));
+            await store.docManager.flushPersistence();
+        });
+        for (const width of [1440, 390]) {
+            await page.setViewportSize({ width, height: 1000 });
+            const today = page.getByRole('region', { name: /^To Do Today/ });
+            const taskRow = today.locator('.px-2.py-2').filter({ has: page.getByRole('checkbox', { name: 'Complete Build the dashboard', exact: true }) });
+            const expenseRow = today.locator('.px-2.py-2').filter({ hasText: 'Client meeting room' });
+            await expect(taskRow.getByText('Overdue', { exact: true })).toBeVisible();
+            await expect(expenseRow.getByText('Overdue', { exact: true })).toBeVisible();
+            await taskRow.getByRole('checkbox').click();
+            await expenseRow.getByRole('button', { name: 'Mark as paid', exact: true }).click();
+            await expect(taskRow.getByRole('checkbox')).toBeChecked();
+            await expect(taskRow.getByText('Overdue', { exact: true })).toHaveCount(0);
+            await expect(expenseRow.getByText('Client meeting room', { exact: true })).toHaveClass(/line-through/);
+            await expect(expenseRow.getByText('Overdue', { exact: true })).toHaveCount(0);
+            await expect(expenseRow.getByRole('button', { name: 'Open expense details', exact: true })).toHaveCount(0);
+            await page.reload();
+            await expect(taskRow.getByRole('checkbox')).toBeChecked();
+            await expect(taskRow.locator('.rounded-full.border')).toHaveCount(0);
+            await expect(expenseRow.locator('.rounded-full.border')).toHaveCount(0);
+            await taskRow.getByRole('checkbox').click();
+            // Exercise the same canonical unpaid updates arriving through Yjs.
+            await page.evaluate(async () => {
+                const store = window.__TASKTIME_STORE__;
+                const { objectToYMap, readEntity } = await import('/src/stores/yjs/entityUtils.ts');
+                const { buildMarkExpenseUnpaidUpdates } = await import('/src/domain/expenses/expenseUpdates.ts');
+                const expense = readEntity(store.expenses.get('late-room'));
+                store.expenses.set('late-room', objectToYMap({ ...expense, ...buildMarkExpenseUnpaidUpdates() }));
+                await store.docManager.flushPersistence();
+            });
+            await expect(taskRow.getByText('Overdue', { exact: true })).toBeVisible();
+            await expect(expenseRow.getByText('Overdue', { exact: true })).toBeVisible();
+            const dates = await page.evaluate(async () => {
+                const { readEntity } = await import('/src/stores/yjs/entityUtils.ts');
+                const store = window.__TASKTIME_STORE__;
+                return [readEntity(store.tasks.get('billable')).startDate, readEntity(store.expenses.get('late-room')).date];
+            });
+            expect(dates).toEqual(['2026-09-24', '2026-09-24']);
+        }
+    });
     test('keeps a standalone task moved to a no-client project non-billable after reload', async ({ page }) => {
         await seedDashboard(page);
         const reports = page.getByRole('region', { name: 'Reports Overview' });
@@ -147,7 +243,7 @@ test.describe('Dashboard smoke', () => {
         });
 
         const today = page.getByRole('region', { name: /^To Do Today/ });
-        const upcoming = page.getByRole('region', { name: 'Upcoming' });
+        const upcoming = page.getByRole('region', { name: /^Upcoming \(\d+\)$/ });
         const activeTaskTitle = today.getByRole('button', { name: 'Build the dashboard', exact: true });
         const upcomingBlockedTitle = upcoming.getByRole('button', {
             name: 'Plan next month’s work with a longer task title',
@@ -289,11 +385,12 @@ test.describe('Dashboard smoke', () => {
     test('keeps phone actions first and stats horizontally scrollable, with no page overflow', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await seedDashboard(page);
+        await expect(page.getByRole('heading', { name: 'Upcoming (2)', exact: true })).toBeVisible();
         await expect(page.getByText('Next 7 days', { exact: true })).toHaveCount(0);
         for (const width of [390, 320, 768, 1024, 1440]) {
             await page.setViewportSize({ width, height: 1000 });
             const today = await page.getByRole('region', { name: /^To Do Today/ }).boundingBox();
-            const upcoming = await page.getByRole('region', { name: 'Upcoming' }).boundingBox();
+            const upcoming = await page.getByRole('region', { name: /^Upcoming \(\d+\)$/ }).boundingBox();
             const summary = await page.getByRole('region', { name: 'Dashboard summary' }).boundingBox();
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
             if (width < 768) {

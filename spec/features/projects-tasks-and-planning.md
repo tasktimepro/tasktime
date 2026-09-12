@@ -5,6 +5,7 @@
 - Projects group tasks, notes, client preference, pricing, billing increments, view/sort preference, quote state, deadline, budget, archive state, and invoice references.
 - Clients hold contact/invoice defaults and can relate to multiple projects/expenses/invoices.
 - Tasks may be top-level or subtasks, with billable state, estimates, ordering, completion, archive, start date, and supported recurrence metadata.
+- Planner project cards omit due-date, overdue, and resolved-deadline badges in desktop and mobile layouts. Quote-stage badges and the separate flag-marked deadline item on its scheduled day remain.
 - Planner attachments reference existing clients/projects/tasks/expenses by date; daily and weekly goals track planned outcomes.
 
 ## Edge cases

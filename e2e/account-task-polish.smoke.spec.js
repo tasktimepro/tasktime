@@ -87,7 +87,7 @@ test('aligns Upcoming with Today and carries expense category color through dash
     });
     await page.reload();
 
-    const upcoming = page.getByRole('region', { name: 'Upcoming' });
+    const upcoming = page.getByRole('region', { name: /^Upcoming \(\d+\)$/ });
     const taskRow = upcoming.getByText('Monthly review', { exact: true }).locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " items-center ") and contains(concat(" ", normalize-space(@class), " "), " gap-3 ")][1]');
     const expenseRow = upcoming.getByText('Design subscription', { exact: true }).locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " items-center ") and contains(concat(" ", normalize-space(@class), " "), " gap-3 ")][1]');
     await expect(taskRow).toHaveCount(1);

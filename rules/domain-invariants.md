@@ -62,6 +62,7 @@ These invariants summarize critical production contracts. They supplement the de
   sent/paid invoices retain their original client/project and snapshots. Eligible
   unbilled work follows the destination. A draft must refresh after its selected
   work leaves the invoiced project or its source-client/billability changes.
+- Editing a paused timer start preserves its original pause endpoint by adjusting paused elapsed time in the same Yjs transaction; note-only edits retain the exact start instant.
 - Time calculations must use a consistent unit and preserve exact stored duration semantics across timers, entries, reports, invoices, imports, and exports.
 - Tasks belong to projects, subtasks use `parentTaskId`, and subtasks cannot be recurring.
 

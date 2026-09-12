@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import * as Y from 'yjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+    updateTimerCommand,
     pauseTimerCommand,
     resumeTimerCommand,
     startTimerCommand,
@@ -114,6 +115,22 @@ describe('useTimers and agent command parity', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+    });
+
+    it('preserves the paused endpoint when UI and agent move a start across midnight', async () => {
+        const harness = createParityHarness();
+        const timer = { projectId: 'project-1', taskId: 'task-1', startTime: Date.now() - 10000, paused: true, pausedElapsedTime: 5000, note: '' };
+        act(() => {
+            harness.uiStore.timers.set('project-1', timer);
+            harness.agentStore.timers.set('project-1', timer);
+        });
+        const startTime = timer.startTime - 2 * 60 * 60 * 1000;
+        await act(async () => {
+            harness.result.current.updateTimer('project-1', { startTime });
+            await updateTimerCommand(harness.agentContext, { timerKey: 'project-1', startTime });
+        });
+        expect(readTimer(harness.uiStore).pausedElapsedTime).toBe(7205000);
+        expect(comparableTimer(readTimer(harness.uiStore))).toEqual(comparableTimer(readTimer(harness.agentStore)));
     });
 
     it('starts the same timer state through the UI and agent paths', () => {

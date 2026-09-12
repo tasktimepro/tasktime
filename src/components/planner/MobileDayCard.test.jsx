@@ -59,7 +59,7 @@ describe('MobileDayCard', () => {
         expect(card.getAttribute('style')).toBeNull();
     });
 
-    it('passes project quote and deadline context through to planner items', () => {
+    it('passes project quote context without deadline badges to planner items', () => {
         render(
             <MobileDayCard
                 {...baseProps}
@@ -79,6 +79,6 @@ describe('MobileDayCard', () => {
         );
 
         expect(screen.getByText('quote')).toBeInTheDocument();
-        expect(screen.getByText('2026-03-28')).toBeInTheDocument();
+        expect(screen.queryByText('2026-03-28')).not.toBeInTheDocument();
     });
 });

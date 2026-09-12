@@ -28,8 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Trash2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 import { formatCurrency } from '@/utils/currencyUtils.ts';
-import { toDisplayDate } from '@/utils/dateUtils.ts';
-import { getProjectDeadlineStatus, isProjectInQuoteMode } from '@/utils/projectPlanningUtils.ts';
+import { isProjectInQuoteMode } from '@/utils/projectPlanningUtils.ts';
 
 /**
  * @param {Object} props
@@ -48,8 +47,6 @@ import { getProjectDeadlineStatus, isProjectInQuoteMode } from '@/utils/projectP
  * @param {string | null} props.supplierName - Expense supplier
  * @param {boolean} props.hasAttachment - Whether item has a planner attachment (can be removed)
  * @param {'active' | 'quote' | undefined} props.projectStatusMode - Project status mode (projects only)
- * @param {string | null | undefined} props.projectDeadline - Project deadline YYYY-MM-DD (projects only)
- * @param {number | null | undefined} props.projectDeadlineResolvedAt - Resolved deadline timestamp (projects only)
  * @param {boolean} props.isProjectDeadlineItem - Whether this is the auto-generated project deadline marker
  * @param {boolean} props.isPreview - Whether item is a non-interactive preview
  * @param {() => void} props.onClick - Click handler
@@ -73,8 +70,6 @@ const PlannerItem = ({
     supplierName,
     hasAttachment = false,
     projectStatusMode,
-    projectDeadline,
-    projectDeadlineResolvedAt,
     isProjectDeadlineItem = false,
     isPreview = false,
     onClick,
@@ -159,24 +154,8 @@ const PlannerItem = ({
                     : subtype === 'attached'
                         ? 'Attached'
                         : null;
-    const projectDeadlineStatus = type === 'project' && projectDeadline
-        ? getProjectDeadlineStatus({ deadline: projectDeadline, deadlineResolvedAt: projectDeadlineResolvedAt ?? null })
-        : null;
-    const isProjectQuoteStage = type === 'project' && isProjectInQuoteMode({ statusMode: projectStatusMode, isPersonal: false });
-    const projectMetaParts = type === 'project' && !isProjectDeadlineItem
-        ? [
-            isProjectQuoteStage ? 'Quote stage' : null,
-            projectDeadlineStatus?.hasDeadline
-                ? (projectDeadlineStatus.isResolved
-                    ? 'Completed'
-                    : projectDeadlineStatus.isOverdue
-                    ? `${Math.abs(projectDeadlineStatus.daysRemaining || 0)}d overdue`
-                    : projectDeadlineStatus.isToday
-                        ? 'Due today'
-                        : `Due ${toDisplayDate(projectDeadlineStatus.deadline, { month: 'short', day: 'numeric' })}`)
-                : null,
-        ].filter(Boolean)
-        : [];
+    const showProjectQuoteStage = type === 'project' && !isProjectDeadlineItem
+        && isProjectInQuoteMode({ statusMode: projectStatusMode, isPersonal: false });
     const metaParts = isProjectDeadlineItem
         ? []
         : isMobileLayout
@@ -292,27 +271,11 @@ const PlannerItem = ({
                     )}>
                         {title}
                     </div>
-                    {projectMetaParts.length > 0 && (
+                    {showProjectQuoteStage && (
                         <div className="mt-1 flex flex-wrap gap-1.5">
-                            {projectMetaParts.map((part) => (
-                                <span
-                                    key={part}
-                                    className={cn(
-                                        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                        part === 'Quote stage'
-                                            ? 'bg-amber-100 text-amber-800'
-                                            : part === 'Completed'
-                                                ? 'bg-emerald-100 text-emerald-800'
-                                            : part === 'Due today'
-                                                ? 'bg-amber-100 text-amber-800'
-                                                : part.includes('overdue')
-                                                    ? 'bg-destructive/10 text-destructive'
-                                                    : 'bg-muted text-muted-foreground'
-                                    )}
-                                >
-                                    {part}
-                                </span>
-                            ))}
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                                Quote stage
+                            </span>
                         </div>
                     )}
                     {metaParts.length > 0 && (

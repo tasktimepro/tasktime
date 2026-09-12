@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ToDoToday from './ToDoToday'
-import { formatDurationWithSeconds, toStorageDate } from '../../utils/dateUtils.ts'
+import { formatDurationWithSeconds, toStorageDate, toDisplayDate } from '../../utils/dateUtils.ts'
 
 const hookMocks = {
     expenses: [],
@@ -182,7 +182,7 @@ describe('ToDoToday', () => {
         expect(screen.getByText('Today Task')).toBeInTheDocument()
 
         const today = screen.getByRole('region', { name: 'To Do Today (2)' })
-        const upcoming = screen.getByRole('region', { name: 'Upcoming' })
+        const upcoming = screen.getByRole('region', { name: 'Upcoming (1)' })
         expect(within(today).queryByText('Upcoming Task')).not.toBeInTheDocument()
         expect(within(upcoming).getByText('Upcoming Task')).toBeInTheDocument()
         expect(within(upcoming).queryByText('Next 7 days')).not.toBeInTheDocument()
@@ -288,6 +288,48 @@ describe('ToDoToday', () => {
         expect(screen.queryByRole('button', { name: 'Open task details' })).not.toBeInTheDocument()
     })
 
+    it.each([
+        { mobile: false, recurring: false },
+        { mobile: true, recurring: false },
+        { mobile: false, recurring: true },
+        { mobile: true, recurring: true },
+    ])('keeps completed rows without schedule badges and restores overdue on reopen: %j', ({ mobile, recurring }) => {
+        setMatchMedia(mobile)
+        const task = {
+            ...overdueTask,
+            recurring: recurring ? { type: 'weekly', weeklyDays: [1] } : null,
+            recurringStatus: { isOverdue: true },
+        }
+        const list = (completed) => (
+            <ToDoToday
+                overdueTasks={[{ ...task, completed }]}
+                tasksForToday={[]}
+                upcomingTasks={[]}
+                getTaskCompletedStatus={(item) => item.completed}
+                handleCompleteTask={() => {}}
+                renderTaskTitle={(item, done) => <span className={done ? 'line-through' : ''}>{item.title}</span>}
+                renderTaskControls={() => null}
+                onTaskTitleClick={() => {}}
+            />
+        )
+        const { rerender } = render(list(false))
+        expect(screen.getByText('Overdue')).toBeInTheDocument()
+
+        rerender(list(true))
+        expect(screen.getByText(task.title)).toHaveClass('line-through')
+        expect(screen.getByRole('checkbox')).toBeChecked()
+        expect(screen.queryByText('Overdue')).not.toBeInTheDocument()
+        expect(screen.queryByText('Every Mo')).not.toBeInTheDocument()
+        expect(screen.queryByText(toDisplayDate(yesterdayStr, { month: 'short', day: 'numeric' }))).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Open task details' })).not.toBeInTheDocument()
+
+        rerender(list(false))
+        expect(screen.getByText(task.title)).not.toHaveClass('line-through')
+        expect(screen.getByRole('checkbox')).not.toBeChecked()
+        expect(screen.getByText('Overdue')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Open task details' })).toBeInTheDocument()
+    })
+
     it('hides row actions when timer exists for the task/project', () => {
         hookMocks.getTimerForTask = vi.fn(() => ({
             taskId: 'different-task',
@@ -382,7 +424,7 @@ describe('ToDoToday', () => {
             upcomingTasks: [],
         })
 
-        expect(within(screen.getByRole('region', { name: 'Upcoming' })).getByText('Upcoming Expense')).toBeInTheDocument()
+        expect(within(screen.getByRole('region', { name: 'Upcoming (1)' })).getByText('Upcoming Expense')).toBeInTheDocument()
     })
 
     it('marks manual unpaid expense as paid and opens expense view', async () => {

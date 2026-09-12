@@ -40,6 +40,26 @@ describe('ExpenseDueCard', () => {
         vi.useRealTimers();
     });
 
+    it.each([
+        [false, false, false], [false, false, true],
+        [true, false, false], [true, false, true],
+        [false, true, false], [false, true, true],
+    ])('constrains the title itself for ellipsis (mobile=%s, compact=%s, clickable=%s)', (mobile, compact, clickable) => {
+        setMatchMedia(mobile)
+        const title = 'Prototyping subscription with an exceptionally long expense title'
+        render(<ExpenseDueCard
+            compact={compact}
+            expense={{ id: 'long-title', title, date: '2026-02-06', amount: 29, currency: 'EUR' }}
+            category={{ color: '#8b5cf6' }}
+            onView={clickable ? vi.fn() : undefined}
+        />)
+        const label = screen.getByText(title)
+        expect(label).toHaveClass('min-w-0', 'truncate')
+        expect(label.parentElement).toHaveClass('max-w-full')
+        expect(label).toHaveAttribute('title', title)
+        expect(screen.getByTestId('category-color-dot')).toHaveClass('shrink-0')
+    })
+
     it('renders fixed expense with amount and mark paid icon button', () => {
         const expense = {
             id: 'exp-1',
@@ -149,6 +169,41 @@ describe('ExpenseDueCard', () => {
         )
 
         expect(screen.getByText('Overdue')).toBeInTheDocument()
+    })
+
+    it.each([
+        { mobile: false, recurring: false },
+        { mobile: true, recurring: false },
+        { mobile: false, recurring: true },
+        { mobile: true, recurring: true },
+    ])('removes paid expense urgency and restores it when unpaid: %j', ({ mobile, recurring }) => {
+        setMatchMedia(mobile)
+        const expense = { id: 'late', title: 'Client meeting room', date: '2026-02-05', amount: 45, currency: 'EUR', paymentStatus: 'unpaid' }
+        const recurrence = recurring ? { repeat: 'monthly', monthlyType: 'specific', monthlyDay: 5 } : null
+        const card = (paymentStatus) => (
+            <ExpenseDueCard expense={{ ...expense, paymentStatus }} recurrence={recurrence} isOverdue onView={() => {}} />
+        )
+        const { rerender } = render(card('unpaid'))
+        expect(screen.getByText('Overdue')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Open expense details' })).toBeInTheDocument()
+
+        rerender(card('paid'))
+        expect(screen.getByText(expense.title)).toHaveClass('line-through')
+        expect(screen.queryByText('Overdue')).not.toBeInTheDocument()
+        expect(screen.queryByText('Monthly (5th)')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Open expense details' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Client meeting room/ })).toBeInTheDocument()
+
+        rerender(card('unpaid'))
+        expect(screen.getByText(expense.title)).not.toHaveClass('line-through')
+        expect(screen.getByText('Overdue')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Open expense details' })).toBeInTheDocument()
+    })
+
+    it('retains the schedule for future automatic payments recorded as paid', () => {
+        render(<ExpenseDueCard expense={{ id: 'future-auto', title: 'Auto subscription', date: '2026-02-07', paymentStatus: 'paid', paymentMode: 'auto', amountType: 'fixed', amount: 19, currency: 'EUR' }} />)
+        expect(screen.getByText('Tomorrow')).toBeInTheDocument()
+        expect(screen.getByText('Auto subscription')).not.toHaveClass('line-through')
     })
 
     it('hides mark paid action for auto-payment expenses', () => {

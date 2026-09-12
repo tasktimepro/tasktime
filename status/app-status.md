@@ -2,6 +2,101 @@
 
 ## Current focus
 
+- Local core checkpoint (2026-09-13): the user approved committing the screenshot
+  fixture and the Planner, Dashboard, expense, Account and timer polish below.
+  Their dated `uncommitted` labels record validation before this checkpoint.
+  These compatible changes join the planned core 1.6.0 launch release; this
+  checkpoint changes no separately published agent artifact or package version.
+  The local metrics startup fix remains in the independent infrastructure repo.
+  Push, tagging, publication and deployment remain separate from this commit.
+
+- [x] Add explicit timer start-date editing and diagnose local sync errors
+  (2026-09-13, local/uncommitted). Start Date and Start Time share the first row
+  above the note using the existing native date input. Yesterday/23:30 edits
+  survive reload; future/invalid dates, DST gaps and overlaps remain guarded,
+  while note-only edits preserve the original instant. Paused start corrections
+  preserve their pause endpoint through shared UI/agent duration updates. Eight
+  UI regressions and the paused-domain regression failed before their fixes.
+  All 66 related timer/Dropbox tests plus seven focused agent command tests pass;
+  useTimers coverage is 96.47% statements, 80% branches, 100% functions and 97.41%
+  lines. Desktop/mobile Chromium edit/reload tests and visual previews pass;
+  lint/typecheck pass. No migration, commit or deployment.
+  Runtime investigation: DebugBundle had no active local incidents. The running
+  local Worker's metrics DB had no tables; applying its existing idempotent
+  schema restored a synthetic /metrics/batch request to HTTP 200, then only that
+  synthetic row was removed. The private infra Makefile now initializes metrics
+  during local preparation, and the exact Make target succeeds on repeat. Dropbox
+  manifest HTTP 500s classify as provider-side temporary failures; a matching
+  download regression verifies four bounded/backoff attempts without auth
+  invalidation. No evidence here establishes the cause or current recovery of
+  the user's specific upstream Dropbox request; no real provider data was changed.
+
+- [x] Fix expense-title ellipsis in compact lists (2026-09-13,
+  local/uncommitted). Shared ExpenseDueCard bounds its category/title flex group
+  and truncates the title text itself, covering Today, Upcoming and due-expense
+  groups across desktop, compact/mobile and non-clickable rows. Full-title
+  tooltips and fixed-size expense/category icons remain available. Six focused
+  regressions failed before the fix; all 55 related card/list/dashboard tests
+  and lint pass. Chromium checks verify actual overflowing ellipsis before and
+  during hover, payment-action visibility and row containment in Today/Upcoming,
+  plus existing main expense-list ellipsis, at 1440/1024/390/320px. No payment,
+  date, persisted-data or selection behavior changed; no commit or deployment.
+
+- [x] Stabilize Account authentication action (2026-09-13,
+  local/uncommitted). The header follows the existing lifecycle-bound retained
+  session instead of cloud transport connectivity: Sign out persists during
+  connecting/syncing, offline operation and temporary outages; absent or
+  invalidated sessions show Sign in, and initial unresolved identity shows
+  disabled Checking account progress. Reconnect remains a Cloud Sync recovery
+  concern. Account now observes actual browser online/offline events instead of
+  reading a nonexistent Yjs context property. Sign-out confirmation is blocked
+  while sync is unavailable/busy, and live connected/idle/no-pending-upload
+  checks prevent local deletion after handled auth failures. No auth storage,
+  provider requests, entitlement decisions or sync scheduling were changed.
+  Red/green Account regressions and all 158 related Account/auth/lifecycle/sync
+  tests pass; four disposable Chromium checks cover Google/Dropbox at 1440px and
+  390px, including retained-session outages and invalidation. Full lint and
+  typecheck pass. Unit tests use the expected public marketing origin instead
+  of the dev container's local site override. No live provider mutation, full
+  app coverage/build, commit or deployment.
+
+- [x] Remove resolved-item urgency from Today (2026-09-13,
+  local/uncommitted). Completed task rows and paid expense rows retain their
+  crossed-out confirmation state without date/recurrence/Overdue badges; paid
+  expenses also lose any stale overdue details button/opacity. Reopening the
+  task or receiving canonical unpaid updates restores the applicable overdue
+  badge. Future fixed automatic expense occurrences retain their upcoming
+  schedule under the existing paid-display exception. Dates, recurrence,
+  selection, payment history and shared task badges elsewhere are unchanged.
+  Eight desktop/mobile, ordinary/recurring transition regressions failed before
+  the fix. All 140 Dashboard/due-expense/date-badge/auto-payment tests, full lint
+  and typecheck pass. The Chromium transition smoke passes at 1440px and 390px,
+  including completion/payment, persistence after reload, reopening and retained
+  source dates. No full-app coverage/build, commit, publication or deployment.
+
+- [x] Show consistent Upcoming item totals (2026-09-12, local/uncommitted).
+  The heading counts all upcoming task and expense rows, including zero, while
+  the collapsed list keeps its five-item preview. The button reports the hidden
+  count as “Show N more” and becomes “Show less” when expanded; the heading total
+  stays fixed. This supersedes the earlier task-only heading interpretation.
+  The seven-day selector and item actions are unchanged. Corrected mixed-item
+  and expense-only expectations failed before the change; all 100 Dashboard
+  unit tests, full lint, and the Chromium responsive Dashboard smoke pass
+  (320/390/768/1024/1440px, dark/light). A disposable browser also verifies the
+  screenshot fixture: Upcoming (8), five visible rows, Show 3 more revealing
+  all eight, and Show less restoring five. No commit or deployment occurred.
+
+- [x] Remove project deadline-status badges from Planner cards (2026-09-12,
+  local/uncommitted). Desktop and mobile attached project cards no longer show
+  due-date, overdue, or resolved-deadline pills that wrap in narrow columns.
+  Quote-stage badges and separate flag-marked deadline items remain; project
+  deadlines, scheduling and persisted data are unchanged. Removed unused display
+  props/helpers and reconciled planning/acceptance docs. Red/green expectations
+  confirmed four failures before the change; all 79 related planner tests now
+  pass, alongside full lint/typecheck. Disposable Chromium checks with the
+  screenshot fixture pass at 1440px and 390px with no page errors. No commit,
+  deployment, full-app coverage or production-build gate was performed.
+
 - [x] Simplify the onboarding welcome step (2026-09-11, local/uncommitted).
   Removed the public-site “Learn more about TaskTime Pro” action and its unused
   origin/button styling dependencies. The step content now owns a responsive

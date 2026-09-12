@@ -286,7 +286,10 @@ export function useTimers(): UseTimersResult {
 
         const updated = buildUpdatedTimer(timer, updates, Date.now());
         const fieldUpdates: Record<string, unknown> = { lastActive: updated.lastActive };
-        if (updates.startTime !== undefined) fieldUpdates.startTime = updated.startTime;
+        if (updates.startTime !== undefined) {
+            fieldUpdates.startTime = updated.startTime;
+            if (timer.paused) fieldUpdates.pausedElapsedTime = updated.pausedElapsedTime;
+        }
         if (updates.note !== undefined) fieldUpdates.note = updated.note;
 
         store.coreDoc.transact(() => {

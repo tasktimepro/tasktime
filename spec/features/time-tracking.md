@@ -6,6 +6,14 @@
 - Start creates/replaces state only through guarded timer behavior.
 - Pause accumulates elapsed duration without creating an entry; resume continues it.
 - Stop creates one closed time entry, records reconciliation identity, and removes the timer.
+- The active timer editor exposes a local Start Date and Start Time plus its note.
+  Date defaults to the existing timer start, and changing it explicitly supports
+  previous-day work. Future starts, invalid dates, nonexistent daylight-saving
+  times and project overlaps remain rejected. Note-only edits preserve the exact
+  stored instant, including sub-second precision and repeated DST hours.
+- Moving a paused timer's start adjusts its frozen elapsed duration to preserve
+  the original pause endpoint; moving it after that endpoint is rejected. UI and
+  agent updates persist the same shared operation without changing timer identity.
 - Manual entries support explicit start/end and notes.
 - Individual time-entry durations use the same seconds-aware display as task durations, so sub-minute work is shown in seconds instead of as `0m`.
 - Hours-report project totals and billable totals use that same seconds-aware display while CSV hour columns remain numeric decimal-hour exports.

@@ -2,6 +2,22 @@
 
 ## Current focus
 
+- [x] Prepare the fictional Paperplane Studio screenshot import (2026-09-12,
+  local/uncommitted) in `test-data/screenshots/`, with dated tasks, coordinated
+  client/project/category colors, planner items, expenses, time history and
+  invoice previews. A disposable Chromium UI import/export preserves all 133
+  entity IDs; Dashboard, Planner, Expenses and the paid invoice preview were
+  checked without changing existing browser/provider data. The capture guide
+  records the date anchor and replacement-import behavior. Owner captures and
+  homepage asset replacement remain open; no app runtime or site assets changed.
+  Follow-up (2026-09-13): corrected the fixture's saved auto-sync mode from
+  backup to recommended sync, keeping auto-sync disabled. The old fixture
+  overrode the app's already-correct sync default and caused the backup warning
+  on first enable. Both provider regressions reproduced that warning before
+  correction; all 61 sync-settings/preferences/fixture/foreground tests and
+  lint pass. Intentionally saved backup preferences retain their confirmation;
+  already-imported browser/cloud data was not rewritten.
+
 - [x] Retain site source privately under `tasktimepro/tasktime-site` through the
   user-approved transfer (2026-09-11); existing history, branches and PRs are
   preserved and local `origin` is updated. Core remains public and independent.

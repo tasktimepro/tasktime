@@ -1,3 +1,4 @@
+import screenshotWorkspace from '../../../test-data/screenshots/tasktime-paperplane-studio-2026-09-12.json'
 import React, { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -574,6 +575,45 @@ describe('YjsSyncSettings', () => {
         expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Connect Dropbox' })).toBeNull()
+    })
+
+    it.each([
+        ['google-drive', undefined],
+        ['dropbox', undefined],
+        ['google-drive', 'sync'],
+        ['dropbox', 'sync'],
+        ['google-drive', screenshotWorkspace.preferences.autoSyncMode],
+        ['dropbox', screenshotWorkspace.preferences.autoSyncMode],
+    ])('enables recommended sync directly for %s with fresh or screenshot preferences (%s)', async (provider, mode) => {
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.isDriveConnected = provider === 'google-drive'
+        yjsSyncSettingsMocks.activeStorageProvider = provider
+        yjsSyncSettingsMocks.isSignedIn = provider === 'google-drive'
+        yjsSyncSettingsMocks.isDropboxSignedIn = provider === 'dropbox'
+        yjsSyncSettingsMocks.autoSyncMode = mode
+        yjsSyncSettingsMocks.autoSyncEnabled = screenshotWorkspace.preferences.autoSyncEnabled
+
+        render(<YjsSyncSettings />)
+        await userEvent.click(screen.getByRole('checkbox', { name: 'Enable auto-sync' }))
+
+        expect(screen.queryByText('Use device backup mode?')).not.toBeInTheDocument()
+        expect(updatePreferencesMock).toHaveBeenCalledWith({ autoSyncEnabled: true, autoSyncMode: 'sync' })
+        expect(setDriveSyncPreferencesMock).toHaveBeenCalledWith(true, 'sync')
+        expect(forceSyncCloudMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('preserves an explicitly saved backup choice and confirms before re-enabling it', async () => {
+        yjsSyncSettingsMocks.isCloudConnected = true
+        yjsSyncSettingsMocks.activeStorageProvider = 'dropbox'
+        yjsSyncSettingsMocks.isDropboxSignedIn = true
+        yjsSyncSettingsMocks.autoSyncMode = 'backup'
+
+        render(<YjsSyncSettings />)
+        await userEvent.click(screen.getByRole('checkbox', { name: 'Enable auto-sync' }))
+
+        expect(screen.getByText('Use device backup mode?')).toBeInTheDocument()
+        expect(updatePreferencesMock).not.toHaveBeenCalled()
+        expect(forceSyncCloudMock).not.toHaveBeenCalled()
     })
 
     it('labels sync as recommended and backup as device-only', () => {

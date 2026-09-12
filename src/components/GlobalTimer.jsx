@@ -3,8 +3,9 @@ import { ChevronDownIcon, ChevronUpIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { TimePicker } from '@/components/ui/time-picker';
-import { formatDurationWithSeconds } from '../utils/dateUtils';
+import { formatDurationWithSeconds, parseStoredDate, toStorageDate } from '../utils/dateUtils';
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
 import TaskTimer from './TaskTimer';
 import { useToast } from '../hooks/useToast';
@@ -16,6 +17,7 @@ import { useTimeEntries } from '../hooks/useTimeEntries';
 const createInitialDraftState = (isActive, startTime, note) => {
     if (!isActive || !startTime) {
         return {
+            startDateInput: '',
             startTimeInput: '',
             noteInput: '',
         };
@@ -23,6 +25,7 @@ const createInitialDraftState = (isActive, startTime, note) => {
 
     const startDate = new Date(startTime);
     return {
+        startDateInput: toStorageDate(startDate),
         startTimeInput: startDate.toTimeString().slice(0, 8),
         noteInput: note || '',
     };
@@ -67,7 +70,7 @@ const GlobalTimer = ({
     
     const [isExpandedInternal, setIsExpandedInternal] = useState(false);
     const isExpanded = typeof isExpandedProp === 'boolean' ? isExpandedProp : isExpandedInternal;
-    const [{ startTimeInput, noteInput }, setDraftState] = useState(() => createInitialDraftState(isActive, startTime, note));
+    const [{ startDateInput, startTimeInput, noteInput }, setDraftState] = useState(() => createInitialDraftState(isActive, startTime, note));
 
     // Find the task associated with the current timer
     const currentTask = tasks.find(task => task.id === taskId);
@@ -98,9 +101,24 @@ const GlobalTimer = ({
         try {
             // Parse and validate start time if it was changed
             const [hours, minutes, seconds] = startTimeInput.split(':').map(Number);
-            const currentDate = new Date(startTime);
-            const newStartTime = new Date(currentDate);
-            newStartTime.setHours(hours, minutes, seconds || 0);
+            const selectedDate = parseStoredDate(startDateInput);
+            if (!selectedDate || toStorageDate(selectedDate) !== startDateInput
+                || !/^\d{2}:\d{2}(?::\d{2})?$/.test(startTimeInput)
+                || hours > 23 || minutes > 59 || (seconds || 0) > 59) {
+                showError('Enter a valid start date and time');
+                return;
+            }
+            const originalDate = new Date(startTime);
+            const timeUnchanged = startDateInput === toStorageDate(originalDate)
+                && startTimeInput === originalDate.toTimeString().slice(0, 8);
+            // Preserve the original instant on note-only edits, including the
+            // repeated hour at DST fall-back and sub-second timer precision.
+            const newStartTime = timeUnchanged ? originalDate : selectedDate;
+            if (!timeUnchanged) newStartTime.setHours(hours, minutes, seconds || 0);
+            if (newStartTime.getHours() !== hours || newStartTime.getMinutes() !== minutes) {
+                showError('This start time does not exist on the selected date');
+                return;
+            }
 
             // Validate that the new start time is not in the future
             if (newStartTime.getTime() > Date.now()) {
@@ -118,7 +136,7 @@ const GlobalTimer = ({
             // Check for overlaps with existing time entries
             const overlapCheck = checkTimerStartOverlap(
                 newStartTime.getTime(),
-                Date.now(), // Current time as potential end time
+                isPaused ? startTime + elapsedTime : Date.now(),
                 task.projectId,
                 timeEntries,
                 tasks
@@ -141,8 +159,8 @@ const GlobalTimer = ({
             } else {
                 setIsExpandedInternal(false);
             }
-        } catch {
-            showError('Invalid time format. Please use HH:MM:SS format');
+        } catch (error) {
+            showError(error?.message || 'Unable to update timer');
         }
     };
 
@@ -222,7 +240,19 @@ const GlobalTimer = ({
             {/* Expanded options */}
             {isExpanded && (
                 <div className="border-t border-border pt-3 pb-2 space-y-3">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="min-w-0">
+                            <Label className="text-xs text-foreground" htmlFor="global-timer-start-date">
+                                Start Date
+                            </Label>
+                            <NativeDateInput
+                                id="global-timer-start-date"
+                                value={startDateInput}
+                                max={toStorageDate(new Date())}
+                                onChange={(e) => setDraftState((prev) => ({ ...prev, startDateInput: e.target.value }))}
+                                className="mt-1 h-8 min-w-0 text-sm"
+                            />
+                        </div>
                         {/* Start Time Input */}
                         <div>
                             <Label className="text-xs text-foreground" htmlFor="global-timer-start-time">
@@ -237,7 +267,7 @@ const GlobalTimer = ({
                         </div>
 
                         {/* Note Input */}
-                        <div>
+                        <div className="col-span-2">
                             <Label className="text-xs text-foreground" htmlFor="global-timer-note">
                                 Note
                             </Label>

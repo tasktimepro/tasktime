@@ -90,8 +90,16 @@ export function buildUpdatedTimer(
         throw new TimerOperationError('INVALID_INPUT', 'startTime must be a finite timestamp.');
     }
 
+    const pausedElapsedTime = timer.paused && updates.startTime !== undefined
+        ? timer.startTime + Math.max(0, timer.pausedElapsedTime || 0) - updates.startTime
+        : undefined;
+    if (pausedElapsedTime !== undefined && pausedElapsedTime < 0) {
+        throw new TimerOperationError('INVALID_INPUT', 'Start time cannot be after the timer was paused');
+    }
+
     return {
         ...timer,
+        ...(pausedElapsedTime === undefined ? {} : { pausedElapsedTime }),
         ...(updates.startTime === undefined ? {} : { startTime: updates.startTime }),
         ...(updates.note === undefined ? {} : { note: updates.note || '' }),
         lastActive: now,

@@ -21,7 +21,7 @@ export default function Upcoming({ tasks, expenses, renderTask, renderExpense })
                 <div className="flex items-center gap-2">
                     <h2 id="dashboard-upcoming-title" className="flex items-center text-lg font-semibold">
                         <CalendarDaysIcon className="status-info-text-strong mr-2 h-5 w-5" />
-                        Upcoming
+                        Upcoming ({items.length})
                     </h2>
                 </div>
             </CardHeader>
@@ -37,7 +37,7 @@ export default function Upcoming({ tasks, expenses, renderTask, renderExpense })
                 )}
                 {items.length > VISIBLE_UPCOMING_ITEMS && (
                     <Button variant="ghost" size="sm" className="mt-2 w-full" aria-expanded={expanded} aria-controls="dashboard-upcoming-items" onClick={() => setExpanded(!expanded)}>
-                        {expanded ? 'Show less' : `Show all ${items.length} upcoming items`}
+                        {expanded ? 'Show less' : `Show ${items.length - VISIBLE_UPCOMING_ITEMS} more`}
                     </Button>
                 )}
             </CardContent>

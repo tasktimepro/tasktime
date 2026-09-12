@@ -33,6 +33,7 @@ const ExpenseDueCard = ({
     const expenseDate = parseStoredDate(expense.date);
     const isUpcomingAuto = isAutoPayment && expenseDate && todayStart && expenseDate > todayStart;
     const isPaidDisplay = isPaid && !isUpcomingAuto;
+    const showOverdue = isOverdue && !isPaidDisplay;
     const isClickable = Boolean(onView);
     const canMarkPaid = Boolean(onMarkPaid) && !isPreview && !isAutoPayment && (!isVariable || hasAmount);
 
@@ -73,8 +74,8 @@ const ExpenseDueCard = ({
         return '';
     }, [recurrence]);
 
-    const dateBadge = recurrence ? (
-        isOverdue ? (
+    const dateBadge = isPaidDisplay ? null : recurrence ? (
+        showOverdue ? (
             <Badge variant="warning">
                 Overdue
             </Badge>
@@ -88,12 +89,12 @@ const ExpenseDueCard = ({
         <StartDateBadge
             startDate={expense.date}
             recurring={null}
-            completed={false}
-            recurringOverdue={Boolean(isOverdue)}
+            completed={isPaidDisplay}
+            recurringOverdue={showOverdue}
         />
     );
 
-    const dateBadgeNode = isOverdue && isClickable ? (
+    const dateBadgeNode = showOverdue && isClickable ? (
         <button
             type="button"
             onClick={() => onView?.(expense)}
@@ -109,11 +110,11 @@ const ExpenseDueCard = ({
 
     return (
         <div
-            className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${isOverdue ? 'opacity-90' : ''}`}
+            className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${showOverdue ? 'opacity-90' : ''}`}
         >
             {isMobileLayout || compact ? (
                 <div className="flex items-start gap-3">
-                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                    <HandCoinsIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden" data-testid={`expense-row-content-${expense.id}`}>
                         {isClickable ? (
                             <button
@@ -122,9 +123,9 @@ const ExpenseDueCard = ({
                                 className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer"
                                 title="Open expense details"
                             >
-                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
                                     <CategoryColorDot category={category} />
-                                    <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
+                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>
                                         {expense.title}
                                     </span>
                                 </span>
@@ -136,9 +137,9 @@ const ExpenseDueCard = ({
                             </button>
                         ) : (
                             <div className="text-left text-sm font-medium text-foreground">
-                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
                                     <CategoryColorDot category={category} />
-                                    <span className={`whitespace-normal break-words ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`}>
+                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>
                                         {expense.title}
                                     </span>
                                 </span>
@@ -178,7 +179,7 @@ const ExpenseDueCard = ({
                 </div>
             ) : (
                 <div className="flex items-center gap-3">
-                    <HandCoinsIcon className="h-5 w-5 text-muted-foreground" />
+                    <HandCoinsIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     <div className="flex-1 min-w-0 space-y-1 overflow-hidden">
                         {isClickable ? (
                             <button
@@ -187,9 +188,9 @@ const ExpenseDueCard = ({
                                 className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer truncate"
                                 title="Open expense details"
                             >
-                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
                                     <CategoryColorDot category={category} />
-                                    <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>{expense.title}</span>
                                 </span>
                                 {amountLabel && (
                                     <span className="ml-2 text-sm text-muted-foreground sensitive-data">
@@ -199,9 +200,9 @@ const ExpenseDueCard = ({
                             </button>
                         ) : (
                             <div className="text-sm font-medium text-foreground truncate">
-                                <span className="inline-flex min-w-0 items-center gap-2 align-middle">
+                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
                                     <CategoryColorDot category={category} />
-                                    <span className={isPaidDisplay ? 'line-through text-muted-foreground' : ''}>{expense.title}</span>
+                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>{expense.title}</span>
                                 </span>
                                 {amountLabel && (
                                     <span className="ml-2 text-sm text-muted-foreground sensitive-data">

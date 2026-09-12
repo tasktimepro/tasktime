@@ -53,8 +53,9 @@ const Account = ({
     const { urlParams, updateUrl } = useUrlState();
     const { showSuccess, showError } = useToast();
     const {
+        store,
+        hostedServiceSessionId,
         clearAllData,
-        isOffline,
         isConnecting,
         isCloudIdentityLoading,
         syncState,
@@ -72,6 +73,17 @@ const Account = ({
         accountEmail: dropboxAccountEmail, signIn: signInDropbox, isLoading: dropboxLoading,
         sessionId: dropboxSessionId, isSignedIn: dropboxSignedIn, error: dropboxAuthError, refresh: refreshDropbox,
     } = useDropboxAuth();
+    const [isOffline, setIsOffline] = useState(!navigator.onLine);
+    useEffect(() => {
+        const handleOnline = () => setIsOffline(false);
+        const handleOffline = () => setIsOffline(true);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
     const [showSignInModal, setShowSignInModal] = useState(false);
     const [signInPending, setSignInPending] = useState(false);
     const [signInError, setSignInError] = useState(null);
@@ -115,6 +127,13 @@ const Account = ({
         ? dropboxAccountEmail
         : (activeStorageProvider === 'google-drive' ? googleUser?.email ?? null : null);
     const providerNeedsReconnect = Boolean(activeStorageProvider && !isCloudConnected);
+    // This provider-bound session survives sync/transport interruptions. A selected
+    // provider or cached email alone is not evidence of a current account session.
+    const isAccountSignedIn = Boolean(hostedServiceSessionId);
+    const isAccountChecking = !isAccountSignedIn && isCloudIdentityLoading;
+    const canSyncBeforeSignOut = isAccountSignedIn && isCloudConnected
+        && !isOffline && !isConnecting && !isCloudIdentityLoading && syncState !== 'syncing'
+        && !movedToStorageProvider;
     
     // Define sections in order (first will be default)
     const sideNavItems = useMemo(() => [
@@ -224,11 +243,17 @@ const Account = ({
     };
 
     const handleAccountSignOut = async () => {
+        if (!canSyncBeforeSignOut || isSigningOut) return;
         setIsSigningOut(true);
 
         try {
             // MUST sync before deleting local data to prevent data loss
             await forceSyncCloud();
+            // Context may handle an auth/transport failure without rejecting.
+            // Read the live store before allowing any local-data removal.
+            if (!store.isCloudConnected() || store.getSyncState() !== 'idle' || store.hasPendingSyncChanges()) {
+                throw new Error('Cloud sync did not finish safely.');
+            }
             showSuccess(`Synced to ${activeProviderName}`);
             
             // Now safe to disconnect and clear local data
@@ -340,7 +365,7 @@ const Account = ({
                         <p className="mt-1 text-sm text-muted-foreground">Manage your account settings</p>
                     )}
                 </div>
-                {isCloudConnected ? (
+                {isAccountSignedIn ? (
                     <Button
                         ref={accountActionRef}
                         variant="ghost"
@@ -352,15 +377,15 @@ const Account = ({
                         {isSigningOut ? 'Signing out...' : 'Sign out'}
                     </Button>
                 ) : (
-                    <Button ref={accountActionRef} variant="ghost" className="shrink-0" leadingIcon={SignInIcon} onClick={() => { setSignInError(null); setShowSignInModal(true); }}>
-                        {activeStorageProvider ? 'Reconnect' : 'Sign in'}
+                    <Button ref={accountActionRef} variant="ghost" className="shrink-0" disabled={isAccountChecking} leadingIcon={SignInIcon} onClick={() => { setSignInError(null); setShowSignInModal(true); }}>
+                        {isAccountChecking ? 'Checking account…' : 'Sign in'}
                     </Button>
                 )}
             </div>
 
             <Modal isOpen={showSignInModal} onClose={() => setShowSignInModal(false)}
                 onCloseAutoFocus={event => { event.preventDefault(); accountActionRef.current?.focus(); }}
-                title={activeStorageProvider ? 'Reconnect account' : 'Sign in'}
+                title="Sign in"
                 description="Choose your cloud storage provider to connect your account and sync your data.">
                 <div className="space-y-3">
                     {isOffline && <Notice title="You're offline" description="Connect to the internet to sign in. Your local work remains available." />}
@@ -526,7 +551,7 @@ const Account = ({
                         </Button>
                         <Button
                             onClick={handleAccountSignOut}
-                            disabled={isSigningOut}
+                            disabled={isSigningOut || !canSyncBeforeSignOut}
                             leadingIcon={SignOutIcon}
                         >
                             {isSigningOut ? 'Signing out...' : 'Sync & Sign out'}
@@ -539,6 +564,12 @@ const Account = ({
                         We will sync your latest changes to {activeProviderName} before signing you out.
                         After the sync completes, all local data on this device will be removed.
                     </p>
+                    {!canSyncBeforeSignOut && <>
+                        <Notice description="Cloud Sync must be ready before you can sign out safely. Your local data will stay on this device until syncing succeeds." />
+                        <Button variant="ghost" onClick={() => { setShowSignOutModal(false); handleSectionChange('sync'); }}>
+                            View connection details
+                        </Button>
+                    </>}
                 </div>
             </Modal>
         </div>

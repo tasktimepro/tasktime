@@ -545,6 +545,23 @@ describe('DropboxFileStore direct cloud contract', () => {
         expect(fetch).toHaveBeenCalledTimes(4);
     });
 
+    it('retries manifest download 500s with backoff without clearing authentication', async () => {
+        vi.useFakeTimers();
+        const fetchMock = vi.fn().mockImplementation(async () => new Response('Internal Server Error', { status: 500 }));
+        vi.stubGlobal('fetch', fetchMock);
+        const store = new DropboxFileStore({ tokenProvider });
+        const pending = store.download({ logicalName: 'tasktime-yjs-manifest.json', opaqueId: 'id:manifest-fixture', modifiedTime: '2026-09-13T00:00:00Z' });
+        const rejection = expect(pending).rejects.toMatchObject({ code: 'transient-unavailable', provider: 'dropbox' });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(999);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        await vi.runAllTimersAsync();
+        await rejection;
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+        expect(tokenProvider.clearToken).not.toHaveBeenCalled();
+    });
+
     it('normalizes provider failures without exposing upstream bodies or account paths', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
             error_summary: 'path/conflict/file/private-name-fixture',

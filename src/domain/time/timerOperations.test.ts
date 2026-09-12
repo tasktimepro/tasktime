@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import {
     TimerOperationError,
+    buildUpdatedTimer,
     buildPausedTimer,
     buildResumedTimer,
     buildStartedTimer,
@@ -15,6 +16,15 @@ const tasks = [
 ];
 
 describe('timer operations', () => {
+    it('adjusts paused elapsed time when the start moves while keeping the pause endpoint', () => {
+        const timer = { projectId: 'project-1', taskId: 'task-1', startTime: 10000, paused: true, pausedElapsedTime: 5000 };
+        const updated = buildUpdatedTimer(timer, { startTime: 1000 }, 50000);
+        expect(updated).toMatchObject({ startTime: 1000, paused: true, pausedElapsedTime: 14000 });
+        expect(updated.startTime + updated.pausedElapsedTime!).toBe(15000);
+        expect(buildUpdatedTimer(timer, { note: 'Note' }, 50000).pausedElapsedTime).toBe(5000);
+        expect(() => buildUpdatedTimer(timer, { startTime: 16000 }, 50000)).toThrow('Start time cannot be after the timer was paused');
+    });
+
     it('preserves exact elapsed time across pause and resume', () => {
         const started = buildStartedTimer({
             task: { id: 'task-1', title: 'Task', projectId: 'project-1' },

@@ -172,8 +172,6 @@ const DayColumn = ({
                                 currency={item.currency}
                                 supplierName={item.supplierName}
                                 projectStatusMode={item.type === 'project' ? item.entity.statusMode : undefined}
-                                projectDeadline={item.type === 'project' ? item.entity.deadline : undefined}
-                                projectDeadlineResolvedAt={item.type === 'project' ? item.entity.deadlineResolvedAt : undefined}
                                 isProjectDeadlineItem={item.type === 'project' ? item.isDeadlineItem : false}
                                 isPreview={item.isPreview}
                                 hasAttachment={!!item.attachment}

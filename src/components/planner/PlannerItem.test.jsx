@@ -276,7 +276,7 @@ describe('PlannerItem', () => {
         expect(screen.queryByText(/€1,200.00 EUR|€1200.00 EUR|€1,200 EUR|€1200 EUR/)).not.toBeInTheDocument();
     });
 
-    it('shows quote stage and deadline metadata for project items', () => {
+    it.each(['default', 'mobile'])('keeps quote stage without deadline metadata in %s project cards', (layout) => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-03-24T12:00:00Z'));
 
@@ -284,6 +284,7 @@ describe('PlannerItem', () => {
             <PlannerItem
                 type="project"
                 title="Quoted project"
+                layout={layout}
                 projectStatusMode="quote"
                 projectDeadline="2026-03-28"
                 onClick={() => {}}
@@ -291,12 +292,12 @@ describe('PlannerItem', () => {
         );
 
         expect(screen.getByText('Quote stage')).toBeInTheDocument();
-        expect(screen.getByText('Due Mar 28')).toBeInTheDocument();
+        expect(screen.queryByText('Due Mar 28')).not.toBeInTheDocument();
 
         vi.useRealTimers();
     });
 
-    it('shows completed metadata for resolved project deadlines', () => {
+    it.each(['default', 'mobile'])('omits resolved deadline metadata in %s project cards', (layout) => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-03-30T12:00:00Z'));
 
@@ -304,13 +305,14 @@ describe('PlannerItem', () => {
             <PlannerItem
                 type="project"
                 title="Resolved project"
+                layout={layout}
                 projectDeadline="2026-03-28"
                 projectDeadlineResolvedAt={Date.UTC(2026, 2, 29)}
                 onClick={() => {}}
             />
         );
 
-        expect(screen.getByText('Completed')).toBeInTheDocument();
+        expect(screen.queryByText('Completed')).not.toBeInTheDocument();
         expect(screen.queryByText('2d overdue')).not.toBeInTheDocument();
 
         vi.useRealTimers();

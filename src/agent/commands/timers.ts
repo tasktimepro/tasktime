@@ -453,7 +453,10 @@ export function updateTimerCommand(context: AgentCommandContext, input: UpdateTi
         throw new AgentCommandError('INVALID_INPUT', error instanceof Error ? error.message : 'Invalid timer update.', { timerKey });
     }
     const updates: Record<string, unknown> = { lastActive: merged.lastActive };
-    if (input.startTime !== undefined) updates.startTime = merged.startTime;
+    if (input.startTime !== undefined) {
+        updates.startTime = merged.startTime;
+        if (timer.paused) updates.pausedElapsedTime = merged.pausedElapsedTime;
+    }
     if (input.note !== undefined) updates.note = merged.note;
 
     context.store.coreDoc.transact(() => {

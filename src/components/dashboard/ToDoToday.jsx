@@ -251,7 +251,7 @@ const ToDoToday = ({
         );
         const canOpenDetails = Boolean(onTaskTitleClick) && !shouldDisable;
 
-        const dateBadge = (
+        const dateBadge = isCompleted ? null : (
             <StartDateBadge
                 startDate={task.startDate}
                 recurring={task.recurring}

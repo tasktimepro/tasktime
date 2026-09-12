@@ -185,7 +185,9 @@ recurrence category change can explicitly update only linked instances that
 still carry its prior category; other recurrence changes remain future-only.
 The expense form opens category management through the shared modal stack and
 restores its unsaved draft on return. Account offers provider sign-in directly
-in its header through the existing authentication flow.
+in its header through the existing authentication flow. Its Sign in/Sign out
+action follows the lifecycle-bound retained session independently of sync
+transport; sign-out still requires a verified final sync before local deletion.
 Retained Dropbox sessions recover through status retry; auth results reach the
 sync runtime through the existing auth-change channel without replacing the session.
 See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
