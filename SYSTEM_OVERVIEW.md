@@ -16,7 +16,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
 - **Public site and build outputs:** The independent private, locally nested and ignored
-  `tasktime-site/` repository owns Astro homepage/product/pricing/blog/legal/agent
+  `tasktime-site/` repository owns Astro homepage/pricing/blog/legal/agent
   pages and public discovery. Core builds only `dist-app`; site builds its own
   `dist`. A reviewed JSON snapshot carries core public tool/discovery metadata
   into site without parent-source imports or coupled release cycles. See

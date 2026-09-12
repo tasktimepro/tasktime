@@ -56,7 +56,7 @@ const AccountFooter = ({ className }) => {
                     target="_blank"
                     rel="noreferrer noopener"
                 >
-                    Privacy Policy
+                    Privacy
                 </a>
                 <a
                     href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/terms/`}
@@ -64,7 +64,7 @@ const AccountFooter = ({ className }) => {
                     target="_blank"
                     rel="noreferrer noopener"
                 >
-                    Terms & Conditions
+                    Terms
                 </a>
             </div>
         </footer>

@@ -25,7 +25,18 @@ test.describe('Onboarding smoke', () => {
         const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime Pro setup' });
         await expect(onboardingDialog).toBeVisible();
         await expect(onboardingDialog.getByText('Welcome to TaskTime Pro.')).toBeVisible();
+        await expect(onboardingDialog.getByRole('link', { name: /Learn more about TaskTime Pro/i })).toHaveCount(0);
+        await expect(onboardingDialog.getByRole('link', { name: 'Privacy', exact: true })).toHaveAttribute('href', 'https://tasktime.pro/privacy/');
+        await expect(onboardingDialog.getByRole('link', { name: 'Terms', exact: true })).toHaveAttribute('href', 'https://tasktime.pro/terms/');
         await expect(onboardingDialog.getByText('1 of 3')).toBeVisible();
+
+        const topSpacing = await onboardingDialog.evaluate((dialog) => {
+            const icon = dialog.querySelector('[data-onboarding-step-icon]');
+
+            return Math.round(icon.getBoundingClientRect().top - dialog.getBoundingClientRect().top);
+        });
+
+        expect(topSpacing).toBeGreaterThanOrEqual(16);
 
         await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
         await expect(onboardingDialog.getByRole('heading', { name: 'Sync with your cloud provider' })).toBeVisible();

@@ -10,8 +10,6 @@ describe('matchesPublicStaticRoute', () => {
         '/blog',
         '/blog/',
         '/blog/privacy-first-invoicing-tool',
-        '/product',
-        '/product/',
         '/pricing',
         '/pricing/',
         '/agents',
@@ -30,6 +28,8 @@ describe('matchesPublicStaticRoute', () => {
 
     it.each([
         '/',
+        '/product',
+        '/product/',
         '/projects',
         '/projects/123',
         '/blogroll',

@@ -5,7 +5,7 @@
 | Repository | Owns | Release output |
 |---|---|---|
 | `tasktime` | React app, Yjs data/sync contracts, agent runtime/packages, public tool definitions | `dist-app/` |
-| `tasktime-site` | Astro homepage, product/pricing/blog/legal/agent docs, site styles/brand assets, SEO, domain verification | `dist/` within its own checkout |
+| `tasktime-site` | Astro homepage, pricing/blog/legal/agent docs, site styles/brand assets, SEO, domain verification | `dist/` within its own checkout |
 | Private infrastructure | Worker/services, deployment credentials, target selection, promotion and rollback evidence | Explicitly selected app or site artifact |
 
 Core source `tasktimepro/tasktime` is public for community use. Site source
@@ -68,7 +68,7 @@ Public routes on the app origin redirect to the exact configured site origin
 with their paths and query strings preserved. The service worker never caches
 those navigations as the offline app shell. OAuth and app routes remain app-owned.
 
-Site owns `/` and retains `/product/`, `/pricing/`, blog URLs, legal/contact,
+Site owns `/` as its sole homepage route, plus `/pricing/`, blog URLs, legal/contact,
 agent docs/discovery aliases, RSS, sitemap, and indexable robots. App actions use
 the exact app origin; site has no SPA fallback, service worker, or persisted
 workspace. A top-level non-indexable `404.html` prevents the host's implicit SPA

@@ -44,7 +44,7 @@ Managed OpenClaw Gateway
 Independent builds (no parent-source dependencies)
 ├── tasktime → dist-app: React, manifest, service worker, app redirects/fallback
 ├── tasktime → public JSON contract → reviewed snapshot in tasktime-site/vendor
-└── tasktime-site → dist: homepage/product/pricing/blog/legal/agents, discovery, static 404 (no PWA)
+└── tasktime-site → dist: homepage/pricing/blog/legal/agents, discovery, static 404 (no PWA)
 
 Approval-gated Phase 4 production target
 ├── existing root Pages project → tasktime-site/dist → tasktime.pro

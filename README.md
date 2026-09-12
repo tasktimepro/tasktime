@@ -183,7 +183,7 @@ TaskTime Pro exposes a same-device local MCP bridge through the packaged `taskti
 Useful entry points:
 
 - `/agents/` - overview and integration model
-- `/product/` - static product overview and direct app entry point
+- `https://tasktime.pro/` - static public homepage and direct app entry point
 - `/pricing/` - Free and Pro comparison, including the founding and standard annual offers
 - `/agents/quickstart/` - bridge launch, pairing, and first MCP call
 - `/agents/security/` - scopes, approvals, revocation, and local-only rules
@@ -244,3 +244,6 @@ TaskTime Pro app and bridge code are licensed under `AGPL-3.0-only`.
 The OpenClaw/ClawHub skill bundle in `integrations/openclaw/tasktime/` is licensed under `MIT-0`.
 
 The Claude Code plugin skill bundle in `integrations/claude/tasktime/` is licensed under `MIT-0`.
+
+The project name and logo are covered by a separate [brand and trademark policy](./TRADEMARKS.md).
+It does not change these software licenses.

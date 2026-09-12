@@ -11,7 +11,7 @@ The stable route surface is defined in `spec/routes.md`. Navigation uses History
 Core `make build` emits only `dist-app`: React entry/assets, manifest, service
 worker, non-indexable robots, public-route redirects, and the exact SPA fallback.
 It excludes Astro pages/assets, sitemap, and public discovery. The independent
-`tasktime-site` repository emits its own `dist`: public homepage/product/pricing,
+`tasktime-site` repository emits its own `dist`: public homepage/pricing,
 blog/legal/agent docs, indexable robots/sitemap/RSS, and discovery aliases. It
 excludes the app manifest, service worker, and SPA fallback.
 

@@ -31,14 +31,14 @@ const LegalInlineLinks = ({ className, linkClassName, openInNewTab = true, prefi
             <span>{prefix}</span>
             <LegalLink
                 href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/privacy/`}
-                label="Privacy Policy"
+                label="Privacy"
                 linkClassName={linkClassName}
                 openInNewTab={openInNewTab}
             />
             <span> and </span>
             <LegalLink
                 href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/terms/`}
-                label="Terms & Conditions"
+                label="Terms"
                 linkClassName={linkClassName}
                 openInNewTab={openInNewTab}
             />

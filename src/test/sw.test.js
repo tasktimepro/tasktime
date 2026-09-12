@@ -157,7 +157,7 @@ describe('service worker caching', () => {
         expect(globalThis.caches.open).not.toHaveBeenCalled()
     })
 
-    it.each(['/product/', '/pricing/', '/agents/tools/', '/llms.txt', '/sitemap.xml', '/.well-known/tasktime-agent.json'])('keeps public navigation network-only without replacing the offline shell: %s', (route) => {
+    it.each(['/pricing/', '/agents/tools/', '/llms.txt', '/sitemap.xml', '/.well-known/tasktime-agent.json'])('keeps public navigation network-only without replacing the offline shell: %s', (route) => {
 
         const event = createEvent()
         event.request = {

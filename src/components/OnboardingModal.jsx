@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/ui/notice';
 import { isDropboxCloudUiEnabled } from '@/config/cloudProviders';
-import { TASKTIME_ORIGIN_CONFIG } from '@/config/syncWorker';
 import {
     ArrowUpTrayIcon,
     CheckIcon,
@@ -201,7 +200,7 @@ const OnboardingModal = ({
             return (
                 <div className="space-y-6">
                     <div className="flex flex-col items-center space-y-4 text-center">
-                        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                        <div data-onboarding-step-icon className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
                             <ClockIcon className="h-6 w-6 text-foreground" />
                         </div>
                         <div className="space-y-3">
@@ -211,15 +210,6 @@ const OnboardingModal = ({
                             <p className="mx-auto max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
                                 TaskTime Pro is a local-first task and time management app that helps you plan your work, track your time and expenses, and easily generate invoices.
                             </p>
-                            <a
-                                href={`${TASKTIME_ORIGIN_CONFIG.marketingOrigin}/product/`}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                aria-label="Learn more about TaskTime Pro (opens in a new tab)"
-                                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                            >
-                                Learn more about TaskTime Pro
-                            </a>
                         </div>
                     </div>
 
@@ -370,10 +360,8 @@ const OnboardingModal = ({
             footer={footer}
             contentRef={contentRef}
         >
-            <div>
-                <div className="min-h-[22rem]">
-                    {currentStepContent}
-                </div>
+            <div data-onboarding-step-content className="min-h-[22rem] pt-4 sm:pt-6">
+                {currentStepContent}
             </div>
         </Modal>
     );

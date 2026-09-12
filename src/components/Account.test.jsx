@@ -198,8 +198,8 @@ describe('Account', () => {
 
         const xLink = screen.getByRole('link', { name: 'TaskTime Pro on X' });
         const githubLink = screen.getByRole('link', { name: 'TaskTime Pro on GitHub' });
-        const privacyLink = screen.getByRole('link', { name: 'Privacy Policy' });
-        const termsLink = screen.getByRole('link', { name: 'Terms & Conditions' });
+        const privacyLink = screen.getByRole('link', { name: 'Privacy' });
+        const termsLink = screen.getByRole('link', { name: 'Terms' });
 
         expect(githubLink.getAttribute('href')).toBe('https://github.com/tasktimepro/tasktime');
         expect(githubLink.getAttribute('target')).toBe('_blank');

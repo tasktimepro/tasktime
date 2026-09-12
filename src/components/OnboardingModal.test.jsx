@@ -42,13 +42,11 @@ describe('OnboardingModal', () => {
         expect(screen.getByRole('button', { name: 'Skip Onboarding' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Skip Step' })).not.toBeInTheDocument()
-        const productLink = screen.getByRole('link', { name: 'Learn more about TaskTime Pro (opens in a new tab)' })
-
-        expect(productLink).toHaveAttribute('href', 'https://tasktime.pro/product/')
-        expect(productLink).toHaveAttribute('target', '_blank')
+        expect(screen.queryByRole('link', { name: /Learn more about TaskTime Pro/i })).not.toBeInTheDocument()
+        expect(document.querySelector('[data-onboarding-step-content]')).toHaveClass('pt-4', 'sm:pt-6')
         expect(screen.getByText(/By using this app, you also agree to our/i)).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', 'https://tasktime.pro/privacy/')
-        expect(screen.getByRole('link', { name: 'Terms & Conditions' })).toHaveAttribute('href', 'https://tasktime.pro/terms/')
+        expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', 'https://tasktime.pro/privacy/')
+        expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', 'https://tasktime.pro/terms/')
         expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Next' }))
     })
 

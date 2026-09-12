@@ -10,6 +10,25 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 **Program Phase 3 UI polishing in progress locally**
 
+- Brand and trademark guidance (2026-09-12, local/uncommitted): the public core
+  repository now has `TRADEMARKS.md`, linked from the README, to distinguish
+  official TaskTime Pro branding from permitted AGPL/MIT-0 use and truthful
+  references to forks. Include it in the reviewed `update/launch` release
+  candidate; legal/commercial approval and publication remain Phase 4 gates.
+
+- Public navigation and onboarding polish (2026-09-11, local/uncommitted):
+  every public-site layout now treats `/` as the sole Home route in visible
+  navigation and discovery copy; the duplicate homepage route is removed from
+  source, sitemap, app redirects and generated output. Public headers span the
+  viewport with responsive edge insets; page content keeps its existing readable
+  width. The app onboarding welcome step no longer links back to the public site
+  and restores deliberate top spacing above the icon without changing the shared
+  modal contract. Privacy and Terms links now use those concise labels in
+  onboarding, Account and public-page navigation. Focused unit/browser,
+  build-contract, PWA, lint and typecheck checks pass; the independent site
+  gate passes with zero audit findings, 7 native tests, 51 pages and 8 Chromium
+  checks. No commit, publication or deployment occurred.
+
 - Site ownership transfer (2026-09-11, user approved): the existing private
   site repository is now `tasktimepro/tasktime-site`, with its history, branches
   and pull requests preserved and local `origin` updated. Core remains public;

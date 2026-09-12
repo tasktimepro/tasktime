@@ -8,9 +8,8 @@
 
 [x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository
 
-[ ] In the homepage, should we mention the direct sending and reminder email features as well?
-
-[ ] Showcase one mobile screenshot for an "on-the go" section that mentions that the app looks and works as good as it does on your computer
+[x] Mention direct invoice, quote, and payment-reminder email sending in the homepage billing story while keeping the Free PDF/manual-delivery boundary explicit
+[x] Prepare an "On the go" homepage section and portrait mobile Dashboard capture slot; the real product capture remains part of the Phase 4 screenshot review
 
 [ ] Check dev console lightsail report and all the necessary meta and SEO/AEO stuff before launching
     [ ] Also test mobile views before publishing
@@ -38,7 +37,7 @@
         [x] Extract the public site into the independent ignored `tasktime-site/` repository; verify standalone app/site builds, pinned public contracts, cross-origin links, and PWA isolation (locally validated, uncommitted; see contracts/site-distribution.md and status/app-status.md)
         [x] Dashboard readability — separate Today/Upcoming, add four glanceable stats, preset period reports, and billable/non-billable stacked hours; verify actions, historical/currency totals, mobile ordering, accessibility, offline charts, and bundle impact locally (Phase 3 local checkpoint; evidence in status/app-status.md)
         [x] Expenses overview — neutral summary cards, spending/category charts, and recorded activity; preserve the original list/tabs and verify payment/history/currency behavior, phones, and offline use locally (uncommitted; evidence in status/app-status.md)
-        [x] Prepare the public product page as the standalone site's root homepage while preserving `/product/` (local build/browser checks pass; actual root deployment remains Phase 4)
+        [x] Prepare the standalone site's root homepage as its only homepage route (local build/browser checks pass; actual root deployment remains Phase 4)
         [x] Point site app CTAs to `https://app.tasktime.pro` and core public links to the site; retain the existing exact-origin app/agent launch configuration (local tests pass; live launch remains Phase 4)
         [x] Reconcile local migration/install/agent guidance, SEO/discovery, billing/pricing and Privacy/Terms copy; preserve Free-first wording and remove historical no-paid-tier and fixed hosted-quota claims (2026-09-11; docs/subscription-claim-inventory.md). Final seller/legal/support/live-catalog approval remains Phase 4
         [ ] Complete responsive, accessibility, and cross-origin UX review without publishing
@@ -55,7 +54,7 @@
         [x] Complete local site/PWA technical sweep: static 404, all-page metadata/assets/sitemap checks, Claude sitemap entry, truthful lastmod dates, square-logo social cards, explicit app-origin install/migration guidance, app manifest/icons/offline checks and crawlable app noindex (2026-09-11; evidence: tasktime-site/STATUS.md)
         [ ] Complete the site launch-content review against the live catalog and approved Privacy/Terms, historical blog claims, contact/support details, real screenshots, canonical URLs, sitemap/RSS, registry proof, and app links; review-only pricing is not a live offer source
         [x] Reconcile legacy no-paid-tier/no-feature-gates claims locally across articles, search/social metadata, agent discovery, pricing, Terms and both Privacy policies; retain Free core and identify optional Pro, Stripe and in-app hosted allowances without publishing test numbers (docs/subscription-claim-inventory.md). Final live-policy approval/publication remains separately gated above
-        [ ] On the approved hosting candidate, verify true 404 responses (including missing /sw.js and /manifest.json), app install/worker MIME and scope, app noindex visibility, public canonical/social/JSON-LD assets, preview/custom-domain noindex, root/www/pages.dev canonical policy, sitemap/RSS and Search Console inspection/submission; preserve existing /product/ URLs and explicitly review its duplicate-homepage canonical strategy. Recheck after the separately approved root switch; local Astro preview is not edge or search-indexing evidence
+        [ ] On the approved hosting candidate, verify true 404 responses (including missing /sw.js and /manifest.json), app install/worker MIME and scope, app noindex visibility, public canonical/social/JSON-LD assets, preview/custom-domain noindex, root/www/pages.dev canonical policy, sitemap/RSS and Search Console inspection/submission. Recheck after the separately approved root switch; local Astro preview is not edge or search-indexing evidence
         [ ] Fix/review the existing desktop homepage hero overflow before launch: the no-wrap heading produces a 1478px document at a 1440px viewport in both pre/post-Astro-upgrade captures; retain mobile and desktop visual coverage
         [ ] Configure protected app/site deployment environments with distinct project targets, environment-scoped credentials, reviewed contract checksum, launch-readiness and split-deployment switches; authorize least-privilege read-only private-site checkout from infrastructure CI before artifact-only rehearsals, and prove app-only/site-only changes cannot deploy the other component
         [ ] Pre-entry external gate, requiring explicit owner authorization before any App Console action: obtain Dropbox App Console production access and complete the non-destructive post-approval sign-in/token/direct-file canary before purchaser-facing billing launch work

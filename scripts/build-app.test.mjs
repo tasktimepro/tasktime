@@ -18,7 +18,7 @@ test('redirects former public routes without capturing app or OAuth routes', () 
     assert.equal(publicPageRedirect('/pricing/?from=app', 'https://tasktime.pro'), 'https://tasktime.pro/pricing/?from=app');
     assert.equal(publicPageRedirect('/blog/old-post/', 'https://tasktime.pro'), 'https://tasktime.pro/blog/old-post/');
     assert.equal(publicPageRedirect('/.well-known/tasktime-agent.json', 'https://tasktime.pro'), 'https://tasktime.pro/.well-known/tasktime-agent.json');
-    for (const route of ['/', '/projects/a', '/auth/callback?code=x', '/auth/dropbox/callback', '/blogger', '/account?section=billing']) {
+    for (const route of ['/', '/product/', '/projects/a', '/auth/callback?code=x', '/auth/dropbox/callback', '/blogger', '/account?section=billing']) {
         assert.equal(publicPageRedirect(route, 'https://tasktime.pro'), null);
     }
 });

@@ -2,6 +2,19 @@
 
 ## Current focus
 
+- [x] Simplify the onboarding welcome step (2026-09-11, local/uncommitted).
+  Removed the public-site “Learn more about TaskTime Pro” action and its unused
+  origin/button styling dependencies. The step content now owns a responsive
+  16px/24px top inset, so the hidden-header modal has deliberate breathing room
+  above its icon while the shared modal's header/scroll spacing contract stays
+  unchanged. Shared onboarding legal links and the Account footer now use the
+  concise Privacy and Terms labels without changing their destinations.
+  Red/green coverage checks both the absent link and measured icon spacing:
+  5 focused component tests and 2 Chromium onboarding smokes pass, alongside
+  core lint, typecheck, 6 build-contract tests and 5 production-PWA checks. No
+  onboarding persistence, workspace data, sync, billing or production state
+  changed.
+
 - [x] Remediate core dependency advisories (2026-09-11, local/uncommitted).
   Fresh full audit falls from 57 entries (3 critical, 17 high, 36 moderate,
   1 low) to **zero**, including development dependencies. Patched locked
