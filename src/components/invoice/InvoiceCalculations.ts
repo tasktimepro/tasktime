@@ -1,6 +1,6 @@
-import { millisecondsToHours } from '../../utils/dateUtils';
 import { getBillableDurationMs } from '../../utils/timeEntryDurationUtils';
 import { getInvoiceEligibleTimeEntries } from '../../domain/invoices/invoiceEligibility';
+import { getCanonicalInvoiceHours } from '../../domain/invoices/invoiceTimePrecision';
 import type { Invoice, Project, Task, TimeEntry } from '../../stores/yjs/types';
 
 type BuildInvoiceTaskParams = {
@@ -94,6 +94,8 @@ export const buildInvoiceTaskData = ({
     // Prepare tasks data array
     const tasksData = Object.entries(taskTimeMap).map(([taskId, totalTime]) => {
         const task = projectTaskMap.get(taskId);
+        const canonicalHours = getCanonicalInvoiceHours(totalTime);
+
         return {
             id: taskId,
             projectId: projectToUse.id,
@@ -102,10 +104,10 @@ export const buildInvoiceTaskData = ({
             projectFlatRate: projectToUse.flatRate === true,
             title: task ? task.title || 'Unknown Task' : 'Unknown Task',
             parentTaskId: task ? task.parentTaskId : null,
-            originalHours: Math.round((millisecondsToHours(totalTime)) * 100) / 100,
+            originalHours: canonicalHours,
             originalTimeMs: totalTime,
-            hours: editableHours[taskId] !== undefined ? editableHours[taskId] : (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0),
-            isEdited: editableHours[taskId] !== undefined && editableHours[taskId] !== (task ? Math.round((millisecondsToHours(totalTime)) * 100) / 100 : 0),
+            hours: editableHours[taskId] !== undefined ? editableHours[taskId] : (task ? canonicalHours : 0),
+            isEdited: editableHours[taskId] !== undefined && editableHours[taskId] !== (task ? canonicalHours : 0),
             billable: task ? task.billable === true : false // Explicitly capture the billable status
         };
     }).filter(task => {

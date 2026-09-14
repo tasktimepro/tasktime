@@ -269,6 +269,33 @@ describe('buildInvoiceTaskData', () => {
         expect(result[0].originalHours).toBe(0.25)
     })
 
+    it('ignores source seconds while retaining whole minutes in invoice hours', () => {
+
+        const tasks = [
+            { id: 'task-1', projectId: 'project-1', title: 'Billable', billable: true },
+            { id: 'task-2', projectId: 'project-1', title: 'Billable minutes', billable: true }
+        ]
+
+        const timeEntries = [
+            { taskId: 'task-1', start: 1, end: 1 + (60 * 60 * 1000) + (20 * 1000) },
+            { taskId: 'task-2', start: 1, end: 1 + (60 * 60 * 1000) + (60 * 1000) + (20 * 1000) }
+        ]
+
+        const result = buildInvoiceTaskData({
+            projectForData: project,
+            selectedProject: null,
+            tasks,
+            timeEntries,
+            editableHours: {}
+        })
+
+        expect(result).toEqual(expect.arrayContaining([
+            expect.objectContaining({ id: 'task-1', originalHours: 1, hours: 1 }),
+            expect.objectContaining({ id: 'task-2', originalHours: 1.02, hours: 1.02 })
+        ]))
+        expect(result.find((task) => task.id === 'task-1').originalTimeMs).toBe((60 * 60 * 1000) + (20 * 1000))
+    })
+
     it('filters billable time entries to the selected billing period', () => {
 
         const tasks = [

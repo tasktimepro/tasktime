@@ -205,7 +205,7 @@ Approval-gated Phase 4 production target
   domain interval validation after loading entry history and archived tasks.
   It rechecks the timer before writing so asynchronous loading cannot overwrite
   a concurrent lifecycle change or edit. Note-only updates retain their interval.
-- Invoice finalization, undo, and terminal cancellation use shared application plans under `src/domain/invoices/` plus the replay-safe `invoiceBillingOperations` journal in `YjsStore`; browser and agent adapters do not calculate source release independently.
+- Invoice finalization, undo, and terminal cancellation use shared application plans under `src/domain/invoices/` plus the replay-safe `invoiceBillingOperations` journal in `YjsStore`; shared invoice number/task-record helpers keep composer values and compatible duplicate task snapshots canonical before source mutation, and browser/agent adapters do not calculate source release independently.
 - The local bridge transports commands but does not become a second data owner.
 - The native OpenClaw plugin is a lifecycle/tool adapter around the existing bridge. It starts services only in the full Gateway runtime, does not duplicate TaskTime command/security logic, and leaves generic stdio hosts supported.
 - Agent browser credential storage is isolated under `src/agent/browser/`: current-tab bearer resume state uses `sessionStorage`; same-profile reopen uses a dedicated non-Yjs IndexedDB store containing a non-exportable signing key and non-secret routing metadata. Neither participates in provider sync, product backup/export, or entity hooks.

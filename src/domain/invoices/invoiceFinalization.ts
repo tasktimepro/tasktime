@@ -1,8 +1,17 @@
 import { hasExplicitBillingMarker } from './invoiceEligibility';
 import type { Client, Expense, Invoice, InvoiceBillingSelectionSnapshot, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import { isStoredDateWithinBillingRange } from '@/utils/billingPeriodUtils';
+import { formatDuration } from '@/utils/dateUtils';
 import { getClientHourlyRate } from '@/utils/projectPlanningUtils';
 import { getBillableDurationMs } from '@/utils/timeEntryDurationUtils';
+import {
+    getCanonicalInvoiceHours,
+    getInvoiceWholeMinutesFromDuration,
+    getInvoiceWholeMinutesFromHours,
+} from './invoiceTimePrecision';
+import { getFiniteInvoiceNumber } from './invoiceNumbers';
+import { collectInvoiceTaskRoots } from './invoiceTaskRecords';
+import { usesInvoiceTaskFlatRate } from './invoiceTaskPricing';
 
 export interface InvoiceFinalizationEntryMutation {
     entry: TimeEntry;
@@ -65,13 +74,13 @@ export function planInvoiceFinalization({
     };
     const agentDraft = normalizeAgentDraft(invoiceRecord.agentDraft);
     const billingSelection = getBillingSelectionSnapshot(invoice.billingSelectionSnapshot);
+    const taskById = new Map(tasks.map((task) => [task.id, task]));
     if (billingSelection) {
-        assertInvoiceMatchesBillingSelection(invoice, billingSelection);
+        assertInvoiceMatchesBillingSelection(invoice, billingSelection, taskById);
     }
     const projectById = new Map(projects.map((project) => [project.id, project]));
     const clientById = new Map(clients.map((client) => [client.id, client]));
-    const taskById = new Map(tasks.map((task) => [task.id, task]));
-    const invoiceTasks = collectInvoiceTasks(invoiceRecord);
+    const invoiceTasks = collectInvoiceTaskRoots(invoiceRecord);
     const invoiceTaskIds = collectInvoiceTaskIds(invoiceTasks);
     const selectedTaskIds = billingSelection
         ? new Set([
@@ -138,7 +147,11 @@ export function planInvoiceFinalization({
         if (!entry.end || entry.end <= entry.start) return;
 
         if (selectedEntry) {
-            assertSelectedEntryUnchanged(entry, selectedEntry);
+            assertSelectedEntryUnchanged(
+                entry,
+                selectedEntry,
+                getSelectedTaskTitle(selectedEntry.taskId, taskById, billingSelection!)
+            );
         } else if (entry.start > finalizedAt) {
             return;
         }
@@ -161,7 +174,8 @@ export function planInvoiceFinalization({
         const missingEntry = billingSelection!.entries.find((selection) => !foundEntryIds.has(selection.entryId));
 
         if (missingEntry) {
-            throw new Error(`Selected time entry "${missingEntry.entryId}" is missing, changed, or already billed. Refresh the draft before finalizing.`);
+            const taskTitle = getSelectedTaskTitle(missingEntry.taskId, taskById, billingSelection!);
+            throw new Error(`${describeTaskTime(taskTitle)} is missing, changed, or already billed. Refresh the invoice before finalizing.`);
         }
     }
 
@@ -199,14 +213,22 @@ export function planInvoiceFinalization({
         const missingExpense = billingSelection.expenses.find((selection) => !foundExpenseIds.has(selection.expenseId));
 
         if (missingExpense) {
-            throw new Error(`Selected expense "${missingExpense.expenseId}" is missing, changed, or already billed. Refresh the draft before finalizing.`);
+            throw new Error(`${describeNamedEntity('Selected expense', missingExpense.title, missingExpense.expenseId)} is missing, changed, or already billed. Refresh the invoice before finalizing.`);
         }
     }
 
     return {
         selectedTaskIds,
         entriesToBill,
-        ...planInvoiceAdjustments({ invoice, invoiceTasks, entries, finalizedAt, createAdjustmentId }),
+        ...planInvoiceAdjustments({
+            invoice,
+            invoiceTasks,
+            taskById,
+            billedRateByTaskId,
+            entries,
+            finalizedAt,
+            createAdjustmentId,
+        }),
         expensesToBill,
         taskLastBilledAt,
         nextTaskCutoffs,
@@ -231,32 +253,59 @@ function getBillingSelectionSnapshot(value: unknown): InvoiceBillingSelectionSna
     return value as unknown as InvoiceBillingSelectionSnapshot;
 }
 
-function assertInvoiceMatchesBillingSelection(invoice: Invoice, snapshot: InvoiceBillingSelectionSnapshot) {
+function assertInvoiceMatchesBillingSelection(
+    invoice: Invoice,
+    snapshot: InvoiceBillingSelectionSnapshot,
+    taskById: Map<string, Task>
+) {
     const itemRecords = Array.isArray(invoice.items) ? invoice.items : [];
 
     snapshot.tasks.forEach((selection) => {
         const item = itemRecords.find((candidate) => candidate.taskId === selection.taskId);
+        const itemQuantity = getFiniteInvoiceNumber(item?.quantity);
+        const itemRate = getFiniteInvoiceNumber(item?.rate);
+        const itemAmount = getFiniteInvoiceNumber(item?.amount);
+        const selectedQuantity = getFiniteInvoiceNumber(selection.quantity);
+        const selectedRate = getFiniteInvoiceNumber(selection.rate);
+        const selectedAmount = getFiniteInvoiceNumber(selection.amount);
         if (
             !item
-            || Math.abs(item.quantity - selection.quantity) >= 0.000001
-            || Math.abs(item.rate - selection.rate) >= 0.005
-            || Math.abs(item.amount - selection.amount) >= 0.005
+            || itemQuantity === null
+            || itemRate === null
+            || itemAmount === null
+            || selectedQuantity === null
+            || selectedRate === null
+            || selectedAmount === null
+            || Math.abs(itemQuantity - selectedQuantity) >= 0.000001
+            || Math.abs(itemRate - selectedRate) >= 0.005
+            || Math.abs(itemAmount - selectedAmount) >= 0.005
         ) {
-            throw new Error(`Invoice line for selected task "${selection.taskId}" changed after preview. Refresh the draft before finalizing.`);
+            const taskTitle = getDisplayTitle(selection.title, selection.taskId)
+                || getDisplayTitle(taskById.get(selection.taskId)?.title, selection.taskId);
+
+            throw new Error(`${describeNamedEntity('Invoice line for task', taskTitle)} changed after preview. Refresh the invoice before finalizing.`);
         }
     });
 
     snapshot.expenses.forEach((selection) => {
         const item = itemRecords.find((candidate) => candidate.expenseId === selection.expenseId);
-        if (!item || Math.abs(item.amount - selection.invoiceAmount) >= 0.005) {
-            throw new Error(`Invoice line for selected expense "${selection.expenseId}" changed after preview. Refresh the draft before finalizing.`);
+        const itemAmount = getFiniteInvoiceNumber(item?.amount);
+        const selectedAmount = getFiniteInvoiceNumber(selection.invoiceAmount);
+        if (
+            !item
+            || itemAmount === null
+            || selectedAmount === null
+            || Math.abs(itemAmount - selectedAmount) >= 0.005
+        ) {
+            throw new Error(`${describeNamedEntity('Invoice line for expense', selection.title, selection.expenseId)} changed after preview. Refresh the invoice before finalizing.`);
         }
     });
 }
 
 function assertSelectedEntryUnchanged(
     entry: TimeEntry,
-    selection: InvoiceBillingSelectionSnapshot['entries'][number]
+    selection: InvoiceBillingSelectionSnapshot['entries'][number],
+    taskTitle = ''
 ) {
     if (
         entry.taskId !== selection.taskId
@@ -264,7 +313,7 @@ function assertSelectedEntryUnchanged(
         || entry.end !== selection.end
         || getBillableDurationMs(entry) !== selection.billableDurationMs
     ) {
-        throw new Error(`Selected time entry "${selection.entryId}" changed after preview. Refresh the draft before finalizing.`);
+        throw new Error(`${describeTaskTime(taskTitle)} changed after preview. Refresh the invoice before finalizing.`);
     }
 }
 
@@ -275,7 +324,10 @@ function assertSelectedExpenseUnchanged(
     const sourceCurrency = typeof expense.currency === 'string' ? expense.currency.trim().toUpperCase() : '';
 
     if (Math.abs(expense.amount - selection.sourceAmount) >= 0.005 || sourceCurrency !== selection.sourceCurrency) {
-        throw new Error(`Selected expense "${selection.expenseId}" changed after preview. Refresh the draft before finalizing.`);
+        const expenseTitle = getDisplayTitle(selection.title, selection.expenseId)
+            || getDisplayTitle(expense.title, expense.id);
+
+        throw new Error(`${describeNamedEntity('Selected expense', expenseTitle)} changed after preview. Refresh the invoice before finalizing.`);
     }
 }
 
@@ -290,65 +342,70 @@ function collectSnapshotQuotedTaskClaims(
 
         const task = taskById.get(selection.taskId);
         if (!task || task.quotedAmountBilling?.invoiceId) {
-            throw new Error(`Selected quoted task "${selection.taskId}" is missing or already billed. Refresh the draft before finalizing.`);
+            throw new Error(`${describeNamedEntity('Selected quoted task', selection.title, selection.taskId)} is missing or already billed. Refresh the invoice before finalizing.`);
         }
 
         if (typeof task.estimatedFlatAmount !== 'number' || Math.abs(task.estimatedFlatAmount - selection.quotedAmount) >= 0.005) {
-            throw new Error(`Selected quoted amount for task "${selection.taskId}" changed after preview. Refresh the draft before finalizing.`);
+            const taskTitle = getDisplayTitle(selection.title, selection.taskId)
+                || getDisplayTitle(task.title, task.id);
+
+            throw new Error(`${describeNamedEntity('Selected quoted amount for task', taskTitle)} changed after preview. Refresh the invoice before finalizing.`);
         }
 
         return [{ taskId: selection.taskId, total: selection.quotedAmount }];
     });
 }
 
-function collectInvoiceTasks(invoice: { tasks?: unknown; projectBreakdowns?: unknown }) {
-    const tasks: Array<Record<string, unknown>> = [];
-
-    if (Array.isArray(invoice.tasks)) {
-        tasks.push(...invoice.tasks.filter(isRecord));
-    }
-
-    if (Array.isArray(invoice.projectBreakdowns)) {
-        invoice.projectBreakdowns.filter(isRecord).forEach((breakdown) => {
-            if (Array.isArray(breakdown.tasks)) {
-                tasks.push(...breakdown.tasks.filter(isRecord));
-            }
-        });
-    }
-
-    const seen = new Set<string>();
-
-    return tasks.filter((task) => {
-        const id = getString(task.id);
-
-        if (!id || seen.has(id)) {
-            return false;
-        }
-
-        seen.add(id);
-        return true;
-    });
-}
-
 function collectInvoiceTaskIds(invoiceTasks: Array<Record<string, unknown>>) {
     const ids = new Set<string>();
 
-    invoiceTasks.forEach((task) => {
-        const taskId = getString(task.id);
+    const collect = (records: unknown) => {
+        if (!Array.isArray(records)) return;
 
-        if (taskId) {
-            ids.add(taskId);
-        }
+        records.filter(isRecord).forEach((task) => {
+            const taskId = getString(task.id);
+            if (taskId) ids.add(taskId);
+            collect(task.mergedSubtasks);
+        });
+    };
 
-        if (Array.isArray(task.mergedSubtasks)) {
-            task.mergedSubtasks.filter(isRecord).forEach((subtask) => {
-                const subtaskId = getString(subtask.id);
-                if (subtaskId) ids.add(subtaskId);
-            });
-        }
-    });
+    collect(invoiceTasks);
 
     return ids;
+}
+
+function collectInvoiceAdjustmentTasks(invoiceTasks: Array<Record<string, unknown>>) {
+    const tasks: Array<Record<string, unknown>> = [];
+    const visited = new Set<Record<string, unknown>>();
+    const seenIds = new Set<string>();
+
+    const collect = (records: unknown, inheritedUseFlatRate: boolean | null = null) => {
+        if (!Array.isArray(records)) {
+            return;
+        }
+
+        records.filter(isRecord).forEach((task) => {
+            if (visited.has(task)) {
+                return;
+            }
+
+            visited.add(task);
+            const effectiveUseFlatRate = inheritedUseFlatRate ?? usesInvoiceTaskFlatRate(task);
+            const taskId = getString(task.id);
+
+            if (taskId && !seenIds.has(taskId)) {
+                seenIds.add(taskId);
+                tasks.push(task.useFlatRate === effectiveUseFlatRate
+                    ? task
+                    : { ...task, useFlatRate: effectiveUseFlatRate });
+            }
+
+            collect(task.mergedSubtasks, effectiveUseFlatRate);
+        });
+    };
+
+    collect(invoiceTasks);
+    return tasks;
 }
 
 function collectFallbackAgentDraftTaskIds({
@@ -389,22 +446,29 @@ function buildBilledRateByTaskId({
 }) {
     const rates = new Map<string, number | null>();
 
-    invoiceTasks.forEach((task) => {
-        const taskId = getString(task.id);
-        const rate = getInvoiceTaskHourlyRate(task);
+    const collectRates = (
+        records: unknown,
+        inheritedUseFlatRate: boolean | null = null,
+        inheritedHourlyRate: number | null = null
+    ) => {
+        if (!Array.isArray(records)) return;
 
-        if (taskId) {
-            rates.set(taskId, rate);
-        }
+        records.filter(isRecord).forEach((task) => {
+            const taskId = getString(task.id);
+            const effectiveUseFlatRate = inheritedUseFlatRate ?? usesInvoiceTaskFlatRate(task);
+            const rate = effectiveUseFlatRate
+                ? null
+                : (getInvoiceTaskHourlyRate(task) ?? inheritedHourlyRate);
 
-        if (Array.isArray(task.mergedSubtasks)) {
-            task.mergedSubtasks.filter(isRecord).forEach((subtask) => {
-                const subtaskId = getString(subtask.id);
-                const subtaskRate = getInvoiceTaskHourlyRate(subtask) ?? rate;
-                if (subtaskId) rates.set(subtaskId, subtaskRate);
-            });
-        }
-    });
+            if (taskId) {
+                rates.set(taskId, rate);
+            }
+
+            collectRates(task.mergedSubtasks, effectiveUseFlatRate, rate);
+        });
+    };
+
+    collectRates(invoiceTasks);
 
     selectedTaskIds.forEach((taskId) => {
         if (rates.has(taskId)) {
@@ -424,12 +488,16 @@ function buildBilledRateByTaskId({
 function planInvoiceAdjustments({
     invoice,
     invoiceTasks,
+    taskById,
+    billedRateByTaskId,
     entries,
     finalizedAt,
     createAdjustmentId,
 }: {
     invoice: Invoice;
     invoiceTasks: Array<Record<string, unknown>>;
+    taskById: Map<string, Task>;
+    billedRateByTaskId: Map<string, number | null>;
     entries: TimeEntry[];
     finalizedAt: number;
     createAdjustmentId: () => string;
@@ -442,26 +510,91 @@ function planInvoiceAdjustments({
     const adjustmentEntriesToCreate: InvoiceAdjustmentCreate[] = [];
     const adjustmentEntriesToUpdate: InvoiceAdjustmentUpdate[] = [];
     const adjustmentEntryIdsToDelete: string[] = [];
+    const plannedTaskAdjustments: Array<{
+        task: Record<string, unknown>;
+        taskId: string;
+        originalMs: number;
+        desiredMs: number;
+        deltaMs: number;
+        existingEntry?: TimeEntry;
+    }> = [];
 
-    invoiceTasks.forEach((task) => {
+    collectInvoiceAdjustmentTasks(invoiceTasks).forEach((task) => {
         const taskId = getString(task.id);
 
         if (!taskId) return;
         taskIdsToAdjust.add(taskId);
         if (task.useFlatRate === true) return;
 
-        const originalMs = getFiniteNumber(task.originalTimeMs)
-            ?? ((getFiniteNumber(task.originalHours) ?? 0) * 3_600_000);
-        const desiredMs = (getFiniteNumber(task.hours) ?? 0) * 3_600_000;
-        const deltaMs = desiredMs - originalMs;
-        const existingEntry = existingByTaskId.get(taskId);
+        const sourceDurationMs = getFiniteInvoiceNumber(task.originalTimeMs)
+            ?? ((getFiniteInvoiceNumber(task.originalHours) ?? 0) * 3_600_000);
+        const canonicalDisplayHours = getCanonicalInvoiceHours(sourceDurationMs);
+        const parsedDesiredHours = getFiniteInvoiceNumber(task.hours);
 
-        if (deltaMs < -1) {
+        if (parsedDesiredHours === null && task.hours !== undefined && task.hours !== null) {
+            const taskTitle = getDisplayTitle(task.title, taskId)
+                || getDisplayTitle(taskById.get(taskId)?.title, taskId);
+
             throw new Error(
-                `Invoice hours for task "${taskId}" are lower than the selected recorded time. `
-                + 'Split or edit the source time entries before finalizing so unbilled time is not consumed.'
+                `${describeNamedEntity('Invoice hours for', taskTitle)} are invalid. `
+                + 'Enter a valid number of hours, then try again.'
             );
         }
+
+        const desiredHours = parsedDesiredHours ?? canonicalDisplayHours;
+        const originalInvoiceMs = getInvoiceWholeMinutesFromDuration(sourceDurationMs) * 60_000;
+        const desiredInvoiceMs = getInvoiceWholeMinutesFromHours(desiredHours) * 60_000;
+        // The composer ignores source seconds and displays the remaining whole
+        // minutes as two-decimal hours. Treat that canonical value as the exact
+        // selected source duration so untouched time neither blocks nor creates
+        // a fake adjustment.
+        const deltaMs = Math.abs(desiredHours - canonicalDisplayHours) < 0.000000001
+            ? 0
+            : desiredInvoiceMs - originalInvoiceMs;
+        const existingEntry = existingByTaskId.get(taskId);
+
+        plannedTaskAdjustments.push({
+            task,
+            taskId,
+            originalMs: originalInvoiceMs,
+            desiredMs: desiredInvoiceMs,
+            deltaMs,
+            existingEntry,
+        });
+    });
+
+    const reducedTasks = plannedTaskAdjustments.filter(({ deltaMs }) => deltaMs < -1);
+
+    if (reducedTasks.length === 1) {
+        const [{ task, originalMs, desiredMs }] = reducedTasks;
+        const taskId = getString(task.id);
+        const taskTitle = getDisplayTitle(task.title, taskId)
+            || getDisplayTitle(taskById.get(taskId)?.title, taskId);
+
+        throw new Error(
+            `${describeNamedEntity('Invoice hours for', taskTitle)} are ${formatDuration(Math.max(0, Math.round(desiredMs)))}, `
+            + `below the selected recorded time of ${formatDuration(Math.max(0, Math.round(originalMs)))}. `
+            + 'To invoice only part of this time, split or edit the source time entries, then try again.'
+        );
+    }
+
+    if (reducedTasks.length > 1) {
+        const taskSummaries = reducedTasks.map(({ task, originalMs, desiredMs }) => {
+            const taskId = getString(task.id);
+            const taskTitle = getDisplayTitle(task.title, taskId)
+                || getDisplayTitle(taskById.get(taskId)?.title, taskId)
+                || 'Task';
+
+            return `"${taskTitle}" (${formatDuration(Math.max(0, Math.round(desiredMs)))} instead of ${formatDuration(Math.max(0, Math.round(originalMs)))})`;
+        });
+
+        throw new Error(
+            `Invoice hours are below the selected recorded time for ${reducedTasks.length} tasks: ${taskSummaries.join('; ')}. `
+            + 'To invoice only part of this time, split or edit the source time entries, then try again.'
+        );
+    }
+
+    plannedTaskAdjustments.forEach(({ task, taskId, deltaMs, existingEntry }) => {
 
         if (deltaMs <= 0) {
             if (existingEntry) {
@@ -472,7 +605,7 @@ function planInvoiceAdjustments({
 
         const start = existingEntry?.start || (finalizedAt - deltaMs);
         const end = start + deltaMs;
-        const billedHourlyRate = getInvoiceTaskHourlyRate(task);
+        const billedHourlyRate = billedRateByTaskId.get(taskId) ?? getInvoiceTaskHourlyRate(task);
         const updates = {
             taskId,
             start,
@@ -544,7 +677,7 @@ function collectQuotedTaskClaims(invoiceTasks: Array<Record<string, unknown>>, t
         const task = taskId ? taskById.get(taskId) : null;
 
         if (!taskId || !task) return;
-        if (invoiceTask.useFlatRate !== undefined ? invoiceTask.useFlatRate !== true : invoiceTask.projectFlatRate !== true) return;
+        if (!usesInvoiceTaskFlatRate(invoiceTask)) return;
         if (task.quotedAmountBilling?.invoiceId) return;
 
         const quotedAmount = getPositiveFiniteNumber(task.estimatedFlatAmount);
@@ -606,15 +739,36 @@ function normalizeAgentDraft(value: unknown): Record<string, unknown> | undefine
 }
 
 function getInvoiceTaskHourlyRate(task: Record<string, unknown>): number | null {
-    return getFiniteNumber(task.hourlyRate) ?? getFiniteNumber(task.projectHourlyRate) ?? null;
+    return getFiniteInvoiceNumber(task.hourlyRate) ?? getFiniteInvoiceNumber(task.projectHourlyRate) ?? null;
 }
 
 function getString(value: unknown): string {
     return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 
-function getFiniteNumber(value: unknown): number | null {
-    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+function getSelectedTaskTitle(
+    taskId: string,
+    taskById: Map<string, Task>,
+    snapshot: InvoiceBillingSelectionSnapshot
+): string {
+    return getDisplayTitle(snapshot.tasks.find((selection) => selection.taskId === taskId)?.title, taskId)
+        || getDisplayTitle(taskById.get(taskId)?.title, taskId);
+}
+
+function getDisplayTitle(title: unknown, entityId = ''): string {
+    const normalizedTitle = getString(title);
+
+    return normalizedTitle && normalizedTitle !== getString(entityId) ? normalizedTitle : '';
+}
+
+function describeNamedEntity(prefix: string, title: string, entityId = ''): string {
+    const displayTitle = getDisplayTitle(title, entityId);
+
+    return displayTitle ? `${prefix} "${displayTitle}"` : prefix;
+}
+
+function describeTaskTime(taskTitle: string): string {
+    return describeNamedEntity('Selected time for task', taskTitle);
 }
 
 function getPositiveFiniteNumber(value: unknown): number | null {

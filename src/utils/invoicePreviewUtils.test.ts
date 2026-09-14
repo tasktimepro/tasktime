@@ -56,6 +56,30 @@ describe('invoicePreviewUtils', () => {
         })]);
     });
 
+    it('uses whole source minutes for shared browser and agent invoice previews', () => {
+        const preview = getProjectInvoicePreview(
+            { id: 'project-1', title: 'Build', preferredClientId: 'client-1', hourlyRate: 100, flatRate: false },
+            {
+                clients: [{ id: 'client-1', title: 'Acme', defaultCurrency: 'CHF' }],
+                tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Task', billable: true }],
+                timeEntries: [{
+                    id: 'entry-1',
+                    taskId: 'task-1',
+                    start: 1000,
+                    end: 1000 + (60 * 60 * 1000) + (20 * 1000),
+                }],
+            }
+        );
+
+        expect(preview.unbilledHours).toBe(1);
+        expect(preview.taskAmount).toBe(100);
+        expect(preview.taskSelections[0]).toEqual(expect.objectContaining({
+            quantity: 1,
+            amount: 100,
+        }));
+        expect(preview.entrySelections[0].billableDurationMs).toBe((60 * 60 * 1000) + (20 * 1000));
+    });
+
     it('can include client-level expenses when explicitly requested', () => {
         const preview = getProjectInvoicePreview(
             { id: 'project-1', title: 'Build', preferredClientId: 'client-1', hourlyRate: 0, flatRate: false },

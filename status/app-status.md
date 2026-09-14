@@ -1,5 +1,19 @@
 # App Status
 
+## September 15 main integration
+
+The app `1.6.0` candidate preserves main releases `1.5.1` and `1.5.2`, including
+invoice time precision, serialized numeric values, explicit zero rates and
+compatible legacy task-copy reconciliation. It also retains editable saved
+drafts and canonical item pricing from the launch branch. The old quantity-save
+regression now uses Save Draft and still checks the stored quantity and total.
+The isolated merged checkout passes all 309 focused invoice checks and the full
+Docker release gate: zero audit findings, lint/typecheck, 286 files / 2,865 unit
+tests with one existing timezone skip, 90 Chromium checks, five PWA checks,
+build/artifact validation and contract export. Evidence is retained in
+`/private/tmp/tasktime-main-merge-release-gate.log`. Main promotion is authorized;
+production Worker/app deployment still depends on its separate preflight.
+
 ## September 15 launch preparation — branch checkpoint
 
 Core version `1.6.0` and the DebugBundle browser SDK `1.7.1` update pass the full
@@ -967,6 +981,10 @@ readiness record.
   The separately recorded real Stripe test-mode lifecycle rehearsal also passed,
   closing Program Phase 1 locally;
   this remains distinct from production deployment or release approval.
+- [x] Prepare core app `1.5.2`: normalize browser-serialized invoice hours, rates, flat rates, and quantities before pricing/persistence/finalization; preserve explicit zero rates; keep merged parent/child selection and inherited pricing consistent; and reconcile compatible legacy task/project-breakdown copies while rejecting conflicting or unsupported nested copies before source billing state changes. No agent artifact, backup schema, Worker, or public-site content release is required.
+- [x] Validate `1.5.2` with 2,282 Docker-backed tests across 243 files at 93.12% statement coverage, zero-diagnostic typecheck, lint, production app/public-site build, all 39 browser smoke tests, and both PWA smoke tests.
+- [x] Prepare core app `1.5.1`: harden invoice time finalization UX by ignoring source seconds in invoice-facing hours and notices while retaining exact billing snapshots, accepting untouched canonical rounding without false reductions or adjustments, aggregating real reductions by task name, and suppressing internal identifiers including legacy title fallbacks. No agent artifact, backup schema, or Worker release is required.
+- [x] Validate the invoice hardening with 2,241 Docker-backed tests across 240 files at 93.12% statement coverage, zero-diagnostic typecheck, lint, production app/public-site build, and all 39 browser smoke tests.
 - [x] Prepare core app `1.4.1`: correct invoice custom/preset billing ranges so the full local end date is eligible in browser and agent composition, preserve historical snapshot-less invoice matching, and normalize exported custom-report timestamps to inclusive day boundaries. No agent artifact, backup schema, or Worker release is required.
 - [x] Make direct Drive sync more responsive without weakening mode boundaries: Backup and Sync modes debounce note edits for 1.5 seconds, pending local work retries with bounded backoff after active-sync/Web Lock contention, Sync mode checks every five minutes only while visible, and Manual mode remains explicit-only.
 - [x] Retire the Drive data proxy and temporary staging environment. The active

@@ -63,7 +63,7 @@ These invariants summarize critical production contracts. They supplement the de
   unbilled work follows the destination. A draft must refresh after its selected
   work leaves the invoiced project or its source-client/billability changes.
 - Editing a paused timer start preserves its original pause endpoint by adjusting paused elapsed time in the same Yjs transaction; note-only edits retain the exact start instant.
-- Time calculations must use a consistent unit and preserve exact stored duration semantics across timers, entries, reports, invoices, imports, and exports.
+- Time calculations must use a consistent unit and preserve exact stored duration semantics across timers, entries, reports, invoice billing evidence, imports, and exports. Invoice-facing presentation and pricing intentionally ignore sub-minute source remainders while retaining the exact selected milliseconds in the billing snapshot.
 - Tasks belong to projects, subtasks use `parentTaskId`, and subtasks cannot be recurring.
 
 ## Invoices, expenses, and reporting
@@ -75,7 +75,8 @@ These invariants summarize critical production contracts. They supplement the de
   before project, client, or visible report filters. A moved member of a legacy
   merged invoice must not make already-claimed time available again. Supported
   legacy rate markers also lock manual time-entry changes.
-- Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval; financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
+- Raw time remains millisecond-exact. Billing increments affect an explicit billable-duration snapshot, not the source interval. Invoice hours derive from whole billable minutes and then use the existing two-decimal-hours presentation; an untouched canonical value is not a reduction or adjustment. Financial records use deterministic two-decimal accounting precision and preserve conversion snapshots used for finalized values.
+- Browser number inputs are untrusted serialized data until parsed as finite decimal values. Invoice preview, persisted task/project-breakdown copies, billing snapshots, and finalization use the same numeric semantics, including valid zero values. Duplicate invoice task copies may fill missing compatible fields but must fail closed on conflicting financial values, root/merged-child duplication, or merged nesting deeper than the supported single level before consuming source records.
 - Billing mutations must be explicit, reversible where supported, and idempotent against retries or repeated commands.
 - Cancellation is the terminal void-like exception to ordinary reversibility: only finalized unpaid sent/overdue invoices may be canceled; the retained invoice number, original values/snapshots, and project links are immutable, only sources still owned by that invoice are released, and template numbering is never rewound.
 - Canceled invoices remain audit records but contribute zero to revenue, payment, output-tax, profit, outstanding, overdue, aging, statement, and project-allocation totals. They cannot be edited, paid, emailed, undone, uncanceled, or rendered without an unmistakable canceled treatment.
