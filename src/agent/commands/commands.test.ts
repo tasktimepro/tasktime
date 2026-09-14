@@ -307,6 +307,7 @@ function createContext(): AgentCommandContext & {
         preferences: { currency: 'GBP' },
     };
 
+    const loadedEntryMaps: any[] = [entries];
     const store = {
         isReady: true,
         coreDoc,
@@ -482,13 +483,19 @@ function createContext(): AgentCommandContext & {
                 alreadyApplied: Boolean(existingOperation),
             };
         }),
-        getAllTimeEntries: () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean),
+        getAllTimeEntries: () => loadedEntryMaps.flatMap(map => Array.from(map.values()).map(value => readEntity(value)).filter(Boolean)),
         getAllTasks: vi.fn(async () => [
             ...Array.from(tasks.values()).map((value) => readEntity(value)).filter(Boolean),
             ...Array.from(archivedTasks.values()).map((value) => readEntity(value)).filter(Boolean),
         ]),
         getAllExpenses: vi.fn(async () => Array.from(expenses.values()).map((value) => readEntity(value)).filter(Boolean)),
-        loadAllTimeEntries: vi.fn(async () => Array.from(entries.values()).map((value) => readEntity(value)).filter(Boolean)),
+        loadAllTimeEntries: vi.fn(async () => {
+            for (const year of await (store as any).getAvailableYears?.() || []) {
+                const map = await (store as any).loadEntriesForYear(year);
+                if (!loadedEntryMaps.includes(map)) loadedEntryMaps.push(map);
+            }
+            return store.getAllTimeEntries();
+        }),
         getAllInvoices: vi.fn(async () => Array.from(invoices.values()).map((value) => readEntity(value)).filter(Boolean)),
         exportBackupData: vi.fn(async (options: Record<string, unknown> = {}) => ({
             version: '1.5',
@@ -585,6 +592,7 @@ function createContext(): AgentCommandContext & {
         setCloudSyncPreferences: vi.fn(),
         forceDriveSync: vi.fn(async () => undefined),
         forceCloudSync: vi.fn(async () => undefined),
+        loadArchivedInvoices: vi.fn(async () => coreDoc.getMap('invoices-archived')),
         loadArchivedTasks: vi.fn(async () => archivedTasks),
         loadArchivedExpenses: vi.fn(async () => archivedExpenses),
         archiveTask: vi.fn(async (taskId: string) => {
@@ -3616,7 +3624,7 @@ describe('agent commands', () => {
         });
 
         startTimerCommand(context, { taskId: 'task-timer-parity', note: 'Initial note' });
-        expect(updateTimerCommand(context, {
+        expect(await updateTimerCommand(context, {
             timerKey: 'project-1',
             note: 'Updated note',
             startTime: 98_000,
@@ -5865,6 +5873,18 @@ describe('agent commands', () => {
         }));
     });
 
+    it('lets the agent restore automatic numbering after a manual draft number', async () => {
+        const context = createContext();
+        context.permissions = new Set(['read', 'write']);
+        const invoice = { id: 'manual-draft', projectId: 'project-1', clientId: 'client-1', invoiceNumber: 'MANUAL-1', draftNumberMode: 'manual', date: '2026-06-25', status: 'draft', items: [], subtotal: 0, total: 0 };
+        context.maps.invoices.set(invoice.id, objectToYMap(invoice));
+        expect(invoice.draftNumberMode).toBe('manual');
+        const result = await updateInvoiceDraftCommand(context, { invoiceId: invoice.id, updates: { draftNumberMode: 'automatic' } });
+        expect(result.invoice.draftNumberMode).toBe('automatic');
+        expect(result.invoice.invoiceNumber).toBe('MANUAL-1');
+        expect(result.sideEffects.advancesInvoiceSequence).toBe(false);
+    });
+
     it('edits draft invoice metadata and line items without billing side effects', async () => {
         const context = createContext();
         context.now = () => Date.parse('2026-06-25T12:00:00Z');
@@ -5903,7 +5923,7 @@ describe('agent commands', () => {
             createdAt: Date.parse('2026-06-20T12:00:00Z'),
         }));
 
-        const updated = updateInvoiceDraftCommand(context, {
+        const updated = await updateInvoiceDraftCommand(context, {
             invoiceId: 'invoice-draft-edit',
             updates: {
                 invoiceNumber: 'DRAFT-2',
@@ -5941,8 +5961,8 @@ describe('agent commands', () => {
                 invoiceNumber: 'DRAFT-2',
                 status: 'draft',
                 subtotal: 180,
-                tax: 18,
-                total: 183,
+                tax: 16.5,
+                total: 181.5,
                 notes: 'Updated draft note',
                 updatedAt: Date.parse('2026-06-25T12:00:00Z'),
             }),
@@ -5957,12 +5977,12 @@ describe('agent commands', () => {
         });
         expect(readStored(context.maps.projects, 'project-1')).not.toHaveProperty('invoiceIds');
 
-        expect(() => updateInvoiceDraftCommand(context, {
+        await expect(updateInvoiceDraftCommand(context, {
             invoiceId: 'invoice-draft-edit',
             updates: {
                 status: 'sent',
             },
-        })).toThrow(/lifecycle/);
+        })).rejects.toThrow(/lifecycle/);
 
         context.maps.invoices.set('invoice-sent-edit', objectToYMap({
             id: 'invoice-sent-edit',
@@ -5976,12 +5996,12 @@ describe('agent commands', () => {
             total: 0,
         }));
 
-        expect(() => updateInvoiceDraftCommand(context, {
+        await expect(updateInvoiceDraftCommand(context, {
             invoiceId: 'invoice-sent-edit',
             updates: {
                 notes: 'Nope',
             },
-        })).toThrow(/Only draft invoices/);
+        })).rejects.toThrow(/Only draft invoices/);
 
         await expect(executeAgentCommand(context, 'update_invoice_draft', {
             invoiceId: 'invoice-draft-edit',
@@ -6186,7 +6206,7 @@ describe('agent commands', () => {
                 quantity: 1,
                 rate: 10,
                 amount: 10,
-                lineType: 'custom',
+                lineType: 'expense',
             }],
             tasks: [{
                 id: 'task-composition',
@@ -6242,12 +6262,12 @@ describe('agent commands', () => {
             note: 'Internal composition note',
             notes: 'Visible composition note',
             totalHours: 2.5,
-            subtotal: 250,
+            subtotal: 350,
             discount: 20,
             discountType: 'fixed',
             discountValue: 20,
             shipping: 5,
-            tax: 22.5,
+            tax: 30.15,
             taxRate: 9,
             taxLabel: 'VAT',
             taxOverride: {
@@ -6278,7 +6298,7 @@ describe('agent commands', () => {
             htmlContent: '<section>Rendered composition invoice</section>',
         };
 
-        const updated = updateInvoiceDraftCommand(context, {
+        const updated = await updateInvoiceDraftCommand(context, {
             invoiceId: 'invoice-composition-draft',
             updates: composerUpdates,
         });
@@ -6294,7 +6314,7 @@ describe('agent commands', () => {
             businessInfo: composerUpdates.businessInfo,
             paymentMethod: composerUpdates.paymentMethod,
             dateOverride: '2026-06-25',
-            tasks: composerUpdates.tasks,
+            tasks: composerUpdates.tasks.map(task => ({ ...task, flatRate: 200, quantity: 2 })),
             additionalTasks: composerUpdates.additionalTasks,
             taskFlatRates: composerUpdates.taskFlatRates,
             useFlatRate: composerUpdates.useFlatRate,
@@ -6307,9 +6327,9 @@ describe('agent commands', () => {
             taxOverride: composerUpdates.taxOverride,
             brandingSnapshot: composerUpdates.brandingSnapshot,
             htmlContent: '<section>Rendered composition invoice</section>',
-            subtotal: 250,
-            tax: 22.5,
-            total: 257.5,
+            subtotal: 350,
+            tax: 30.15,
+            total: 365.15,
             updatedAt: Date.parse('2026-06-25T12:00:00Z'),
         }));
         expect(updated.sideEffects).toEqual({
@@ -6334,7 +6354,7 @@ describe('agent commands', () => {
             projectBreakdowns: composerUpdates.projectBreakdowns,
             clientExpenseItems: composerUpdates.clientExpenseItems,
             invoiceOnlyExpenseItems: composerUpdates.invoiceOnlyExpenseItems,
-            tasks: composerUpdates.tasks,
+            tasks: composerUpdates.tasks.map(task => ({ ...task, flatRate: 200, quantity: 2 })),
             additionalTasks: composerUpdates.additionalTasks,
             taskFlatRates: composerUpdates.taskFlatRates,
             useFlatRate: composerUpdates.useFlatRate,
@@ -6343,7 +6363,7 @@ describe('agent commands', () => {
             mergedSubtasks: composerUpdates.mergedSubtasks,
             taxOverride: composerUpdates.taxOverride,
             brandingSnapshot: composerUpdates.brandingSnapshot,
-            htmlContent: '<section>Rendered composition invoice</section>',
+            htmlContent: null,
             billingStateSnapshot: expect.objectContaining({
                 taskLastBilledAt: {
                     'task-composition': null,
@@ -6726,8 +6746,8 @@ describe('agent commands', () => {
                 expenseId: 'expense-ui',
                 lineType: 'expense',
             }],
-            subtotal: 915,
-            total: 915,
+            subtotal: 1005,
+            total: 1005,
             billingPeriodStart: '2025-01-01',
             billingPeriodEnd: '2026-12-31',
         }));

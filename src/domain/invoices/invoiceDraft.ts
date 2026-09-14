@@ -1,5 +1,5 @@
 import type { Invoice, InvoiceItem, Project } from '@/stores/yjs/types';
-import type { ProjectInvoicePreview } from '@/utils/invoicePreviewUtils';
+import type { ProjectInvoicePreview, ProjectInvoiceExpenseSelection } from '@/utils/invoicePreviewUtils';
 
 export class InvoiceDraftValidationError extends Error {
 
@@ -10,6 +10,21 @@ export class InvoiceDraftValidationError extends Error {
         this.name = 'InvoiceDraftValidationError';
         this.details = details;
     }
+}
+
+export function buildDraftExpenseItems(selections: ProjectInvoiceExpenseSelection[], projectId?: string): InvoiceItem[] {
+    return selections.map((selection) => ({
+        description: selection.title,
+        quantity: 1,
+        rate: selection.invoiceAmount,
+        amount: selection.invoiceAmount,
+        ...(projectId ? { projectId } : {}),
+        expenseId: selection.expenseId,
+        originalAmount: selection.sourceAmount,
+        originalCurrency: selection.sourceCurrency,
+        exchangeRate: selection.exchangeRate,
+        lineType: 'expense' as const,
+    }));
 }
 
 export function buildDraftInvoiceItems(project: Project, preview: ProjectInvoicePreview): InvoiceItem[] {
@@ -23,18 +38,7 @@ export function buildDraftInvoiceItems(project: Project, preview: ProjectInvoice
         lineType: 'task' as const,
         pricingMode: selection.pricingMode,
     }));
-    const expenseItems = preview.expenseSelections.map((selection) => ({
-        description: selection.title,
-        quantity: 1,
-        rate: selection.invoiceAmount,
-        amount: selection.invoiceAmount,
-        projectId: project.id,
-        expenseId: selection.expenseId,
-        originalAmount: selection.sourceAmount,
-        originalCurrency: selection.sourceCurrency,
-        exchangeRate: selection.exchangeRate,
-        lineType: 'expense' as const,
-    }));
+    const expenseItems = buildDraftExpenseItems(preview.expenseSelections, project.id);
 
     if (taskItems.length > 0 || expenseItems.length > 0) {
         return [...taskItems, ...expenseItems];
@@ -114,15 +118,25 @@ export function buildDraftInvoiceUpdates(
     }
 
     const taxRate = numberFromUpdate(updates, existing, 'taxRate', 0);
+    if (Object.prototype.hasOwnProperty.call(updates, 'discount') && !Object.prototype.hasOwnProperty.call(updates, 'discountValue')) {
+        updates.discountType = 'fixed';
+        updates.discountValue = updates.discount;
+    }
+    const discountType = updates.discountType ?? existing.discountType;
+    const shouldReprice = shouldRecalculateSubtotal || ['subtotal', 'taxRate', 'discount', 'discountType', 'discountValue', 'shipping'].some(key => Object.prototype.hasOwnProperty.call(updates, key));
+    const discount = discountType === 'percentage' && !Object.prototype.hasOwnProperty.call(updates, 'discount')
+        ? roundMinorUnits(subtotal * numberFromUpdate(updates, existing, 'discountValue', 0) / 100)
+        : numberFromUpdate(updates, existing, 'discountValue', numberFromUpdate(updates, existing, 'discount', 0));
+    if (shouldReprice) updates.discount = discount;
+
+    const shipping = numberFromUpdate(updates, existing, 'shipping', 0);
     const tax = Object.prototype.hasOwnProperty.call(updates, 'tax')
         ? numberFromUpdate(updates, existing, 'tax', 0)
-        : (Object.prototype.hasOwnProperty.call(updates, 'taxRate') || shouldRecalculateSubtotal
-            ? subtotal * (taxRate / 100)
+        : (shouldReprice
+            ? (subtotal - discount + shipping) * (taxRate / 100)
             : numberFromUpdate(updates, existing, 'tax', 0));
-    const discount = numberFromUpdate(updates, existing, 'discount', 0);
-    const shipping = numberFromUpdate(updates, existing, 'shipping', 0);
 
-    if (!Object.prototype.hasOwnProperty.call(updates, 'tax') && (Object.prototype.hasOwnProperty.call(updates, 'taxRate') || shouldRecalculateSubtotal)) {
+    if (!Object.prototype.hasOwnProperty.call(updates, 'tax') && (shouldReprice)) {
         updates.tax = roundMinorUnits(tax);
     }
 

@@ -633,6 +633,18 @@ describe('createInvoiceHTML', () => {
         expect(html).not.toContain('Stale Name')
     })
 
+    it('marks saved draft previews clearly and does not reuse stale draft html', () => {
+        const html = getCurrentInvoiceHtmlContent({
+            invoiceNumber: 'INV-1', status: 'draft', htmlContent: '<div>INV-1 OLD CONTENT</div>',
+            tasks: [{ id: 'task', title: 'Current draft work', hours: 1, hourlyRate: 50 }],
+            client: { name: 'Client' }, subtotal: 50, total: 50, currency: 'EUR',
+        })
+        expect(html).toContain('data-invoice-draft')
+        expect(html).toContain('DRAFT')
+        expect(html).toContain('Current draft work')
+        expect(html).not.toContain('OLD CONTENT')
+    })
+
     it('regenerates stale stored html when invoice number changed', () => {
 
         const html = getCurrentInvoiceHtmlContent({

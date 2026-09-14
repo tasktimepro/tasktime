@@ -25,6 +25,12 @@ const bundles = [
 ]
 
 try {
+  const canonicalBridge = await readFile(path.join(repoRoot, 'agent-bridge/dist/tasktime-agent-bridge.mjs'))
+  for (const bundle of bundles) {
+    const bundledBridge = await readFile(path.join(bundle.root, 'vendor/tasktime-agent-bridge.mjs'))
+    assert(bundledBridge.equals(canonicalBridge), `${bundle.name} vendored bridge differs from the current build; rebuild and sync both vendored bridges before release`)
+  }
+
   await assertOpenClawNativePlugin()
 
   for (const bundle of bundles) {

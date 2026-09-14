@@ -73,6 +73,85 @@ test('keeps index icons neutral while preserving colored project identity in Pla
     await expect(plannerProject.locator('svg').first()).toHaveClass(/lucide-folder-closed/);
 });
 
+test('gives Planner project and client titles the hidden menu space until hover or keyboard focus', async ({ page }) => {
+    await seed(page);
+    await page.evaluate(async () => {
+        const store = window.__TASKTIME_STORE__;
+        const { objectToYMap } = await import('/src/stores/yjs/entityUtils.ts');
+        for (const type of ['project', 'client']) {
+            const collection = type === 'project' ? store.projects : store.clients;
+            collection.get(type).set('title', `Long ${type} name for the weekly planning card`);
+            store.plannerAttachments.set(`planner-${type}`, objectToYMap({
+                id: `planner-${type}`, type, referenceId: type, mode: 'static',
+                sortOrder: 1, createdAt: Date.now(),
+            }));
+        }
+        await store.docManager.flushPersistence();
+    });
+    await page.goto('/planner');
+
+    for (const width of [1440, 1024]) {
+        await page.setViewportSize({ width, height: 1000 });
+        for (const type of ['project', 'client']) {
+            const card = page.getByRole('button', { name: `Long ${type} name for the weekly planning card Item options`, exact: true }).first();
+            const title = card.getByText(`Long ${type} name for the weekly planning card`, { exact: true });
+            const menu = card.getByRole('button', { name: 'Item options' });
+            const titleWidth = () => title.evaluate(element => element.getBoundingClientRect().width);
+            await page.getByRole('heading', { name: /^Week/ }).click();
+            await page.mouse.move(0, 0);
+            await expect(menu).toHaveCSS('opacity', '0');
+            // The title reaches the content row's right edge while the menu is hidden.
+            expect(await title.evaluate(element => Math.abs(
+                element.getBoundingClientRect().right - element.parentElement.parentElement.getBoundingClientRect().right
+            ))).toBeLessThan(1);
+            const fullWidth = await titleWidth();
+            await card.hover();
+            await expect(menu).toHaveCSS('opacity', '1');
+            await expect(title).toHaveCSS('text-overflow', 'ellipsis');
+            expect(await title.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+            expect(fullWidth - await titleWidth()).toBeCloseTo(Math.min(32, fullWidth), 0);
+            if (await titleWidth() > 0) {
+                expect(await title.evaluate(element => element.getBoundingClientRect().right))
+                    .toBeLessThanOrEqual((await menu.boundingBox()).x);
+            }
+            await page.mouse.move(0, 0);
+            await expect.poll(titleWidth).toBe(fullWidth);
+
+            await card.focus();
+            await expect(menu).toHaveCSS('opacity', '1');
+            expect(fullWidth - await titleWidth()).toBeCloseTo(Math.min(32, fullWidth), 0);
+            await page.keyboard.press('Tab');
+            await expect(menu).toBeFocused();
+            await page.keyboard.press('Enter');
+            await expect(page.getByRole('menu')).toBeVisible();
+            await expect(page).toHaveURL(/\/planner/);
+            await page.mouse.move(0, 0);
+            await expect(menu).toHaveCSS('opacity', '1');
+            expect(fullWidth - await titleWidth()).toBeCloseTo(Math.min(32, fullWidth), 0);
+            await page.keyboard.press('Escape');
+            await expect(menu).toBeFocused();
+            await page.keyboard.press('Tab');
+            await expect.poll(titleWidth).toBe(fullWidth);
+        }
+    }
+
+    for (const width of [390, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        for (const type of ['project', 'client']) {
+            const card = page.getByRole('button', { name: `Long ${type} name for the weekly planning card Item options`, exact: true }).first();
+            const title = card.getByText(`Long ${type} name for the weekly planning card`, { exact: true });
+            const menu = card.getByRole('button', { name: 'Item options' });
+            await expect(menu).toHaveCSS('opacity', '1');
+            await expect(title).toHaveCSS('white-space', 'normal');
+            expect(await title.evaluate(element => element.getBoundingClientRect().right))
+                .toBeLessThanOrEqual((await menu.boundingBox()).x);
+            await menu.click();
+            await expect(page.getByRole('menu')).toBeVisible();
+            await page.keyboard.press('Escape');
+        }
+    }
+});
+
 test('aligns Upcoming with Today and carries expense category color through dashboard, expense cards, and Planner', async ({ page }) => {
     await seed(page);
     await page.evaluate(async () => {

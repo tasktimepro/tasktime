@@ -29,7 +29,7 @@ describe('InvoiceActions', () => {
         expect(onPreview).toHaveBeenCalledTimes(1)
     })
 
-    it('uses the shorter generate label for new invoices', () => {
+    it('offers an optional draft save separately from finalization', async () => {
         render(
             <InvoiceActions
                 editingInvoice={null}
@@ -38,7 +38,8 @@ describe('InvoiceActions', () => {
             />
         )
 
-        expect(screen.getByRole('button', { name: 'Generate Invoice' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Finalize Invoice' })).toHaveAttribute('type', 'submit')
+        expect(screen.getByRole('button', { name: 'Save Draft' })).toHaveAttribute('type', 'button')
         expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Generate New Invoice' })).not.toBeInTheDocument()

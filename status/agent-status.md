@@ -2,6 +2,33 @@
 
 ## Current focus
 
+- Final audit and authorized local checkpoint (2026-09-14): invoice preparation,
+  editing, client-only expense refresh, deletion and finalization share the UI's
+  guarded operations. Public refresh metadata now names both project/client
+  scope and the saved billing period. Canonical, OpenClaw and Claude bridge bytes
+  match; `smoke:agent-bundles` now rejects stale vendors before launcher checks.
+  Full local agent and app gates pass; evidence and release scope are in
+  `app-status.md`. Historical notes below about an older Claude vendor or an
+  uncommitted implementation are superseded by this checkpoint. The site snapshot
+  is promoted separately from the clean committed core revision and checked for
+  exact public-payload parity. Installed agents and published packages remain
+  unchanged; Phase 4 owns versions, MCP metadata and artifact publication.
+
+- Saved invoice drafts (2026-09-15, local/uncommitted): UI and agent commands now
+  share guarded save/refresh/delete/finalize operations, fixed source selections,
+  composer/canonical line adapters, and automatic/manual number handling.
+  Added read/write, approval-required `refresh_invoice_draft` and
+  `delete_invoice_draft`; existing update/finalize commands support both draft
+  representations. Canonical bridge, native OpenClaw registrations and both
+  vendored bridges are rebuilt locally. The live MCP smoke now exercises draft
+  edit, explicit refresh and confirmed deletion before finalization/cancellation.
+  Final local gate evidence is recorded in `app-status.md`. A future approved
+  release needs core feature versioning, bridge/MCP metadata, changed OpenClaw
+  and Claude bundles, and the reviewed public-site contract snapshot. The
+  separately owned site's snapshot promotion is recorded in its `STATUS.md`
+  against an approved committed core source. No installed agent,
+  published package or production service was changed.
+
 - Core dependency remediation (2026-09-11, local/uncommitted) passes canonical
   bridge/native OpenClaw builds, bridge and managed-bundle smokes, and the
   isolated live browser/MCP timer/invoice/cancellation journey. Public tool,

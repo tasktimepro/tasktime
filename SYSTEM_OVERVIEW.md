@@ -124,6 +124,18 @@ The Yjs store is split into documents so current work stays loaded and historica
 2. Start, pause, resume, and stop one timer per project; stopping creates one time entry.
 3. Record expenses and recurrences, organize tax-return periods, and track paid/claimed states.
 4. Generate invoice drafts or quotes from unbilled work and expenses, finalize them, record payments, cancel finalized unpaid invoices as retained audit records, export/send valid documents, and undo supported billing operations.
+
+   Invoice preparation offers optional Save Draft and direct Finalize Invoice.
+   Saved drafts have their own list, Continue Draft, explicit Refresh Work and
+   confirmed Delete Draft actions. UI and agent commands use the same guarded
+   operations and source selections. Reopening preserves captured prices and work;
+   refresh deliberately replaces linked selections within the saved project/client
+   scope and period, including client-only expenses. Drafts neither claim work nor
+   advance invoice numbers; saved and unsaved previews/PDFs are visibly unissued.
+   Finalization checks current complete history, pricing consistency and number
+   availability before the replay-safe billing operation; sending/payment follow
+   finalization.
+
 5. Review dashboard metrics and reports, then export CSV, PDF, ZIP, backup, or accountant artifacts.
 6. Optionally connect Google Drive or Dropbox using manual, backup, or bidirectional sync modes.
 7. Optionally pair a same-device agent bridge and grant scoped business-action access.
@@ -214,6 +226,11 @@ See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
 - Canceled invoices remain read-only audit records in `core`, are unmistakably marked in retained PDFs, and contribute zero to payment, revenue, output-tax, profit, outstanding, aging, statement, and project-allocation calculations. Portable backup `1.5` preserves the record while continuing to import every previously supported backup version.
 - Mark-as-unpaid is a paid-invoice correction only: it clears payment evidence while retaining billing-source claims and cannot reopen a sent, overdue, draft, or canceled invoice.
 - UI hooks and agent commands share domain operations for timer lifecycle/recovered stops, protected manual time-entry mutations, task completion/recurrence state, duplicate-safe entity identity, protected expense deletion, and relationship-safe project/client/task writes.
+- Timer start edits also share complete-history overlap checks and a fresh
+  timer check before their Yjs write; paused edits keep the existing endpoint,
+  including across calendar boundaries. Note-only edits leave timing untouched.
+  The quick editor offers Today/Yesterday, preserves older timer dates, and
+  previews the resulting interval and duration before saving.
 - The locally implemented entitlement policy is shared across browser and agent paths but remains production-disabled.
   It gates only a net-increasing active-client create/restore transition,
   advanced Reports/exports, and hosted Send. `/reports`, its current-month

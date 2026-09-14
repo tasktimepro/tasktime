@@ -32,6 +32,11 @@
 - A subtask cannot be configured as recurring.
 - Two projects may have timers concurrently, but a project cannot hold two active timer states.
 - Pause/resume preserves elapsed duration without creating an entry.
+- The timer editor offers Today/Yesterday and Start Time with a live interval
+  and duration preview. Paused previews keep their endpoint. Invalid/future
+  starts and starts after the paused endpoint explain the problem before saving.
+- Existing older timer dates and open drafts survive day rollover and reload
+  without being clamped to yesterday. Historical manual entries remain available.
 - Stop creates one entry for the selected task, including the correct interval/note, and clears only that timer.
 - Repeating a recovered stop operation does not create a duplicate entry.
 
@@ -145,10 +150,11 @@
 - Project and client list headings hide only their parenthesized totals below
   the `sm` breakpoint while preserving their icons, titles, sort controls, and
   create actions.
-- Project and client dashboard Unbilled cards match the leading-icon,
-  title/value alignment, typography, padding, and responsive behavior of the
-  adjacent metric cards. An available unbilled-expense total remains a secondary
-  line within that same content column.
+- Project and client dashboard Unbilled cards place their heading above a compact
+  work icon/amount row, with unbilled expenses on a separate row below when
+  present. Amounts align left beside their icons, with screen-reader labels and
+  no visible Work/Expenses labels. Separate currencies wrap without page
+  overflow. Neighboring metric cards remain equal in height on mobile and desktop.
 
 - Today and Upcoming retain task/recurrence/timer/expense actions. Upcoming is
   visible without expanding Today, its header omits a redundant seven-day
@@ -247,6 +253,10 @@
 
 ## Billing and finance
 
+- Save Draft supports incomplete preparation; Drafts is separate from Outstanding and exposes Continue Draft and confirmed Delete Draft. Sending and recording payment require finalization, and draft PDFs clearly say Draft.
+- UI and agents can edit and finalize each other's drafts without changing saved currency, prices, manual lines, adjustments or source selection on reopen. Refresh Work is explicit and resets linked work to current eligibility while retaining invoice-level settings.
+- Saving/deleting drafts leaves entries, expenses, quoted tasks, project invoice references and numbering untouched. Finalization checks full history, saved source conflicts, matching line totals, available numbers and concurrent/pending edits before applying billing once. Automatic numbering skips existing finalized/archived numbers; manual conflicts are editable.
+- Client-only expense drafts refresh through the same UI/agent operation, preserve period/currency scope and manual lines, and fail without mutation when required conversion rates are missing. Unsaved invoice previews also carry the Draft notice. Mobile invoice footers retain Preview/Save Draft/Finalize Invoice, with the header close control available at 320px.
 - Invoice preview includes only eligible selected work/expenses and its totals equal the visible line calculation, adjustments, and tax.
 - Finalization applies billing markers once and preserves snapshots needed for reporting/payment/undo.
 - A paid invoice exposes an explicitly confirmed **Mark as unpaid** correction that clears its recorded payment date and currency snapshot, preserves its finalized billing-source claims, and returns it to the effective Outstanding or Overdue bucket; the UI makes clear that this does not issue a refund.

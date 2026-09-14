@@ -61,7 +61,8 @@ export function buildInvoiceBillingSelectionSnapshotFromPlan({
         tasks: Array.from(plan.selectedTaskIds).map((taskId) => {
             const task = taskRecords.find((candidate) => candidate.id === taskId);
             const item = itemRecords.find((candidate) => candidate.taskId === taskId);
-            const useFlatRate = task?.useFlatRate === true || task?.projectFlatRate === true || item?.pricingMode === 'flat';
+            const useFlatRate = item?.pricingMode ? item.pricingMode === 'flat'
+                : task?.useFlatRate !== undefined ? task.useFlatRate === true : task?.projectFlatRate === true;
             const quantity = finiteNumber(item?.quantity)
                 ?? (useFlatRate ? finiteNumber(task?.quantity) : finiteNumber(task?.hours))
                 ?? 0;

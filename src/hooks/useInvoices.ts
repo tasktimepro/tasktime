@@ -35,6 +35,7 @@ import {
     getInvoiceCancellationBlockReason as getInvoiceCancellationBlockReasonForRecord,
 } from '@/domain/invoices/invoiceCancellation';
 import { isInvoiceBillingOperation, type InvoiceBillingOperation } from '@/domain/invoices/invoiceBillingOperation';
+import { saveInvoiceDraft as saveDraft, deleteInvoiceDraft as deleteDraft, finalizeSavedInvoice, refreshInvoiceDraft as refreshDraft } from '@/stores/yjs/invoiceDraftOperations';
 
 const shouldStoreInvoicePaymentSnapshot = (invoice: Partial<Invoice>, preferredCurrency: string) => {
     return normalizeCurrencyCode(invoice.currency || preferredCurrency) !== preferredCurrency;
@@ -513,21 +514,21 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
 
     const finalizeInvoice = useCallback(async (
         desiredInvoice: Invoice,
-        application: InvoiceFinalizationApplicationPlan,
+        _application: InvoiceFinalizationApplicationPlan | null,
         finalizedAt: number,
+        expectedInvoice: Invoice | null = null,
     ) => {
-        return store.commitInvoiceFinalization({
-            operationId: generateId(),
-            desiredInvoice,
-            application,
-            createdAt: finalizedAt,
-        });
+        return (await finalizeSavedInvoice(store, desiredInvoice, expectedInvoice, generateId(), finalizedAt)).invoice;
     }, [store]);
+
+    const saveInvoiceDraft = useCallback((invoice: Invoice, expected: Invoice | null = null) => saveDraft(store, invoice, expected), [store]);
+    const refreshInvoiceDraft = useCallback((invoice: Invoice, expected: Invoice, exchangeRates: Record<string, number> | null) => refreshDraft(store, invoice, expected, exchangeRates), [store]);
+    const deleteInvoiceDraft = useCallback((invoice: Invoice) => deleteDraft(store, invoice), [store]);
 
     // Get total amounts
     const totals = useMemo(() => {
         const outstanding = filteredInvoices
-            .filter((invoice) => !isInvoicePaid(invoice) && !isInvoiceCanceled(invoice))
+            .filter((invoice) => !isInvoicePaid(invoice) && !isInvoiceCanceled(invoice) && getInvoiceStatus(invoice) !== 'draft')
             .reduce((sum, invoice) => sum + getInvoiceTotal(invoice), 0);
             
         const paid = filteredInvoices
@@ -555,6 +556,9 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
         updateInvoice,
         deleteInvoice,
         finalizeInvoice,
+        saveInvoiceDraft,
+        refreshInvoiceDraft,
+        deleteInvoiceDraft,
         cancelInvoice,
         undoLatestInvoice,
 

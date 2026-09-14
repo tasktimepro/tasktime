@@ -228,9 +228,10 @@ const Invoices = ({
                     businessInfos={businessInfos}
                     clients={clients}
                     activeModal={activeModal}
-                    onInvoiceSaved={() => {
+                    onInvoiceSaved={(invoice) => {
                         setShowInvoiceModal(false);
                         setEditingInvoice(null);
+                        if (invoice) updateUrl({ tab: invoice.status === 'draft' ? 'draft' : 'outstanding', section: 'invoices' });
                         // Add a small delay before allowing it to be opened again
                         setTimeout(() => {}, 100);
                     }}

@@ -60,6 +60,11 @@ Approval-gated Phase 4 production target
   see `contracts/site-distribution.md`.
 - Components call hooks or focused domain/application functions; they do not create parallel persistence paths.
 - Hooks expose Yjs-backed collections and mutations through `YjsContext`/`YjsStore`.
+- Invoice UI hooks and agent commands share `stores/yjs/invoiceDraftOperations.ts`
+  for guarded save, refresh, delete and finalization. `domain/invoices/invoiceDraftDocument.ts`
+  translates existing UI composer snapshots and canonical agent lines. Source
+  selection stays fixed on reopen; finalization revalidates full history before
+  invoking the existing cross-document billing journal.
 - `YjsContext.shared.ts` and `BillingContext.shared.ts` own context identity with
   no runtime provider/UI dependencies. Provider modules keep their existing
   hook exports; first lazy Reports navigation after a shared UI hot update must
@@ -196,6 +201,10 @@ Approval-gated Phase 4 production target
   generation/session-fingerprint binding plus trusted-time evidence. It never
   enters Yjs, provider sync, backup/export/import, or origin migration.
 - Shared operations under `src/domain/time/`, `src/domain/tasks/`, `src/domain/work/`, `src/domain/entities/`, and `src/domain/expenses/` own cross-surface validation and mutation planning; hooks and agent commands adapt errors, permissions, transactions, archive loading, and activity metrics around them.
+- `src/stores/yjs/timerUpdates.ts` applies UI/agent timer edits through shared
+  domain interval validation after loading entry history and archived tasks.
+  It rechecks the timer before writing so asynchronous loading cannot overwrite
+  a concurrent lifecycle change or edit. Note-only updates retain their interval.
 - Invoice finalization, undo, and terminal cancellation use shared application plans under `src/domain/invoices/` plus the replay-safe `invoiceBillingOperations` journal in `YjsStore`; browser and agent adapters do not calculate source release independently.
 - The local bridge transports commands but does not become a second data owner.
 - The native OpenClaw plugin is a lifecycle/tool adapter around the existing bridge. It starts services only in the full Gateway runtime, does not duplicate TaskTime command/security logic, and leaves generic stdio hosts supported.

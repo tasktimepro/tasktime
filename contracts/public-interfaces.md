@@ -33,6 +33,18 @@ Callers must not create a second persistence layer. Hook return shapes may evolv
 
 `useTimers` is the browser timer-lifecycle boundary, including stop recovery and timer-created entry snapshots; `stopTimer` resolves asynchronously after complete-history validation/recovery. `useTimeEntries` keeps generic internal CRUD for controlled billing/deletion applications and exposes asynchronous protected manual-entry mutations for user-facing create/edit/delete flows so historical documents and archived task relationships are loaded before mutation. Project, client, and task hooks validate relationship-bearing writes through the same domain contracts used by agent commands; persisted entity IDs are immutable and create operations reject an existing ID before writing.
 
+`useTimers.updateTimer` and the `update_timer` handler resolve asynchronously.
+Start edits share complete-local-history overlap validation and a fresh timer
+check before the Yjs transaction; callers await success before closing an editor.
+Future starts, overlaps and concurrent timer changes leave the timer untouched.
+Paused start edits retain the existing pause endpoint. Note-only edits preserve
+the interval and can clear a note without loading history. Command inputs and
+persisted timer shapes remain unchanged.
+
+The browser's quick editor offers Today/Yesterday plus retained existing dates;
+this presentation limit does not narrow the agent timestamp contract or rewrite
+older timers. Both paths keep the same interval and complete-history validation.
+
 The planned active-client entitlement adds one shared transition contract beneath
 every browser and agent adapter. `active` means `archived !== true`. Free permits
 one active client; Trial/Pro are unlimited. `create_client`, explicit unarchive,
@@ -54,6 +66,14 @@ with no persisted expense or mutation contract change.
 `useInvoices.cancelInvoice` and the agent `cancel_invoice` command are adapters over one shared cancellation application. The operation accepts `invoiceId`, a trimmed 1–500 character `reason`, a stable `operationId`, and an optional finite `canceledAt`; adapters additionally require exact invoice-number confirmation and agent approval. It returns the retained canceled invoice plus stable counts for released time entries, deleted adjustment entries, released expenses, released quoted tasks, restored task cutoffs, and retained project links, with `retainedInvoiceNumber: true` and retry state through `alreadyApplied`. The operation rejects missing, draft, paid, and conflicting already-canceled invoices without partial product mutation and replays the same persisted operation idempotently.
 
 `useInvoices.markAsUnpaid` and the agent `mark_invoice_unpaid` command are payment-correction boundaries, not refund operations. They accept only an invoice whose current persisted status is `paid`, clear its payment evidence, and preserve every billing-source claim. Missing, non-paid, and canceled invoices fail without mutation; callers cannot use this transition to reopen or alter a sent, overdue, draft, or canceled invoice.
+
+`useInvoices.saveInvoiceDraft`, `refreshInvoiceDraft`, `deleteInvoiceDraft`, and `finalizeInvoice` share `invoiceDraftOperations` with the agent commands. Save/refresh/finalize load complete archived billing history and compare the expected draft again before mutation. Stale editors cannot overwrite, delete or finalize a changed record. Save and confirmed delete have no billing, project-link or numbering side effects. Finalization validates line totals, retained source selections, number uniqueness and pending source claims before entering the replay-safe journal.
+
+`refresh_invoice_draft` accepts `invoiceId`, `confirmRefresh: true`, and optional `exchangeRates`; it replaces linked selections for the saved project/client and period scope with current eligible work and rates, retaining manual items and invoice adjustments. Client-only expense drafts need no project, duplicate client expenses are included once, and missing conversion rates leave the saved draft unchanged. It returns `{ invoice }`. `delete_invoice_draft` accepts `invoiceId` and `confirmDelete: true`, returning `{ invoiceId, deleted: true }`. Both require read/write scopes and agent approval; invalid confirmation is `INVALID_INPUT`, missing records are `NOT_FOUND`, and stale/finalized/pending records are `CONFLICT`. `finalize_invoice` retains its billing scope, explicit confirmation and idempotency contract for both UI-created and agent-created drafts. Draft PDFs and unsaved invoice previews are marked as unissued; send/payment commands require finalization.
+
+`update_invoice_draft` also accepts `draftNumberMode: 'automatic' | 'manual'`.
+Editing `invoiceNumber` without a mode selects manual numbering; switching to
+automatic leaves the provisional label intact until finalization allocates it.
 
 ## Persisted Yjs boundary
 

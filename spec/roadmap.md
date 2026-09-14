@@ -120,17 +120,21 @@ The detailed finding-by-finding execution checklist and validation state live in
 - Deliver through the checklist in `status/cloud-sync-provider-expansion.md`: contract/baseline, Drive characterization, Google-compatible seams, Worker capacity/session foundation, Dropbox direct vertical, provider lifecycle, hidden parity, verified transfer, product/agent parity, and staged release.
 - Success evidence requires Google non-regression, both-provider contract/mode/request-count tests, both transfer directions with failure injection and lazy data, token/privacy/cache proof, Worker tests/typecheck, the full app release gate, supported-browser credential canaries, Dropbox production approval, capacity evidence, rollback proof, and explicit release/deployment approval.
 
-## Coordinated delivery program — License, app origin, homepage, and launch (Phase 3 in progress locally)
+## Coordinated delivery program — License, app origin, homepage, and launch (Phase 3 validated locally; Phase 4 preparation next)
 
 This delivery sequence spans existing roadmap phases; its Program Phase numbers are release-order labels rather than replacements for the product roadmap above.
 
-The current Phase 3 local checkpoint includes the dashboard redesign, homepage
-presentation, product naming, and shared project icons. The new dashboard
-functionality belongs in the next core-app minor release (`1.6.0` from the
-current `1.5.0` baseline). Published agent artifacts are unchanged, so no agent
-release train is required for this slice. This checkpoint does not bump versions,
-tag, push, publish, or deploy. Final product captures, homepage promotion, and
-the supervised origin transition remain separate pending work.
+The Phase 3 local checkpoint includes the dashboard/homepage presentation,
+responsive product captures, shared project icons, Planner menu spacing, validated
+timer editing and durable saved invoice drafts with UI/agent parity. It belongs
+in the next core-app minor release (`1.6.0` from the current `1.5.0` baseline).
+Changed bridge tool metadata/runtime, OpenClaw and Claude artifacts require the
+corresponding agent release train; an unchanged ClawHub skill needs no additional
+publication solely for this slice. The site pins a reviewed public contract from
+the clean committed core candidate and retains its independent gate and commit.
+This user-authorized local checkpoint does not bump versions, tag, push, publish
+or deploy. Phase 4 still requires exact approved release revisions, live-policy
+and catalog/content review, protected delivery and supervised origin transition.
 
 1. Complete the provider-neutral subscription/license flow and its Worker, client, UI, agent, compatibility, rollback, and local release evidence with every production billing/trial/Checkout/enforcement control disabled.
 2. Prepare the move of the application from `https://tasktime.pro` to `https://app.tasktime.pro` locally. For the two known users, use a supervised same-provider reconnect/bootstrap with a complete portable backup/import fallback, leave source data untouched until verified, and re-establish rather than copy origin-scoped credentials, licenses, Push subscriptions, and agent pairing state.

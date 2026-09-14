@@ -1709,7 +1709,7 @@ const MCP_TOOL_DEFINITIONS = [
   },
   {
     name: "update_invoice_draft",
-    description: "Edit allowed metadata, line items, totals, and UI composition fields on an existing draft invoice. This does not mark billing state, update task billing cutoffs, link projects, or advance invoice numbering.",
+    description: "Edit allowed metadata, line items, totals, and UI composition fields on an existing draft invoice. Set draftNumberMode to automatic or manual; an invoiceNumber edit defaults to manual. This does not mark billing state, update task billing cutoffs, link projects, or advance invoice numbering.",
     scopes: ["read", "write"],
     inputSchema: {
       type: "object",
@@ -1725,8 +1725,30 @@ const MCP_TOOL_DEFINITIONS = [
     }
   },
   {
+    name: "delete_invoice_draft",
+    description: "Delete an unissued draft after confirmation. Source time, expenses and numbering remain unchanged.",
+    scopes: ["read", "write"],
+    inputSchema: {
+      type: "object",
+      properties: { invoiceId: optionalString, confirmDelete: optionalBoolean },
+      required: ["invoiceId", "confirmDelete"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "refresh_invoice_draft",
+    description: "Rebuild and save linked work for the draft client/project scope and billing period after confirmation, including client-only expenses. Reset linked task/expense selections, hours, rates and merged rows. Retain manual items, notes, discount, shipping and tax settings. Review the refreshed draft before finalization.",
+    scopes: ["read", "write"],
+    inputSchema: {
+      type: "object",
+      properties: { invoiceId: optionalString, confirmRefresh: optionalBoolean, exchangeRates: { type: ["object", "null"] } },
+      required: ["invoiceId", "confirmRefresh"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "finalize_invoice",
-    description: "Finalize an agent-created draft invoice after explicit confirmation. This marks matching active time entries and expenses billed, updates task billing cutoffs, links the invoice to the project, advances invoice sequence state, and changes the invoice from draft to sent.",
+    description: "Finalize a UI- or agent-created draft invoice after explicit confirmation. This revalidates the saved source selection and marks its time entries and expenses billed, updates task billing cutoffs, links the invoice to the project, advances invoice sequence state, and changes the invoice from draft to sent.",
     scopes: ["read", "write", "billing"],
     inputSchema: {
       type: "object",

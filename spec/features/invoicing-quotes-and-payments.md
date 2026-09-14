@@ -4,6 +4,27 @@
 
 - Preview gathers eligible unbilled time/tasks/expenses into explicit invoice line and project-breakdown data.
 - Drafts remain editable without applying billed markers.
+- Saved drafts are an optional prepare-now/finish-later step in both browser and
+  agent workflows. Saving, reopening, editing and deleting a draft neither claim
+  source work nor advance final invoice numbering. New automatic draft numbers
+  are provisional; finalization allocates a current unused final number.
+- Drafts appear separately from Outstanding and offer edit, explicit finalize
+  and confirmed delete actions. Sending and payment actions require finalization.
+  Preview/download clearly identify an unfinalized document as Draft, including
+  a new invoice preview before its first save.
+- A saved draft captures selected source entries, linked expenses, rates and
+  adjustments. Reopening does not silently add later work. Explicit Refresh Work
+  rebuilds linked work from current eligibility for the selected projects and
+  period, after explaining that linked-line selections and overrides are reset;
+  manual items, invoice notes and overall discount/shipping/tax settings remain.
+- Refresh also supports client-only expense invoices without a project. It
+  retains the saved period and invoice currency, includes eligible expenses
+  once, and leaves the draft unchanged if required exchange rates are missing.
+- UI and agent-created drafts use compatible line and selection representations.
+  Save and finalization reject stale invoice edits without overwriting newer
+  state. Finalization revalidates complete source history and applies the existing
+  replay-safe billing operation exactly once; deleting a draft cannot delete an
+  invoice that was finalized while its confirmation was open.
 - Finalization rejects stale drafts when selected work leaves the invoiced
   project, changes its source-client context, or becomes non-billable. Explicit
   agent invoice-recipient selection remains supported when the captured source

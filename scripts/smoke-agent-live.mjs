@@ -395,6 +395,9 @@ async function assertToolExposure(lines, bridge) {
     'open_project_view',
     'preview_invoice_from_unbilled_work',
     'create_invoice_draft',
+    'update_invoice_draft',
+    'refresh_invoice_draft',
+    'delete_invoice_draft',
     'finalize_invoice',
     'cancel_invoice',
     'get_report_summary',
@@ -556,6 +559,25 @@ async function runInvoiceLiveSmoke({ lines, bridge, page }) {
   assert(draft.total === 150, `draft invoice total mismatch: ${JSON.stringify(draftResult)}`)
   assert(payload(draftResult).sideEffects?.marksEntriesBilled === false, 'draft creation should not mark entries billed')
   log(`created invoice draft ${invoiceId}`)
+
+  const editedDraft = payload(await callTool(lines, bridge, 'update_invoice_draft', {
+    invoiceId, updates: { notes: 'Reviewed in the MCP draft editor' },
+  })).invoice
+  assert(editedDraft?.notes === 'Reviewed in the MCP draft editor', 'MCP draft edit did not persist')
+  const refreshedDraft = payload(await callToolWithVisibleApproval(lines, bridge, page, 'refresh_invoice_draft', {
+    invoiceId, confirmRefresh: true,
+  })).invoice
+  assert(refreshedDraft?.total === 150 && refreshedDraft?.status === 'draft', 'MCP draft refresh changed its financial lifecycle')
+  assert(refreshedDraft.billingSelectionSnapshot.entries.some(entry => entry.entryId === entryId), 'MCP refresh lost the selected source')
+  const disposableDraft = payload(await callTool(lines, bridge, 'create_invoice_draft', {
+    projectId, clientId, invoiceDate: entryDate,
+    idempotencyKey: `disposable-draft-${testStamp}`,
+  })).invoice
+  const deletedDraft = payload(await callToolWithVisibleApproval(lines, bridge, page, 'delete_invoice_draft', {
+    invoiceId: disposableDraft.id, confirmDelete: true,
+  }))
+  assert(deletedDraft.deleted === true, 'MCP draft deletion did not complete')
+  log('verified MCP draft edit, refresh and confirmed deletion without billing source work')
 
   const unbilledBeforeFinalize = await callTool(lines, bridge, 'find_unbilled_time', {
     projectId,

@@ -183,7 +183,7 @@ describe('ProjectDashboard', () => {
         expect(screen.getByText('Task tree')).toBeInTheDocument();
     });
 
-    it('uses the same icon and content columns for Unbilled as the other metric cards', () => {
+    it('places the Unbilled heading above compact icon and amount rows', () => {
         render(
             <ProjectDashboard
                 project={{ id: 'project-1', title: 'Website', hourlyRate: 125, isPersonal: false }}
@@ -210,14 +210,14 @@ describe('ProjectDashboard', () => {
         );
 
         const content = screen.getByTestId('project-unbilled-metric-content');
-        const [iconColumn, detailsColumn] = content.children;
+        const amounts = content.querySelector('dl');
 
-        expect(content).toHaveClass('flex', 'items-center', 'w-full');
-        expect(iconColumn).toHaveClass('flex-shrink-0');
-        expect(iconColumn.querySelector('svg')).toHaveClass('lucide-dollar-sign', 'h-5', 'w-5');
-        expect(detailsColumn).toHaveClass('ml-4', 'w-0', 'flex-1');
-        expect(detailsColumn).toContainElement(screen.getByText('Unbilled'));
-        expect(detailsColumn.querySelector('dd')).toHaveClass('font-semibold', 'text-foreground', 'text-lg');
+        expect(content.firstElementChild).toBe(screen.getByText('Unbilled'));
+        expect(amounts).toHaveClass('mt-2', 'space-y-1');
+        expect(amounts.querySelector('svg')).toHaveClass('lucide-dollar-sign', 'h-4', 'w-4');
+        expect(amounts.querySelector('dt')).toHaveClass('sr-only');
+        expect(amounts.querySelector('dd')).toHaveClass('text-sm');
+        expect(amounts.querySelector('dd span')).toHaveClass('font-semibold', 'text-foreground');
     });
 
     it('keeps the invoice action on the header row until flex wrapping is needed on mobile', () => {

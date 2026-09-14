@@ -916,6 +916,7 @@ export const getNextSequentialNumberForTemplate = (
     }
 
     const usedSequentialNumbers = getTemplateInvoices(invoices, template.id, options.excludeInvoiceId)
+        .filter((invoice) => getInvoiceStatus(invoice) !== 'draft')
         .map((invoice) => extractSequentialNumber(invoice?.invoiceNumber, template))
         .filter((value): value is number => Number.isInteger(value));
 
@@ -929,7 +930,7 @@ export const getNextSequentialNumberForTemplate = (
 const getLatestInvoice = (invoices: any[] | null | undefined) => {
 
     const sortedInvoices = (Array.isArray(invoices) ? invoices : [])
-        .filter((invoice) => invoice && typeof invoice === 'object')
+        .filter((invoice) => invoice && typeof invoice === 'object' && getInvoiceStatus(invoice) !== 'draft')
         .slice()
         .sort((a, b) => getInvoiceSortValue(a) - getInvoiceSortValue(b));
 
@@ -954,6 +955,10 @@ export const getInvoiceUndoBlockReason = (invoice: any, invoices: any[] | null |
 
     if (!invoice || typeof invoice !== 'object' || !invoice.id) {
         return 'Invoice not found.';
+    }
+
+    if (getInvoiceStatus(invoice) === 'draft') {
+        return 'Draft invoices can be deleted without undoing billing.';
     }
 
     if (isInvoiceCanceled(invoice)) {

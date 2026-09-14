@@ -114,6 +114,43 @@ const getInvoiceExpenseAmount = (
     return { amount: conversion.amount, included: true };
 };
 
+/** Resolve eligible expenses for either project work or a client-only invoice. */
+export const getInvoiceExpensePreview = ({
+    expenses, currency, projectIds = [], clientIds = [], exchangeRates = null,
+    billingPeriodStart = '', billingPeriodEnd = '',
+}: {
+    expenses: Expense[];
+    currency: string;
+    projectIds?: string[];
+    clientIds?: string[];
+    exchangeRates?: Record<string, number> | null;
+    billingPeriodStart?: string;
+    billingPeriodEnd?: string;
+}): Pick<ProjectInvoicePreview, 'expenseAmount' | 'selectedExpenseCount' | 'excludedExpenseCount' | 'expenseSelections'> => {
+    let expenseAmount = 0;
+    let excludedExpenseCount = 0;
+    const expenseSelections: ProjectInvoiceExpenseSelection[] = [];
+    for (const expense of expenses) {
+        if (!expense || expense.billable !== true || expense.billingStatus !== 'unbilled') continue;
+        if (!isStoredDateWithinBillingRange(expense.date, billingPeriodStart, billingPeriodEnd)) continue;
+        if (expense.projectId ? !projectIds.includes(expense.projectId) : !expense.clientId || !clientIds.includes(expense.clientId)) continue;
+        const converted = getInvoiceExpenseAmount(expense, currency, exchangeRates);
+        if (!converted.included) {
+            excludedExpenseCount++;
+            continue;
+        }
+        expenseAmount += converted.amount;
+        const sourceAmount = normalizeFiniteNumber(expense.amount) ?? 0;
+        expenseSelections.push({
+            expenseId: expense.id, title: expense.title, sourceAmount,
+            sourceCurrency: normalizeCurrencyCode(expense.currency || currency),
+            invoiceAmount: converted.amount, invoiceCurrency: currency,
+            exchangeRate: sourceAmount === 0 ? 1 : converted.amount / sourceAmount,
+        });
+    }
+    return { expenseAmount: roundCurrency(expenseAmount), selectedExpenseCount: expenseSelections.length, excludedExpenseCount, expenseSelections };
+};
+
 /**
  * Calculates the same default project-context invoice preview total used by the
  * invoice modal before user edits, including selected billable expenses.
@@ -222,44 +259,11 @@ export const getProjectInvoicePreview = (
             }
         });
 
-    let expenseAmount = 0;
-    let selectedExpenseCount = 0;
-    let excludedExpenseCount = 0;
-    const expenseSelections: ProjectInvoiceExpenseSelection[] = [];
-
-    expenses
-        .filter((expense) => {
-            if (!expense || expense.billable !== true || expense.billingStatus !== 'unbilled') return false;
-            if (!isStoredDateWithinBillingRange(expense.date, activeBillingPeriodStart, activeBillingPeriodEnd)) return false;
-
-            if (expense.projectId) {
-                return expense.projectId === project.id;
-            }
-
-            return Boolean(includeClientLevelExpenses && projectClient?.id && expense.clientId === projectClient.id);
-        })
-        .forEach((expense) => {
-            const converted = getInvoiceExpenseAmount(expense, projectCurrency, exchangeRates);
-
-            if (!converted.included) {
-                excludedExpenseCount += 1;
-                return;
-            }
-
-            selectedExpenseCount += 1;
-            expenseAmount += converted.amount;
-            const sourceAmount = normalizeFiniteNumber(expense.amount) ?? 0;
-            const sourceCurrency = normalizeCurrencyCode(expense.currency || projectCurrency);
-            expenseSelections.push({
-                expenseId: expense.id,
-                title: expense.title,
-                sourceAmount,
-                sourceCurrency,
-                invoiceAmount: converted.amount,
-                invoiceCurrency: projectCurrency,
-                exchangeRate: sourceAmount === 0 ? 1 : converted.amount / sourceAmount,
-            });
-        });
+    const { expenseAmount, selectedExpenseCount, excludedExpenseCount, expenseSelections } = getInvoiceExpensePreview({
+        expenses, currency: projectCurrency, projectIds: [project.id],
+        clientIds: includeClientLevelExpenses && projectClient ? [projectClient.id] : [],
+        exchangeRates, billingPeriodStart: activeBillingPeriodStart, billingPeriodEnd: activeBillingPeriodEnd,
+    });
 
     const roundedTaskAmount = roundCurrency(taskAmount);
     const roundedExpenseAmount = roundCurrency(expenseAmount);

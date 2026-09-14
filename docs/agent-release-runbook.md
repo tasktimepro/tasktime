@@ -104,6 +104,11 @@ Do not commit the private key, PEM contents, or derived private-key hex. If the 
 
 Run Node/npm commands through Docker for this app:
 
+After changing bridge source or package metadata, build the bridge and refresh
+both vendored copies using the commands below before running these gates.
+`smoke:agent-bundles` rejects any OpenClaw or Claude vendor that differs byte for
+byte from the current canonical build, then exercises both managed launchers.
+
 ```bash
 make release-gate
 make npm CMD="run release:agent"

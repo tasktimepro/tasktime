@@ -1,4 +1,5 @@
-import { ArrowLeftIcon, BanknotesIcon, DocumentTextIcon, CurrencyDollarIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
+import UnbilledMetricContent from './UnbilledMetricContent';
+import { ArrowLeftIcon, BanknotesIcon, DocumentTextIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -593,35 +594,18 @@ const ProjectDashboard = ({
                     )}
                     data-testid="project-metrics-row"
                 >
-                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                    <Card className={cn('h-full', isMobileLayout && 'h-auto min-w-[15.5rem] flex-shrink-0')}>
                         <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
-                            <div data-testid="project-unbilled-metric-content" className="flex items-center w-full">
-                                <div className="flex-shrink-0">
-                                    <CurrencyDollarIcon className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                                <div className="ml-4 w-0 flex-1">
-                                    <dl>
-                                        <dt className="text-sm font-medium text-muted-foreground truncate">Unbilled</dt>
-                                        <dd className={cn('font-semibold text-foreground', isMobileLayout ? 'text-base' : 'text-lg')}>
-                                            <span className="sensitive-data">
-                                                {formatCurrency(projectMetrics.potentialRevenue, projectCurrency)}
-                                            </span>
-                                        </dd>
-                                    </dl>
-                                    {projectExpenses.length > 0 && (
-                                        <div className="mt-1 flex items-center text-sm text-muted-foreground">
-                                            <HandCoinsIcon className="h-4 w-4 mr-2" />
-                                            <span className="sensitive-data font-semibold text-foreground">
-                                                {formatAmounts(unbilledExpenseTotalsByCurrency)}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            <UnbilledMetricContent
+                                testId="project-unbilled-metric-content"
+                                workAmount={formatCurrency(projectMetrics.potentialRevenue, projectCurrency)}
+                                expenseAmount={Object.values(unbilledExpenseTotalsByCurrency).some(amount => amount > 0)
+                                    ? formatAmounts(unbilledExpenseTotalsByCurrency) : null}
+                            />
                         </CardContent>
                     </Card>
 
-                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                    <Card className={cn('h-full', isMobileLayout && 'h-auto min-w-[15.5rem] flex-shrink-0')}>
                         <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
                             <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">
@@ -642,7 +626,7 @@ const ProjectDashboard = ({
                     </Card>
 
                     {projectExpenses.length > 0 && (
-                        <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                        <Card className={cn('h-full', isMobileLayout && 'h-auto min-w-[15.5rem] flex-shrink-0')}>
                             <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
                                 <div className="flex items-center w-full">
                                     <div className="flex-shrink-0">
@@ -663,7 +647,7 @@ const ProjectDashboard = ({
                         </Card>
                     )}
 
-                    <Card className={cn('h-full', isMobileLayout && 'min-w-[15.5rem] flex-shrink-0')}>
+                    <Card className={cn('h-full', isMobileLayout && 'h-auto min-w-[15.5rem] flex-shrink-0')}>
                         <CardContent className={cn('flex items-center h-full', isMobileLayout ? 'p-3' : 'p-5')}>
                             <div className="flex items-center w-full">
                                 <div className="flex-shrink-0">

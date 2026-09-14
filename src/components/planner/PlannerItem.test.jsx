@@ -5,6 +5,18 @@ import PlannerItem from './PlannerItem';
 
 describe('PlannerItem', () => {
 
+    it('does not open the card when its menu receives a keyboard activation', () => {
+        const onClick = vi.fn();
+        render(<PlannerItem type="project" title="Project" hasAttachment onClick={onClick} />);
+
+        fireEvent.keyDown(screen.getByText('Project').closest('[role="button"]'), { key: 'Enter' });
+        expect(onClick).toHaveBeenCalledTimes(1);
+        onClick.mockClear();
+
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Item options' }), { key: 'Enter' });
+        expect(onClick).not.toHaveBeenCalled();
+    });
+
     it('renders title', () => {
         render(
             <PlannerItem

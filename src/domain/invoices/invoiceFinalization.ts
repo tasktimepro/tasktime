@@ -189,7 +189,7 @@ export function planInvoiceFinalization({
             return true;
         }
 
-        return selectedExpenseIds.size === 0
+        return !billingSelection && selectedExpenseIds.size === 0
             && Boolean(agentDraft)
             && isExpenseSelectedForAgentDraft(expense, projectIdsToLink, agentDraft);
     });
@@ -544,7 +544,7 @@ function collectQuotedTaskClaims(invoiceTasks: Array<Record<string, unknown>>, t
         const task = taskId ? taskById.get(taskId) : null;
 
         if (!taskId || !task) return;
-        if (invoiceTask.useFlatRate !== true && invoiceTask.projectFlatRate !== true) return;
+        if (invoiceTask.useFlatRate !== undefined ? invoiceTask.useFlatRate !== true : invoiceTask.projectFlatRate !== true) return;
         if (task.quotedAmountBilling?.invoiceId) return;
 
         const quotedAmount = getPositiveFiniteNumber(task.estimatedFlatAmount);

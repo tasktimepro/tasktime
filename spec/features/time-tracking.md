@@ -6,14 +6,33 @@
 - Start creates/replaces state only through guarded timer behavior.
 - Pause accumulates elapsed duration without creating an entry; resume continues it.
 - Stop creates one closed time entry, records reconciliation identity, and removes the timer.
-- The active timer editor exposes a local Start Date and Start Time plus its note.
-  Date defaults to the existing timer start, and changing it explicitly supports
-  previous-day work. Future starts, invalid dates, nonexistent daylight-saving
-  times and project overlaps remain rejected. Note-only edits preserve the exact
-  stored instant, including sub-second precision and repeated DST hours.
+- The active timer editor exposes Start Time, a Today/Yesterday Start Day choice,
+  and its note. Existing older timers retain their actual date as a labeled
+  choice; the editor does not offer an unrestricted calendar. Older work can be
+  recorded through manual time entries. Date selections remain absolute local
+  dates when midnight changes the labels, including an open yesterday draft
+  that becomes older than yesterday. Yesterday uses calendar-day arithmetic,
+  including month/year and daylight-saving boundaries.
+- Before saving, the editor previews the selected interval and its duration.
+  Running previews advance to now; paused previews retain the fixed endpoint.
+  Invalid times, future starts and starts after the paused endpoint show a
+  compact error notice with an alert icon and theme-aware danger colors, and
+  disable Update Timer. Project overlaps remain rejected on submission. Note-only
+  edits preserve the exact stored instant, including sub-second precision and
+  repeated DST hours. Focusing and leaving a time-picker field untouched preserves
+  its value; only explicitly clearing a field resets it to zero on blur.
 - Moving a paused timer's start adjusts its frozen elapsed duration to preserve
   the original pause endpoint; moving it after that endpoint is rejected. UI and
   agent updates persist the same shared operation without changing timer identity.
+  Historical starts submitted through the agent API remain supported and adjust
+  duration by the same rule. Overlap checks use the entire interval, including
+  work in intervening months or years.
+- Start edits await complete local entry history and archived task relationships
+  before saving through the shared UI/agent write boundary. Future starts and
+  overlaps are rejected without mutation; a timer replaced, stopped, resumed or
+  edited during that load must be reopened before retrying. The editor reports
+  success only after validation and the Yjs write succeed. Note-only edits retain
+  the exact interval, permit clearing the note, and do not load or revalidate history.
 - Manual entries support explicit start/end and notes.
 - Individual time-entry durations use the same seconds-aware display as task durations, so sub-minute work is shown in seconds instead of as `0m`.
 - Hours-report project totals and billable totals use that same seconds-aware display while CSV hour columns remain numeric decimal-hour exports.

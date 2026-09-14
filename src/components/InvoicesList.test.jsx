@@ -1678,10 +1678,14 @@ describe('InvoicesList', () => {
                 businessInfos={[]}
                 clients={[]}
                 invoiceTemplates={[]}
-                selectedTab="outstanding"
+                selectedTab="draft"
             />
         )
 
+        expect(screen.getByRole('tab', { name: 'Drafts (1)' })).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: 'Outstanding (0)' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Mark as Paid' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Send Invoice by Email' })).not.toBeInTheDocument()
         await user.click(screen.getByRole('button', { name: 'More actions' }))
         await user.click(screen.getByRole('menuitem', { name: 'Edit invoice' }))
 

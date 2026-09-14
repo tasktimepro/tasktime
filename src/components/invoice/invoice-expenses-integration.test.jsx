@@ -313,9 +313,10 @@ describe('invoice expenses integration', () => {
         })
         const invoiceData = invoiceHookMocks.createInvoice.mock.calls[0][0]
 
-        expect(invoiceData.items).toEqual([
+        expect(invoiceData.items.filter(item => item.expenseId)).toEqual([
             {
                 description: 'Expense One',
+                lineType: 'expense',
                 quantity: 1,
                 rate: 125,
                 amount: 125,

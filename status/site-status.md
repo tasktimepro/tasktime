@@ -2,6 +2,17 @@
 
 ## Current focus
 
+- [x] Complete the local homepage capture/layout audit (2026-09-14). The supplied
+  light/dark Dashboard, Planner and mobile images are integrated in the separate
+  site repository. Invoice captures were refreshed from this fictional fixture
+  through an isolated UI import so they show Drafts and Continue Draft instead
+  of the old draft/payment actions. Both themes, desktop hero containment and
+  narrow mobile layouts pass the site gate. The site's own `STATUS.md` records
+  capture dimensions, final validation and the reviewed clean core-contract pin.
+  This user-authorized local checkpoint prepares Phase 4; publication and live
+  content/policy review remain separate. Earlier capture-pending notes below
+  describe the original fixture handoff.
+
 - [x] Prepare the fictional Paperplane Studio screenshot import (2026-09-12,
   local/uncommitted) in `test-data/screenshots/`, with dated tasks, coordinated
   client/project/category colors, planner items, expenses, time history and

@@ -10,6 +10,12 @@ Minimize the distance from identifying work to tracking it accurately.
 - Task hierarchy remains scannable; subtask actions do not imply unsupported recurrence.
 - Planner organizes references by week/day and supports desktop columns plus mobile day navigation. Attached project items use the shared closed-folder project icon; project deadline markers retain their flag icon. Projects always retain the solid 4px left identity border, using the resolved project/client color when available and the normal neutral border token otherwise. Expense items use a dotted 4px left accent to distinguish them from tasks and projects while keeping the rest of the card border solid. They resolve that accent from the current category record by ID, including recurring previews and archived categories; uncategorized or colorless expenses retain a neutral left accent and never inherit project or client colors.
 - Global timers show project/task identity, elapsed state, and clear pause/resume/stop actions.
+- Planner project/client attachments use the full available title width while
+  their desktop three-dot menu is hidden. Hover, keyboard focus within the card,
+  and an open menu reserve action space and ellipsize overflowing titles.
+  Leaving both hover and focus restores the width once the menu is closed.
+  Phone layouts retain a visible menu beside wrapping titles. Keyboard activation
+  of the menu must not also activate the surrounding card.
 
 ## Recurrence controls and project settings
 
@@ -106,10 +112,12 @@ Minimize the distance from identifying work to tracking it accurately.
   Client links, financial values, filters and row padding remain unchanged.
 
 - Today and Upcoming use the shared compact 32px empty-state icon size.
-- Unbilled cards in client and project dashboards use the same leading-icon and
-  title/value columns as Pending, Expenses, and Paid Revenue. When unbilled
-  expenses exist, their total remains a secondary line inside the shared content
-  column without shifting the base alignment.
+- Unbilled cards in client and project dashboards keep the heading above compact,
+  left-aligned icon/amount rows: work first, then expenses when unbilled expenses
+  exist. Both rows use 16px muted icons and 14px semibold amounts; Work/Expenses
+  labels are available to screen readers without adding visible text. Separate
+  currencies can wrap, and an empty unbilled-expense total adds no placeholder
+  row. The mobile metric rail stretches neighboring cards to the same height.
 
 - Desktop shows four summary cards above Today and Upcoming; the two action
   panels sit side by side at `xl` (3:2), stretching to equal height. Below `md`,

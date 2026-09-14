@@ -72,7 +72,7 @@ describe('useInvoices', () => {
         expect(result.current.draftInvoices.map((i) => i.id)).toEqual(['a'])
         expect(result.current.paidInvoices.map((i) => i.id)).toEqual([])
         expect(result.current.overdueInvoices.map((i) => i.id)).toEqual(['b'])
-        expect(result.current.totals).toEqual({ outstanding: 300, paid: 0, total: 300 })
+        expect(result.current.totals).toEqual({ outstanding: 200, paid: 0, total: 200 })
 
         await act(async () => {
             result.current.markAsSent('a')

@@ -141,6 +141,7 @@ type InvoiceData = {
         pricingMode?: 'hourly' | 'flat' | 'mixed';
     }>;
     note?: string;
+    notes?: string;
     totalHours?: number | string;
     total?: number;
     totalAmount?: number;
@@ -1581,7 +1582,7 @@ export const buildInvoiceHtmlContent = (
             supplierName: item.supplierName,
             projectId: item.projectId || null,
         }));
-    const useCanonicalItems = canonicalItems.length > 0;
+    const useCanonicalItems = canonicalItems.length > 0 && !(invoice.tasks?.length || invoice.additionalTasks?.length);
 
     return createInvoiceHTML({
         documentMode: invoice.documentMode,
@@ -1595,7 +1596,7 @@ export const buildInvoiceHtmlContent = (
         tasks: useCanonicalItems ? canonicalTasks : (invoice.tasks || []),
         additionalTasks: useCanonicalItems ? [] : (invoice.additionalTasks || []),
         expenseItems: useCanonicalItems ? canonicalExpenses : (invoice.expenseItems || []),
-        note: invoice.note,
+        note: invoice.note ?? invoice.notes,
         totalHours: invoice.totalHours,
         total: invoice.total,
         invoiceNumber: invoice.invoiceNumber,
@@ -1630,12 +1631,15 @@ export const getCurrentInvoiceHtmlContent = (
     clients: StoredClient[] = [],
     businessBrandAssets: StoredBusinessBrandAsset[] = []
 ): string => {
-    const storedHtml = invoice?.htmlContent;
+    const isDraft = invoice?.status === 'draft' && invoice.documentMode !== 'quote';
+    const storedHtml = isDraft ? null : invoice?.htmlContent;
     const currentHtml = storedHtml && (!invoice?.invoiceNumber || storedHtml.includes(invoice.invoiceNumber))
         ? storedHtml
         : buildInvoiceHtmlContent(invoice, clients, businessBrandAssets);
 
-    return applyInvoiceCancellationTreatment(currentHtml, invoice);
+    return isDraft
+        ? `<div data-invoice-draft="true" style="padding:12px 20px;margin-bottom:16px;border:2px solid #525252;background:#f5f5f5;color:#262626;text-align:center;page-break-inside:avoid"><strong style="font-size:22px;letter-spacing:0.15em">DRAFT</strong><p style="margin:4px 0 0;font-size:12px">For review. Not issued or payable. Automatic invoice numbers are provisional.</p></div>${currentHtml}`
+        : applyInvoiceCancellationTreatment(currentHtml, invoice);
 };
 
 const escapeInvoiceCancellationHtml = (value: string): string => value

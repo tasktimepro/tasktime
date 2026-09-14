@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Notice } from '@/components/ui/notice';
-import { Send, Bell, MoreHorizontal, RotateCcw, Ban } from 'lucide-react';
+import { Send, Bell, MoreHorizontal, RotateCcw, Ban, Trash2 } from 'lucide-react';
 import { generatePDF, getCurrentInvoiceHtmlContent } from '../utils/pdfUtils.ts';
 import { getCurrencySymbol, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { toDisplayDate } from '../utils/dateUtils.ts';
@@ -87,6 +87,7 @@ const InvoicesList = ({
     const { showSuccess, showError } = useToast();
     const { businessBrandAssets } = useBusinessBrandAssets();
     const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [pendingDeleteDraft, setPendingDeleteDraft] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [pendingPaidEditInvoice, setPendingPaidEditInvoice] = useState(null);
     const [pendingPaymentInvoice, setPendingPaymentInvoice] = useState(null);
@@ -126,6 +127,7 @@ const InvoicesList = ({
         updatePaymentDetails,
         markAsUnpaid,
         undoLatestInvoice,
+        deleteInvoiceDraft,
         canUndoInvoice,
         cancelInvoice,
         getInvoiceCancellationBlockReason,
@@ -373,10 +375,10 @@ const InvoicesList = ({
     const outstandingInvoices = useMemo(() =>
         activeInvoices.filter((invoice) => (
             matchesInvoiceStatusFilter(invoice, 'outstanding')
-            || matchesInvoiceStatusFilter(invoice, 'draft')
         )),
     [activeInvoices]);
 
+    const draftInvoices = useMemo(() => activeInvoices.filter(invoice => matchesInvoiceStatusFilter(invoice, 'draft')), [activeInvoices]);
     const paidInvoices = useMemo(() =>
         activeInvoices.filter((invoice) => matchesInvoiceStatusFilter(invoice, 'paid')),
     [activeInvoices]);
@@ -392,7 +394,7 @@ const InvoicesList = ({
     
     // Default to first non-empty tab (overdue -> outstanding -> paid), with optional override via selectedTab
     const defaultTab = useMemo(() => {
-        const validTabs = ['overdue', 'outstanding', 'paid', 'canceled'];
+        const validTabs = ['draft', 'overdue', 'outstanding', 'paid', 'canceled'];
         if (
             selectedTab
             && validTabs.includes(selectedTab)
@@ -405,8 +407,9 @@ const InvoicesList = ({
 
         if (overdueInvoices.length > 0) return 'overdue';
         if (outstandingInvoices.length > 0) return 'outstanding';
+        if (draftInvoices.length > 0) return 'draft';
         return 'paid';
-    }, [selectedTab, overdueInvoices.length, outstandingInvoices.length, canceledInvoices.length]);
+    }, [draftInvoices.length, selectedTab, overdueInvoices.length, outstandingInvoices.length, canceledInvoices.length]);
     
     const [activeTab, setActiveTab] = useState(defaultTab);
     
@@ -422,6 +425,7 @@ const InvoicesList = ({
     const [paidPage, setPaidPage] = useState(1);
     const [overduePage, setOverduePage] = useState(1);
     const [canceledPage, setCanceledPage] = useState(1);
+    const [draftPage, setDraftPage] = useState(1);
     const ITEMS_PER_PAGE = 8;
 
     // Calculate paginated invoices for each tab
@@ -858,12 +862,12 @@ const InvoicesList = ({
         <div className="text-center py-8">
             <DocumentTextIcon className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-sm font-medium text-foreground">
-                {tabType === 'outstanding' ? 'No outstanding invoices' :
+                {tabType === 'draft' ? 'No draft invoices' : tabType === 'outstanding' ? 'No outstanding invoices' :
                  tabType === 'overdue' ? 'No overdue invoices' :
                  tabType === 'canceled' ? 'No canceled invoices' : 'No paid invoices'}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-                {tabType === 'outstanding' 
+                {tabType === 'draft' ? 'Save an invoice as a draft to finish preparing it later.' : tabType === 'outstanding'
                     ? 'You have no current invoices awaiting payment.'
                     : tabType === 'overdue'
                     ? 'All your invoices are up to date.'
@@ -879,7 +883,13 @@ const InvoicesList = ({
     const renderInvoiceList = () => {
         let currentInvoices, currentPage, totalPages, handlePageChange, totalInvoices;
         
-        if (activeTab === 'overdue') {
+        if (activeTab === 'draft') {
+            totalPages = Math.max(1, Math.ceil(draftInvoices.length / ITEMS_PER_PAGE));
+            currentPage = Math.min(draftPage, totalPages);
+            currentInvoices = draftInvoices.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+            handlePageChange = setDraftPage;
+            totalInvoices = draftInvoices.length;
+        } else if (activeTab === 'overdue') {
             currentInvoices = paginatedOverdueInvoices;
             currentPage = overduePage;
             totalPages = overdueTotalPages;
@@ -1090,7 +1100,7 @@ const InvoicesList = ({
 
                                     {/* Action buttons - right side */}
                                     <div className={cn('flex items-center gap-2', isMobileLayout ? 'w-full flex-wrap justify-end' : 'justify-end')}>
-                                        {!invoiceIsPaid && !invoiceIsCanceled && (
+                                        {invoiceStatus !== 'draft' && !invoiceIsPaid && !invoiceIsCanceled && (
                                             <Button
                                                 onClick={() => handleMarkPaid(invoice)}
                                                 size="sm"
@@ -1100,10 +1110,17 @@ const InvoicesList = ({
                                             </Button>
                                         )}
 
+                                        {invoiceStatus === 'draft' && (
+                                            <Button size="sm" leadingIcon={PencilIcon} onClick={() => handleEdit(invoice)}>
+                                                Continue Draft
+                                            </Button>
+                                        )}
+
                                         {/* Email actions: Send Invoice or Send Reminder */}
                                         {emailRecoveryReady
                                             && !invoiceIsPaid
                                             && !invoiceIsCanceled
+                                            && invoiceStatus !== 'draft'
                                             && !effectiveSentAt
                                             && !invoiceSendProtected && (
                                             <Button
@@ -1183,6 +1200,12 @@ const InvoicesList = ({
                                                     >
                                                         <PencilIcon className="h-4 w-4 mr-2" />
                                                         <span>Edit invoice</span>
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {invoiceStatus === 'draft' && (
+                                                    <DropdownMenuItem onClick={() => setPendingDeleteDraft(invoice)} className="status-danger-action cursor-pointer">
+                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                        <span>Delete draft</span>
                                                     </DropdownMenuItem>
                                                 )}
                                                 {invoiceCanBeUndone && (
@@ -1297,6 +1320,16 @@ const InvoicesList = ({
                         </TabsTrigger>
                     )}
                     <TabsTrigger
+                        value="draft"
+                        className={cn(
+                            isMobileLayout
+                                ? 'rounded-full border border-border bg-transparent px-3 py-1.5 font-medium text-sm data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none'
+                                : 'px-4 py-2 border-b-2 border-transparent rounded-none bg-transparent font-medium text-sm -mb-px transition-colors data-[state=active]:bg-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground hover:text-foreground hover:border-border'
+                        )}
+                    >
+                        Drafts ({draftInvoices.length})
+                    </TabsTrigger>
+                    <TabsTrigger
                         value="outstanding"
                         className={cn(
                             isMobileLayout
@@ -1333,6 +1366,23 @@ const InvoicesList = ({
 
             {/* Tab Content */}
             {renderInvoiceList()}
+
+            <Modal isOpen={Boolean(pendingDeleteDraft)} onClose={() => setPendingDeleteDraft(null)} title="Delete draft?" size="sm"
+                footer={<>
+                    <Button variant="secondary" onClick={() => setPendingDeleteDraft(null)}>Keep Draft</Button>
+                    <Button variant="destructive" onClick={() => {
+                        try {
+                            deleteInvoiceDraft(pendingDeleteDraft);
+                            setPendingDeleteDraft(null);
+                            showSuccess('Draft deleted. Its time and expenses remain unbilled.');
+                        } catch (error) {
+                            showError(error.message || 'Unable to delete this draft.');
+                        }
+                    }}>Delete Draft</Button>
+                </>}
+            >
+                <p className="text-sm text-muted-foreground">Delete {pendingDeleteDraft?.invoiceNumber}? This removes the saved draft. Its time entries and expenses remain available to invoice.</p>
+            </Modal>
 
             {/* Invoice Preview Modal */}
             {renderInvoicePreview()}

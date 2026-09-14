@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { InlineFieldHeader } from '@/components/ui/inline-field-header';
 import { NativeDateInput } from '@/components/ui/native-date-input';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +22,9 @@ const InvoiceModal = ({
     editingInvoice,
     handleClose,
     handleSaveInvoice,
+    handleSaveDraft,
+    isSaving = false,
+    onRefreshWork,
     handlePreviewInvoice,
     handleSendQuote,
     handleDownloadQuote,
@@ -118,6 +122,8 @@ const InvoiceModal = ({
     invoiceTemplates,
     selectedTemplate,
     handleTemplateSelection,
+    invoiceNumberValue = '',
+    onInvoiceNumberChange,
     invoiceDateOverride,
     setInvoiceDateOverride,
     useInvoiceDateOverride,
@@ -155,7 +161,7 @@ const InvoiceModal = ({
 
     // Helper function to get the currency to use (client currency or user preference)
     const getInvoiceCurrency = () => {
-        return selectedClient?.defaultCurrency || preferredCurrency || DEFAULT_CURRENCY;
+        return preferredCurrency || selectedClient?.defaultCurrency || DEFAULT_CURRENCY;
     };
 
     const [activeSection, setActiveSection] = useState(getDefaultSection());
@@ -250,6 +256,8 @@ const InvoiceModal = ({
             onDownload={handleDownloadQuote}
             canUndoInvoice={canUndoInvoice}
             onUndoInvoice={handleUndoInvoice}
+            onSaveDraft={handleSaveDraft}
+            isSaving={isSaving}
         />
     );
 
@@ -280,6 +288,11 @@ const InvoiceModal = ({
             footer={footer}
         >
             <form id="invoice-form" onSubmit={handleSave} className="space-y-5">
+                {editingInvoice && !isQuoteMode && (
+                    <Notice title="Saved draft" description="Work stays as saved until you refresh it. Finalizing checks the selected work and marks it billed.">
+                        <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={onRefreshWork}>Refresh Work</Button>
+                    </Notice>
+                )}
                 {/* Client & Project Details */}
                 <div className="border border-border rounded-lg">
                     <button
@@ -769,6 +782,13 @@ const InvoiceModal = ({
                     </button>
                     {activeSection === 'invoiceSettings' && (
                         <div className="p-4 space-y-4">
+                            {!isQuoteMode && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="draft-invoice-number">Invoice number</Label>
+                                    <Input id="draft-invoice-number" value={invoiceNumberValue} onChange={event => onInvoiceNumberChange?.(event.target.value)} placeholder="Assigned when finalized" />
+                                    <p className="text-xs text-muted-foreground">Leave blank to assign an available number from the template when you finalize.</p>
+                                </div>
+                            )}
                             {/* Template selection */}
                             <div className="mb-6">
                                 <InlineFieldHeader

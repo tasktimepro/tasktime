@@ -210,7 +210,7 @@ test.describe('Backup smoke', () => {
 
         await page.goto('/invoices?section=invoices');
         await expect(page.getByRole('heading', { name: /^Invoices \(3\)$/ })).toBeVisible();
-        await page.getByRole('tab', { name: /^Outstanding \(1\)$/ }).click();
+        await page.getByRole('tab', { name: /^Drafts \(1\)$/ }).click();
 
         const invoiceCard = page
             .getByRole('heading', { name: 'RET-2026-004' })
@@ -218,8 +218,7 @@ test.describe('Backup smoke', () => {
 
         await expect(invoiceCard).toBeVisible();
         await expect(invoiceCard).toContainText('RET-2026-004');
-        await invoiceCard.getByRole('button', { name: 'More actions' }).click();
-        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        await invoiceCard.getByRole('button', { name: 'Continue Draft' }).click();
 
         const editDialog = page.getByRole('dialog', { name: 'Edit Invoice' });
         await expect(editDialog).toBeVisible();

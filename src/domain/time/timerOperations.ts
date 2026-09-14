@@ -89,6 +89,9 @@ export function buildUpdatedTimer(
     if (updates.startTime !== undefined && !Number.isFinite(updates.startTime)) {
         throw new TimerOperationError('INVALID_INPUT', 'startTime must be a finite timestamp.');
     }
+    if (updates.startTime !== undefined && updates.startTime !== timer.startTime && updates.startTime > now) {
+        throw new TimerOperationError('INVALID_INPUT', 'Start time cannot be in the future');
+    }
 
     const pausedElapsedTime = timer.paused && updates.startTime !== undefined
         ? timer.startTime + Math.max(0, timer.pausedElapsedTime || 0) - updates.startTime
@@ -104,6 +107,21 @@ export function buildUpdatedTimer(
         ...(updates.note === undefined ? {} : { note: updates.note || '' }),
         lastActive: now,
     };
+}
+
+/** Validate the exact interval that an updated timer would save if stopped now. */
+export function assertTimerInterval(timer: MultiTimerState, tasks: Task[], entries: TimeEntry[], now: number): void {
+    const task = tasks.find((candidate) => candidate.id === timer.taskId);
+    if (!task) throw new TimerOperationError('NOT_FOUND', 'Timer task not found.');
+    const end = timer.paused ? timer.startTime + Math.max(0, timer.pausedElapsedTime || 0) : now;
+    const overlap = checkTimeOverlap(
+        timer.startTime,
+        end,
+        getTimerKeyForTask(task),
+        entries,
+        tasks.map((candidate) => ({ ...candidate, projectId: getTimerKeyForTask(candidate) })),
+    );
+    if (!overlap.isValid) throw new TimerOperationError('CONFLICT', overlap.error || 'Timer overlaps existing work.');
 }
 
 export function findStoppedTimerEntry({

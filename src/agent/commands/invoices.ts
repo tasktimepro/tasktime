@@ -1,3 +1,5 @@
+import { persistInvoiceDraft, saveInvoiceDraft, deleteInvoiceDraft, refreshInvoiceDraft, finalizeSavedInvoice } from '@/stores/yjs/invoiceDraftOperations';
+import { getInvoiceDraftEditorRecord, getInvoiceDraftItems, updateDraftSelectionPricing, synchronizeInvoiceDraftLayout } from '@/domain/invoices/invoiceDraftDocument';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 import { collectEntities, readEntity } from '@/stores/yjs/entityUtils';
 import type { BusinessBrandAsset, BusinessInfo, Client, EmailTemplate, Expense, Invoice, InvoiceTemplate, PaymentMethod, Project, Task, TimeEntry } from '@/stores/yjs/types';
@@ -22,9 +24,6 @@ import {
     getQuoteDownloadFilename,
     getQuoteNumberTimestamp,
 } from '@/utils/quoteUtils';
-import {
-    buildInvoiceFinalizationApplication,
-} from '@/domain/invoices/invoiceFinalizationApplication';
 import {
     buildInvoiceCancellationApplication,
     buildInvoiceCancellationResult,
@@ -52,7 +51,6 @@ import { AgentCommandError } from '@/agent/types';
 import {
     assertPermission,
     assertReady,
-    createValidatedEntity,
     getId,
     getNow,
     readRequiredEntity,
@@ -505,6 +503,7 @@ const ALLOWED_DRAFT_UPDATE_KEYS = new Set([
     'paymentMethod',
     'paymentMethodId',
     'invoiceNumber',
+    'draftNumberMode',
     'date',
     'dateOverride',
     'dueDate',
@@ -699,7 +698,7 @@ export async function createInvoiceDraftFromUnbilledWorkCommand(
         const dueDate = Object.prototype.hasOwnProperty.call(input, 'dueDate')
             ? input.dueDate ?? null
             : calculateDueDate(resolvedTemplate as any, new Date(invoiceDate));
-        const invoice = createValidatedEntity<Invoice>(context.store.invoices as any, 'invoices', {
+        const invoice = persistInvoiceDraft(context.store, {
             id: input.id || getId(context),
             projectId: project.id,
             projectIds: [project.id],
@@ -716,6 +715,7 @@ export async function createInvoiceDraftFromUnbilledWorkCommand(
             businessInfoId: input.businessInfoId ?? null,
             paymentMethodId: input.paymentMethodId ?? null,
             invoiceNumber,
+            draftNumberMode: input.invoiceNumber ? 'manual' : 'automatic',
             date: invoiceDate,
             dueDate,
             status: 'draft',
@@ -749,7 +749,7 @@ export async function createInvoiceDraftFromUnbilledWorkCommand(
             },
             createdAt: now,
             updatedAt: now,
-        }, `agent create invoice draft ${invoiceNumber}`);
+        }, null, now);
 
         return {
             invoice,
@@ -766,16 +766,16 @@ export async function createInvoiceDraftFromUnbilledWorkCommand(
     });
 }
 
-export function updateInvoiceDraftCommand(
+export async function updateInvoiceDraftCommand(
     context: AgentCommandContext,
     input: UpdateInvoiceDraftInput
-): UpdatedInvoiceDraftResult {
+): Promise<UpdatedInvoiceDraftResult> {
     assertReady(context);
     assertPermission(context, 'read');
     assertPermission(context, 'write');
 
     const invoiceId = requireString(input.invoiceId, 'invoiceId');
-    const updates = input.updates || {};
+    const updates = { ...input.updates };
     assertDraftInvoiceUpdateKeys(updates);
 
     const existing = readRequiredEntity<Invoice & Record<string, unknown>>(context.store.invoices as any, invoiceId, 'Invoice');
@@ -802,6 +802,22 @@ export function updateInvoiceDraftCommand(
     let invoiceUpdates: Partial<Invoice> & Record<string, unknown>;
 
     try {
+        const mapFields = { taskHourlyRates: 'hourlyRate', taskFlatRates: 'flatRate', taskQuantities: 'quantity', useFlatRate: 'useFlatRate' };
+        const editsComposer = ['tasks', 'additionalTasks', ...Object.keys(mapFields)].some(key => Object.prototype.hasOwnProperty.call(updates, key));
+        if (editsComposer) {
+            const composer = getInvoiceDraftEditorRecord(structuredClone({ ...existing, ...updates }) as Invoice);
+            const applyPricing = (tasks: any[]) => tasks.map(task => {
+                const next = { ...task };
+                for (const [map, field] of Object.entries(mapFields)) {
+                    if (updates[map] && Object.prototype.hasOwnProperty.call(updates[map], task.id)) next[field] = (updates[map] as Record<string, unknown>)[task.id];
+                }
+                if (task.mergedSubtasks) next.mergedSubtasks = applyPricing(task.mergedSubtasks);
+                return next;
+            });
+            composer.tasks = applyPricing(composer.tasks);
+            updates.tasks = composer.tasks;
+            updates.items = getInvoiceDraftItems(composer);
+        }
         invoiceUpdates = buildDraftInvoiceUpdates(existing, updates, getNow(context));
     } catch (error) {
         if (error instanceof InvoiceDraftValidationError) {
@@ -811,13 +827,27 @@ export function updateInvoiceDraftCommand(
         throw error;
     }
 
-    const invoice = updateValidatedEntity<Invoice>(
-        context.store.invoices as any,
-        'invoices',
-        invoiceId,
-        invoiceUpdates,
-        `agent update invoice draft ${invoiceId}`
-    );
+    let document: Invoice & Record<string, any> = { ...existing, ...invoiceUpdates };
+    if (Object.prototype.hasOwnProperty.call(updates, 'items') && !Object.prototype.hasOwnProperty.call(updates, 'tasks')) {
+        document = getInvoiceDraftEditorRecord({ ...document, tasks: undefined, additionalTasks: undefined, taskHourlyRates: {}, taskFlatRates: {}, taskQuantities: {}, useFlatRate: {}, mergedSubtasks: {} });
+        document.projectBreakdowns = (document.projectBreakdowns || []).map(breakdown => ({
+            ...breakdown, tasks: document.tasks.filter((task: any) => task.projectId === breakdown.projectId),
+        }));
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'tasks')) document.items = getInvoiceDraftItems(document);
+    if (document.billingSelectionSnapshot) document.billingSelectionSnapshot = updateDraftSelectionPricing(document, document.billingSelectionSnapshot);
+    if (Object.prototype.hasOwnProperty.call(updates, 'invoiceNumber') && !Object.prototype.hasOwnProperty.call(updates, 'draftNumberMode')) document.draftNumberMode = 'manual';
+    if (Object.prototype.hasOwnProperty.call(updates, 'notes')) document.note = document.notes;
+    if (Object.prototype.hasOwnProperty.call(updates, 'note')) document.notes = document.note;
+    if (Object.prototype.hasOwnProperty.call(updates, 'taxRate') || Object.prototype.hasOwnProperty.call(updates, 'taxLabel')) {
+        document.taxOverride = { enabled: true, rate: document.taxRate || 0, label: document.taxLabel || 'Tax' };
+    }
+    if (!Object.prototype.hasOwnProperty.call(updates, 'projectBreakdowns') && ['items', 'subtotal', 'discount', 'shipping', 'tax', 'taxRate', 'projectId', 'projectIds'].some(key => Object.prototype.hasOwnProperty.call(updates, key))) {
+        document = synchronizeInvoiceDraftLayout(document, collectEntities<Project>(context.store.projects as any));
+    }
+    let invoice: Invoice;
+    try { invoice = await saveInvoiceDraft(context.store, document, existing, getNow(context)); }
+    catch (error) { throw new AgentCommandError('CONFLICT', error instanceof Error ? error.message : 'Unable to save this draft safely.'); }
 
     return {
         invoice,
@@ -830,6 +860,36 @@ export function updateInvoiceDraftCommand(
             advancesInvoiceSequence: false,
         },
     };
+}
+
+function runDraftMutation<T>(operation: () => T): T {
+    try { return operation(); }
+    catch (error) {
+        throw new AgentCommandError('CONFLICT', error instanceof Error ? error.message : 'Unable to change this draft safely.');
+    }
+}
+
+export function deleteInvoiceDraftCommand(context: AgentCommandContext, input: { invoiceId: string; confirmDelete: boolean }) {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'write');
+    if (input.confirmDelete !== true) throw new AgentCommandError('INVALID_INPUT', 'Draft deletion requires confirmDelete: true.');
+    const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, requireString(input.invoiceId, 'invoiceId'), 'Invoice');
+    runDraftMutation(() => deleteInvoiceDraft(context.store, invoice));
+    return { invoiceId: invoice.id, deleted: true };
+}
+
+export async function refreshInvoiceDraftCommand(context: AgentCommandContext, input: { invoiceId: string; confirmRefresh: boolean; exchangeRates?: Record<string, number> | null }) {
+    assertReady(context);
+    assertPermission(context, 'read');
+    assertPermission(context, 'write');
+    if (input.confirmRefresh !== true) throw new AgentCommandError('INVALID_INPUT', 'Refreshing draft work requires confirmRefresh: true.');
+    const invoice = readRequiredEntity<Invoice>(context.store.invoices as any, requireString(input.invoiceId, 'invoiceId'), 'Invoice');
+    try {
+        return { invoice: await refreshInvoiceDraft(context.store, invoice, invoice, input.exchangeRates ?? null, getNow(context)) };
+    } catch (error) {
+        throw new AgentCommandError('CONFLICT', error instanceof Error ? error.message : 'Unable to refresh this draft safely.');
+    }
 }
 
 export function finalizeInvoiceCommand(
@@ -888,60 +948,16 @@ export function finalizeInvoiceCommand(
         }
 
         const finalizedAt = input.finalizedAt ?? getNow(context);
-        const projects = collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent invoice finalize projects');
-        const clients = collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent invoice finalize clients');
-        const taskMaps = await collectTaskMapsForInvoiceFinalization(context);
-        const tasks = taskMaps.flatMap((taskMap) => collectValidatedEntities<Task>('tasks', taskMap as any, 'agent invoice finalize tasks'));
-        const entryMaps = await collectEntryMapsForInvoiceFinalization(context);
-        const entries = entryMaps.flatMap((entryMap) => collectValidatedEntities<TimeEntry>(
-            'timeEntries',
-            entryMap as any,
-            'agent invoice finalize time entries'
-        ));
-        const expenseMaps = await collectExpenseMapsForInvoiceFinalization(context);
-        const expenses = expenseMaps.flatMap((expenseMap) => collectValidatedEntities<Expense>('expenses', expenseMap as any, 'agent invoice finalize expenses'));
-        const invoiceTemplates = collectValidatedEntities<InvoiceTemplate & Record<string, unknown>>(
-            'invoiceTemplates',
-            context.store.invoiceTemplates as any,
-            'agent invoice finalize templates'
-        );
-        const invoicesForSequence = collectValidatedEntities<Invoice>(
-            'invoices',
-            context.store.invoices as any,
-            'agent invoice finalize sequence invoices'
-        );
-        let finalizationApplication: ReturnType<typeof buildInvoiceFinalizationApplication>['application'];
-
+        let result;
         try {
-            finalizationApplication = buildInvoiceFinalizationApplication({
-                invoice,
-                projects,
-                clients,
-                tasks,
-                entries,
-                expenses,
-                invoiceTemplate: resolveCurrentInvoiceTemplate(invoice, invoiceTemplates),
-                invoices: invoicesForSequence,
-                finalizedAt,
-                createAdjustmentId: () => getId(context),
-            }).application;
+            result = await finalizeSavedInvoice(context.store, invoice, invoice, input.idempotencyKey || getId(context), finalizedAt);
         } catch (error) {
-            throw new AgentCommandError('CONFLICT', 'Unable to prepare invoice finalization side effects.', {
-                invoiceId,
-                reason: error instanceof Error ? error.message : 'finalization planning failed',
+            throw new AgentCommandError('CONFLICT', 'Unable to finalize this invoice safely.', {
+                invoiceId, reason: error instanceof Error ? error.message : 'Finalization failed.',
             });
         }
-
-        const desiredInvoice: Invoice = {
-            ...invoice,
-            ...finalizationApplication.invoiceUpdates,
-        };
-        const finalizedInvoice = await context.store.commitInvoiceFinalization({
-            operationId: input.idempotencyKey || getId(context),
-            desiredInvoice,
-            application: finalizationApplication,
-            createdAt: finalizedAt,
-        });
+        const finalizedInvoice = result.invoice;
+        const finalizationApplication = result.application;
 
         return {
             invoice: finalizedInvoice,

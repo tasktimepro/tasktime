@@ -152,6 +152,15 @@ describe('invoiceUtils', () => {
         expect(getNextSequentialNumberForTemplate(template, [{ id: 'inv-empty', templateId: 'tpl-1', invoiceNumber: 'BAD' }])).toBe(3)
     })
 
+    it('does not reserve numbering or block undo when a newer draft is saved', () => {
+        const template = { id: 'tpl-1', currentSequentialNumber: 3, useSequentialNumbers: true, invoiceNumberFormat: 'INV-{sequential}' }
+        const finalized = { id: 'final', templateId: 'tpl-1', invoiceNumber: 'INV-3', status: 'sent', createdAt: 1 }
+        const draft = { id: 'draft', templateId: 'tpl-1', invoiceNumber: 'INV-99', status: 'draft', createdAt: 2 }
+        expect(getNextSequentialNumberForTemplate(template, [finalized, draft])).toBe(4)
+        expect(getLatestUndoableInvoice([finalized, draft])).toEqual(finalized)
+        expect(getInvoiceUndoBlockReason(draft, [finalized, draft])).toBe('Draft invoices can be deleted without undoing billing.')
+    })
+
     it('characterizes finalized lifecycle precedence and retained-number consumption', () => {
 
         const referenceDate = new Date('2026-07-14T12:00:00Z')

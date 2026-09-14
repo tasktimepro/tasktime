@@ -370,6 +370,8 @@ export interface Invoice {
     brandingSnapshot?: InvoiceBrandingSnapshot | null;
     billingStateSnapshot?: InvoiceBillingStateSnapshot | null;
     billingSelectionSnapshot?: InvoiceBillingSelectionSnapshot | null;
+    /** Automatic draft numbers are provisional until finalization. Missing means legacy/manual. */
+    draftNumberMode?: 'automatic' | 'manual';
     _archiveTransition?: ArchiveTransition;
 }
 

@@ -510,7 +510,7 @@ test.describe('Invoices smoke', () => {
         await expect(invoiceDialog.getByText('Subtotal:', { exact: true }).locator('..')).toContainText(expectedTotal);
         await expect(invoiceDialog.getByText('Total:', { exact: true }).locator('..')).toContainText(expectedTotal);
 
-        await invoiceDialog.getByRole('button', { name: 'Generate Invoice', exact: true }).click();
+        await invoiceDialog.getByRole('button', { name: 'Finalize Invoice', exact: true }).click();
         await expect(invoiceDialog).not.toBeVisible();
 
         await page.goto('/invoices?section=invoices');

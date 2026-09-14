@@ -8,7 +8,31 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
-**Program Phase 3 UI polishing in progress locally**
+**Program Phase 3 locally validated; Phase 4 launch preparation next**
+
+- Final audit and user-authorized local checkpoint (2026-09-14): saved invoice
+  drafts, timer editing, Planner menu spacing and restored Unbilled cards pass
+  the complete core gate (2,815 unit, 90 Chromium and 5 PWA checks), focused
+  Firefox/WebKit and Ljubljana timer checks, and local packaged/live MCP checks.
+  Audit fixes cover client-only expense refresh, unissued unsaved previews and
+  exact canonical/vendor bridge parity. The site independently passes its gate;
+  its desktop hero overflow is fixed and invoice captures are refreshed for the
+  new Drafts UI. The clean committed core public contract is reviewed and pinned
+  in the separate site checkpoint. Evidence lives in `app-status.md`,
+  `agent-status.md` and the site's `STATUS.md`.
+  Local commits on `update/launch` are authorized; no push, version bump, tag,
+  publication, deployment or production-data change is included. Phase 4 retains
+  exact-revision gates, live-provider evidence, legal/commercial sign-off,
+  repository/environment protection and staged launch/rollback approval.
+  The release train is core `1.6.0` plus the changed bridge/MCP metadata, OpenClaw
+  and Claude bundles. Historical dated `uncommitted` notes below describe their
+  original validation state, not the state after this checkpoint.
+
+- Saved invoice drafts (2026-09-15, local/uncommitted) now have a complete UI
+  preparation workflow and shared agent operations. The full app release gate,
+  cross-browser draft checks and live local MCP/bundle checks pass. See
+  `app-status.md` and `agent-status.md` for evidence and the separate future
+  core/agent/site-contract release scope.
 
 - Brand and trademark guidance (2026-09-12, local/uncommitted): the public core
   repository now has `TRADEMARKS.md`, linked from the README, to distinguish
@@ -143,9 +167,8 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
   Planner expense accents are dotted on the left edge only, preserving category
   colors and neutral fallback. Project and Client heading totals hide on phones
   so the existing icons, titles, sort controls, and create buttons retain room.
-  Client and project dashboard Unbilled cards now match the icon/content column
-  structure of their adjacent metric cards while retaining an optional secondary
-  unbilled-expense amount.
+  Client and project dashboard Unbilled cards were subsequently restored to the
+  user's reference: heading above compact work and optional expense amount rows.
   Compatibility and browser checks are recorded in `app-status.md`. Follow-up review fixes
   stale recurrence edits/menu intent,
   hidden rate validation, and retained Dropbox recovery. Final local gates:

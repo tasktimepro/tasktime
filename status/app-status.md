@@ -2,6 +2,139 @@
 
 ## Current focus
 
+- [x] Final local audit and user-authorized commit checkpoint (2026-09-14).
+  The reviewed scope includes saved invoice drafts/UI-agent parity, timer start
+  validation and Today/Yesterday editing, Planner menu space, the restored
+  Unbilled cards, and independent homepage screenshots. Earlier dated
+  `uncommitted` and no-commit notes below describe their original validation state.
+  Audit regressions exposed and fixed client-only expense drafts losing eligible
+  work during Refresh Work, and new unsaved invoice previews looking issued.
+  Refresh now shares project/client expense eligibility, period and currency
+  checks; missing conversion data leaves the draft unchanged. Finalizing bills
+  only selected sources, so omitted eligible work remains available for a later
+  invoice whose selected period includes it. Preview never issues an invoice.
+  Phone footer Close remains hidden to fit Save Draft/Finalize; the header close
+  control and all footer actions are verified at 320px.
+  The full Docker release gate passes: zero audit findings, lint, typecheck,
+  282 files / 2,815 unit tests and per-file coverage, 90 Chromium browser checks,
+  5 PWA/offline checks, build/artifact validation and public-contract export.
+  The one UTC DST skip passes in a separate 50-test Ljubljana timer run. All
+  40 focused Firefox/WebKit draft/timer/Unbilled scenarios pass; one WebKit
+  navigation crash in the combined run passed three consecutive isolated reruns.
+  `release:agent` passes canonical/native builds and local bridge/bundle/live MCP
+  journeys. A new bundle gate first reproduced stale vendored bytes, then passed
+  after both packages were synchronized byte for byte with the canonical build.
+  Final lint/typecheck pass after that guard and metadata reconciliation.
+  Evidence: `/private/tmp/tasktime-final-audit-core-gate.log`,
+  `/private/tmp/tasktime-final-audit-browsers.log`,
+  `/private/tmp/tasktime-final-audit-webkit-retry.log`,
+  `/private/tmp/tasktime-final-audit-timers-tz.log`,
+  `/private/tmp/tasktime-final-audit-agent.log`, and
+  `/private/tmp/tasktime-final-audit-bundle-green.log`.
+  Core release scope is the planned `1.6.0` minor plus changed bridge/MCP metadata,
+  OpenClaw and Claude artifacts; versions remain unpublished candidates until
+  Phase 4 release preparation. Site and infrastructure have separate commits and
+  gates. No push, tag, package publication, deployment or real-data change is
+  authorized by this local checkpoint. See `TODO.md` for remaining launch gates.
+
+- [x] Restore the original Unbilled dashboard layout (local/uncommitted).
+  Per the user's reference, both project and client cards show the heading
+  above small left-aligned icon/amount rows, with expenses beneath work when
+  present. Visible Work/Expenses labels are removed; screen-reader labels
+  remain. Original spacing and font sizes are restored, and mobile cards stay
+  equal in height. The updated regression failed before restoration. All 27
+  dashboard unit tests pass with 100% shared-component coverage; all 12 browser
+  checks pass across Chromium, Firefox and WebKit in both themes and at mobile
+  and desktop widths, including no expenses, expense-only and multiple-currency
+  states. Screenshots were inspected against the reference. Lint, typecheck,
+  local app build and diff checks pass. No commit or deployment.
+
+- [x] Saved invoice drafts in UI and agent workflows (2026-09-15,
+  local/uncommitted). Optional Save Draft supports incomplete preparation beside
+  Finalize Invoice. Drafts has Continue Draft, explicit Refresh Work and confirmed
+  Delete Draft; preview/PDF are marked unissued and send/payment actions require
+  finalization. Reopening retains selected sources, currency, prices and manual
+  adjustments. Refresh resets linked work deliberately. Shared operations guard
+  stale editors, pending operations, complete historical sources, line totals,
+  source conflicts and automatic/manual numbering; drafts have no billing,
+  project-link or sequence side effects. UI composer and canonical agent shapes
+  remain compatible, with one additive optional `draftNumberMode` field.
+  Regressions cover partial drafts, later tracked work, hourly/flat/merged work,
+  percentage/fixed discounts, expenses across projects, changed/deleted/billed
+  sources, property-order-independent stale checks, archived numbers and reload.
+  Docker `make release-gate` passed: 282 files / 2,813 unit tests, one existing
+  timezone skip, per-file coverage thresholds, audit/lint/types/build/artifact
+  checks, 82 browser smokes and 5 PWA/offline checks. All 18 draft browser checks
+  passed across Chromium/Firefox/WebKit at 1440px/light and 390px/dark; legacy
+  backup import/preview also passed across all three browsers. `release:agent`
+  passed with real MCP draft edit/refresh/delete/finalize/cancel calls and both
+  matching vendored bridges. Evidence: `/private/tmp/tasktime-drafts-release-gate-final.log`,
+  `/private/tmp/tasktime-drafts-firefox-webkit-final.log`, and
+  `/private/tmp/tasktime-drafts-agent-gate-final.log`. Generated public contract
+  was exported locally; site snapshot promotion and release versioning remain
+  part of a separately approved release. Earlier Planner/timer/site work is
+  preserved. Nothing was committed, published, deployed or changed in an
+  installed agent or the user's active data.
+
+- [x] Simplify the timer editor to Today/Yesterday (2026-09-14,
+  local/uncommitted). The user approved replacing the unrestricted calendar
+  with a Start Day choice and live interval/duration preview. Existing older
+  dates remain selectable, and absolute local draft dates survive midnight,
+  month/year boundaries and reload. Running previews advance to now; paused
+  previews preserve their endpoint. Invalid/future starts and starts after the
+  paused endpoint disable saving and display a compact Notice with an alert
+  icon and existing light/dark danger tokens. Older work is directed to manual
+  time entries. The shared UI/agent validation and persisted timer contract
+  remain intact.
+  Six new editor regressions failed before implementation. Browser checks also
+  exposed an existing TimePicker bug: focusing and leaving an untouched field
+  reset it to zero. Three regressions reproduced that failure; only explicitly
+  cleared fields now reset on blur. All 96 focused Ljubljana tests pass with
+  coverage above the required thresholds, including midnight, DST, exact
+  note-only timestamps, paused endpoints, keyboard/clear/clamp behavior and
+  complete-history validation. All 18 desktop/mobile checks pass in Chromium,
+  Firefox and WebKit, including edit/reload/stop, archived overlaps and both
+  notice themes; text contrast is at least 4.5:1 and icon contrast at least 3:1.
+  The final full coverage gate passes 280 files / 2,788 tests with one UTC DST
+  skip covered by the focused Ljubljana run. Final lint, typecheck, app build
+  and diff check pass. No schema migration, commit or deployment.
+
+- [x] Harden timer start-update validation (2026-09-14, local/uncommitted).
+  The reported August/September case is reproduced: the selected date is used,
+  but changing only a paused timer's start retains its September endpoint and
+  therefore can overlap September work. A timer actually paused in August is
+  validated only through that August endpoint. The user chose to simplify the
+  quick editor to Today/Yesterday with a duration preview, keeping the existing
+  start-only semantics; see the editor follow-up above.
+  The audit found real boundary gaps: four UI/agent regressions confirmed that
+  direct updates accepted future starts and missed archived overlaps. Both now
+  share complete-history validation, archived-task scope, a fresh timer check
+  after asynchronous loading, schema validation and one Yjs transaction. The
+  editor awaits success, preserves failed drafts, correctly scopes standalone
+  tasks, and allows note clearing without changing/revalidating the interval.
+  All 12 desktop/mobile date-edit/reload/stop checks pass in Chromium, Firefox
+  and WebKit. The full standard coverage gate passes 280 files / 2,773 tests
+  with one timezone skip; the final schema guard passes the focused 66-test
+  Ljubljana suite without skips. useTimers coverage is 96.21% statements,
+  79.77% branches, 100% functions and 97.22% lines; the shared update module is
+  96.66% statements, 85.18% branches and 100% functions/lines. Lint, typecheck
+  and the app build pass. The full suite under Ljubljana time also reproduced
+  six existing failures in expense metrics, notification-date fixtures, the
+  agent report summary and recurring-expense creation on the unchanged HEAD
+  baseline; unrelated async approval timing failures during concurrent runs
+  cleared with bounded test concurrency. No real workspace/provider data,
+  persisted schema, commit or deployment changed.
+
+- [x] Reclaim hidden Planner menu space (2026-09-13, local/uncommitted).
+  Project/client attachment titles use the full desktop content width until
+  hover, keyboard focus within the card, or an open menu reserves the action
+  space. Phone menus stay visible beside wrapping titles. Menu keyboard events
+  no longer also activate the surrounding card. Browser geometry and keyboard
+  regressions failed before the fixes; all 71 related Planner tests pass.
+  Chromium checks pass for both entity types at 1440/1024/390/320px, covering
+  hover exit, focus, menu-open retention, Escape and phone interaction; lint and
+  typecheck pass. No persisted-data changes, commit or deployment.
+
 - Local core checkpoint (2026-09-13): the user approved committing the screenshot
   fixture and the Planner, Dashboard, expense, Account and timer polish below.
   Their dated `uncommitted` labels record validation before this checkpoint.
@@ -225,9 +358,8 @@
   category color or neutral fallback while the other card edges remain solid.
   Project and Client list entity totals hide below the `sm` breakpoint to keep
   the existing phone header actions on the same compact row.
-  Unbilled metrics in both client and project dashboards now use the same leading
-  icon and content columns as Pending, Expenses, and Paid Revenue; the optional
-  unbilled-expense total remains a secondary line.
+  Unbilled metrics were subsequently restored to the reference layout: the
+  heading sits above compact left-aligned work and optional expense amount rows.
   Shared three-dot action menus are non-modal and no longer lock page scrolling;
   they close once their trigger moves past an 8px scroll threshold. Unit and
   cross-browser wheel-scroll regressions cover the common primitive.

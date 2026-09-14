@@ -223,6 +223,7 @@ const PlannerItem = ({
             onClick={handleClick}
             onContextMenu={handleContextMenu}
             onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     if (isClickable) {
@@ -262,7 +263,13 @@ const PlannerItem = ({
             <div className={cn('relative z-10 mb-0.5 flex w-full min-w-0 gap-2', isMobileLayout ? 'items-start' : 'items-center')}>
                 <Icon className={cn('h-4 w-4 flex-shrink-0', isMobileLayout && 'mt-0.5', iconClasses)} />
                 
-                <div className={cn('min-w-0 flex-1', isMobileLayout && 'space-y-0.5')}>
+                <div className={cn(
+                    'min-w-0 flex-1',
+                    isMobileLayout && 'space-y-0.5',
+                    // Reserve the desktop action space only while the action is visible.
+                    canShowMenu && 'md:group-hover/item:pr-8 md:group-focus-within/item:pr-8',
+                    canShowMenu && menuOpen && 'md:pr-8'
+                )}>
                     <div className={cn(
                         isProjectDeadlineItem
                             ? 'text-sm font-medium truncate whitespace-nowrap'
@@ -300,7 +307,7 @@ const PlannerItem = ({
                     />
                 )}
 
-                {/* Three-dot menu button - appears on hover */}
+                {/* Desktop menus leave the text flow; phones retain an always-visible action. */}
                 {canShowMenu && (
                     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
                         <DropdownMenuTrigger asChild>
@@ -308,10 +315,11 @@ const PlannerItem = ({
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
                                 className={cn(
-                                    'ml-auto rounded p-1',
+                                    'ml-auto shrink-0 rounded p-1 md:absolute md:right-0',
                                     'hover:bg-muted focus:outline-none focus:opacity-100 cursor-pointer',
-                                    'opacity-100 md:opacity-0 md:group-hover/item:opacity-100',
-                                    menuOpen && 'opacity-100'
+                                    'opacity-100 md:group-hover/item:opacity-100 md:group-focus-within/item:opacity-100',
+                                    'md:group-hover/item:pointer-events-auto md:group-focus-within/item:pointer-events-auto',
+                                    menuOpen ? 'md:opacity-100' : 'md:opacity-0 md:pointer-events-none'
                                 )}
                                 aria-label="Item options"
                             >

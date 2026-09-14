@@ -57,3 +57,9 @@ HTML preview, and UI export preserving all 133 entity IDs. References and invoic
 arithmetic pass additional checks; no browser page errors were observed. No
 existing browser or provider workspace was changed. Final screenshot capture
 and homepage asset replacement remain separate.
+
+The final local audit on 14 September 2026 reused this fixture in an isolated
+browser to refresh both invoice homepage captures. The current Drafts view shows
+Continue Draft with separate Outstanding/Paid tabs and no payment action before
+finalization. The site's `STATUS.md` records the independent asset checkpoint;
+no existing profile or cloud data was changed.

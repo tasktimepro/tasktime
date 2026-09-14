@@ -20,7 +20,8 @@ The app stores user work data locally with Yjs and IndexedDB, supports optional 
 - Projects, clients, hierarchical tasks, project notes, and weekly planning
 - Multiple project timers with pause, stop, and automatic time-entry creation
 - Expenses, tax-return periods, recurring expenses, and backup/restore flows
-- Invoice drafts, terminal cancellation of finalized unpaid invoices, templates, PDF export, payments, quotes, and reports
+- Save invoice drafts to finish later, continue or explicitly refresh selected work from the Drafts tab, then finalize when ready. The UI and agent share this workflow; drafts leave work unbilled and do not reserve final invoice numbers.
+- Terminal cancellation of finalized unpaid invoices, templates, PDF export, payments, quotes, and reports
 - Local-first storage with browser persistence and optional provider-backed sync
 - Agent-ready local MCP bridge with scopes, approval tokens, and generated tool docs
 

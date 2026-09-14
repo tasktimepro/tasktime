@@ -8,6 +8,14 @@ import {
 } from './invoiceDraft';
 
 describe('invoiceDraft', () => {
+    it('keeps an explicit discount edit consistent with the UI discount settings', () => {
+        const invoice = { subtotal: 100, total: 90, discountType: 'percentage', discountValue: 10, discount: 10, taxRate: 0 } as any;
+        expect(buildDraftInvoiceUpdates(invoice, { discount: 25 }, 10)).toMatchObject({ discount: 25, discountType: 'fixed', discountValue: 25, total: 75 });
+    });
+    it('recalculates a percentage discount and tax after editing draft items', () => {
+        const invoice = { items: [], subtotal: 100, total: 99, discountType: 'percentage', discountValue: 10, discount: 10, taxRate: 10, tax: 9 } as any;
+        expect(buildDraftInvoiceUpdates(invoice, { items: [{ description: 'Work', quantity: 2, rate: 100, amount: 200 }] }, 10)).toMatchObject({ subtotal: 200, discount: 20, tax: 18, total: 198 });
+    });
     it('builds draft invoice items from task and expense preview totals', () => {
         const items = buildDraftInvoiceItems(
             { id: 'project-1', title: 'Website Refresh', flatRate: false },
@@ -91,8 +99,8 @@ describe('invoiceDraft', () => {
 
         expect(updates).toEqual(expect.objectContaining({
             subtotal: 200,
-            tax: 40,
-            total: 220,
+            tax: 36,
+            total: 216,
             updatedAt: 1234,
         }));
     });

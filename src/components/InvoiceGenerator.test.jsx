@@ -28,6 +28,7 @@ const invoiceHookMocks = vi.hoisted(() => ({
     createInvoice: vi.fn((data) => ({ ...data, id: 'new-invoice-id' })),
     finalizeInvoice: vi.fn(),
     updateInvoice: vi.fn(),
+    saveInvoiceDraft: vi.fn(),
     undoLatestInvoice: vi.fn(),
     canUndoInvoice: vi.fn(() => false),
 }))
@@ -93,6 +94,7 @@ vi.mock('../hooks/useInvoices.ts', () => ({
         createInvoice: invoiceHookMocks.createInvoice,
         finalizeInvoice: invoiceHookMocks.finalizeInvoice,
         updateInvoice: invoiceHookMocks.updateInvoice,
+        saveInvoiceDraft: invoiceHookMocks.saveInvoiceDraft,
         undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
         canUndoInvoice: invoiceHookMocks.canUndoInvoice,
     })
@@ -365,6 +367,7 @@ vi.mock('./invoice/InvoiceModal', () => {
                 >
                     Save Invoice
                 </button>
+                <button type="button" onClick={(event) => capturedInvoiceModalProps.handleSaveDraft(event)}>Save Draft</button>
                 <button type="button" onClick={handleClose}>Close Invoice</button>
             </div>
         )
@@ -431,7 +434,7 @@ describe('InvoiceGenerator', () => {
         invoiceHookMocks.createInvoice.mockClear()
         invoiceHookMocks.finalizeInvoice.mockReset()
         invoiceHookMocks.finalizeInvoice.mockImplementation(async (invoice, application) => {
-            invoiceHookMocks.createInvoice(invoice)
+            invoiceHookMocks.createInvoice({ ...invoice, ...application?.invoiceUpdates })
             application.adjustmentEntryIdsToDelete.forEach((id) => timeEntryHookMocks.deleteEntry(id))
             application.adjustmentEntriesToUpdate.forEach(({ id, updates }) => timeEntryHookMocks.updateEntry(id, updates))
             application.adjustmentEntriesToCreate.forEach(({ id, entry }) => timeEntryHookMocks.createEntry({ id, ...entry }))
@@ -446,6 +449,11 @@ describe('InvoiceGenerator', () => {
                     application.invoiceTemplateSequenceUpdate.updates
                 )
             }
+            return invoice
+        })
+        invoiceHookMocks.saveInvoiceDraft.mockReset()
+        invoiceHookMocks.saveInvoiceDraft.mockImplementation(async (invoice) => {
+            invoiceHookMocks.updateInvoice(invoice.id, invoice)
             return invoice
         })
         invoiceHookMocks.updateInvoice.mockClear()
@@ -488,6 +496,17 @@ describe('InvoiceGenerator', () => {
     afterEach(() => {
 
         vi.restoreAllMocks()
+    })
+
+    it('saves a durable draft without finalizing or advancing numbering', async () => {
+        modalConfig.skipTemplateSelection = true
+        templateHookMocks.invoiceTemplates = []
+        renderGenerator()
+        await userEvent.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        await userEvent.click(await screen.findByRole('button', { name: 'Save Draft' }))
+        expect(invoiceHookMocks.saveInvoiceDraft).toHaveBeenCalledWith(expect.objectContaining({ status: 'draft', templateId: null }), null)
+        expect(invoiceHookMocks.finalizeInvoice).not.toHaveBeenCalled()
+        expect(templateHookMocks.updateInvoiceTemplate).not.toHaveBeenCalled()
     })
 
     it('creates a new invoice using date override and client currency', { timeout: 20000 }, async () => {
@@ -548,6 +567,18 @@ describe('InvoiceGenerator', () => {
 
         expect(capturedInvoiceModalProps?.allowAdditionalProjectsSelection).toBe(true)
         expect(capturedInvoiceModalProps?.openedFromProjectContext).toBe(false)
+    })
+
+    it('marks a new invoice preview as an unissued draft without saving or billing it', async () => {
+        const user = userEvent.setup()
+        renderGenerator()
+        await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
+        act(() => capturedInvoiceModalProps.handlePreviewInvoice())
+        await waitFor(() => expect(pdfMocks.getCurrentInvoiceHtmlContent).toHaveBeenCalledWith(
+            expect.objectContaining({ status: 'draft' }), expect.anything(), expect.anything()
+        ))
+        expect(invoiceHookMocks.finalizeInvoice).not.toHaveBeenCalled()
+        expect(invoiceHookMocks.saveInvoiceDraft).not.toHaveBeenCalled()
     })
 
     it('opens project dashboard invoices focused on tasks and without additional project selection', async () => {
@@ -781,7 +812,7 @@ describe('InvoiceGenerator', () => {
             />
         )
 
-        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Draft' }))
 
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
         const [invoiceId, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
@@ -1129,7 +1160,7 @@ describe('InvoiceGenerator', () => {
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
         await new Promise((resolve) => setTimeout(resolve, 0))
-        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Draft' }))
 
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
         const [invoiceId, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
@@ -1306,7 +1337,7 @@ describe('InvoiceGenerator', () => {
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
         await new Promise((resolve) => setTimeout(resolve, 0))
-        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Draft' }))
 
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
         const [, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
@@ -1344,7 +1375,7 @@ describe('InvoiceGenerator', () => {
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
         await new Promise((resolve) => setTimeout(resolve, 0))
-        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Draft' }))
 
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
         const [, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]
@@ -1445,7 +1476,7 @@ describe('InvoiceGenerator', () => {
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
         await new Promise((resolve) => setTimeout(resolve, 0))
-        await user.click(await screen.findByRole('button', { name: 'Save Invoice' }))
+        await user.click(await screen.findByRole('button', { name: 'Save Draft' }))
 
         expect(invoiceHookMocks.updateInvoice).toHaveBeenCalledTimes(1)
         const [, invoiceData] = invoiceHookMocks.updateInvoice.mock.calls[0]

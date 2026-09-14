@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronDownIcon, ChevronUpIcon } from '@/components/ui/icons';
+import { ChevronDownIcon, ChevronUpIcon, ExclamationCircleIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { NativeDateInput } from '@/components/ui/native-date-input';
+import { Notice } from '@/components/ui/notice';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TimePicker } from '@/components/ui/time-picker';
-import { formatDurationWithSeconds, parseStoredDate, toStorageDate } from '../utils/dateUtils';
+import { formatDurationWithSeconds, parseStoredDate, toDisplayDate, toStorageDate } from '../utils/dateUtils';
 import { checkTimerStartOverlap } from '../utils/timeValidationUtils';
 import TaskTimer from './TaskTimer';
 import { useToast } from '../hooks/useToast';
@@ -13,6 +14,35 @@ import { useTimers } from '../hooks/useTimers';
 import { useTasks } from '../hooks/useTasks';
 import { useProjects } from '../hooks/useProjects';
 import { useTimeEntries } from '../hooks/useTimeEntries';
+import { useMasterClock } from '../hooks/useMasterClock';
+
+/** Derive the preview and submitted interval from the same local-date draft. */
+const getTimerEditPreview = (dateInput, timeInput, startTime, isPaused, elapsedTime, now) => {
+    const [hours, minutes, seconds = 0] = timeInput.split(':').map(Number);
+    const selectedDate = parseStoredDate(dateInput);
+    if (!selectedDate || toStorageDate(selectedDate) !== dateInput
+        || !/^\d{2}:\d{2}(?::\d{2})?$/.test(timeInput)
+        || hours > 23 || minutes > 59 || seconds > 59) {
+        return { error: 'Enter a valid start date and time' };
+    }
+    const originalDate = new Date(startTime);
+    const timeUnchanged = dateInput === toStorageDate(originalDate)
+        && timeInput === originalDate.toTimeString().slice(0, 8);
+    // Preserve sub-second precision and the original occurrence of a repeated DST hour.
+    const start = timeUnchanged ? startTime : selectedDate.setHours(hours, minutes, seconds, 0);
+    const localStart = new Date(start);
+    if (localStart.getHours() !== hours || localStart.getMinutes() !== minutes) {
+        return { error: 'This start time does not exist on the selected date' };
+    }
+    if (!timeUnchanged && start > now) {
+        return { error: 'Start time cannot be in the future' };
+    }
+    const end = isPaused ? startTime + elapsedTime : now;
+    if (!timeUnchanged && start > end) {
+        return { error: 'Start time cannot be after the timer was paused' };
+    }
+    return { start, end, timeUnchanged, duration: Math.max(0, end - start) };
+};
 
 const createInitialDraftState = (isActive, startTime, note) => {
     if (!isActive || !startTime) {
@@ -69,8 +99,27 @@ const GlobalTimer = ({
     }, [isActive, elapsedTime]);
     
     const [isExpandedInternal, setIsExpandedInternal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const isExpanded = typeof isExpandedProp === 'boolean' ? isExpandedProp : isExpandedInternal;
     const [{ startDateInput, startTimeInput, noteInput }, setDraftState] = useState(() => createInitialDraftState(isActive, startTime, note));
+
+    // Tick only while editing so paused timers also refresh their day labels at midnight.
+    useMasterClock(isActive && isExpanded);
+    const now = Date.now();
+    const today = toStorageDate(new Date(now));
+    const yesterdayDate = new Date(now);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = toStorageDate(yesterdayDate);
+    const originalDay = startTime ? toStorageDate(new Date(startTime)) : '';
+    // Keep absolute dates in the draft; midnight must never reinterpret a selection.
+    const startDays = [...new Set([today, yesterday, originalDay, startDateInput].filter(Boolean))];
+    const dayLabel = (date) => date === today ? 'Today' : date === yesterday ? 'Yesterday'
+        : toDisplayDate(date, { day: 'numeric', month: 'short', year: 'numeric' });
+    const preview = getTimerEditPreview(startDateInput, startTimeInput, startTime, isPaused, elapsedTime, now);
+    const rangeLabel = (timestamp) => {
+        const date = new Date(timestamp);
+        return `${dayLabel(toStorageDate(date))} ${date.toTimeString().slice(0, 8)}`;
+    };
 
     // Find the task associated with the current timer
     const currentTask = tasks.find(task => task.id === taskId);
@@ -95,34 +144,13 @@ const GlobalTimer = ({
     /**
      * Handle form submission (update both start time and note)
      */
-    const handleSubmitChanges = () => {
-        if (!isActive || !startTime || !projectId) return;
+    const handleSubmitChanges = async () => {
+        if (!isActive || !startTime || !projectId || isSaving) return;
 
         try {
-            // Parse and validate start time if it was changed
-            const [hours, minutes, seconds] = startTimeInput.split(':').map(Number);
-            const selectedDate = parseStoredDate(startDateInput);
-            if (!selectedDate || toStorageDate(selectedDate) !== startDateInput
-                || !/^\d{2}:\d{2}(?::\d{2})?$/.test(startTimeInput)
-                || hours > 23 || minutes > 59 || (seconds || 0) > 59) {
-                showError('Enter a valid start date and time');
-                return;
-            }
-            const originalDate = new Date(startTime);
-            const timeUnchanged = startDateInput === toStorageDate(originalDate)
-                && startTimeInput === originalDate.toTimeString().slice(0, 8);
-            // Preserve the original instant on note-only edits, including the
-            // repeated hour at DST fall-back and sub-second timer precision.
-            const newStartTime = timeUnchanged ? originalDate : selectedDate;
-            if (!timeUnchanged) newStartTime.setHours(hours, minutes, seconds || 0);
-            if (newStartTime.getHours() !== hours || newStartTime.getMinutes() !== minutes) {
-                showError('This start time does not exist on the selected date');
-                return;
-            }
-
-            // Validate that the new start time is not in the future
-            if (newStartTime.getTime() > Date.now()) {
-                showError('Start time cannot be in the future');
+            const submitted = getTimerEditPreview(startDateInput, startTimeInput, startTime, isPaused, elapsedTime, Date.now());
+            if (submitted.error) {
+                showError(submitted.error);
                 return;
             }
 
@@ -135,22 +163,23 @@ const GlobalTimer = ({
 
             // Check for overlaps with existing time entries
             const overlapCheck = checkTimerStartOverlap(
-                newStartTime.getTime(),
-                isPaused ? startTime + elapsedTime : Date.now(),
-                task.projectId,
+                submitted.start,
+                submitted.end,
+                task.projectId || task.id,
                 timeEntries,
-                tasks
+                tasks.map((candidate) => ({ ...candidate, projectId: candidate.projectId || candidate.id }))
             );
 
-            if (!overlapCheck.isValid) {
+            if (!submitted.timeUnchanged && !overlapCheck.isValid) {
                 showError(overlapCheck.error);
                 return;
             }
 
             // Update the timer with both start time and note
-            updateTimer(projectId, {
-                startTime: newStartTime.getTime(),
-                note: noteInput.trim() || undefined
+            setIsSaving(true);
+            await updateTimer(projectId, {
+                startTime: submitted.start,
+                note: noteInput.trim()
             });
 
             showSuccess('Timer updated successfully');
@@ -161,6 +190,8 @@ const GlobalTimer = ({
             }
         } catch (error) {
             showError(error?.message || 'Unable to update timer');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -242,16 +273,26 @@ const GlobalTimer = ({
                 <div className="border-t border-border pt-3 pb-2 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                         <div className="min-w-0">
-                            <Label className="text-xs text-foreground" htmlFor="global-timer-start-date">
-                                Start Date
+                            <Label className="text-xs text-foreground" htmlFor="global-timer-start-day">
+                                Start Day
                             </Label>
-                            <NativeDateInput
-                                id="global-timer-start-date"
+                            <Select
                                 value={startDateInput}
-                                max={toStorageDate(new Date())}
-                                onChange={(e) => setDraftState((prev) => ({ ...prev, startDateInput: e.target.value }))}
-                                className="mt-1 h-8 min-w-0 text-sm"
-                            />
+                                disabled={isSaving}
+                                onValueChange={(value) => setDraftState((prev) => ({ ...prev, startDateInput: value }))}
+                            >
+                                <SelectTrigger
+                                    id="global-timer-start-day"
+                                    aria-describedby="global-timer-preview"
+                                    className="mt-1 h-8 min-w-0 text-sm"
+                                    onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent onKeyDown={(event) => event.stopPropagation()}>
+                                    {startDays.map((date) => <SelectItem key={date} value={date}>{dayLabel(date)}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
                         </div>
                         {/* Start Time Input */}
                         <div>
@@ -260,11 +301,36 @@ const GlobalTimer = ({
                             </Label>
                             <TimePicker
                                 id="global-timer-start-time"
+                                aria-describedby="global-timer-preview"
+                                aria-invalid={Boolean(preview.error)}
                                 value={startTimeInput}
+                                disabled={isSaving}
                                 onChange={(e) => setDraftState((prev) => ({ ...prev, startTimeInput: e.target.value }))}
                                 className="mt-1 h-8 text-sm"
                             />
                         </div>
+
+                        <div id="global-timer-preview" role="group" aria-label="Timer preview" className={`col-span-2 text-xs ${preview.error ? '' : 'space-y-1 rounded-md bg-muted/50 px-3 py-2'}`}>
+                            {preview.error ? (
+                                <Notice
+                                    compact
+                                    variant="destructive"
+                                    icon={ExclamationCircleIcon}
+                                    description={preview.error}
+                                    role="alert"
+                                    className="[&_p]:text-xs [&_svg]:h-4 [&_svg]:w-4"
+                                />
+                            ) : (
+                                <>
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                                        <span className="text-muted-foreground">Timer duration</span>
+                                        <strong className="text-sm font-medium tabular-nums">{formatDurationWithSeconds(preview.duration)}</strong>
+                                    </div>
+                                    <p className="text-muted-foreground">{rangeLabel(preview.start)} → {rangeLabel(preview.end)} ({isPaused ? 'paused' : 'now'})</p>
+                                </>
+                            )}
+                        </div>
+                        <p className="col-span-2 text-xs text-muted-foreground">For older work, add a manual time entry.</p>
 
                         {/* Note Input */}
                         <div className="col-span-2">
@@ -275,6 +341,7 @@ const GlobalTimer = ({
                                 id="global-timer-note"
                                 type="text"
                                 value={noteInput}
+                                disabled={isSaving}
                                 onChange={(e) => setDraftState((prev) => ({ ...prev, noteInput: e.target.value }))}
                                 placeholder="What are you working on..."
                                 className="mt-1 h-8 text-sm"
@@ -302,8 +369,9 @@ const GlobalTimer = ({
                             type="button"
                             size="sm"
                             onClick={handleSubmitChanges}
+                            disabled={isSaving || Boolean(preview.error)}
                         >
-                            Update Timer
+                            {isSaving ? 'Updating…' : 'Update Timer'}
                         </Button>
                     </div>
                 </div>

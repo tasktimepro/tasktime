@@ -17,16 +17,19 @@ const InvoiceActions = ({
     onDownload,
     canUndoInvoice = false,
     onUndoInvoice,
+    onSaveDraft,
+    isSaving = false,
 }) => {
     const isQuoteMode = mode === 'quote';
 
     return (
-        <div className="flex w-full items-center justify-between gap-2">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2" aria-busy={isSaving}>
             {onPreview ? (
                 <Button
                     type="button"
                     variant="outline"
                     onClick={onPreview}
+                    disabled={isSaving}
                     aria-label={isQuoteMode ? 'Preview quote' : 'Preview invoice'}
                     className="gap-0 px-2.5 sm:gap-2 sm:px-4"
                     leadingIcon={EyeIcon}
@@ -51,6 +54,8 @@ const InvoiceActions = ({
                     type="button"
                     variant="secondary"
                     onClick={handleClose}
+                    disabled={isSaving}
+                    className={isQuoteMode ? '' : 'hidden sm:inline-flex'}
                 >
                     Close
                 </Button>
@@ -76,11 +81,15 @@ const InvoiceActions = ({
                     </>
                 ) : (
                     <>
+                        <Button type="button" variant="outline" onClick={onSaveDraft} disabled={isSaving}>
+                            Save Draft
+                        </Button>
                         <Button
                             type="submit"
                             form="invoice-form"
+                            disabled={isSaving}
                         >
-                            {editingInvoice ? 'Update Invoice' : 'Generate Invoice'}
+                            Finalize Invoice
                         </Button>
                     </>
                 )}

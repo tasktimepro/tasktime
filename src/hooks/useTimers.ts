@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useYjs } from '@/contexts/YjsContext';
 import { useMasterClock } from '@/hooks/useMasterClock';
 import type { MultiTimerState, Project, Task, TimeEntry } from '@/stores/yjs/types';
+import { updateTimerWithValidation } from '@/stores/yjs/timerUpdates';
 import { generateId } from '@/utils/idUtils';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { readEntity, objectToYMap, updateEntityFields } from '@/stores/yjs/entityUtils';
@@ -16,7 +17,6 @@ import {
     buildPausedTimer,
     buildResumedTimer,
     buildStartedTimer,
-    buildUpdatedTimer,
     findStoppedTimerEntry,
     planStoppedTimer,
 } from '@/domain/time/timerOperations';
@@ -48,7 +48,7 @@ export interface UseTimersResult {
     /** Clear timer without creating entry */
     clearTimer: (projectId: string) => void;
     /** Update timer properties */
-    updateTimer: (projectId: string, updates: { startTime?: number; note?: string }) => void;
+    updateTimer: (projectId: string, updates: { startTime?: number; note?: string }) => Promise<void>;
     /** Focus a timer (brings to top of stack) */
     focusTimer: (projectId: string) => void;
     /** Whether timer state is loading */
@@ -278,24 +278,11 @@ export function useTimers(): UseTimersResult {
         markMeaningfulActivity('timer_clear');
     }, [isReady, store]);
 
-    const updateTimer = useCallback((projectId: string, updates: { startTime?: number; note?: string }) => {
+    const updateTimer = useCallback(async (projectId: string, updates: { startTime?: number; note?: string }) => {
         if (!isReady) return;
+        if (!store.timers.has(projectId)) return;
 
-        const timer = readValidatedEntity<MultiTimerState>('timers', store.timers.get(projectId), `update timer ${projectId}`);
-        if (!timer) return;
-
-        const updated = buildUpdatedTimer(timer, updates, Date.now());
-        const fieldUpdates: Record<string, unknown> = { lastActive: updated.lastActive };
-        if (updates.startTime !== undefined) {
-            fieldUpdates.startTime = updated.startTime;
-            if (timer.paused) fieldUpdates.pausedElapsedTime = updated.pausedElapsedTime;
-        }
-        if (updates.note !== undefined) fieldUpdates.note = updated.note;
-
-        store.coreDoc.transact(() => {
-            updateEntityFields(store.timers as any, projectId, fieldUpdates);
-        });
-
+        await updateTimerWithValidation(store, projectId, updates);
         markMeaningfulActivity('timer_update');
     }, [isReady, store]);
 

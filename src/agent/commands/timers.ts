@@ -1,3 +1,4 @@
+import { updateTimerWithValidation } from '@/stores/yjs/timerUpdates';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { collectValidatedEntities, readValidatedEntity, validateCollectionEntity } from '@/stores/yjs/validation';
 import { objectToYMap, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
@@ -10,7 +11,6 @@ import {
     buildPausedTimer,
     buildResumedTimer,
     buildStartedTimer,
-    buildUpdatedTimer,
     findStoppedTimerEntry,
     planStoppedTimer,
 } from '@/domain/time/timerOperations';
@@ -431,40 +431,18 @@ export function clearTimerCommand(context: AgentCommandContext, input: ClearTime
     };
 }
 
-export function updateTimerCommand(context: AgentCommandContext, input: UpdateTimerCommandInput): MultiTimerState {
+export async function updateTimerCommand(context: AgentCommandContext, input: UpdateTimerCommandInput): Promise<MultiTimerState> {
     assertReady(context);
     assertPermission(context, 'write');
 
     const timerKey = resolveTimerKey(context, input);
-    const timer = readValidatedEntity<MultiTimerState>('timers', context.store.timers.get(timerKey), `agent update timer ${timerKey}`);
-
-    if (!timer) {
-        throw new AgentCommandError('NOT_FOUND', 'Timer not found.', { timerKey });
-    }
-
-    if (input.startTime === undefined && input.note === undefined) {
-        throw new AgentCommandError('INVALID_INPUT', 'startTime or note is required to update a timer.', { timerKey });
-    }
-
-    let merged: MultiTimerState;
     try {
-        merged = validateCollectionEntity<MultiTimerState>('timers', buildUpdatedTimer(timer, input, getNow(context)), `agent update timer ${timerKey}`);
+        const updated = await updateTimerWithValidation(context.store, timerKey, input, () => getNow(context));
+        markMeaningfulActivity('timer_update');
+        return updated;
     } catch (error) {
-        throw new AgentCommandError('INVALID_INPUT', error instanceof Error ? error.message : 'Invalid timer update.', { timerKey });
+        return throwAgentTimerError(error);
     }
-    const updates: Record<string, unknown> = { lastActive: merged.lastActive };
-    if (input.startTime !== undefined) {
-        updates.startTime = merged.startTime;
-        if (timer.paused) updates.pausedElapsedTime = merged.pausedElapsedTime;
-    }
-    if (input.note !== undefined) updates.note = merged.note;
-
-    context.store.coreDoc.transact(() => {
-        updateEntityFields(context.store.timers as any, timerKey, updates);
-    });
-
-    markMeaningfulActivity('timer_update');
-    return merged;
 }
 
 export function addManualTimeEntryCommand(context: AgentCommandContext, input: AddManualTimeEntryCommandInput): Promise<TimeEntry> {

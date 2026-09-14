@@ -411,6 +411,7 @@ const invoiceSchema = z.object({
     cancellationReason: z.string().trim().min(1).max(500).nullable().optional(),
     billingStateSnapshot: invoiceBillingStateSnapshotSchema.nullable().optional(),
     billingSelectionSnapshot: invoiceBillingSelectionSnapshotSchema.nullable().optional(),
+    draftNumberMode: z.enum(['automatic', 'manual']).optional(),
     brandingSnapshot: z.object({
         businessInfoId: optionalNullableIdSchema,
         templateId: optionalNullableIdSchema,

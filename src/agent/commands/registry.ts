@@ -144,6 +144,8 @@ import {
     getEmailSendStatusCommand,
     undoLatestInvoiceCommand,
     updateInvoiceDraftCommand,
+    deleteInvoiceDraftCommand,
+    refreshInvoiceDraftCommand,
 } from './invoices';
 import {
     focusRunningTimerCommand,
@@ -268,6 +270,8 @@ export type AgentCommandName =
     | 'preview_invoice_from_unbilled_work'
     | 'create_invoice_draft'
     | 'update_invoice_draft'
+    | 'delete_invoice_draft'
+    | 'refresh_invoice_draft'
     | 'finalize_invoice'
     | 'mark_invoice_paid'
     | 'mark_invoice_unpaid'
@@ -990,6 +994,18 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         description: 'Edit allowed metadata, line items, totals, and UI composition fields on an existing draft invoice without billing side effects.',
         scopes: ['read', 'write'],
         handler: updateInvoiceDraftCommand,
+    },
+    delete_invoice_draft: {
+        name: 'delete_invoice_draft',
+        description: 'Delete an unissued draft after explicit confirmation without changing source work or invoice numbering.',
+        scopes: ['read', 'write'], requiresApproval: true,
+        handler: deleteInvoiceDraftCommand,
+    },
+    refresh_invoice_draft: {
+        name: 'refresh_invoice_draft',
+        description: 'Rebuild and save linked draft work for its client/project scope and billing period after explicit confirmation, including client-only expenses. Reset linked selections and pricing overrides while retaining manual items, notes, discount, shipping, and tax settings.',
+        scopes: ['read', 'write'], requiresApproval: true,
+        handler: refreshInvoiceDraftCommand,
     },
     finalize_invoice: {
         name: 'finalize_invoice',

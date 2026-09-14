@@ -94,7 +94,8 @@ const TimeFieldInput = ({ label, value, min, max, onCommit }) => {
 
     const handleBlur = () => {
 
-        if (editValue === "" || editValue === null) {
+        // Null means the field was only focused; preserve its existing value.
+        if (editValue === "") {
             onCommit(padTime(0));
         }
 
