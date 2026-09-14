@@ -1,5 +1,31 @@
 # App Status
 
+## September 15 launch preparation — branch checkpoint
+
+Core version `1.6.0` and the DebugBundle browser SDK `1.7.1` update pass the full
+Docker gate: zero audit findings, lint/typecheck/build and coverage gates, 2,815
+unit checks with one existing timezone skip, 90 Chromium and five PWA checks.
+The packaged/live local agent gate also passes. Logs are
+`/private/tmp/tasktime-launch-core-gate.log` and
+`/private/tmp/tasktime-launch-agent-gate.log`. The owner authorized committing
+and pushing this preparation to `update/launch`, followed by GitHub CI. This
+authorization excludes main promotion, tags, package publication and deployment.
+The user's pre-existing `TODO.md` edits are preserved outside the commit.
+The independent site's contract pin still refers to its existing clean core
+checkpoint and needs review after the final core commit before site publication.
+
+Private preparation now includes a tested deployed-Worker overlap rehearsal
+and a shared app/site workflow with separate prepare/deploy runs, exact artifact
+approval and fixed targets. The owner-approved database rollback copies are
+retained privately and pass local SQLite plus Cloudflare-runtime restore and
+additive migration checks with all legacy values preserved. The owner confirmed
+the Google/Dropbox app-origin additions; live sign-in remains to be checked.
+Production preparation remains gated on migration/configuration
+and rollback evidence, and the exact deployment decision. The app origin is first; the root
+site and temporary returning-user export notice remain later work requiring
+separate root-switch approval. Operational details stay in the private launch
+readiness record.
+
 ## Current focus
 
 - [x] Final local audit and user-authorized commit checkpoint (2026-09-14).

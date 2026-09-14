@@ -8,6 +8,17 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
+- September 15 launch preparation is approved for an `update/launch` branch
+  commit/push and GitHub CI, without main promotion or deployment: core `1.6.0` with
+  browser SDK `1.7.1` passes the full core and local agent gates. Private overlap
+  and artifact-target guards pass. Owner-approved database rollback copies are
+  retained privately and pass local SQLite and Cloudflare-runtime migration
+  checks. OAuth additions are owner-confirmed; live sign-in and production
+  migration/configuration evidence remain prerequisites.
+  `app-status.md` and the private readiness record retain the evidence. No
+  deployment occurred; root publication still requires the owner's separate
+  go-ahead after app-origin testing.
+
 **Program Phase 3 locally validated; Phase 4 launch preparation next**
 
 - Final audit and user-authorized local checkpoint (2026-09-14): saved invoice
