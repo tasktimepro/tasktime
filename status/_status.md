@@ -9,7 +9,9 @@ root rollback fallback; the original independent archive is unavailable. Private
 site checkout access is verified. The recovery candidate is ready for its clean
 source checkpoint and independent site pin. Final commercial availability and
 per-device migration acceptance are being reconciled before the root switch;
-the earlier Stripe Tax deferral still keeps paid activation disabled. The private
+both users have confirmed their active devices. The owner explicitly approved
+completing live billing, and the confirmed domestic tax registration is now active.
+Production billing still awaits its runtime configuration and live verification. The private
 execution record owns deployment identities, artifact hashes and live results.
 Earlier dated notes below remain historical checkpoints.
 

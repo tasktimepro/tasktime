@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+// Trust only this mounted checkout, as the site-contract exporter does in CI.
+const git = (...args) => execFileSync('git', ['-c', `safe.directory=${process.cwd()}`, ...args], { encoding: 'utf8' }).trim();
 const manifest = {
     schemaVersion: 1,
     purpose: 'temporary-old-origin-readonly-backup',
