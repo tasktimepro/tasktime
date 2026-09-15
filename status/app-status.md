@@ -2,18 +2,43 @@
 
 ## September 15 staged launch execution
 
-Core main and update/launch contain the integrated `9ab3daa` candidate. Its
-automatic main CI passed. The approved compatible shared Worker upgrade and
-additive migrations are complete; retained legacy records passed comparison.
-The separate app host is active, while root Pages and DNS remain unchanged.
-The first app artifact preparation stopped before packaging or deployment:
-88 Chromium checks passed, while two long dashboard journeys exceeded their
-60-second total test budget on the private runner. Both pass locally, including
-with SDK instrumentation enabled and reporting requests intercepted, and passed
-the core CI. Their total budget is now 180 seconds; assertions and individual
-assertion deadlines are unchanged. A fresh complete artifact gate is required.
-Root publication, returning-user recovery notice and owner data acceptance stay
-separate. No tag or agent package has been published.
+App `1.6.0` is live at `https://app.tasktime.pro`, deployed from exact core
+`fa2287039a8159eb9147b647a396e498f67d6253` by the private app-only workflow.
+The original root deployment and DNS are unchanged. Root publication, the
+returning-user recovery notice and owner data acceptance remain separate gates;
+only an explicit later owner go-ahead permits the root switch. No tag or agent
+package has been published.
+
+The successful artifact gate passes 286 files / 2,865 unit tests plus one
+existing timezone skip, lint/typecheck/coverage/build/contracts, zero audit
+findings, all 90 Chromium scenarios and five PWA checks. One long manual-sync
+journey required a retry, passing at 59.7 seconds after two total-budget timeouts.
+The two dashboard journeys pass with their total budget increased to 180 seconds;
+assertions and individual assertion deadlines are unchanged. A separate test-only
+follow-up gives the long sync journey the same budget; both focused convergence
+checks and lint pass. That follow-up is not part of the deployed `fa22870` artifact
+and requires no application rebuild, version bump or agent artifact release.
+
+All 24 live artifact checks pass. JavaScript, CSS and other checked assets match
+the retained archive bytes; served HTML matches after removing only the identified
+Cloudflare challenge script. Real Edge tests pass Google consent/callback and
+initial sync, plus Dropbox connection and explicit Sync Now. Google showed an
+empty test workspace; Dropbox restored its saved sync preferences. These bounded
+test-account checks do not substitute for owner acceptance of existing data and
+normal invoice/timer workflows.
+
+Google's non-destructive Sync & disconnect completed and retained local data.
+The same tab then showed stale account text and hid both connection buttons until
+the app was reopened. Track and reproduce this UI state issue before root
+promotion; no data reset was used. The final test tab remains connected to Dropbox.
+
+Core main remains `9ab3daa`; its automatic CI passed. Automatic approval review
+rejected pushing the subsequent test-only changes to main because of the deferred
+root promotion boundary. The app was instead prepared from `update/launch`.
+Further main follow-up requires explicit approval and must not deploy the root.
+The compatible shared Worker upgrade and additive migrations are complete, with
+legacy-value comparison, retained private backups and live origin checks passing.
+Exact operational pins and rollback limits remain in the private readiness record.
 
 ## September 15 main integration
 

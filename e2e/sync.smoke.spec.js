@@ -359,6 +359,9 @@ test.describe('Cloud sync smoke', () => {
     });
 
     test('converges same-project remote and disconnected local edits after Sync Now in manual mode', async ({ page }) => {
+        // Disconnect, reconcile and reload can exhaust the default total budget on private CI.
+        // Keep each assertion's deadline unchanged while allowing the complete journey.
+        test.setTimeout(180_000);
         const originalTitle = `Playwright Reconnect Shared Project ${Date.now()}`;
         const localTitle = `Playwright Reconnect Local Title ${Date.now()}`;
         const mergedColorValue = 'rgb(59, 130, 246)';

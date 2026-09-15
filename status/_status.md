@@ -8,13 +8,16 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
-- September 15 app-first execution: main promotion and the compatible shared
-  Worker preparation are complete. Root deployment and DNS remain unchanged.
-  The app host is active but its first artifact gate stopped on two long browser
-  scenarios exhausting their total test budget; packaging/deployment did not run.
-  Their assertions are preserved with an explicit longer journey budget, pending
-  a fresh complete gate. This supersedes the earlier branch-only authorization
-  checkpoint below. Root publication still requires the owner's separate go-ahead.
+- September 15 app-first launch is live at `https://app.tasktime.pro`, using
+  exact core `fa22870`. The complete artifact gate and 24 live checks pass;
+  one long sync browser journey needed a retry. Real Edge Google sign-in/initial
+  sync and Dropbox connection/Sync Now pass. A disconnect UI issue remains:
+  Google connection buttons can stay hidden until reopening the app. Owner
+  data/workflow acceptance is next. Root deployment and DNS remain unchanged;
+  root publication and its recovery notice require the owner's separate go-ahead.
+  Test/documentation follow-ups remain on `update/launch` after automatic approval
+  review rejected a further core main push. See `app-status.md` and private
+  readiness evidence. This supersedes the historical preparation checkpoints below.
 
 - September 15 launch preparation is approved for an `update/launch` branch
   commit/push and GitHub CI, without main promotion or deployment: core `1.6.0` with
