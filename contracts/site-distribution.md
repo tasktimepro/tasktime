@@ -21,7 +21,7 @@ source, share node_modules, or require a synchronized app release for site copy.
 Site may bundle its own optional browser diagnostics module, with a separate
 write-only origin-restricted project token. This does not authorize app hydration,
 workspace storage, a service worker or product analytics. Diagnostic failure must
-not block public navigation. The default social image is a site-owned 1200×630 PNG.
+not block public navigation. The default social image is a site-owned 1200×630 JPEG.
 Small static icon/token/brand assets are owned copies; changing shared branding
 requires an intentional review in each repository, not a shared UI framework.
 
@@ -78,6 +78,25 @@ the exact app origin; site has no SPA fallback, service worker, or persisted
 workspace. A top-level non-indexable `404.html` prevents the host's implicit SPA
 fallback. Site favicon/touch/social icons are static branding, not installation
 metadata. Public links inside core use the configured marketing origin.
+
+## Temporary old-origin recovery exception
+
+The approved root cutover may distribute a checksum-pinned, core-built recovery
+module alongside the site. This is a removable compatibility reader, not the app
+runtime. It may enumerate existing TaskTime IndexedDB documents and read their
+Yjs updates in readonly transactions. It must never create/upgrade a database,
+connect a provider, copy credentials, mutate workspace records, or register a PWA.
+The site shows the approved dismissible notice only for actual workspace records;
+theme/default preferences alone do not count. Dismissal is an origin-local UI
+preference. Export uses the supported portable-backup validator and includes all
+locally persisted archive documents. Concurrent changes, incomplete Yjs updates,
+pending restore/billing work, malformed records and ambiguous archive duplicates
+fail closed. Unfinished timers require the existing portable-backup warning.
+
+The reviewed module's source commit and SHA-256 are pinned explicitly in the
+independent site repository. Core owns the reader/backup semantics; site owns
+notice UI. No parent source imports or automatic latest-core fetching is allowed.
+Old-worker/offline return and exact rollback proof remain cutover gates.
 
 ## Independent release policy
 

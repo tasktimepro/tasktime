@@ -137,6 +137,7 @@ site-stop:
 	$(DEV_COMPOSE) stop site
 site-contract:
 	$(APP_RUN) npm run export:site-contract
+	$(APP_RUN) npm run build:site-recovery
 
 # Historical convenience names keep working for existing local instructions.
 blog-install:
@@ -213,6 +214,7 @@ release-gate:
 	$(APP_RUN) npm run test:e2e:smoke
 	$(APP_RUN) npm run test:e2e:pwa:smoke
 	$(APP_RUN) npm run export:site-contract
+	$(APP_RUN) npm run build:site-recovery
 
 # View logs
 logs:

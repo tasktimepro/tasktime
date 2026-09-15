@@ -1,5 +1,40 @@
 # Delivery Status — Overview
 
+## September 15 production promotion approved
+
+The owner authorized continuing the app and root-site launch with necessary
+Cloudflare operations, no additional expenses, and cleanup only after successful
+verification. The retained Cloudflare production deployment is the approved
+root rollback fallback; the original independent archive is unavailable. Private
+site checkout access is verified. The recovery candidate is ready for its clean
+source checkpoint and independent site pin. Final commercial availability and
+per-device migration acceptance are being reconciled before the root switch;
+the earlier Stripe Tax deferral still keeps paid activation disabled. The private
+execution record owns deployment identities, artifact hashes and live results.
+Earlier dated notes below remain historical checkpoints.
+
+## September 15 root launch continuation — recovery validated locally
+
+The owner approved the notice UI and proceeding with Phase 4 including the public
+root. The temporary readonly recovery reader and real site download are now
+implemented in the local candidate. Core gate: 2,887 unit tests, 96 Chromium and
+five PWA checks; targeted recovery journeys also pass in Firefox and WebKit.
+Site gate: 10 native tests, 20 Chromium checks and one optional diagnostics skip;
+nine preview checks pass. The retained production worker rehearsal confirms
+online complete export and reopening an old bookmark after an offline visit.
+That worker can still show its original app shell offline, so known-profile
+retirement remains part of cutover. No workspace mutation is performed by the
+reader. See `status/app-status.md` and private launch readiness for evidence.
+
+Root and app deployments remain unchanged. Publication is blocked on the private
+site checkout credential and an explicit rollback decision: the original GitHub
+archive expired, while Cloudflare retains the successful original deployment.
+The recovery bundle is still marked dirty; clean source pins and final CI/artifact
+preparation must follow the reviewed commits. No new commit, push, merge or
+deployment occurred in this recovery continuation. Live billing remains disabled
+under the owner's separate Tax-registration deferral. These current facts
+supersede the historical preparation-only and visual-fixture notes below.
+
 ## September 15 approved launch policies — local validation complete
 
 Owner-selected allowance, grace, refund/support and retention policies are

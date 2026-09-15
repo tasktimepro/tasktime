@@ -7,6 +7,13 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **DATA-1:** Store application entities in Yjs documents persisted through IndexedDB.
 - **DATA-2:** Read supported historical local, Drive, and backup shapes without requiring a user reset.
 - **DATA-3:** Make persisted schema changes additive or provide an explicit, tested migration.
+- **DATA-RECOVERY:** During the approved root-origin retirement window, detect
+  actual saved workspace records and offer a validated local portable backup
+  including all persisted archives. Read without creating/upgrading databases or
+  changing source data. Fail closed on unfinished operations, corrupt storage or
+  concurrent changes. Warn explicitly that portable backups exclude unfinished
+  timers. Never copy auth, licences, Push or agent credentials. Remember explicit
+  notice dismissal separately as an origin-local UI preference.
 - **DATA-4:** Preserve entity relationships during normal mutations, cascade deletion, import, export, archive, and restore.
 - **DATA-5:** Reject or safely normalize malformed external data without silently discarding valid records.
 - **DATA-6:** A persisted collection or field is not complete until every applicable storage and product consumer has been reviewed: types, validation, compatibility/migration, sync/archive, backup/export, import/restore, deletion, reports, UI, agents, and historical regression fixtures. Intentional exclusions must be specified.

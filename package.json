@@ -18,6 +18,7 @@
     "smoke:agent-bundles": "node ./scripts/smoke-agent-bundles.mjs",
     "smoke:agent-live": "node ./scripts/smoke-agent-live.mjs",
     "export:site-contract": "node ./scripts/site-contract.mjs --output artifacts/site-contract.json",
+    "build:site-recovery": "vite build --config vite.recovery.config.js && node scripts/recovery-manifest.mjs",
     "check:site-contract": "node ./scripts/site-contract.mjs --check",
     "lint": "sh ./scripts/run-eslint.sh",
     "typecheck": "tsc --noEmit --pretty false",
@@ -32,7 +33,7 @@
     "test:e2e:drive-browsers": "playwright test --workers=2 e2e/sync.smoke.spec.js --grep \"uploads through the direct Google transport\"",
     "test:e2e:pwa:smoke": "npm run build && playwright test -c playwright.pwa.config.js",
     "audit:security": "npm audit --audit-level=high",
-    "release": "npm run audit:security && npm run lint && npm run typecheck && npm run test:build-artifacts && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run export:site-contract",
+    "release": "npm run audit:security && npm run lint && npm run typecheck && npm run test:build-artifacts && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run export:site-contract && npm run build:site-recovery",
     "release:agent": "npm run build:agent-bridge && npm run build:openclaw-plugin && npm run smoke:agent-bridge && npm run smoke:agent-bundles && npm run smoke:agent-live"
   },
   "dependencies": {

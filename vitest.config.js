@@ -19,6 +19,7 @@ export default defineConfig({
             reporter: ['text', 'json', 'html'],
             include: [
                 'src/utils/**',
+                'src/recovery/localWorkspaceRecovery.ts',
                 'src/hooks/**',
                 'src/components/dashboard/dashboardMetrics.ts',
                 'src/components/dashboard/hooks/**',

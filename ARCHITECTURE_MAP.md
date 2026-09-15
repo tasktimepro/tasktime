@@ -55,6 +55,11 @@ Approval-gated Phase 4 production target
 
 ## Dependency direction
 
+- `src/recovery/` reads existing old-origin IndexedDB updates into in-memory Yjs
+  documents, then uses `utils/backupData.ts` for portable validation. Its standalone
+  bundle is manually checksum-pinned into site; it never imports the app lifecycle,
+  provider auth or runtime. See the temporary exception in `contracts/site-distribution.md`.
+
 - Core source is public; site and infrastructure source are private. Repository
   visibility does not change the independent builds or public website output;
   see `contracts/site-distribution.md`.

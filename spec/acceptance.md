@@ -1,5 +1,13 @@
 # Acceptance Criteria
 
+- Temporary root recovery distinguishes absent/preferences-only storage from
+  actual workspace records, includes archived years/tasks/invoices/expenses,
+  preserves source update bytes and restores through the normal app importer on
+  a separate origin. All three browser engines exercise readonly access, corrupt
+  data and concurrent changes. Pending restore/billing/transfer operations cannot
+  produce an apparently successful partial backup. Production site integration,
+  old-worker/offline return and retained rollback proof are separate launch gates.
+
 ## Local-first and compatibility
 
 - A returning user can open an existing supported IndexedDB dataset after an upgrade without clearing browser data.

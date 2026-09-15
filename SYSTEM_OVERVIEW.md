@@ -6,6 +6,12 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 
 ## Runtime components
 
+- **Temporary root recovery:** `src/recovery/` builds an independently pinned
+  readonly Yjs/IndexedDB reader for the old root origin. It uses the normal
+  portable backup validator without initializing the app store or a provider.
+  The public site owns its dismissible UI; removal follows the recovery window.
+  Production publication still requires old-worker and rollback verification.
+
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **React context identity:** Yjs and billing context objects live in UI-independent
   shared modules so lazy Reports imports after development hot updates retain

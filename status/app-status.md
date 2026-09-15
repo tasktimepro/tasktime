@@ -1,5 +1,37 @@
 # App Status
 
+## September 15 production continuation authorized
+
+The owner approved launch continuation, including root publication and the
+retained Cloudflare rollback fallback, with no new expenses and cleanup deferred
+until verification. The core 1.6.0 candidate below is being frozen for clean
+contract/recovery pins and final CI. No agent artifact contents changed. Source
+checkpoint approval does not mark the remaining device, commercial-availability
+or production canaries complete; their evidence belongs in the private runbook.
+
+## September 15 temporary root recovery — local candidate validated
+
+`src/recovery/localWorkspaceRecovery.ts` reads only existing old-origin Yjs
+updates and decodes them in memory. It reuses the normal portable-backup parser,
+includes local archive documents and rejects ambiguous/partial state. It never
+creates a database, starts persistence/sync, exports credentials or mutates source
+records. Full core gate passes 2,887 unit tests (one existing skip), 96 Chromium
+checks and five PWA checks, with audit/lint/typecheck/coverage/build/contracts.
+The 17 recovery unit tests cover all five supported sample backup fixtures,
+concurrency, pending operations, corrupt data and unfinished timers. All 15
+targeted browser tests pass across Chromium, Firefox and WebKit, including a real
+YjsStore import on the separate app origin. Recovery coverage exceeds the 75%
+per-file requirement. Evidence: `/private/tmp/tasktime-phase4-recovery-core-gate.log`,
+`/private/tmp/tasktime-recovery-browser.log` and
+`/private/tmp/tasktime-recovery-coverage.log`.
+
+The standalone bundle builds successfully and is locally pinned in the site as
+a dirty candidate. The site now uses it for real downloads; its release gate and
+the retained old-worker online/offline/reopen rehearsal pass. Final clean pins,
+private checkout access, rollback decision and root-profile retirement remain
+release work. No agent artifact changed, so no agent package republish is needed.
+This remains the core 1.6.0 launch train, with independent site/infra revisions.
+
 ## September 15 Phase 4 preflight — validated, awaiting branch commit approval
 
 The app-origin Google disconnect issue is reproduced and fixed locally. Every
