@@ -1,5 +1,19 @@
 # Public Site Status
 
+## September 15 diagnostics, VAT copy and social metadata — uncommitted
+
+The independent site now includes optional DebugBundle `1.7.1` capture using its
+own `tasktime-site` service/project, with no app hydration/storage or analytics.
+Public pricing states that VAT is included where applicable. The generic social
+image uses the owner's 1200×630 JPEG and large-image cards; repeated article
+icon overrides were removed so they inherit the common default. The supplied
+artwork is unchanged. All 50 public metadata pages use its URL and JPEG type;
+blog defaults resolve in the layout to avoid retaining stale cached images.
+The owner requested no commits. The refreshed site gate passes with 10 native and
+16 Chromium tests, zero audit findings and 51 built pages. A final clean core
+contract review/pin and separate owner approval remain publication gates.
+
+
 ## Current focus
 
 - [x] Complete the local homepage capture/layout audit (2026-09-14). The supplied

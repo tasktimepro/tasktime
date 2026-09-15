@@ -233,7 +233,13 @@ export function useBillingStatus(options: {
                 // A reachable browser can still meet a transient Worker/session
                 // failure. Only the browser's network state justifies offline UI.
                 setOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
-                setError(caught.code);
+                // Status reads can overlap return reconciliation or another
+                // tab's account operation. Let the existing bounded retries
+                // settle that busy response before displaying an outage.
+                const waitingForAccount = caught.status === 409
+                    && caught.code === 'ACCOUNT_OPERATION_IN_PROGRESS'
+                    && retryCount.current < MAX_TRANSIENT_RETRIES;
+                setError(waitingForAccount ? null : caught.code);
                 if (retryCount.current < MAX_TRANSIENT_RETRIES) {
                     const delay = 2_000 * (2 ** retryCount.current);
                     retryCount.current += 1;

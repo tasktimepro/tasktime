@@ -1,5 +1,145 @@
 # App Status
 
+## September 15 Phase 4 preflight — validated, awaiting branch commit approval
+
+The app-origin Google disconnect issue is reproduced and fixed locally. Every
+mounted auth consumer now clears its signed-in identity when the shared stored
+session is removed; account sign-in and cloud connection buttons return without
+reloading. No local work is reset or remote grant revoked. The regression, all
+92 related tests and a Chromium disconnect journey pass. Changed-hook coverage:
+87.79% statements, 76.49% branches, 89.85% functions and 88.39% lines.
+
+The final complete Docker app gate passes: 287 files / 2,870 unit tests plus one
+existing timezone skip, 91 Chromium checks, five PWA checks, zero audit findings,
+lint/typecheck/coverage/build/contracts. All 790 installed tooling packages match
+the lockfile; five private app/site deployment guard tests pass. Logs:
+`/private/tmp/tasktime-phase4-final-core-gate.log`,
+`/private/tmp/tasktime-phase4-disconnect-green.log`,
+`/private/tmp/tasktime-phase4-disconnect-browser.log`.
+
+Fresh Cloudflare/GitHub reads confirm the deployed app and old root are unchanged,
+paid controls remain off and required Stripe/licence bindings are not installed.
+Core stays public, nested site/infra private and ignored; queried branches are
+unprotected. The reviewed public snapshot needs a clean core commit before the
+site can pin it. The next proposed step is separate update/launch commits/pushes
+and CI/artifact preparation, preserving the earlier no-commit boundary until
+explicitly released. No agent artifacts changed in this follow-up. Main promotion,
+production billing, root publication and cleanup remain separate decisions.
+
+## September 15 invoice VAT and receipt setup
+
+The owner subsequently chose to leave Stripe Tax registrations unchanged for now.
+Registration setup is deferred; live billing remains disabled.
+
+Owner supplied the invoice VAT number; it is now added and verified in the
+correct TaskTime Pro live Stripe account. Invoice-default selection, receipt
+emails await confirmation of the earlier Dashboard steps. The owner has now
+confirmed completing payment recovery: eight attempts over two weeks, final
+cancellation, invoice left overdue and failed-payment emails. The API still
+reports no TaskTime Tax registrations; an invoice VAT ID is present. The optional first-purchase thank-you copy and delivery contract are
+prepared privately; its runtime implementation remains a follow-up. No email
+was sent, no code committed, and no Worker/app/site deployment occurred.
+
+## September 15 approved launch policies — local validation complete
+
+The owner approved 100 hosted messages per UTC month, seven-day paid-renewal
+grace, 14-day refund requests on annual purchases/renewals, a two-business-day
+support response target, 30-day completed-delivery reference retention and
+1,095-day trial markers. Local review pricing and the private sandbox now use
+the approved allowance; the sandbox also uses the approved grace/retention.
+Existing session/signing keys and customer workspace data were preserved.
+
+The Worker removes expired trial markers in bounded sweeps and anchors renewal
+markers to first activation. Expired markers are not recreated by identity
+transfer. Billing history and accounting records are retained separately;
+no blanket tax-data deletion was added. Red/green real-D1 regressions pass.
+Validation: all 40 Worker files / 384 tests plus typecheck, the focused core
+pricing test, and the site gate (10 native tests, 15 browser tests passed; the
+optional token-dependent diagnostics canary was skipped). Local Worker health,
+catalog and supported Dropbox auth-status endpoints return 200; the catalog
+shows 100 monthly emails and inclusive EUR 39/59 annual offers. Scheduler and
+listener remain running. Evidence: `/private/tmp/tasktime-policy-worker-gate.log`,
+`/private/tmp/tasktime-policy-core-test.log`, `/private/tmp/tasktime-policy-site-gate.log`.
+
+Updated legal/pricing drafts remain unpublished, version 2026-09-15. The private
+candidate records owner-selected settings and refreshed draft hashes with
+activation false. The pinned site snapshot needs an immutable core refresh after
+an authorized commit. Invoice-default/receipt confirmation and the separate
+Stripe Tax registration remain open; recovery settings are owner-confirmed. Shared Resend capacity is owner-managed by explicit
+September 15 follow-up and is no longer a separate approval hold. Stripe Dashboard in Edge needs
+owner sign-in. Nothing committed, pushed, deployed or enabled in production;
+`tasktime.pro` still requires the owner's separate go-ahead.
+
+
+## September 15 diagnostics and inclusive-price follow-up — uncommitted
+
+The owner explicitly requested leaving this follow-up uncommitted while replacing
+the site's social artwork. The existing app SDK and transitive DebugBundle packages
+already resolve to npm's latest `1.7.1`. App diagnostic service naming is now
+`tasktime-app`; its existing hosted project was renamed with ID/history preserved.
+Local review offers now say Tax included, with a changed review catalog version.
+New Worker acquisition policy requires inclusive Stripe Prices; historical catalog
+and signed state remain readable. Paid production controls remain off.
+
+Validation: full core gate passes 286 files / 2,865 tests plus one existing timezone
+skip, 90 Chromium checks, five PWA checks, audit/lint/typecheck/build/coverage and
+contract export. The additional local review-price regression passes separately.
+The private Worker passes 374 tests and typecheck, including the subsequent
+inclusive-price reconciliation regressions. The separate site's full gate
+passes with its own SDK, diagnostic canary and 1200×630 social metadata. Source
+changes are not deployed. The original root site is unchanged. The owner's
+replacement JPEG passes the separate site's full gate and metadata checks.
+
+The previous main follow-up was explicitly approved and pushed at `bcaac6b` before
+this new work. Live Stripe write access is resolved: both annual Prices and the
+account default are inclusive. Stripe now verifies TaskTime Pro's trading name,
+business tax details, head office and active SaaS Tax settings. Invoice tax-ID
+and registration setup remain open. The customer Portal is prepared and licence
+keys are locally verified but not installed; live billing stays disabled.
+The owner completed a synthetic Stripe test payment, but its isolated lifecycle
+rehearsal failed before webhook/projection acceptance. Reconciliation still
+required legacy Price lookup names; it now recognizes configured immutable Price
+IDs while retaining amount/currency/offer checks and the actual lookup name for
+audit. Red/green contract and D1 regressions pass for legacy and inclusive names;
+the complete inclusive-price real Stripe test-mode lifecycle now passes, including
+both Checkouts, webhook reconciliation, Portal cancellation/return, renewal and
+failed-payment recovery, disputes and cleanup. This remains isolated test evidence.
+The local Worker and scheduler were restored without data/session resets. Edge
+now loads Plan & Billing for the connected Dropbox account with its existing
+complimentary Pro access. This access is separate from the synthetic payment.
+Cloudflare monitoring was explicitly deferred. Operational evidence and mappings
+stay private.
+
+The owner observed a short-lived `409` on `/billing/status` after Checkout return.
+The exact historical response body could not be recovered from Edge. The
+retryable account-operation path reproduces an immediate warning while already
+retrying; it now stays quiet during the existing two bounded retries and warns
+on exhaustion. Other conflicts still fail visibly, signed local access remains
+usable, and stale online actions/usage are withheld. Red/green regressions and
+all 69 related billing tests pass; changed-hook coverage is 93.65% statements,
+85.92% branches, 91.89% functions and 97.88% lines. Core typecheck/lint pass.
+The original browser request is not proven to have this exact response code;
+the change is verified against the explicit retryable account-operation contract.
+Two subsequent real Edge visits to the local `checkout=success` return route
+settled to the connected Dropbox account and complimentary Pro, cleared the
+return parameter, and produced no captured warning/error console entries.
+These checks reused the return handler without another payment. They do not
+prove that a short-lived 409 can never occur: server account-operation fencing
+remains in place, and the frontend change controls bounded retry presentation.
+Nothing was committed or deployed, and production billing remains disabled.
+
+The owner accepted the return test and asked to continue preparation. A fresh
+TaskTime-only Stripe read confirms active inclusive EUR 39/59 annual Prices and
+the configured live Portal. Registration and invoice tax-ID lists are still
+empty; owner questions for VAT details, live email allowance and paid grace are
+pending. Retention and final legal/publication choices remain outstanding.
+The review also reproduced trial activation unconditionally rejecting production
+despite an approved rollout and explicit retention. It now accepts local or
+production with the required configured retention; rollout gates and invalid/
+missing-retention rejection remain intact. Ten focused API regressions and the
+complete Worker gate pass: 40 files / 384 tests plus typecheck. No live trial,
+secret installation, commit, deployment or root-site change was performed.
+
 ## September 15 staged launch execution
 
 App `1.6.0` is live at `https://app.tasktime.pro`, deployed from exact core

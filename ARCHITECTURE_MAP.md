@@ -27,7 +27,7 @@ Browser / PWA
         ├── Dropbox App Folder direct data path (production optional)
         ├── provider-neutral hosted identity (production control plane)
         ├── local Stripe/D1 billing + public catalog/signed-license control plane (not deployed)
-        ├── DebugBundle endpoint (optional diagnostics)
+        ├── DebugBundle endpoint (optional tasktime-app diagnostics; independent tasktime-site browser module)
         └── exchange-rate / email / push integrations as configured
 
 Local agent process

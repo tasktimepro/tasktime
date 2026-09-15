@@ -52,7 +52,7 @@ describe('debugbundle utility', () => {
         expect(initSpy).toHaveBeenCalledWith({
             projectToken: 'project-token',
             environment: 'staging',
-            service: 'tasktime-web',
+            service: 'tasktime-app',
         })
     })
 
@@ -67,7 +67,7 @@ describe('debugbundle utility', () => {
         expect(initSpy).toHaveBeenLastCalledWith({
             projectToken: 'token',
             environment: 'development',
-            service: 'tasktime-web',
+            service: 'tasktime-app',
         })
 
         vi.resetModules()
@@ -82,7 +82,7 @@ describe('debugbundle utility', () => {
         expect(initSpy).toHaveBeenLastCalledWith({
             projectToken: 'token',
             environment: 'production',
-            service: 'tasktime-web',
+            service: 'tasktime-app',
         })
     })
 

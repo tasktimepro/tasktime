@@ -864,9 +864,16 @@ export const useGoogleAuth = () => {
             return;
         }
         driveAccessTokenProvider.setSession(null);
+        // Another mounted consumer may have disconnected the shared session.
+        // Clear its identity here too so account and sync controls can reconnect.
         setState(prev => ({
             ...prev,
+            isSignedIn: false,
             isLoading: false,
+            user: null,
+            accessToken: null,
+            sessionId: null,
+            driveTransport: 'proxy',
             hadPreviousSession: readHadPreviousSessionFlag(),
         }));
     }, [validateWorkerSession, isOnline]);

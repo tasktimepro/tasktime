@@ -1,6 +1,27 @@
 # Delivery Status — Overview
 
-This coordinator tracks active execution. Detailed work lives in `app-status.md`, `agent-status.md`, and `site-status.md`. `TODO.md` remains the broader backlog and ideas list.
+## September 15 approved launch policies — local validation complete
+
+Owner-selected allowance, grace, refund/support and retention policies are
+implemented in local preparation. Worker 384 tests/typecheck, core pricing
+regression and site release gate pass. Local services are healthy. See
+`status/app-status.md` and the private subscription launch decision packet for
+evidence and remaining Stripe/Resend checks. No commit, deployment, production
+billing activation or root-site publication occurred.
+
+## Phase 4 continuation — September 15
+
+The owner requested Phase 4 continuation. Fresh read-only inventory confirms both
+existing deployments and disabled billing controls. The earlier Google disconnect
+UI issue is fixed locally with red/green and Chromium proof. The final app gate
+passes 2,870 unit tests, 91 browser checks and five PWA checks, plus static/build
+checks and zero audit findings. App status and private readiness retain the
+branch-only commit scope. The owner subsequently approved committing/pushing the reviewed changes to
+`update/launch` and CI/artifact preparation. Site update preparation is also
+authorized, with publication held until the owner previews and confirms the
+recovery notice UI and its data-recovery checks pass. Main promotion remains
+a separate action. The new local notice is a visual fixture only; production
+data detection/export and old-worker recovery are not yet implemented.
 
 ## Overall state
 
@@ -8,11 +29,24 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
+- September 15 uncommitted follow-up: app/site DebugBundle separation and
+  VAT-inclusive acquisition are locally validated; the site has a new generic
+  social-image slot. The owner's replacement JPEG now passes all-page metadata
+  and image checks; no commits were requested. Live Stripe inclusive Prices and
+  active Tax defaults are configured; the invoice VAT ID is saved and separate Tax registration is owner-deferred.
+  Inclusive-price reconciliation and production trial configuration now pass
+  384 Worker tests and typecheck;
+  the full isolated Stripe test lifecycle passes. Brief retryable account-operation
+  warnings now wait for bounded recovery; 69 related billing tests, changed-hook
+  coverage, core typecheck and lint pass. Local billing/Dropbox
+  availability is restored. Both deployed
+  sites are unchanged; see `app-status.md` and site `STATUS.md`.
+
 - September 15 app-first launch is live at `https://app.tasktime.pro`, using
   exact core `fa22870`. The complete artifact gate and 24 live checks pass;
   one long sync browser journey needed a retry. Real Edge Google sign-in/initial
-  sync and Dropbox connection/Sync Now pass. A disconnect UI issue remains:
-  Google connection buttons can stay hidden until reopening the app. Owner
+  sync and Dropbox connection/Sync Now pass. The Google disconnect UI issue is
+  fixed in the uncommitted Phase 4 candidate with unit/browser proof. Owner
   data/workflow acceptance is next. Root deployment and DNS remain unchanged;
   root publication and its recovery notice require the owner's separate go-ahead.
   Test/documentation follow-ups remain on `update/launch` after automatic approval

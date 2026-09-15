@@ -135,6 +135,10 @@ presenting partial totals as complete.
   the left and the rocket-led Get Pro action on the right, replaces the rocket
   with the shared loading spinner while Checkout opens, and places the
   right-aligned tax qualifier below the actions only while Get Pro is present.
+  New purchase offers use **Tax included**; public pricing says **Prices include
+  VAT where applicable**. Stripe automatic tax is included within the listed
+  annual amount, never added on top. Existing catalog presentations remain
+  readable for historical state.
   Manage billing uses the same loading treatment while the Stripe Portal opens;
   a completed purchase never leaves Checkout tax copy on the Pro card. Hosted
   Checkout owns the final recurring-subscription disclosure and confirmation.
@@ -143,6 +147,15 @@ presenting partial totals as complete.
   never becomes account, trial, or entitlement identity. Checkout keeps automatic tax and business
   tax-ID support, lets Stripe collect only the location detail it needs, and does
   not force a full-address form or separate TaskTime Terms checkbox.
+- Owner-approved launch policy (15 September 2026): trial and Pro include 100
+  provider-accepted hosted messages per UTC calendar month, including each
+  separately forwarded copy, with no rollover or automatic overage. Paid-renewal
+  grace is seven days within the existing entitlement validity bounds. Annual
+  purchase/renewal refunds are available on request within 14 days; later routine
+  prorated refunds are excluded without limiting mandatory rights or billing-error
+  correction. Cancellation takes effect at period end and preserves workspace data.
+  Support aims to respond within two business days. These selections are local
+  launch preparation, not authority to publish or enable production billing.
 - Owner-selected complimentary Pro is a separate permanent, revocable grant
   source. The Pro card replaces paid pricing with **Complimentary**, explains
   that there is no charge or renewal and that access remains until revoked, and
@@ -160,7 +173,11 @@ presenting partial totals as complete.
   transport readiness gates the Portal/Checkout/status calls, not the local plan
   display or offline entitlement. A transient return failure clears and retries when
   canonical status recovers instead of remaining until navigation, and online
-  service/session failures are not labelled as browser offline. The explicit
+  service/session failures are not labelled as browser offline. A retryable
+  account-operation conflict on a status read stays quiet during the existing
+  two bounded retries; exhaustion shows the warning. Verified local access is
+  retained, while stale online actions and usage are withheld. Other conflicts
+  and failures keep their existing error handling. The explicit
   **Refresh status** control asks the service to reconcile canonical billing and
   then forces a new signed status read; it is not only a cached status reload. The subscription
   webhook remains the source-of-truth fallback if the user closes the Portal or

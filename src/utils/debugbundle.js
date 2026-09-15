@@ -125,7 +125,7 @@ export function initializeDebugBundle() {
         debugBundle.init({
             projectToken,
             environment: getEnvironment(),
-            service: 'tasktime-web',
+            service: 'tasktime-app',
         })
     } catch {
         return false

@@ -3,7 +3,7 @@
  * remains authoritative for production availability and every billing action.
  */
 export const LOCAL_REVIEW_PRICING = Object.freeze({
-    planConfigVersion: 'local-review-v1',
+    planConfigVersion: 'local-review-inclusive-policy-v3',
     trialDays: 30,
     trialDurationHours: 720,
     foundingAnnualEur: 39,
@@ -11,7 +11,7 @@ export const LOCAL_REVIEW_PRICING = Object.freeze({
     foundingMemberLimit: 250,
     standardAnnualEur: 59,
     standardAnnualMinor: 5900,
-    invoiceEmailSendsPerUtcMonth: 25,
+    invoiceEmailSendsPerUtcMonth: 100,
 });
 
 export function buildLocalReviewBillingCatalog() {
@@ -46,7 +46,7 @@ export function buildLocalReviewBillingCatalog() {
                         currency: 'EUR',
                         unitAmountMinor: LOCAL_REVIEW_PRICING.foundingAnnualMinor,
                         interval: 'year',
-                        taxPresentation: 'calculated_at_checkout',
+                        taxPresentation: 'inclusive',
                         renewal: 'automatic',
                         founding: {
                             memberLimit: LOCAL_REVIEW_PRICING.foundingMemberLimit,
@@ -60,7 +60,7 @@ export function buildLocalReviewBillingCatalog() {
                         currency: 'EUR',
                         unitAmountMinor: LOCAL_REVIEW_PRICING.standardAnnualMinor,
                         interval: 'year',
-                        taxPresentation: 'calculated_at_checkout',
+                        taxPresentation: 'inclusive',
                         renewal: 'automatic',
                         founding: null,
                     },

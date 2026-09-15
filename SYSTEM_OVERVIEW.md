@@ -12,6 +12,10 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   their mounted providers. Store lifecycle and entitlement policy are unchanged.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
 - **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. Dropbox's verified connected-account email is read browser-to-provider and retained in the origin-local auth record; the Worker keeps its pseudonymous subject for identity and entitlement. Only when the user explicitly starts paid Checkout may the browser submit that verified email as a separate billing contact for the mapped Stripe Customer. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
+- **Shared Google auth UI:** Storage re-reads clear signed-in identity when the
+  shared session is absent, so local disconnect updates every mounted account
+  and sync consumer without a page reload. This does not reset workspace data
+  or revoke the remote grant.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
@@ -41,7 +45,12 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   Final cutover cleanup removes obsolete old-origin/callback/temporary authority
   but never clones or deletes the shared Worker, D1/KV, provider, email, or Push
   services.
-- **Operational evidence:** DebugBundle captures opted-in runtime incident evidence; local tests remain the first tool for deterministic failures.
+- **Operational evidence:** App and site use independent DebugBundle browser
+  configuration and services (`tasktime-app`, `tasktime-site`). The site owns a
+  small optional bundled diagnostic module, without app storage or analytics.
+  Local tests remain the first tool for deterministic failures. New subscription
+  acquisition requires VAT-inclusive Stripe Prices and matching catalog copy;
+  automatic tax stays enabled, with paid activation separately gated.
 - **Locally implemented subscription control plane:** Private Worker/D1/Stripe
   modules and the browser client now implement a sanitized catalog, canonical
   provider-bound billing status, short-lived signed local assertions, recovery,

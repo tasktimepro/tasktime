@@ -535,6 +535,55 @@ describe('useBillingStatus', () => {
         online.mockRestore();
     });
 
+    it.each([false, true])('keeps account-operation retries quiet, then reports exhaustion=%s', async exhausted => {
+        vi.useFakeTimers();
+        const response = status('principal-1', 'active');
+        verify.mockResolvedValue({
+            ok: true,
+            payload: { ...response.entitlement, iat: response.serverTime / 1000,
+                exp: response.serverTime / 1000 + 86_400, jti: 'busy-license' },
+            keyId: 'key-1',
+        });
+        const busy = new BillingClientError('ACCOUNT_OPERATION_IN_PROGRESS', 409, true);
+        const getStatus = vi.fn().mockResolvedValueOnce(status('principal-1', 'active'));
+        if (exhausted) getStatus.mockRejectedValue(busy);
+        else getStatus.mockRejectedValueOnce(busy).mockResolvedValue(status('principal-1', 'active'));
+        const client = { getStatus, getJwks: vi.fn(), getCatalog: vi.fn() };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true, catalogEnabled: false, lifecycle, client: client as never,
+        }));
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        expect(hook.result.current.status).not.toBeNull();
+        await act(async () => { await hook.result.current.refresh(); });
+        expect(hook.result.current.error).toBeNull();
+        expect(hook.result.current.status).toBeNull();
+        expect(hook.result.current.resolution.kind).toBe('canonical');
+        expect(storage.clearActiveBillingBinding).not.toHaveBeenCalled();
+        await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+        expect(hook.result.current.error).toBeNull();
+        await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+        expect(hook.result.current.error).toBe(exhausted ? 'ACCOUNT_OPERATION_IN_PROGRESS' : null);
+        expect(getStatus).toHaveBeenCalledTimes(exhausted ? 4 : 3);
+        expect(hook.result.current.status === null).toBe(exhausted);
+        await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+        expect(getStatus).toHaveBeenCalledTimes(exhausted ? 4 : 3);
+        hook.unmount();
+    });
+
+    it('reports a non-retryable billing conflict immediately', async () => {
+        const client = {
+            getStatus: vi.fn().mockRejectedValue(new BillingClientError('BILLING_STATE_CONFLICT', 409, false)),
+            getJwks: vi.fn(), getCatalog: vi.fn(),
+        };
+        const hook = renderHook(() => useBillingStatus({
+            enabled: true, catalogEnabled: false, lifecycle, client: client as never,
+        }));
+        await waitFor(() => expect(hook.result.current.error).toBe('BILLING_STATE_CONFLICT'));
+        expect(hook.result.current.resolution).toEqual({ kind: 'unresolved', reason: 'conflict' });
+        expect(client.getStatus).toHaveBeenCalledOnce();
+        hook.unmount();
+    });
+
     it('does not call an online transient billing failure an offline browser', async () => {
         const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(true);
         const client = {

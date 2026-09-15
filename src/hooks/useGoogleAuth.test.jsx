@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useGoogleAuth, _resetValidationCache } from './useGoogleAuth'
 import { APP_VERSION } from '@/constants/app'
-import { getStoredSession, clearStoredSession } from '@/utils/googleAuthStorage'
+import { getStoredSession, clearStoredSession, storeSession } from '@/utils/googleAuthStorage'
 
 const { captureDebugBundleIncidentSpy } = vi.hoisted(() => ({
     captureDebugBundleIncidentSpy: vi.fn(),
@@ -50,6 +50,8 @@ describe('useGoogleAuth', () => {
         vi.restoreAllMocks()
         vi.clearAllMocks()
         _resetValidationCache()
+        // Mirror persisted writes when subscribers re-read after sign-in.
+        storeSession.mockImplementation(async session => getStoredSession.mockResolvedValue(session))
         window.sessionStorage.clear()
         vi.stubGlobal('fetch', vi.fn())
         vi.spyOn(window, 'open').mockImplementation(() => createPopupStub())
@@ -474,6 +476,31 @@ describe('useGoogleAuth', () => {
         expect(fetch).toHaveBeenCalledTimes(1)
         expect(clearStoredSession).toHaveBeenCalledTimes(1)
         expect(result.current.isSignedIn).toBe(false)
+    })
+
+    it('clears every mounted auth consumer after a local disconnect without reloading', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-shared-disconnect',
+            userId: 'user-shared-disconnect',
+            email: 'shared-disconnect@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch.mockResolvedValue({ ok: true, json: async () => ({ authenticated: true }) })
+        clearStoredSession.mockImplementationOnce(async () => getStoredSession.mockResolvedValue(null))
+        const { result } = renderHook(() => ({ first: useGoogleAuth(), second: useGoogleAuth() }))
+        await waitFor(() => {
+            expect(result.current.first.isSignedIn).toBe(true)
+            expect(result.current.second.isSignedIn).toBe(true)
+        })
+        await act(async () => { await result.current.first.signOut() })
+        await waitFor(() => {
+            expect(result.current.second).toMatchObject({
+                isSignedIn: false, isLoading: false, user: null,
+                sessionId: null, accessToken: null, hadPreviousSession: false,
+            })
+        })
+        expect(clearStoredSession).toHaveBeenCalledTimes(1)
+        expect(fetch).toHaveBeenCalledTimes(1)
     })
 
     it('retries a transient auth init network failure without requiring another user tap', async () => {

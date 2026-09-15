@@ -129,6 +129,11 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **ENTL-6:** The Worker publishes a sanitized versioned catalog. Clients and the
   homepage do not hardcode prices, tax labels, allowances, legal versions, or
   Stripe IDs; a changed catalog requires fresh purchase confirmation.
+- **ENTL-6a:** Advertised subscription prices include VAT where applicable. New
+  Checkout acquisitions require explicitly inclusive Stripe Prices and matching
+  catalog presentation; exclusive or unspecified acquisition configuration fails
+  closed. Automatic tax remains enabled. Historical signed/catalog payloads stay
+  readable, and this policy does not rewrite existing subscriptions or invoices.
 - **ENTL-7:** Hosted email uses a UTC calendar-month allowance and atomic,
   idempotent primary/forward reservations. Provider-accepted parts consume;
   proven pre-acceptance failure releases; acceptance-unknown outcomes remain

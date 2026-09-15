@@ -317,6 +317,11 @@
 
 ## Subscription and Pro boundary (implemented locally; production controls remain off)
 
+- New subscription acquisition presents VAT-inclusive prices, keeps automatic
+  tax enabled, and rejects exclusive/unspecified Stripe Price policy. The local
+  preview and Stripe test rehearsal use inclusive behavior too. Live Price
+  creation, tax setup/registration and Checkout proof remain distinct gates.
+
 - An explicit local billing-sandbox flag is honored only by a Vite development
   build on a loopback hostname. It does not add sandbox-only banners or
   developer-facing notices to product screens, disables the bundled catalog
@@ -581,6 +586,9 @@
 - The visible sync-status control remains keyboard-operable while loading, connecting, checking, downloading, uploading, or syncing and opens Account > Cloud Sync without starting a duplicate sync.
 - The client exposes Google Drive and Dropbox by default and onboarding describes cloud sync without implying that Google Drive is required. An explicit build-time false value remains an emergency UI opt-out; Worker policy still fails closed for disabled Dropbox endpoints, new connections, or transfers.
 - Google Drive and Dropbox expose the same two connected-provider choices. Disconnect syncs and detaches only this browser while retaining cloud data and provider authorization. Wipe data & disconnect deletes and verifies all TaskTime sync files and backups before confirmed revocation and disconnect, while retaining local data.
+- After a local Google disconnect, every mounted auth consumer clears the removed
+  session identity. Account sign-in and provider connection controls reappear
+  without a reload; local workspace data and the remote grant are preserved.
 - The active cloud card shows the selected provider's official mark beside its title and switches both after verified transfer activation. A visible transfer panel precedes provider settings, remains at zero until the first durable stage, reports accessible monotonic determinate progress with a reduced-motion-safe traveling highlight inside the filled line, and is removed after successful completion.
 - Transfer confirmation and progress use provider names and concise plain language. Their compact title-free warning says not to use TaskTime on other devices during transfer and to connect them to the named new provider before editing.
 - Opening a provider with a verified moved marker does not retry indefinitely or report a generic incident. The recorded destination is the primary recovery action and does not delete source data.

@@ -18,7 +18,7 @@
   },
   "services": [
     {
-      "name": "tasktime-web",
+      "name": "tasktime-app",
       "kind": "frontend",
       "runtime": "Browser",
       "framework": "React",
@@ -89,12 +89,12 @@
   "critical_paths": [
     {
       "name": "Browser app bootstrap and global runtime capture",
-      "owner_service": "tasktime-web",
+      "owner_service": "tasktime-app",
       "notes": "Entry point and top-level render path for the production SPA; browser SDK initialization belongs here."
     },
     {
       "name": "Client routing and auth callback flow",
-      "owner_service": "tasktime-web",
+      "owner_service": "tasktime-app",
       "notes": "Path-based routing, including /auth/callback handling, is owned by the SPA hooks and App shell."
     },
     {
@@ -109,7 +109,7 @@
     },
     {
       "name": "Production build and Pages deployment pipeline",
-      "owner_service": "tasktime-web",
+      "owner_service": "tasktime-app",
       "notes": "The merged app+blog artifact is built in GitHub Actions and deployed to Cloudflare Pages, so hosted browser tokens must be injected at build time."
     }
   ],

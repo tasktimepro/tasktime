@@ -4,16 +4,6 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
-[x] Fix the issue with disabling a task under the same project when another task of the same project is running, I am still able to open the view task modal of other supposedly disabled tasks from the dashboard - so please just make sure that we can't click on or open the view task modal if it's in a disabled state
-
-[x] Keep private payment and infrastructure identifiers, credentials, and operator procedures out of the public core repository
-
-[x] Mention direct invoice, quote, and payment-reminder email sending in the homepage billing story while keeping the Free PDF/manual-delivery boundary explicit
-[x] Prepare an "On the go" homepage section and portrait mobile Dashboard capture slot; the real product capture remains part of the Phase 4 screenshot review
-
-[ ] Check dev console lightsail report and all the necessary meta and SEO/AEO stuff before launching
-    [ ] Also test mobile views before publishing
-
 ...
 
 
@@ -44,6 +34,7 @@
     [ ] Program Phase 4 — Launch through controlled production changes
         [x] Retain the extracted site source in its own user-approved local initial checkpoint before core commits the old blog removal; this does not replace approved remote retention or main/publication provenance
         [x] Retain site source privately at tasktimepro/tasktime-site before core main removes blog; user-approved transfer preserves the existing repository/history and updates local origin (2026-09-11). Both nested checkouts remain ignored by core
+        [x] Update DebugBundle SDK packages to latest - also check if we need to include another one in site now since we'll have two different locations and if we should include it anywhere else in cloudflare if we can if that is possible
         [ ] Complete site provenance/license/maintainer review, main-branch protection, required CI and dependency/security monitoring verification; approve any plan/access changes needed for private-repository protections before main promotion
         [ ] Review and approve exact core/site/private-infra `update/launch` revisions and separate main promotions; a merge must not deploy automatically. Record each resulting main SHA, release scope, rollback owner, and checked artifact digest
         [ ] Export the site contract from the approved committed core revision, require clean source metadata, verify the pinned site snapshot against that revision, and review public tool/discovery/pricing semantics; unrelated future app commits must not force site releases
@@ -59,20 +50,22 @@
         [ ] Configure protected app/site deployment environments with distinct project targets, environment-scoped credentials, reviewed contract checksum, launch-readiness and split-deployment switches; authorize least-privilege read-only private-site checkout from infrastructure CI before artifact-only rehearsals, and prove app-only/site-only changes cannot deploy the other component
         [ ] Pre-entry external gate, requiring explicit owner authorization before any App Console action: obtain Dropbox App Console production access and complete the non-destructive post-approval sign-in/token/direct-file canary before purchaser-facing billing launch work
         [ ] Approve whether the `EUR 39/year` founding and `EUR 59/year` standard base prices are tax-inclusive or plus applicable tax, plus their exact immutable live Stripe Product/Price mappings, payment methods, and promotions
-        [ ] Approve the live Trial/Pro hosted-email allowance and paid payment-failure grace
+        [x] Approve the live Trial/Pro hosted-email allowance and paid payment-failure grace (owner selected 100 emails per UTC month and seven days on 2026-09-15; production activation remains separate)
         [ ] Approve seller/tax/legal terms and payment/refund/dispute/cancellation/Portal behavior
         [ ] Approve support ownership, retention periods, repair policy, and Privacy wording
         [ ] Verify the live catalog contains both approved offers and that exhaustion/former-founder selection returns the `EUR 59/year` summary for explicit reconfirmation without mutating founding capacity
         [ ] Obtain explicit deployment/release approval and record exact Worker, app, site, and agent artifact versions
         [ ] Verify the public/private repository boundary and secret scan, record the live pre-cutover Cloudflare/OAuth/DNS/service inventory, reuse the existing root Pages project, create exactly one permanent app Pages project, retain the exact combined root rollback artifact, and prove one deployment authority per project
         [ ] Replace and review the pre-split combined Pages workflow with explicit app-only and site-only project/artifact targets before using it; keep combined `dist` available only through the approval-gated rollback path and classify every dev/preview deployment and origin
-        [ ] Deploy one compatible shared Worker and the app-subdomain foundation with both exact origins/callbacks and billing/trial/Checkout/enforcement controls still at their approved disabled state; do not duplicate Worker, D1/KV, email, Push, or provider-data services
+        [x] Deploy one compatible shared Worker and the app-subdomain foundation with both exact origins/callbacks and billing/trial/Checkout/enforcement controls still at their approved disabled state; do not duplicate Worker, D1/KV, email, Push, or provider-data services (app-first launch verified 2026-09-15; root and paid activation remain separate)
         [ ] Migrate and verify the known production users one at a time, including every active device, complete data, provider reconnect, PWA/Push state, billing status, email/metrics checks, and agent re-pairing while the old root app remains unchanged
         [ ] After a separate root-switch approval, retire the old root PWA/service worker on known profiles without clearing IndexedDB, deploy the public-site artifact to the existing root Pages project, and publish app/agent launch URLs only after clean-profile and migrated-profile verification
         [ ] Hold the documented rollback window, then separately approve removal of the old Worker origin, OAuth callbacks, temporary preview authority/canaries, and routine combined deployment path; capture a final inventory proving exactly two intended Pages projects, one shared Worker, and no orphan migration resources
         [ ] With general Checkout still off, complete separately approved live `EUR 39/year` founding and `EUR 59/year` standard canaries; verify the founding purchase consumes exactly one permanent allocation and the standard purchase consumes none
         [ ] Enable approved billing UI, trial, Checkout, active-client enforcement, advanced-Reports enforcement, and hosted-email enforcement as separate reversible steps with live canaries
         [ ] Make sure to publish any packages such as MCP etc if they were modified in this launch update
+        [x] Stripe VAT must be inclusive in the price so that we do not scare or shock customers
+        [x] Don't forget to add a generic og-image for site
 
 [x] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished

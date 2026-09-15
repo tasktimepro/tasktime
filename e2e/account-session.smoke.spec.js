@@ -96,3 +96,24 @@ for (const width of [1440, 390]) {
         await expect(page.getByRole('button', { name: 'Reconnect', exact: true })).toHaveCount(0);
     });
 }
+
+
+test('Google disconnect restores connection controls and clears account identity without a reload', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('tasktime-onboarding-completed', 'true'));
+    const fixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
+    await installMockDriveRoutes(page, fixture);
+    await page.goto('/account?section=sync');
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+    await seedStoredGoogleSession(page, {
+        sessionId: 'disconnect-ui-fixture', userId: 'disconnect-ui-user', email: 'disconnect@example.test',
+    });
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Disconnect', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Disconnect from Google Drive?' });
+    await dialog.getByRole('button', { name: 'Sync & disconnect', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Connect Google Drive', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+    await expect(page.getByText('disconnect@example.test', { exact: true })).toHaveCount(0);
+});
