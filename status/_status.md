@@ -8,6 +8,14 @@ TaskTime Pro is in production. The core local-first app, Drive sync, invoicing/r
 
 ## Current phase
 
+- September 15 app-first execution: main promotion and the compatible shared
+  Worker preparation are complete. Root deployment and DNS remain unchanged.
+  The app host is active but its first artifact gate stopped on two long browser
+  scenarios exhausting their total test budget; packaging/deployment did not run.
+  Their assertions are preserved with an explicit longer journey budget, pending
+  a fresh complete gate. This supersedes the earlier branch-only authorization
+  checkpoint below. Root publication still requires the owner's separate go-ahead.
+
 - September 15 launch preparation is approved for an `update/launch` branch
   commit/push and GitHub CI, without main promotion or deployment: core `1.6.0` with
   browser SDK `1.7.1` passes the full core and local agent gates. Private overlap

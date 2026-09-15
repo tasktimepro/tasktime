@@ -62,6 +62,9 @@ async function seedDashboard(page, liveClock = false) {
 
 test.describe('Dashboard smoke', () => {
     test('ellipsizes long expense titles in Today, Upcoming and expense lists', async ({ page }) => {
+        // Four viewport journeys exceed the default total budget on the private CI runner.
+        // Keep individual assertion deadlines unchanged.
+        test.setTimeout(180_000);
         await seedDashboard(page);
         const title = 'Prototyping subscription for the complete studio design and development workspace with an exceptionally long title '.repeat(2).trim();
         await page.evaluate(async title => {
@@ -183,6 +186,9 @@ test.describe('Dashboard smoke', () => {
     });
 
     test('updates live tracked time each minute without changing financial values or writing entries', async ({ page }) => {
+        // Replay each clock tick through pause, stop and reload on slower CI runners.
+        // This extends the complete journey, not any individual assertion deadline.
+        test.setTimeout(180_000);
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
         await seedDashboard(page, true);

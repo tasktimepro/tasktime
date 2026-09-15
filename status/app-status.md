@@ -1,5 +1,20 @@
 # App Status
 
+## September 15 staged launch execution
+
+Core main and update/launch contain the integrated `9ab3daa` candidate. Its
+automatic main CI passed. The approved compatible shared Worker upgrade and
+additive migrations are complete; retained legacy records passed comparison.
+The separate app host is active, while root Pages and DNS remain unchanged.
+The first app artifact preparation stopped before packaging or deployment:
+88 Chromium checks passed, while two long dashboard journeys exceeded their
+60-second total test budget on the private runner. Both pass locally, including
+with SDK instrumentation enabled and reporting requests intercepted, and passed
+the core CI. Their total budget is now 180 seconds; assertions and individual
+assertion deadlines are unchanged. A fresh complete artifact gate is required.
+Root publication, returning-user recovery notice and owner data acceptance stay
+separate. No tag or agent package has been published.
+
 ## September 15 main integration
 
 The app `1.6.0` candidate preserves main releases `1.5.1` and `1.5.2`, including
