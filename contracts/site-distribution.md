@@ -110,12 +110,16 @@ Both repository release gates require a fresh full dependency audit and stop on
 high/critical findings, including build/test dependencies. Functional checks and
 site-only security evidence cannot waive an app release blocker.
 
-Phase 4 must approve the three repository promotions independently, retire the
-old combined automation before use, reuse the existing root Pages project for
-site, and create only the one permanent app Pages project. Deployment authority
-and credentials stay private. The actual pre-cutover combined root artifact is
-the rollback source; rebuilding old source or assembling new app/site artifacts
-does not recreate it. No live change is authorized by this local extraction.
+The three repositories retain independent promotion and deployment authority.
+Production has one permanent site Pages project and one permanent app Pages
+project, with the existing shared Worker/services. The original launch reused
+the root project; its subsequent owner-approved replacement uses Direct Upload.
+A project replacement must verify the candidate before moving the custom domain
+and retire the previous project only after live domain verification. Keeping the
+same public origin preserves browser storage and does not migrate credentials.
+Deployment authority, credentials and exact project identities stay private.
+The original combined launch rollback is retired; its historical evidence does
+not authorize a new deployment or recreation of the combined runtime.
 
 This follows [GitHub's build supply-chain guidance](https://docs.github.com/en/code-security/tutorials/implement-supply-chain-best-practices/securing-builds)
 and [Cloudflare's external-CI direct-upload model](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/)

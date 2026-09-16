@@ -30,7 +30,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   pages and public discovery. Core builds only `dist-app`; site builds its own
   `dist`. A reviewed JSON snapshot carries core public tool/discovery metadata
   into site without parent-source imports or coupled release cycles. See
-  `contracts/site-distribution.md`. Production reuses the existing root Pages
+  `contracts/site-distribution.md`. Production uses one root Pages
   project for site and one permanent app project, sharing the existing
   Worker/services. The launch rollback deployment is retired after owner acceptance.
   Site source is retained privately under `tasktimepro`;

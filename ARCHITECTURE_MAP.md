@@ -47,9 +47,9 @@ Independent builds (no parent-source dependencies)
 └── tasktime-site → dist: homepage/pricing/blog/legal/agents, discovery, static 404 (no PWA)
 
 Production topology (independently approved artifact deployments)
-├── existing root Pages project → tasktime-site/dist → tasktime.pro
+├── dedicated root Pages project → tasktime-site/dist → tasktime.pro
 ├── one permanent app Pages project → dist-app → app.tasktime.pro
-├── one shared Worker + existing stateful bindings → both origins during overlap
+├── one shared Worker + existing stateful bindings → app services and public catalog
 └── old-origin recovery reader → readonly export for returning users
 ```
 
