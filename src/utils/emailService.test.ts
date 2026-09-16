@@ -16,6 +16,12 @@ vi.mock('@/config/syncWorker', () => ({
     },
 }));
 
+// Keep legacy protocol coverage independent of deployment flags. The entitled
+// protocol is covered with enforcement enabled in emailService.entitlement.test.ts.
+vi.mock('@/config/billingFeatures', () => ({
+    BILLING_FEATURES: { emailEntitlementEnforcement: false, sandbox: false },
+}));
+
 vi.mock('@/utils/debugbundle', () => ({
     captureDebugBundleIncident: captureDebugBundleIncidentSpy,
 }));

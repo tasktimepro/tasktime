@@ -1,5 +1,13 @@
 ## September 16 final email-stage browser fixture
 
+The final flag preflight also exposed legacy `emailService` unit tests that
+implicitly depended on email enforcement being off. A focused red run reproduces
+17 failures; the compatibility suite now explicitly pins the legacy protocol,
+while the separate entitlement suite pins enforcement on. All 2,888 unit tests
+and per-file coverage pass with final client/report/email flags enabled. This
+changes no runtime behavior or package contents. A new exact-source preparation
+must replace the canceled `35077247508` artifact run.
+
 Hosted-email Worker policy is live; signed production status confirms available
 Pro quota 100. Reports is also live with 25 route/byte checks and isolated Free
 Overview, advanced-tab gating and offline recovery proof. Final browser-artifact
