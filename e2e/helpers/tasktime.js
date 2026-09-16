@@ -603,6 +603,7 @@ export async function installMockDirectDriveRoutes(target, driveFixture) {
     let proxyRequests = 0;
     let statusRequests = 0;
     let tokenRequests = 0;
+    let billingRequests = 0;
     const directUploads = [];
     const corsHeaders = {
         'Access-Control-Allow-Origin': 'http://127.0.0.1:3101',
@@ -616,10 +617,24 @@ export async function installMockDirectDriveRoutes(target, driveFixture) {
         return true;
     };
 
+    // Sync must remain usable when billing is unavailable. Keep synthetic
+    // provider sessions and catalog requests inside this fixture in every
+    // production billing stage, rather than contacting the live Worker.
+    await target.route(/^https?:\/\/[^/]+\/billing\//, async (route) => {
+        if (await fulfillPreflight(route)) return;
+        billingRequests += 1;
+        await route.fulfill({
+            status: 503,
+            headers: corsHeaders,
+            json: { version: 1, code: 'BILLING_UNAVAILABLE' },
+        });
+    });
+
     driveFixture.directRequestCount = () => directRequests;
     driveFixture.proxyRequestCount = () => proxyRequests;
     driveFixture.statusRequestCount = () => statusRequests;
     driveFixture.tokenRequestCount = () => tokenRequests;
+    driveFixture.billingRequestCount = () => billingRequests;
     driveFixture.directUploads = () => directUploads;
     driveFixture.setResponseHeaders(corsHeaders);
 

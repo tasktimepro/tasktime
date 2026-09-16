@@ -1,5 +1,18 @@
 # App Status
 
+## September 16 billing-enabled release fixture correction
+
+The billing-enabled release gate passed 2,887 unit tests and 95 of 96 browser
+checks. The direct Google transport test treated the catalog effect's intentional
+StrictMode/reload cancellation as a sync failure. The direct-drive fixture now
+returns a deterministic unavailable billing API response instead of contacting
+the live Worker. The test excludes only that exact catalog cancellation, retains
+all provider/non-cancellation errors, and checks failures again after uploads.
+It also verifies the billing fixture was exercised when billing UI is enabled.
+Both affected Chromium journeys and focused lint pass; the full release
+preparation is being rerun. Production runtime and published agent contents are
+unchanged, so the existing core 1.6.0 release train and site pin remain valid.
+
 ## September 15 production continuation authorized
 
 The owner approved launch continuation, including root publication and the

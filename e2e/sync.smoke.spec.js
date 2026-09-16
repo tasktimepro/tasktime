@@ -21,6 +21,11 @@ test.describe('Cloud sync smoke', () => {
         const failedRequests = [];
 
         page.on('requestfailed', (request) => {
+            // React StrictMode and reload intentionally abort the independent
+            // catalog effect. Preserve every other failure, including all
+            // provider requests and non-cancellation billing errors.
+            if (new URL(request.url()).pathname === '/billing/catalog'
+                && request.failure()?.errorText === 'net::ERR_ABORTED') return;
             failedRequests.push(`${request.url()}: ${request.failure()?.errorText || 'unknown error'}`);
         });
 
@@ -51,6 +56,10 @@ test.describe('Cloud sync smoke', () => {
         expect(driveFixture.directUploads().every(({ contentType }) => (
             contentType.startsWith('multipart/related; boundary=tasktime-')
         ))).toBe(true);
+        if (process.env.VITE_BILLING_UI_ENABLED === 'true') {
+            expect(driveFixture.billingRequestCount()).toBeGreaterThan(0);
+        }
+        expect(failedRequests).toEqual([]);
     });
 
     test('pulls remote data on first manual restore when local state is pristine', async ({ page }) => {
