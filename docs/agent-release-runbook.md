@@ -70,6 +70,11 @@ native-plugin publication:
 .github/workflows/publish-clawhub-plugin.yml
 ```
 
+For ordinary native-plugin OIDC publication, pass `GITHUB_REF` as `--source-ref`
+and `GITHUB_SHA` as `--source-commit`; the registry verifies them independently.
+Do not substitute the commit SHA for the workflow ref. Split-candidate credentials
+are a distinct registry flow and are not used by this workflow.
+
 ClawHub does not currently support GitHub OIDC trusted publishing for skills.
 The native plugin uses a one-time token-authenticated publication to establish
 the package, then configures GitHub Actions OIDC trusted publishing for

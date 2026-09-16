@@ -71,6 +71,9 @@ jobs:
           echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing candidate $PACKAGE_NAME@$PACKAGE_VERSION from $GITHUB_REPOSITORY@$GITHUB_SHA ($PACKAGE_PATH), built against OpenClaw $BUILD_VERSION."
 
+      - name: Verify publication source arguments
+        run: node --test scripts/clawhub-publish-workflow.test.mjs
+
       - name: Validate native plugin package
         shell: bash
         run: |
@@ -102,7 +105,8 @@ jobs:
           if [[ "${{ inputs.use_token }}" == "true" ]]; then
             PUBLISH_ARGS+=(--owner tasktimepro --source-ref "$GITHUB_REF")
           else
-            PUBLISH_ARGS+=(--source-ref "$GITHUB_SHA")
+            # Ordinary OIDC binds the workflow ref; --source-commit pins its SHA.
+            PUBLISH_ARGS+=(--source-ref "$GITHUB_REF")
           fi
 
           npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
@@ -123,7 +127,8 @@ jobs:
           if [[ "${{ inputs.use_token }}" == "true" ]]; then
             PUBLISH_ARGS+=(--owner tasktimepro --source-ref "$GITHUB_REF")
           else
-            PUBLISH_ARGS+=(--source-ref "$GITHUB_SHA")
+            # Ordinary OIDC binds the workflow ref; --source-commit pins its SHA.
+            PUBLISH_ARGS+=(--source-ref "$GITHUB_REF")
           fi
 
           npx -y "clawhub@$CLAWHUB_CLI_VERSION" package publish "$PACKAGE_PATH" \
