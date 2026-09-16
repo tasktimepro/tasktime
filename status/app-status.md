@@ -1,3 +1,13 @@
+## September 16 enforcement-enabled agent fixture correction
+
+Client-stage preparation `35068126974` exposed three command tests that assumed
+synchronous, unguarded client writes. Their shared fixture now supplies an
+explicit Pro grant and awaits client commands in both flag modes. Duplicate and
+identity assertions remain intact, and separate Free/unresolved/concurrency
+policy tests remain enforced. All 92 command/policy tests pass with client,
+report and email enforcement enabled; lint/typecheck pass. This is test-only
+and changes no published agent artifact or app release version.
+
 ## September 16 billing refresh correction
 
 The deployed preview exposed a duplicate status request after normal account

@@ -621,6 +621,25 @@ function createContext(): AgentCommandContext & {
 
     return {
         store: store as any,
+        // Broad command behavior uses an entitled account. Free, unresolved,
+        // and concurrent client-limit cases live in clientEntitlementLock tests.
+        entitlementResolution: {
+            kind: 'canonical',
+            snapshot: {
+                version: 1, entitlementRevision: 1, planConfigVersion: 'test-command-fixture',
+                subject: 'command-fixture', plan: 'pro', accessStatus: 'active',
+                billingStatus: 'none', source: 'grant', trialStatus: 'used',
+                trialStartedAt: null, trialEndsAt: null, sourceExpiresAt: null,
+                entitlements: ['reports.access', 'invoice.email.send'],
+                limits: {
+                    invoiceEmailSendsPerMonth: 100, cloudSync: true, automaticCloudBackups: true,
+                    webPush: true, activeProjects: null, activeClients: null, activeTasks: null,
+                },
+                subscriptionCurrentPeriodStart: null, subscriptionCurrentPeriodEnd: null,
+                cancelAtPeriodEnd: false, graceUntil: null,
+                sourceUpdatedAt: '2026-06-25T00:00:00.000Z', lastReconciledAt: null,
+            },
+        },
         isReady: true,
         now: () => 1_700_000_000_000,
         generateId: () => `agent-id-${nextId++}`,
@@ -1072,7 +1091,7 @@ describe('agent commands', () => {
         const context = createContext();
         context.now = () => Date.parse('2026-06-25T10:00:00Z');
 
-        const client = createClientCommand(context, {
+        const client = await createClientCommand(context, {
             id: 'client-agent',
             title: 'Agent Client',
             contactPerson: 'Alex Contact',
@@ -1088,12 +1107,12 @@ describe('agent commands', () => {
             createdAt: Date.parse('2026-06-25T10:00:00Z'),
             updatedAt: Date.parse('2026-06-25T10:00:00Z'),
         }));
-        expect(createClientCommand(context, {
+        expect((await createClientCommand(context, {
             title: 'Duplicate client',
             idempotencyKey: 'client-create-1',
-        }).id).toBe('client-agent');
+        })).id).toBe('client-agent');
 
-        const updated = updateClientCommand(context, {
+        const updated = await updateClientCommand(context, {
             clientId: 'client-agent',
             updates: {
                 title: 'Agent Client Ltd',
@@ -1108,7 +1127,7 @@ describe('agent commands', () => {
             disableTax: true,
         }));
 
-        const archived = archiveClientCommand(context, { clientId: 'client-agent' });
+        const archived = await archiveClientCommand(context, { clientId: 'client-agent' });
         expect(archived).toEqual(expect.objectContaining({
             archived: true,
             archivedOnDate: '2026-06-25',
@@ -1116,7 +1135,7 @@ describe('agent commands', () => {
         expect(listClientsCommand(context).map((item) => item.id)).not.toContain('client-agent');
         expect(listClientsCommand(context, { includeArchived: true }).map((item) => item.id)).toContain('client-agent');
 
-        const restored = unarchiveClientCommand(context, { clientId: 'client-agent' });
+        const restored = await unarchiveClientCommand(context, { clientId: 'client-agent' });
         expect(restored).toEqual(expect.objectContaining({
             archived: false,
             archivedOnDate: null,
@@ -3391,7 +3410,7 @@ describe('agent commands', () => {
             updates: { projectId: 'project-2' },
         })).rejects.toThrow(/Stop the active timer/i);
 
-        const client = createClientCommand(context, { id: 'client-identity', title: 'Identity client' });
+        const client = await createClientCommand(context, { id: 'client-identity', title: 'Identity client' });
         expect(() => updateClientCommand(context, {
             clientId: client.id,
             updates: { id: 'client-replacement' },
@@ -3405,7 +3424,7 @@ describe('agent commands', () => {
     it('rejects duplicate create IDs without replacing active or archived records', async () => {
         const context = createContext();
         createProjectCommand(context, { id: 'project-duplicate', title: 'Original project' });
-        createClientCommand(context, { id: 'client-duplicate', title: 'Original client' });
+        await createClientCommand(context, { id: 'client-duplicate', title: 'Original client' });
         createTaskCommand(context, { id: 'task-duplicate', title: 'Original task', projectId: 'project-1' });
         context.maps.archivedTasks.set('archived-task-duplicate', objectToYMap({
             id: 'archived-task-duplicate',
@@ -3425,8 +3444,8 @@ describe('agent commands', () => {
 
         expect(() => createProjectCommand(context, { id: 'project-duplicate', title: 'Replacement project' }))
             .toThrow(/already exists/i);
-        expect(() => createClientCommand(context, { id: 'client-duplicate', title: 'Replacement client' }))
-            .toThrow(/already exists/i);
+        await expect(Promise.resolve().then(() => createClientCommand(context, { id: 'client-duplicate', title: 'Replacement client' })))
+            .rejects.toThrow(/already exists/i);
         expect(() => createTaskCommand(context, { id: 'task-duplicate', title: 'Replacement task', projectId: 'project-1' }))
             .toThrow(/already exists/i);
         expect(() => createTaskCommand(context, {
