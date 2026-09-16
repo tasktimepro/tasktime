@@ -1,3 +1,14 @@
+## September 16 billing refresh correction
+
+The deployed preview exposed a duplicate status request after normal account
+refresh/trial actions. The announcer used a separate BroadcastChannel instance,
+so its own mounted listener also refreshed. A red regression reproduced two
+requests; sharing the sending/listening instance now preserves other-tab updates
+without receiving its own announcement. All 38 focused context/status tests,
+changed-file lint and core typecheck pass. This compatible runtime fix stays in
+the unreleased 1.6.0 app train; no packaged agent content changes. Full artifact
+validation and deployment remain pending for this correction.
+
 # App Status
 
 ## September 16 billing-enabled release fixture correction

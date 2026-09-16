@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
     refresh: vi.fn(async () => undefined),
@@ -123,6 +123,7 @@ function UserRefreshProbe() {
 }
 
 describe('BillingProvider Checkout continuity', () => {
+    afterEach(() => vi.unstubAllGlobals());
     beforeEach(() => {
         vi.clearAllMocks();
         state.isCloudConnected = true;
@@ -133,6 +134,36 @@ describe('BillingProvider Checkout continuity', () => {
         state.hadPreviousCloudSession = true;
         state.movedToStorageProvider = null;
         state.billingStatusOptions = null;
+    });
+
+    it('refreshes its own status once while still notifying other billing tabs', async () => {
+        const peers = new Set<TestChannel>();
+        class TestChannel {
+            onmessage: ((event: { data: unknown }) => void) | null = null;
+            constructor(readonly name: string) { peers.add(this); }
+            postMessage(data: unknown) {
+                for (const peer of peers) {
+                    if (peer !== this && peer.name === this.name) {
+                        queueMicrotask(() => peer.onmessage?.({ data }));
+                    }
+                }
+            }
+            close() { peers.delete(this); }
+        }
+        vi.stubGlobal('BroadcastChannel', TestChannel);
+        const otherTab = new BroadcastChannel('tasktime-billing-refresh-v1');
+        const otherTabMessage = vi.fn();
+        otherTab.onmessage = otherTabMessage;
+        render(<BillingProvider><UserRefreshProbe /></BillingProvider>);
+
+        await act(async () => fireEvent.click(screen.getByText('Refresh billing status')));
+        expect(state.billingRefresh).toHaveBeenCalledOnce();
+        expect(state.refresh).toHaveBeenCalledOnce();
+        expect(otherTabMessage).toHaveBeenCalledOnce();
+
+        await act(async () => otherTab.postMessage({ version: 1, reason: 'canonical-state-changed' }));
+        expect(state.refresh).toHaveBeenCalledTimes(2);
+        otherTab.close();
     });
 
     it('keeps the mounted account and entitlement when a lazy consumer loads a hot-updated module', async () => {

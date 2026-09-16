@@ -137,19 +137,23 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         lifecycle,
         needsCloudReconnect,
     ]);
+    const refreshChannel = useRef<BroadcastChannel | null>(null);
     const announceRefresh = useCallback(() => {
-        if (typeof BroadcastChannel === 'undefined') return;
-        const channel = new BroadcastChannel('tasktime-billing-refresh-v1');
-        channel.postMessage({ version: 1, reason: 'canonical-state-changed' });
-        channel.close();
+        // BroadcastChannel excludes its sending instance. Reuse the listener
+        // so this tab does not race its explicit refresh with its own message.
+        refreshChannel.current?.postMessage({ version: 1, reason: 'canonical-state-changed' });
     }, []);
     useEffect(() => {
         if (typeof BroadcastChannel === 'undefined' || !BILLING_FEATURES.status) return;
         const channel = new BroadcastChannel('tasktime-billing-refresh-v1');
+        refreshChannel.current = channel;
         channel.onmessage = event => {
             if (event.data?.version === 1) void refresh();
         };
-        return () => channel.close();
+        return () => {
+            refreshChannel.current = null;
+            channel.close();
+        };
     }, [refresh]);
     const refreshCanonicalStatus = useCallback(async () => {
         assertCurrentAccount();
