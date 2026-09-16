@@ -1,3 +1,22 @@
+## September 16 final app stage and v1.6.0 released
+
+Core `cbe52a0` is tagged/released as `v1.6.0` and deployed with all final browser
+billing flags. The complete production artifact gate passes 2,888 unit tests,
+per-file coverage, 95 first-pass Chromium journeys plus one successful retry,
+and five PWA checks. The mock direct-Drive test retained one aborted manifest
+request during its full-page-navigation fixture; all upload/proxy assertions
+passed on retry and in three further final-flag runs without retries. Separate
+exact-source core CI passes all 96 browser journeys without retries.
+
+All 25 live route/asset/TLS checks match the tested artifact. A disposable live
+browser imports the synthetic backup, retains editable email drafts and the Pro
+send boundary, and downloads a valid PDF with zero send requests/runtime errors.
+That probe waits for import completion before navigating. Edge loads the final
+asset, retains four clients and its Pro trial, reports In sync and no billing
+warning. The root site and readonly recovery path remain independently deployed.
+Rollback/cleanup and broader Dropbox developer-account confirmation stay in the
+private operational follow-up record; no customer storage is reset.
+
 ## September 16 final email-stage browser fixture
 
 The final flag preflight also exposed legacy `emailService` unit tests that

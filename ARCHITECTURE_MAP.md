@@ -5,8 +5,8 @@ Browser / PWA
 ├── src/App.jsx + src/components/          UI composition and workflows
 ├── src/hooks/                             React-facing entity and behavior APIs
 ├── src/domain/                            Pure/central business operations
-│   └── entitlements/                      Implemented shared semantic UI/agent policy (production-disabled)
-├── src/config/billingFeatures.ts          Production-off flags + guarded loopback sandbox mode
+│   └── entitlements/                      Shared semantic UI/agent policy (enabled in production)
+├── src/config/billingFeatures.ts          Fail-closed defaults + explicit release flags and guarded loopback sandbox mode
 ├── src/config/origins.ts                  Exact marketing/app/migration/Worker/agent origin roles
 ├── src/contexts/BillingContext.tsx        Normal Worker-backed billing client and lifecycle
 ├── src/config/localReviewPricing.ts       Shared loopback app + public pricing review values
@@ -26,7 +26,7 @@ Browser / PWA
         ├── Google Drive appDataFolder direct data path (production optional)
         ├── Dropbox App Folder direct data path (production optional)
         ├── provider-neutral hosted identity (production control plane)
-        ├── local Stripe/D1 billing + public catalog/signed-license control plane (not deployed)
+        ├── Shared Stripe/D1 billing + public catalog/signed-license control plane (deployed)
         ├── DebugBundle endpoint (optional tasktime-app diagnostics; independent tasktime-site browser module)
         └── exchange-rate / email / push integrations as configured
 
@@ -46,11 +46,11 @@ Independent builds (no parent-source dependencies)
 ├── tasktime → public JSON contract → reviewed snapshot in tasktime-site/vendor
 └── tasktime-site → dist: homepage/pricing/blog/legal/agents, discovery, static 404 (no PWA)
 
-Approval-gated Phase 4 production target
+Production topology (independently approved artifact deployments)
 ├── existing root Pages project → tasktime-site/dist → tasktime.pro
 ├── one permanent app Pages project → dist-app → app.tasktime.pro
 ├── one shared Worker + existing stateful bindings → both origins during overlap
-└── pinned dist artifact → root rollback only
+└── old-origin recovery reader → readonly export for returning users
 ```
 
 ## Dependency direction
@@ -152,7 +152,7 @@ Approval-gated Phase 4 production target
   transfer. Legacy `driveSessionId` remains a compatibility field, not a hidden
   Google requirement when Dropbox is active.
 - Agent commands call the same store/domain behaviors as the UI and never expose raw Yjs access to MCP clients.
-- Locally implemented Pro enforcement is action-based through one pure entitlement policy; production switches remain false.
+- Pro enforcement is action-based through one pure entitlement policy with independent client/report/email rollout switches.
   `BillingContext` publishes its derived `entitlementState` with independent plan
   and connection dimensions, and the shared Get Pro action policy drives both
   Plan & Billing and Reports presentation. The Reports shell passes both into

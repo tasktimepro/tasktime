@@ -1,0 +1,81 @@
+name: Verify published agent releases
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLAWHUB_CLI_VERSION: "0.23.1"
+      SKILL_PATH: integrations/openclaw/tasktime/skills/tasktime
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check publication workflow regressions
+        run: node --test scripts/clawhub-publish-workflow.test.mjs
+      - name: Read published npm and MCP versions
+        run: |
+          set -euo pipefail
+          test "$(npm view @tasktimepro/agent-bridge@1.2.0 version)" = "1.2.0"
+          test "$(npm view @tasktimepro/openclaw@1.2.0 version)" = "1.2.0"
+          node --input-type=module -e '
+            const r = await fetch("https://registry.modelcontextprotocol.io/v0.1/servers/pro.tasktime%2Fagent-bridge/versions/1.2.0");
+            if (!r.ok) throw Error("MCP registry unavailable");
+            const result = await r.json();
+            if ((result.server ?? result).version !== "1.2.0") throw Error("Unexpected MCP version");
+          '
+      - name: Verify ClawHub plugin files against reviewed source
+        run: |
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package inspect @tasktimepro/openclaw --version 1.2.0 --json > /tmp/plugin.json
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import crypto from "node:crypto";
+            const x = JSON.parse(fs.readFileSync("/tmp/plugin.json", "utf8"));
+            if (x.package.name !== "@tasktimepro/openclaw" || x.owner.handle !== "tasktimepro" || x.version.version !== "1.2.0" || x.package.scanStatus !== "clean" || !x.version.files.length) throw Error("Unexpected plugin identity or scan");
+            for (const file of x.version.files) {
+              if (file.path.includes("..") || file.path.startsWith("/")) throw Error("Invalid artifact path");
+              const actual = crypto.createHash("sha256").update(fs.readFileSync("integrations/openclaw/tasktime/" + file.path)).digest("hex");
+              if (actual !== file.sha256) throw Error("Published file mismatch: " + file.path);
+            }
+            console.log("Verified " + x.version.files.length + " published plugin files");
+          '
+      - name: Verify canonical publisher identity
+        shell: bash
+        env:
+          EXPECTED_VERSION: "1.3.0"
+          VERIFY_PATH: ${{ runner.temp }}/clawhub-verify.json
+        run: |
+          set -euo pipefail
+          # Exit 1 may mean only the optional asynchronous skill card is absent.
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill verify @tasktimepro/tasktime-agent \
+            --version "$EXPECTED_VERSION" > "$VERIFY_PATH" || VERIFY_EXIT=$?
+
+          node -e '
+            const fs = require("node:fs");
+            const result = JSON.parse(fs.readFileSync(process.env.VERIFY_PATH, "utf8"));
+            const crypto = require("node:crypto");
+            const expectedHash = crypto.createHash("sha256").update(fs.readFileSync(process.env.SKILL_PATH + "/SKILL.md")).digest("hex");
+            const valid = result.security?.passed === true
+              && (result.reasons ?? []).every(reason => reason === "card.missing")
+              && result.artifact?.files?.some(file => file.path === "SKILL.md" && file.sha256 === expectedHash)
+              && result.publisherHandle === "tasktimepro"
+              && result.slug === "tasktime-agent"
+              && result.version === process.env.EXPECTED_VERSION;
+            process.exit(valid ? 0 : 1);
+          '
+
+          if ! node -e '
+            const fs = require("node:fs");
+            const result = JSON.parse(fs.readFileSync(process.env.VERIFY_PATH, "utf8"));
+            process.exit(result.ok === true && result.card?.available === true && result.provenance?.source === "server-resolved-github-import" ? 0 : 1);
+          '; then
+            echo "::warning::ClawHub confirmed the official publisher and version, but its asynchronous card/provenance record is not yet complete. Do not republish this immutable version."
+            cat "$VERIFY_PATH"
+          fi

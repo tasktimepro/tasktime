@@ -13,8 +13,12 @@ Immediate registry readback failed during npm/ClawHub processing; later public
 verification supersedes those failures without republishing immutable versions.
 The native plugin first rejected a SHA used as its OIDC ref; a red/green shell
 argument regression now preserves GITHUB_REF separately from GITHUB_SHA. The
-corrected publication was accepted from 3616ccc. Core v1.6.0 tagging still awaits
-the final app rollout. Cleanup and verification-workflow polish remain separate.
+corrected publication was accepted from 3616ccc. Core v1.6.0 is tagged/released at
+`cbe52a0` after the final app rollout and live checks. The publication verifier now accepts only a clean, hash-matched skill with the
+specific optional `card.missing` result; other failures remain blocking. A
+read-only verification workflow checks already published artifacts without
+republishing. Four shell regressions pass, including red/green coverage of
+the missing-card failure. No published artifact contents changed.
 
 # Agent Integration Status
 

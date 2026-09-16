@@ -10,7 +10,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   readonly Yjs/IndexedDB reader for the old root origin. It uses the normal
   portable backup validator without initializing the app store or a provider.
   The public site owns its dismissible UI; removal follows the recovery window.
-  Production publication still requires old-worker and rollback verification.
+  It remains available after launch cleanup for returning local-only users.
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
 - **React context identity:** Yjs and billing context objects live in UI-independent
@@ -30,11 +30,11 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   pages and public discovery. Core builds only `dist-app`; site builds its own
   `dist`. A reviewed JSON snapshot carries core public tool/discovery metadata
   into site without parent-source imports or coupled release cycles. See
-  `contracts/site-distribution.md`. Phase 4 reuses the existing root Pages
-  project for site and adds one permanent app project, sharing the existing
-  Worker/services. The actual pre-cutover combined artifact remains the pinned
-  root rollback source. Site source is retained privately under `tasktimepro`;
-  website publication, pricing, and split deployment remain launch-gated.
+  `contracts/site-distribution.md`. Production reuses the existing root Pages
+  project for site and one permanent app project, sharing the existing
+  Worker/services. The launch rollback deployment is retired after owner acceptance.
+  Site source is retained privately under `tasktimepro`;
+  each component deploys independently from its tested, approved artifact.
 - **Publication isolation:** Only the app owns PWA installation and offline
   caching. Site ships a static non-indexable 404 to disable implicit host SPA
   fallback, plus complete public metadata/sitemap checks. App noindex metadata
@@ -56,15 +56,14 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   small optional bundled diagnostic module, without app storage or analytics.
   Local tests remain the first tool for deterministic failures. New subscription
   acquisition requires VAT-inclusive Stripe Prices and matching catalog copy;
-  automatic tax stays enabled, with paid activation separately gated.
-- **Locally implemented subscription control plane:** Private Worker/D1/Stripe
+  automatic tax stays enabled and server controls independently authorize acquisition.
+- **Subscription control plane:** Private Worker/D1/Stripe
   modules and the browser client now implement a sanitized catalog, canonical
   provider-bound billing status, short-lived signed local assertions, recovery,
-  and action policy under guarded local plus bounded real Stripe test-mode
-  evidence. Program Phase 1 is complete locally. Production controls remain off
-  until the documented launch gates; no remote billing migration or live
-  Stripe/deployment evidence is claimed, and billing state never becomes
-  Yjs/product/provider data.
+  and action policy. Production acquisition is enabled after staged verification;
+  the status register and private operational record own rollout evidence.
+  Independent client/report/email switches permit staged enforcement and rollback.
+  Billing state never becomes Yjs/product/provider data.
 - **Production-like local stack:** In an operator checkout, the default
   `make dev` command applies an explicit Vite-development flag on a loopback
   hostname and runs the app, local Worker/D1, scheduled recovery runner, and
@@ -154,7 +153,7 @@ The Yjs store is split into documents so current work stays loaded and historica
 5. Review dashboard metrics and reports, then export CSV, PDF, ZIP, backup, or accountant artifacts.
 6. Optionally connect Google Drive or Dropbox using manual, backup, or bidirectional sync modes.
 7. Optionally pair a same-device agent bridge and grant scoped business-action access.
-8. The locally implemented, production-disabled Pro release boundary gives Free one active client and a
+8. The deployed Pro release boundary gives Free one active client and a
    useful Reports Overview for the current local calendar month. An optional
    no-card trial, Pro subscription, or owner-issued complimentary grant unlocks
    unlimited active clients, advanced report tabs/outputs, and TaskTime-hosted
@@ -247,7 +246,7 @@ See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
   including across calendar boundaries. Note-only edits leave timing untouched.
   The quick editor offers Today/Yesterday, preserves older timer dates, and
   previews the resulting interval and duration before saving.
-- The locally implemented entitlement policy is shared across browser and agent paths but remains production-disabled.
+- The entitlement policy is shared across browser and agent paths, with independent production rollout switches.
   It gates only a net-increasing active-client create/restore transition,
   advanced Reports/exports, and hosted Send. `/reports`, its current-month
   Overview, and every tab remain visible; a locked advanced tab branches to a

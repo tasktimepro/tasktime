@@ -1,18 +1,27 @@
-## September 16 public site live; staged billing rollout continuing
+## September 16 production launch released
 
-The approved public site is live at `https://tasktime.pro`; the app remains at
-`https://app.tasktime.pro`. Site artifact/route/OG/recovery verification passes.
-Core `2ba528f` is on main and deployed with client-limit enforcement and the
-same-tab billing refresh fix. Its complete gate passes 2,888 unit tests, 96
-Chromium journeys and five PWA checks; 25 served app checks pass. Runtime refresh
-now makes one status request and returns 200 without the duplicate conflict.
-General catalog, no-card trial, Checkout and Portal are enabled after scoped
-non-charging live proof; no synthetic live charge was made. Reports and hosted
-email enforcement are still staged follow-ups, and package/tag publications
-remain separately gated. No additional hosting resources or plans were added.
-Rollback deployments and original browser data are retained; cleanup is deferred.
-Private launch readiness owns exact deployment identities and operational proof.
-Earlier dated entries below are historical checkpoints, not current blockers.
+The new public site is live at `https://tasktime.pro`, and app v1.6.0 is live at
+`https://app.tasktime.pro`. Core tag/release `v1.6.0` identifies tested source
+`cbe52a0`. General catalog, no-card trial, Checkout, Portal and the staged client,
+Reports and hosted-email controls are enabled. Free draft editing, PDF export,
+local records and cloud sync are preserved.
+
+Exact-source CI and the production artifact gate pass: 2,888 unit tests with
+per-file coverage, 96 Chromium journeys and five PWA checks. The production gate
+has one retained mock-Drive cancellation flake that passed on retry and in three
+additional runs without retries. All 25 live app route/asset/TLS checks and the
+isolated email/PDF smoke pass; 17 site checks and returning-user recovery proof
+are retained. Edge shows the expected Pro trial, four clients, sync ready and
+no billing warning after loading the final app assets.
+
+Bridge/MCP, OpenClaw and Claude 1.2.0, marketplace 1.4.0 and ClawHub skill 1.3.0
+are published and verified. No extra paid hosting resources or plans were added.
+The owner accepted production and approved launch cleanup on September 16.
+The launch rollback and staged Pages builds are removed; historical hosting
+versions and customer data remain. First legitimate paid/send monitoring follows;
+Dropbox broad-public developer status still needs confirmation in its owning
+account. Private launch readiness owns the exact operational evidence. Earlier
+dated entries below are historical checkpoints, not current approval blockers.
 
 # Delivery Status — Overview
 

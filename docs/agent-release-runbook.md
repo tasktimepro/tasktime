@@ -2,6 +2,16 @@
 
 This file is the local source of truth for publishing TaskTime Pro agent-facing artifacts: the MCP bridge npm package, public agent docs, OpenClaw/ClawHub skill, OpenClaw bundle, and Claude Code plugin bundle.
 
+## Verify an existing release
+
+Run `verify-agent-releases.yml` to check published npm/MCP versions and compare
+ClawHub plugin/skill hashes with the reviewed source without publishing again.
+Registry processing can delay visibility after an accepted publication. The
+optional ClawHub skill card/import provenance can also remain unavailable;
+identity, artifact hashes and a clean security result must still pass. Only the
+specific `card.missing` result is treated as a warning. Other failures block.
+Do not retry publication of an already accepted immutable version.
+
 ## Canonical Artifacts
 
 - MCP bridge npm package: `@tasktimepro/agent-bridge`

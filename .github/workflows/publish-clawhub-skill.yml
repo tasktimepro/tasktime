@@ -109,13 +109,19 @@ jobs:
           VERIFY_PATH: ${{ runner.temp }}/clawhub-verify.json
         run: |
           set -euo pipefail
+          # Exit 1 may mean only the optional asynchronous skill card is absent.
           npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill verify @tasktimepro/tasktime-agent \
-            --version "$EXPECTED_VERSION" > "$VERIFY_PATH"
+            --version "$EXPECTED_VERSION" > "$VERIFY_PATH" || VERIFY_EXIT=$?
 
           node -e '
             const fs = require("node:fs");
             const result = JSON.parse(fs.readFileSync(process.env.VERIFY_PATH, "utf8"));
-            const valid = result.publisherHandle === "tasktimepro"
+            const crypto = require("node:crypto");
+            const expectedHash = crypto.createHash("sha256").update(fs.readFileSync(process.env.SKILL_PATH + "/SKILL.md")).digest("hex");
+            const valid = result.security?.passed === true
+              && (result.reasons ?? []).every(reason => reason === "card.missing")
+              && result.artifact?.files?.some(file => file.path === "SKILL.md" && file.sha256 === expectedHash)
+              && result.publisherHandle === "tasktimepro"
               && result.slug === "tasktime-agent"
               && result.version === process.env.EXPECTED_VERSION;
             process.exit(valid ? 0 : 1);

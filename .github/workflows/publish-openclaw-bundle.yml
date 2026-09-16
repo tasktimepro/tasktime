@@ -66,8 +66,12 @@ jobs:
         env:
           EXPECTED_VERSION: ${{ steps.package_version.outputs.version }}
         run: |
-          PUBLISHED_VERSION="$(npm view "@tasktimepro/openclaw@${EXPECTED_VERSION}" version)"
-          test "$PUBLISHED_VERSION" = "$EXPECTED_VERSION"
+          for attempt in {1..12}; do
+            PUBLISHED_VERSION="$(npm view "@tasktimepro/openclaw@${EXPECTED_VERSION}" version 2>/dev/null)" || PUBLISHED_VERSION=""
+            if [[ "$PUBLISHED_VERSION" == "$EXPECTED_VERSION" ]]; then exit 0; fi
+            if [[ "$attempt" == "12" ]]; then exit 1; fi
+            sleep 5
+          done
 
       - name: Publish package
         if: ${{ inputs.dry_run == false && steps.package_version.outputs.exists == 'false' }}
@@ -81,5 +85,9 @@ jobs:
         env:
           EXPECTED_VERSION: ${{ steps.package_version.outputs.version }}
         run: |
-          PUBLISHED_VERSION="$(npm view "@tasktimepro/openclaw@${EXPECTED_VERSION}" version)"
-          test "$PUBLISHED_VERSION" = "$EXPECTED_VERSION"
+          for attempt in {1..12}; do
+            PUBLISHED_VERSION="$(npm view "@tasktimepro/openclaw@${EXPECTED_VERSION}" version 2>/dev/null)" || PUBLISHED_VERSION=""
+            if [[ "$PUBLISHED_VERSION" == "$EXPECTED_VERSION" ]]; then exit 0; fi
+            if [[ "$attempt" == "12" ]]; then exit 1; fi
+            sleep 5
+          done
