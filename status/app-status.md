@@ -1,3 +1,14 @@
+## September 16 final email-stage browser fixture
+
+Hosted-email Worker policy is live; signed production status confirms available
+Pro quota 100. Reports is also live with 25 route/byte checks and isolated Free
+Overview, advanced-tab gating and offline recovery proof. Final browser-artifact
+preparation exposed an older smoke expectation for the pre-policy cloud prompt.
+A focused red run reproduces that assertion; the corrected test explicitly covers
+both policy modes, retained draft fields and zero send requests. No runtime or
+agent artifact changes are required. The full final artifact gate must pass
+before enabling the browser email flag or publishing the core release tag.
+
 ## September 16 client-stage production deployment
 
 Core `2ba528f` is promoted to main and live at `app.tasktime.pro` with client

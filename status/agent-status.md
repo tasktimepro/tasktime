@@ -1,3 +1,21 @@
+## September 16 approved agent publications
+
+Bridge/MCP 1.2.0 and OpenClaw npm/native-plugin 1.2.0 are published. Public registry
+readbacks confirm versions; the bridge's published executable matches local bytes,
+and all 11 ClawHub plugin files match the reviewed package. npm and ClawHub expose
+the same OpenClaw artifact integrity. ClawHub scans are clean and downloads are
+not blocked. The skill is published as 1.3.0 under tasktimepro with matching source
+bytes and a clean scan; its optional generated card/import provenance remains
+unavailable, so it is not claimed as independently registry-attested. Claude is
+available from core main as plugin 1.2.0 / marketplace 1.4.0.
+
+Immediate registry readback failed during npm/ClawHub processing; later public
+verification supersedes those failures without republishing immutable versions.
+The native plugin first rejected a SHA used as its OIDC ref; a red/green shell
+argument regression now preserves GITHUB_REF separately from GITHUB_SHA. The
+corrected publication was accepted from 3616ccc. Core v1.6.0 tagging still awaits
+the final app rollout. Cleanup and verification-workflow polish remain separate.
+
 # Agent Integration Status
 
 ## Current focus

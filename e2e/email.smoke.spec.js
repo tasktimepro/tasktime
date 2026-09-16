@@ -8,6 +8,10 @@ test.describe('Invoice email smoke', () => {
 
     test('shows Send Invoice button on unpaid invoice and opens email modal', async ({ page }) => {
 
+        const sendRequests = [];
+        page.on('request', request => {
+            if (new URL(request.url()).pathname === '/email/invoice') sendRequests.push(request.url());
+        });
         const now = Date.now();
         const projectTitle = `PW Email Invoice Project ${now}`;
         const clientTitle = `PW Email Invoice Client ${now}`;
@@ -36,15 +40,22 @@ test.describe('Invoice email smoke', () => {
         const emailModal = page.getByRole('dialog', { name: /Send Invoice/ });
         await expect(emailModal).toBeVisible();
 
-        // Hosted sending uses whichever supported cloud provider is active.
-        await expect(emailModal.getByText(/Cloud provider required/i)).toBeVisible();
-        await expect(emailModal.getByText(
-            /Connect Google Drive or Dropbox in Account settings/i,
-        )).toBeVisible();
-
-        // The Send Invoice button in the modal should be disabled until cloud sync is connected.
+        // Keep both staged states explicit: neither permits a disconnected Send.
+        const emailPolicyEnabled = process.env.VITE_EMAIL_ENTITLEMENT_ENFORCEMENT === 'true'
+            || process.env.VITE_BILLING_SANDBOX_MODE === 'true';
         const modalSendButton = emailModal.getByRole('button', { name: /Send Invoice/i });
-        await expect(modalSendButton).toBeVisible();
+        if (emailPolicyEnabled) {
+            await expect(emailModal.getByText(/Your email draft, template editing/i)).toBeVisible();
+            await expect(emailModal.getByRole('button', { name: 'View Pro options' })).toBeVisible();
+            await expect(modalSendButton).toHaveCount(0);
+            await expect(emailModal.getByText(/Cloud provider required/i)).toHaveCount(0);
+        } else {
+            await expect(emailModal.getByText(/Cloud provider required/i)).toBeVisible();
+            await expect(emailModal.getByText(
+                /Connect Google Drive or Dropbox in Account settings/i,
+            )).toBeVisible();
+            await expect(modalSendButton).toBeDisabled();
+        }
 
         await expect(emailModal.getByLabel('Subject')).toBeVisible();
         await expect(emailModal.getByLabel('Attachment Filename')).toHaveValue(/invoice-INV-/);
@@ -52,6 +63,7 @@ test.describe('Invoice email smoke', () => {
         // Close the modal
         await emailModal.getByRole('button', { name: /Cancel/ }).click();
         await expect(emailModal).not.toBeVisible();
+        expect(sendRequests).toEqual([]);
     });
 
     test('Send Invoice button is not shown on paid invoices', async ({ page }) => {
