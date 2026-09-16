@@ -1,3 +1,14 @@
+## September 16 client-stage production deployment
+
+Core `2ba528f` is promoted to main and live at `app.tasktime.pro` with client
+limits enabled. The exact staged artifact passes 2,888 unit tests (one existing
+skip), all 96 Chromium journeys, five PWA checks and static/build checks. All
+25 live route/asset/TLS checks pass. Edge shows the expected four active clients
+under the confirmed Pro trial and Dropbox in sync. One explicit status refresh
+makes one GET (plus its CORS preflight), returns 200 and produces no conflict.
+Reports and hosted-email enforcement remain separate pending stages. The public
+root now serves the approved site with its readonly migration recovery reader.
+
 ## September 16 enforcement-enabled agent fixture correction
 
 Client-stage preparation `35068126974` exposed three command tests that assumed

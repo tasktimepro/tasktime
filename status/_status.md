@@ -1,3 +1,19 @@
+## September 16 public site live; staged billing rollout continuing
+
+The approved public site is live at `https://tasktime.pro`; the app remains at
+`https://app.tasktime.pro`. Site artifact/route/OG/recovery verification passes.
+Core `2ba528f` is on main and deployed with client-limit enforcement and the
+same-tab billing refresh fix. Its complete gate passes 2,888 unit tests, 96
+Chromium journeys and five PWA checks; 25 served app checks pass. Runtime refresh
+now makes one status request and returns 200 without the duplicate conflict.
+General catalog, no-card trial, Checkout and Portal are enabled after scoped
+non-charging live proof; no synthetic live charge was made. Reports and hosted
+email enforcement are still staged follow-ups, and package/tag publications
+remain separately gated. No additional hosting resources or plans were added.
+Rollback deployments and original browser data are retained; cleanup is deferred.
+Private launch readiness owns exact deployment identities and operational proof.
+Earlier dated entries below are historical checkpoints, not current blockers.
+
 # Delivery Status — Overview
 
 ## September 15 production promotion approved
