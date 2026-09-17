@@ -1,3 +1,95 @@
+## September 17 Dashboard Today and Upcoming actions — local
+
+The full Docker `make release-gate` now passes for this local app candidate:
+the security audit found no vulnerabilities, lint/typecheck and configured
+coverage passed, all 103 Chromium smoke tests and five production-preview PWA
+smoke tests passed, and the public contract export and recovery build completed.
+The two smoke tests that blocked the first gate were corrected to use the
+remaining Tasks menu and to measure expense footer alignment in one browser
+frame after a phone resize. The candidate remains uncommitted and undeployed;
+physical-phone acceptance and release approval are separate.
+
+The New Recurring Expense button now fills its phone row, including the empty
+state. Eligible expense and recurring-template editors show a named trash-only
+delete button on phones, aligned with Cancel and Save, and trash plus text on
+desktop; the existing confirmation dialogs remain. Focused modal tests and
+responsive Chromium checks pass. Local and uncommitted.
+
+On phones, the Expenses and Recurring top tabs now split the row evenly;
+Payment Methods and Your Business are hidden from that row. The recurring tab
+uses its shorter label, and the Manage categories menu aligns with the content
+left edge. Desktop retains its four tabs and right-aligned menu. The focused
+Chromium check passes at 320, 390, 768, and 1440 pixels, including tab
+navigation and no page overflow. Local and uncommitted.
+
+Dashboard and Expenses phone summary rails now span both screen edges like the
+project, client, and Planner rails. Their first cards remain aligned with the
+16px content inset; scroll snapping uses that same inset, letting preceding
+cards pass visibly off the left edge. The next card peeks in on the right, and
+the last card retains its 16px end inset. Focused Chromium journeys pass at
+320 and 390 pixels without page overflow; desktop grids are unchanged. Local
+and uncommitted.
+
+Removed the phone-only bottom scroll gutters from the project and client
+dashboard metric rails, Planner day selector, and Expenses summary rail. The
+Expenses rail now reaches the phone's right edge so the next card is visible;
+the last card retains a 16px end inset. Project/client/Planner and Expenses
+Chromium viewport checks pass, including horizontal scrolling and no page
+overflow. Desktop layouts are unchanged. This remains local and uncommitted.
+
+The Projects list now uses the Clients list's 24px header-to-card spacing on
+phones, with the existing 32px desktop spacing. A focused Chromium comparison
+passes at 320, 390, and 1024 pixels. This is local and uncommitted.
+
+With a visible global timer on phones, content now starts about 14px below the
+collapsed timer card instead of 26px. The mobile "+N more" toggle retains its
+original position. The focused Chromium check covers the two-timer label at
+390 and 320 pixels and the single-timer state at 320 pixels; the captured phone
+screenshot was visually reviewed.
+
+The phone Dashboard summary rail now reaches the screen's right edge, letting
+the next card remain visible beyond the dashboard content margin. Removed its
+extra 8px bottom padding and the rail's rounded clipping. The rail keeps a
+16px end inset when scrolled to the last card, matching the dashboard cards'
+right margin. Desktop grid spacing is unchanged. The focused Chromium viewport
+journey passes at 320, 390, 768, 1024, and 1440 pixels, including no page
+overflow on phones. This remains local and uncommitted.
+
+The Dashboard To Do Today task rows now show the timer shortcut without
+the direct time-entry and task-menu buttons. The task title still opens details,
+where both actions remain available. Upcoming task rows retain their completion
+checkboxes and date badges; checking a task removes it under the existing
+Upcoming filter. Timer, time entry, task menu, and expense pay shortcuts remain
+available from the task or expense details instead. The focused widget,
+Upcoming, and detail tests pass (44 tests), as does the Chromium Dashboard
+viewport check at 320, 390, 768, and 1440 pixels. This is a local,
+uncommitted app-only change; no deployment or agent artifact changed.
+
+The mobile Today and Upcoming layouts now give task titles and expense
+title/total pairs a full first line, with supporting text and dates below.
+Task checkboxes and expense icons center vertically beside each row. Today's
+timer remains by the date, while Mark Paid sits below the expense date on
+narrow screens so supplier text retains space. Desktop composition remains
+unchanged. The focused Chromium Dashboard journey checks this at 320 and 390
+pixels and passes across 320, 390, 768, and 1440 pixels.
+Mobile task project/note previews are now limited to two lines so long notes
+do not stretch Today or Upcoming rows. Mobile previews use plain text to avoid
+focus on a clipped link; full linked notes remain in task details.
+The Dashboard, widget, Upcoming, and expense-card component tests pass (58),
+as do lint, typecheck, the long-expense-title Chromium journey, and the two
+responsive Dashboard Chromium journeys.
+
+The Reports Overview period selector now shows a calendar icon and period text
+on desktop. At phone widths it becomes a calendar-only control aligned to the
+right of the heading; its tooltip names the selected period. A focused Chromium
+journey passes at 320, 390, 768, and 1440 pixels and verifies selection across
+the phone-to-desktop resize.
+
+Expense title and amount text now share one baseline and line height in the
+common due-expense card used by Today and Upcoming, including compact and
+non-clickable variants. The focused Chromium alignment journey passes at 320,
+390, 768, and 1440 pixels; the long-title truncation journey also passes.
+
 ## September 16 final app stage and v1.6.0 released
 
 Core `cbe52a0` is tagged/released as `v1.6.0` and deployed with all final browser
@@ -418,9 +510,9 @@ readiness record.
   month/year boundaries and reload. Running previews advance to now; paused
   previews preserve their endpoint. Invalid/future starts and starts after the
   paused endpoint disable saving and display a compact Notice with an alert
-  icon and existing light/dark danger tokens. Older work is directed to manual
-  time entries. The shared UI/agent validation and persisted timer contract
-  remain intact.
+  icon and existing light/dark danger tokens. Historical manual time entries
+  remain available through their separate workflow. The shared UI/agent
+  validation and persisted timer contract remain intact.
   Six new editor regressions failed before implementation. Browser checks also
   exposed an existing TimePicker bug: focusing and leaving an untouched field
   reset it to zero. Three regressions reproduced that failure; only explicitly

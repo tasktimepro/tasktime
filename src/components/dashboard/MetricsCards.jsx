@@ -1,11 +1,12 @@
 import { lazy, Suspense } from 'react';
-import { ChartBarIcon, ClockIcon, CurrencyDollarIcon, BanknotesIcon, HandCoinsIcon, ArrowUpRightIcon, ArrowDownRightIcon, MinusIcon } from '@/components/ui/icons';
+import { ChartBarIcon, CalendarDaysIcon, ClockIcon, CurrencyDollarIcon, BanknotesIcon, HandCoinsIcon, ArrowUpRightIcon, ArrowDownRightIcon, MinusIcon } from '@/components/ui/icons';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDurationWithSeconds, parseStoredDate } from '@/utils/dateUtils';
 import { DashboardMoneyValue } from './DashboardMoneyValue';
+import useIsMobileLayout from '../../hooks/useIsMobileLayout';
 
 const DashboardHoursChart = lazy(() => import('./DashboardHoursChart'));
 
@@ -25,6 +26,8 @@ function ReportTrend({ trend, comparison }) {
 
 /** A single selected period governs both the four cards and the hours chart. */
 export default function MetricsCards({ report, comparison, period, periodOptions, onPeriodChange, preferredCurrency, loading, error, onRetry }) {
+    const isMobileLayout = useIsMobileLayout();
+    const selectedPeriodLabel = periodOptions.find(option => option.value === period)?.label || 'Period';
     const money = value => <DashboardMoneyValue money={value} currency={preferredCurrency} />;
     const conversionFallback = [report.unbilled, report.received, report.spent].some(value => value.hadConversionError);
     const cards = [
@@ -36,10 +39,19 @@ export default function MetricsCards({ report, comparison, period, periodOptions
     return (
         <Card role="region" aria-labelledby="dashboard-reports-title" className="min-w-0 shadow-sm">
             <CardHeader className="px-3 pt-3 pb-4 sm:px-5 sm:pt-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 id="dashboard-reports-title" className="flex items-center text-lg font-semibold"><ChartBarIcon className="status-info-text-strong mr-2 h-5 w-5" />Reports Overview</h2>
+                <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <h2 id="dashboard-reports-title" className="flex min-w-0 items-center whitespace-nowrap text-lg font-semibold"><ChartBarIcon className="status-info-text-strong mr-2 h-5 w-5 shrink-0" />Reports Overview</h2>
                     <Select value={period} onValueChange={onPeriodChange}>
-                        <SelectTrigger aria-label="Dashboard report period" className="w-auto min-w-40"><SelectValue /></SelectTrigger>
+                        <SelectTrigger
+                            aria-label="Dashboard report period"
+                            title={isMobileLayout ? `Report period: ${selectedPeriodLabel}` : undefined}
+                            leadingIcon={CalendarDaysIcon}
+                            iconOnly={isMobileLayout}
+                            hideCaret={isMobileLayout}
+                            className={isMobileLayout ? 'h-9 w-9 shrink-0' : 'w-auto min-w-40'}
+                        >
+                            <span className={isMobileLayout ? 'sr-only' : ''}><SelectValue /></span>
+                        </SelectTrigger>
                         <SelectContent align="end" className="max-h-[min(18rem,var(--radix-select-content-available-height))]">{periodOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>

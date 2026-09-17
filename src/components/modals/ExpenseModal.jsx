@@ -6,6 +6,7 @@ import { CategoryLabel } from '@/components/expenses/CategoryLabel';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../Modal';
 import { Button } from '@/components/ui/button';
+import { TrashIcon } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { NativeDateInput } from '@/components/ui/native-date-input';
 import { Label } from '@/components/ui/label';
@@ -1453,20 +1454,20 @@ const ExpenseModal = ({
             : (editingExpense ? 'Save Expense' : 'Create Expense'));
 
     const modalFooter = (
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-row flex-wrap gap-2 sm:items-center">
+        <div className="flex w-full items-center justify-between gap-2">
+            <div className="flex shrink-0 items-center">
                 {(isSubmittingRecurring || (editingExpense && !editingRecurrenceId)) && !expenseDeletionBlockReason && (
-                    <Button variant="destructive" type="button" onClick={handleDeleteInstance}>
-                        Delete Expense
+                    <Button variant="destructive" size="icon" className="gap-0 md:w-auto md:gap-2 md:px-4" leadingIcon={TrashIcon} aria-label="Delete Expense" title="Delete Expense" type="button" onClick={handleDeleteInstance}>
+                        <span className="hidden md:inline">Delete Expense</span>
                     </Button>
                 )}
                 {editingRecurrenceId && (
-                    <Button variant="destructive" type="button" onClick={handleDeleteTemplate}>
-                        Delete Expense
+                    <Button variant="destructive" size="icon" className="gap-0 md:w-auto md:gap-2 md:px-4" leadingIcon={TrashIcon} aria-label="Delete Expense" title="Delete Expense" type="button" onClick={handleDeleteTemplate}>
+                        <span className="hidden md:inline">Delete Expense</span>
                     </Button>
                 )}
             </div>
-            <div className="flex flex-row flex-wrap justify-end gap-2">
+            <div className="flex shrink-0 items-center justify-end gap-2">
                 <Button variant="outline" onClick={handleClose} type="button">
                     Cancel
                 </Button>

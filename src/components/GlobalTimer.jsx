@@ -330,8 +330,6 @@ const GlobalTimer = ({
                                 </>
                             )}
                         </div>
-                        <p className="col-span-2 text-xs text-muted-foreground">For older work, add a manual time entry.</p>
-
                         {/* Note Input */}
                         <div className="col-span-2">
                             <Label className="text-xs text-foreground" htmlFor="global-timer-note">

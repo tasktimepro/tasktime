@@ -48,10 +48,6 @@ vi.mock('../../hooks/useToast.ts', () => ({
     })
 }))
 
-vi.mock('../TimeEntriesModal', () => ({
-    default: ({ isOpen, task }) => (isOpen ? <div>Time entries for {task.title}</div> : null)
-}))
-
 vi.mock('../expenses/ExpenseDueCard', () => ({
     default: ({ expense, category, isOverdue, isToday, isPreview, onView, onMarkPaid }) => (
         <div data-testid={`expense-${expense.id}`}>
@@ -64,15 +60,6 @@ vi.mock('../expenses/ExpenseDueCard', () => ({
             {onMarkPaid && (
                 <button type="button" onClick={onMarkPaid}>Mark expense paid</button>
             )}
-        </div>
-    )
-}))
-
-vi.mock('../task/TaskActionsMenu', () => ({
-    default: ({ task, onEdit, onDelete }) => (
-        <div>
-            <button type="button" onClick={() => onEdit(task)}>Edit task</button>
-            <button type="button" onClick={() => onDelete(task)}>Delete task</button>
         </div>
     )
 }))
@@ -150,9 +137,6 @@ describe('ToDoToday', () => {
             getTaskCompletedStatus: vi.fn(() => false),
             renderTaskTitle: (task) => <span>{task.title}</span>,
             renderTaskControls: () => null,
-            onEditTask: vi.fn(),
-            onDeleteTask: vi.fn(),
-            onArchiveTask: vi.fn(),
             onTaskTitleClick: vi.fn(),
             openExpenseView: vi.fn(),
             ...overrides,
@@ -189,7 +173,7 @@ describe('ToDoToday', () => {
         expect(screen.queryByTestId(`task-row-content-${upcomingTask.id}`)).not.toBeInTheDocument()
     })
 
-    it('stacks task metadata and actions below the title content', () => {
+    it('keeps the mobile timer action with the task date', () => {
         setMatchMedia(true)
 
         renderComponent({
@@ -201,10 +185,42 @@ describe('ToDoToday', () => {
         const secondaryRow = screen.getByTestId(`task-row-secondary-${overdueTask.id}`)
         const actionsRow = screen.getByTestId(`task-row-actions-${overdueTask.id}`)
 
-        expect(secondaryRow.className.includes('w-full')).toBe(true)
-        expect(secondaryRow.className.includes('justify-end')).toBe(true)
-        expect(actionsRow.className.includes('justify-end')).toBe(true)
+        expect(secondaryRow).toContainElement(actionsRow)
         expect(within(actionsRow).getByText('Start timer')).toBeInTheDocument()
+    })
+
+    it.each([true, false])('keeps Today actions and makes Upcoming a details preview (mobile: %s)', async (mobile) => {
+        setMatchMedia(mobile)
+        const user = userEvent.setup()
+        const props = renderComponent({
+            overdueTasks: [],
+            renderTaskTitle: (task) => (
+                <button type="button" onClick={() => props.onTaskTitleClick(task)}>{task.title}</button>
+            ),
+            renderTaskControls: () => <button type="button">Start timer</button>,
+        })
+
+        const today = screen.getByRole('region', { name: 'To Do Today (1)' })
+        const upcoming = screen.getByRole('region', { name: 'Upcoming (1)' })
+
+        expect(within(today).getByRole('button', { name: 'Start timer' })).toBeInTheDocument()
+        expect(within(today).queryByTitle('Add time entry')).not.toBeInTheDocument()
+        expect(within(today).queryByRole('button', { name: 'Edit task' })).not.toBeInTheDocument()
+        expect(within(today).queryByRole('button', { name: 'Delete task' })).not.toBeInTheDocument()
+
+        await user.click(within(today).getByRole('button', { name: todayTask.title }))
+        expect(props.onTaskTitleClick).toHaveBeenCalledWith(todayTask)
+
+        expect(within(upcoming).getByText('Tomorrow')).toBeInTheDocument()
+        expect(within(upcoming).getByRole('checkbox', { name: `Complete ${upcomingTask.title}` })).not.toBeChecked()
+        expect(within(upcoming).queryByRole('button', { name: 'Start timer' })).not.toBeInTheDocument()
+        expect(within(upcoming).queryByTitle('Add time entry')).not.toBeInTheDocument()
+        expect(within(upcoming).queryByRole('button', { name: 'Edit task' })).not.toBeInTheDocument()
+        expect(within(upcoming).queryByRole('button', { name: 'Delete task' })).not.toBeInTheDocument()
+        await user.click(within(upcoming).getByRole('button', { name: upcomingTask.title }))
+        expect(props.onTaskTitleClick).toHaveBeenCalledWith(upcomingTask)
+        await user.click(within(upcoming).getByRole('checkbox', { name: `Complete ${upcomingTask.title}` }))
+        expect(props.handleCompleteTask).toHaveBeenCalledWith(upcomingTask, true)
     })
 
     it('hides recent time on mobile task rows', () => {
@@ -237,22 +253,13 @@ describe('ToDoToday', () => {
         expect(screen.getAllByText(duplicate.title)).toHaveLength(1)
     })
 
-    it('handles completion and actions', async () => {
+    it('handles Today completion', async () => {
         const user = userEvent.setup()
-        const props = renderComponent({ upcomingTasks: [] })
+        const props = renderComponent()
 
-        const [checkbox] = screen.getAllByRole('checkbox')
+        const checkbox = within(screen.getByRole('region', { name: 'To Do Today (2)' })).getByRole('checkbox', { name: `Complete ${overdueTask.title}` })
         await user.click(checkbox)
         expect(props.handleCompleteTask).toHaveBeenCalledWith(overdueTask, true)
-
-        await user.click(screen.getAllByTitle('Add time entry')[0])
-        expect(screen.getByText('Time entries for Overdue Task')).toBeInTheDocument()
-
-        await user.click(screen.getAllByText('Edit task')[0])
-        expect(props.onEditTask).toHaveBeenCalledWith(overdueTask)
-
-        await user.click(screen.getAllByText('Delete task')[0])
-        expect(props.onDeleteTask).toHaveBeenCalledWith(overdueTask)
     })
 
     it('opens task details only for overdue incomplete tasks when callback is provided', async () => {
@@ -403,9 +410,9 @@ describe('ToDoToday', () => {
         expect(props.onTaskTitleClick).toHaveBeenCalledWith(expect.objectContaining({ id: recurringCarryOver.id }))
     })
 
-    it('shows upcoming expenses immediately in the upcoming panel', () => {
-        hookMocks.expenses = [
-            {
+    it('shows upcoming expense dates and opens details without a pay shortcut', async () => {
+        const user = userEvent.setup()
+        const expense = {
                 id: 'expense-upcoming',
                 title: 'Upcoming Expense',
                 paymentStatus: 'unpaid',
@@ -415,16 +422,22 @@ describe('ToDoToday', () => {
                 currency: 'USD',
                 date: tomorrowStr,
                 isRecurring: false,
-            },
-        ]
+        }
+        hookMocks.expenses = [expense]
+        const openExpenseView = vi.fn()
 
         renderComponent({
             overdueTasks: [],
             tasksForToday: [],
             upcomingTasks: [],
+            openExpenseView,
         })
 
-        expect(within(screen.getByRole('region', { name: 'Upcoming (1)' })).getByText('Upcoming Expense')).toBeInTheDocument()
+        const upcoming = within(screen.getByRole('region', { name: 'Upcoming (1)' }))
+        expect(upcoming.getByText('Upcoming Expense')).toBeInTheDocument()
+        expect(upcoming.queryByRole('button', { name: 'Mark expense paid' })).not.toBeInTheDocument()
+        await user.click(upcoming.getByRole('button', { name: 'View expense' }))
+        expect(openExpenseView).toHaveBeenCalledWith(expense)
     })
 
     it('marks manual unpaid expense as paid and opens expense view', async () => {

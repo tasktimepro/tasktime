@@ -2,16 +2,13 @@
  * ToDoToday component - Shows overdue, today, and upcoming tasks.
  */
 
-import { useMemo, useState } from 'react';
-import { ClockIcon, ListTodoIcon } from '@/components/ui/icons';
+import { useMemo } from 'react';
+import { ListTodoIcon } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import CustomCheckbox from '../CustomCheckbox';
 import Upcoming from './Upcoming';
 import StartDateBadge from '../task/StartDateBadge';
-import TaskActionsMenu from '../task/TaskActionsMenu';
-import TimeEntriesModal from '../TimeEntriesModal';
 import ExpenseDueCard from '../expenses/ExpenseDueCard';
 import { useTimers } from '../../hooks/useTimers';
 import { useExpenses } from '../../hooks/useExpenses.ts';
@@ -34,9 +31,6 @@ import { useTodayString } from '@/hooks/useDayRollover';
  * @param {Function} props.renderTaskTitle
  * @param {Function} props.renderTaskControls
  * @param {Function} props.onTaskTitleClick
- * @param {Function} props.onEditTask
- * @param {Function} props.onDeleteTask
- * @param {Function} props.onArchiveTask
  * @param {Function} props.openExpenseView
  */
 const ToDoToday = ({
@@ -48,9 +42,6 @@ const ToDoToday = ({
     renderTaskTitle,
     renderTaskControls,
     onTaskTitleClick,
-    onEditTask,
-    onDeleteTask,
-    onArchiveTask,
     openExpenseView
 }) => {
     const { getTimerForTask } = useTimers();
@@ -59,8 +50,6 @@ const ToDoToday = ({
     const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
     const { showError, showSuccess } = useToast();
     const isMobileLayout = useIsMobileLayout();
-    const [selectedTask, setSelectedTask] = useState(null);
-    const [showTimeEntriesModal, setShowTimeEntriesModal] = useState(false);
     const todayStr = useTodayString() || '';
 
     // Combine and deduplicate tasks (a task might be both overdue and planned for today)
@@ -228,22 +217,11 @@ const ToDoToday = ({
         return groups;
     }, [expenses, recurrences, todayStr]);
 
-    const handleOpenTimeEntries = (task) => {
-        setSelectedTask(task);
-        setShowTimeEntriesModal(true);
-    };
-
-    const closeTimeEntries = () => {
-        setShowTimeEntriesModal(false);
-        setSelectedTask(null);
-    };
-
     const renderTaskRow = (task, options = {}) => {
         const rowContext = options.context === 'upcoming' ? 'upcoming' : 'today';
         const timer = getTimerForTask(task.id, task.projectId);
         const isTimerActive = !!timer && timer.taskId === task.id;
         const shouldDisable = !!timer && !timer.isPaused && !isTimerActive;
-        const hideActions = !!timer;
         const isCompleted = getTaskCompletedStatus(task);
         const isOverdue = !isCompleted && (
             Boolean(task.recurringStatus?.isOverdue) ||
@@ -277,7 +255,7 @@ const ToDoToday = ({
         return (
             <div key={task.id} className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${shouldDisable ? 'opacity-50' : ''}`}>
                 {isMobileLayout ? (
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-center gap-3">
                         <CustomCheckbox
                             id={`dashboard-${rowContext}-${task.id}`}
                             label={`Complete ${task.title}`}
@@ -286,40 +264,13 @@ const ToDoToday = ({
                             onChange={(checked) => handleCompleteTask(task, checked)}
                             disabled={shouldDisable}
                         />
-                        <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden" data-testid={`task-row-content-${task.id}`}>
-                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable })}
-                            <div
-                                className="flex w-full flex-wrap items-center justify-end gap-2"
-                                data-testid={`task-row-secondary-${task.id}`}
-                            >
-                                <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
-                                    {dateBadgeNode}
-                                </div>
-                                {(!shouldDisable || !hideActions) && (
-                                    <div
-                                        className="flex flex-wrap items-center justify-end gap-1"
-                                        data-testid={`task-row-actions-${task.id}`}
-                                    >
+                        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 gap-y-1 overflow-hidden" data-testid={`task-row-content-${task.id}`}>
+                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable, mobileGrid: true })}
+                            <div className="col-start-2 row-start-2 flex items-center justify-end gap-2" data-testid={`task-row-secondary-${task.id}`}>
+                                {dateBadgeNode}
+                                {rowContext === 'today' && !shouldDisable && (
+                                    <div className="flex items-center justify-end" data-testid={`task-row-actions-${task.id}`}>
                                         {renderTaskControls(task, shouldDisable)}
-                                        {!hideActions && (
-                                            <>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                    title="Add time entry"
-                                                    onClick={() => handleOpenTimeEntries(task)}
-                                                >
-                                                    <ClockIcon className="h-5 w-5" />
-                                                </Button>
-                                                <TaskActionsMenu
-                                                    task={task}
-                                                    onEdit={onEditTask}
-                                                    onDelete={onDeleteTask}
-                                                    onArchive={onArchiveTask}
-                                                />
-                                            </>
-                                        )}
                                     </div>
                                 )}
                             </div>
@@ -344,28 +295,9 @@ const ToDoToday = ({
                                 {formatDurationWithSeconds(task.recentTime || 0)}
                             </div>
                         )}
-                        {(!shouldDisable || !hideActions) && (
+                        {rowContext === 'today' && !shouldDisable && (
                             <div className="flex flex-shrink-0 space-x-1">
                                 {renderTaskControls(task, shouldDisable)}
-                                {!hideActions && (
-                                    <>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                            title="Add time entry"
-                                            onClick={() => handleOpenTimeEntries(task)}
-                                        >
-                                            <ClockIcon className="h-5 w-5" />
-                                        </Button>
-                                        <TaskActionsMenu
-                                            task={task}
-                                            onEdit={onEditTask}
-                                            onDelete={onDeleteTask}
-                                            onArchive={onArchiveTask}
-                                        />
-                                    </>
-                                )}
                             </div>
                         )}
                     </div>
@@ -393,7 +325,7 @@ const ToDoToday = ({
             isPreview={expense.isPreview}
             recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
             onView={() => openExpenseView?.(expense)}
-            onMarkPaid={expense.isPreview
+            onMarkPaid={options.context === 'upcoming' || expense.isPreview
                     || (expense.paymentMode === 'auto' && expense.amountType !== 'variable')
                     || expense.paymentStatus === 'paid'
                 ? undefined
@@ -448,13 +380,6 @@ const ToDoToday = ({
             <div className="min-w-0 xl:col-span-2">
                 <Upcoming tasks={upcomingTasks} expenses={upcomingExpenses} renderTask={renderTaskRow} renderExpense={renderExpenseRow} />
             </div>
-            {selectedTask && (
-                <TimeEntriesModal
-                    isOpen={showTimeEntriesModal}
-                    onClose={closeTimeEntries}
-                    task={selectedTask}
-                />
-            )}
         </div>
     );
 };

@@ -554,7 +554,7 @@ const ProjectList = ({
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 md:space-y-8">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="flex min-w-0 flex-1 items-center gap-2 text-2xl font-bold text-foreground">

@@ -75,6 +75,7 @@ describe('GlobalTimer', () => {
         vi.setSystemTime(new Date('2026-09-14T00:15:00'))
         mockTimers = [{ projectId: 'project-1', taskId: 'task-1', startTime: Date.now() - 60000, elapsedTime: 60000 }]
         renderWithToast(<GlobalTimer isExpanded />)
+        expect(screen.queryByText('For older work, add a manual time entry.')).not.toBeInTheDocument()
         expect(screen.queryByLabelText('Start Date')).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Open date picker' })).not.toBeInTheDocument()
         expect(screen.getByRole('combobox', { name: 'Start Day' })).toHaveTextContent('Today')

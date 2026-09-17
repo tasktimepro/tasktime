@@ -24,6 +24,7 @@ const ExpenseDueCard = ({
     compact = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
+    const isCompactMobile = isMobileLayout;
     const isVariable = expense.amountType === 'variable';
     const hasAmount = typeof expense.amount === 'number' && expense.amount > 0;
     const isPaid = expense.paymentStatus === 'paid';
@@ -108,58 +109,54 @@ const ExpenseDueCard = ({
         dateBadge
     );
 
+    const titleAndAmount = (
+        <>
+            <CategoryColorDot category={category} className="self-center" />
+            <span className={`min-w-0 truncate leading-5 ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>
+                {expense.title}
+            </span>
+            {amountLabel && (
+                <span className="sensitive-data shrink-0 whitespace-nowrap text-sm leading-5 text-muted-foreground">
+                    {amountLabel}
+                </span>
+            )}
+        </>
+    );
+
     return (
         <div
             className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${showOverdue ? 'opacity-90' : ''}`}
         >
             {isMobileLayout || compact ? (
-                <div className="flex items-start gap-3">
+                <div className={`flex gap-3 ${isCompactMobile ? 'items-center' : 'items-start'}`}>
                     <HandCoinsIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden" data-testid={`expense-row-content-${expense.id}`}>
+                    <div className={`flex-1 min-w-0 overflow-hidden ${isCompactMobile ? 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 gap-y-1' : 'space-y-1.5'}`} data-testid={`expense-row-content-${expense.id}`}>
                         {isClickable ? (
                             <button
                                 type="button"
                                 onClick={() => onView?.(expense)}
-                                className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer"
+                                className={`hover-status-info-text-strong flex w-full min-w-0 items-baseline gap-2 text-left text-sm font-medium leading-5 text-foreground transition-colors cursor-pointer ${isCompactMobile ? 'col-span-2 row-start-1' : ''}`}
                                 title="Open expense details"
                             >
-                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
-                                    <CategoryColorDot category={category} />
-                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>
-                                        {expense.title}
-                                    </span>
-                                </span>
-                                {amountLabel && (
-                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data whitespace-nowrap">
-                                        {amountLabel}
-                                    </span>
-                                )}
+                                {titleAndAmount}
                             </button>
                         ) : (
-                            <div className="text-left text-sm font-medium text-foreground">
-                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
-                                    <CategoryColorDot category={category} />
-                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>
-                                        {expense.title}
-                                    </span>
-                                </span>
-                                {amountLabel && (
-                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data whitespace-nowrap">
-                                        {amountLabel}
-                                    </span>
-                                )}
+                            <div className={`flex w-full min-w-0 items-baseline gap-2 text-left text-sm font-medium leading-5 text-foreground ${isCompactMobile ? 'col-span-2 row-start-1' : ''}`}>
+                                {titleAndAmount}
                             </div>
                         )}
                         {metaLine && (
-                            <p className={`text-xs text-muted-foreground whitespace-normal break-words ${isPaidDisplay ? 'line-through' : ''}`}>
+                            <p className={`text-xs text-muted-foreground whitespace-normal break-words ${isPaidDisplay ? 'line-through' : ''} ${isCompactMobile ? 'col-start-1 row-start-2 self-center' : ''}`}>
                                 {metaLine}
                             </p>
                         )}
-                        <div className="flex w-full flex-wrap items-center justify-end gap-2" data-testid={`expense-row-secondary-${expense.id}`}>
+                        <div className={isCompactMobile
+                            ? 'col-start-2 row-start-2 flex items-center justify-end gap-2 justify-self-end'
+                            : 'flex w-full flex-wrap items-center justify-end gap-2'} data-testid={`expense-row-secondary-${expense.id}`}>
                             <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
                                 {dateBadgeNode}
                             </div>
-                            {canMarkPaid && (
+                            {canMarkPaid && !isCompactMobile && (
                                 <div className="flex flex-wrap items-center justify-end gap-2" data-testid={`expense-row-actions-${expense.id}`}>
                                     <Button
                                         size="xs"
@@ -175,6 +172,21 @@ const ExpenseDueCard = ({
                                 </div>
                             )}
                         </div>
+                        {canMarkPaid && isCompactMobile && (
+                            <div className="col-span-2 row-start-3 justify-self-end" data-testid={`expense-row-actions-${expense.id}`}>
+                                <Button
+                                    size="xs"
+                                    className="h-7 px-3"
+                                    aria-label="Mark as paid"
+                                    title="Mark as paid"
+                                    onClick={() => onMarkPaid?.()}
+                                    leadingIcon={CheckIcon}
+                                    type="button"
+                                >
+                                    Mark Paid
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
             ) : (
@@ -185,30 +197,14 @@ const ExpenseDueCard = ({
                             <button
                                 type="button"
                                 onClick={() => onView?.(expense)}
-                                className="hover-status-info-text-strong block w-full text-left text-sm font-medium text-foreground transition-colors cursor-pointer truncate"
+                                className="hover-status-info-text-strong flex w-full min-w-0 items-baseline gap-2 text-left text-sm font-medium leading-5 text-foreground transition-colors cursor-pointer"
                                 title="Open expense details"
                             >
-                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
-                                    <CategoryColorDot category={category} />
-                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>{expense.title}</span>
-                                </span>
-                                {amountLabel && (
-                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data">
-                                        {amountLabel}
-                                    </span>
-                                )}
+                                {titleAndAmount}
                             </button>
                         ) : (
-                            <div className="text-sm font-medium text-foreground truncate">
-                                <span className="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">
-                                    <CategoryColorDot category={category} />
-                                    <span className={`min-w-0 truncate ${isPaidDisplay ? 'line-through text-muted-foreground' : ''}`} title={expense.title}>{expense.title}</span>
-                                </span>
-                                {amountLabel && (
-                                    <span className="ml-2 text-sm text-muted-foreground sensitive-data">
-                                        {amountLabel}
-                                    </span>
-                                )}
+                            <div className="flex w-full min-w-0 items-baseline gap-2 text-left text-sm font-medium leading-5 text-foreground">
+                                {titleAndAmount}
                             </div>
                         )}
                         {metaLine && (

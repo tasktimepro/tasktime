@@ -23,7 +23,7 @@ const MobileBottomNav = ({ items, isMoreActive, moreButton, moreButtonBadge, onO
                         key={item.key}
                         type="button"
                         onClick={item.onClick}
-                        className={`flex min-h-14 flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition-colors cursor-pointer ${item.isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
+                        className={`flex min-h-14 flex-col items-center justify-center rounded-xl px-2 py-2 text-[11px] font-medium transition-colors cursor-pointer ${item.isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
                         aria-label={item.label}
                     >
                         <ItemIcon className="mb-1 h-5 w-5" />
@@ -34,7 +34,7 @@ const MobileBottomNav = ({ items, isMoreActive, moreButton, moreButtonBadge, onO
                 <button
                     type="button"
                     onClick={moreButton?.onClick || onOpenMore}
-                    className={`relative flex min-h-14 flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium transition-[opacity,color,background-color] duration-200 cursor-pointer ${moreButtonToneClassName} ${moreButtonOpacityClassName}`}
+                    className={`relative flex min-h-14 flex-col items-center justify-center rounded-xl px-2 py-2 text-[11px] font-medium transition-[opacity,color,background-color] duration-200 cursor-pointer ${moreButtonToneClassName} ${moreButtonOpacityClassName}`}
                     aria-label={moreButtonAriaLabel}
                     aria-describedby={moreButtonDescriptionId}
                 >

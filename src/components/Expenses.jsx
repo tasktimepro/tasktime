@@ -664,12 +664,12 @@ const Expenses = ({
     }, [activeTab]);
 
     return (
-        <div className={cn('space-y-6', isMobileLayout && 'space-y-4 overflow-x-hidden')}>
+        <div className={cn('space-y-6', isMobileLayout && 'space-y-4', isMobileLayout && activeTab !== 'all' && 'overflow-x-hidden')}>
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
                 <TabsList className={cn(
                     'w-full bg-transparent rounded-none',
                     isMobileLayout
-                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
+                        ? 'grid h-auto grid-cols-2 gap-2 border-0 p-0'
                         : 'justify-start border-b border-border p-0'
                 )}>
                     {sideNavItems.map((item) => {
@@ -681,12 +681,13 @@ const Expenses = ({
                                 className={cn(
                                     'flex items-center font-medium text-sm whitespace-nowrap transition-colors',
                                     isMobileLayout
-                                        ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
-                                        : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
+                                        ? 'w-full min-w-0 rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
+                                        : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border',
+                                    isMobileLayout && (item.id === 'payment-methods' || item.id === 'business-info') && 'hidden'
                                 )}
                             >
                                 <Icon className="h-4 w-4 mr-2" />
-                                {item.name}
+                                {isMobileLayout && item.id === 'recurring' ? 'Recurring' : item.name}
                             </TabsTrigger>
                         );
                     })}
@@ -722,7 +723,7 @@ const Expenses = ({
                                             <MoreHorizontalIcon className="h-5 w-5" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuContent align={isMobileLayout ? 'start' : 'end'}>
                                         <DropdownMenuItem onClick={() => setIsCategoryManagerOpen(true)}>
                                             <TagsIcon className="h-4 w-4" />
                                             Manage categories
@@ -918,7 +919,7 @@ const Expenses = ({
                                     Manage recurring expenses and schedules.
                                 </p>
                             </div>
-                            <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null, { isRecurring: true })}>
+                            <Button className="w-full md:w-auto" leadingIcon={PlusIcon} onClick={() => openExpenseModal(null, { isRecurring: true })}>
                                 New Recurring Expense
                             </Button>
                         </div>
@@ -931,7 +932,7 @@ const Expenses = ({
                                     Create a recurring expense to automate repeating expenses.
                                 </p>
                                 <div className="mt-6">
-                                    <Button leadingIcon={PlusIcon} onClick={() => openExpenseModal(null, { isRecurring: true })}>
+                                    <Button className="w-full md:w-auto" leadingIcon={PlusIcon} onClick={() => openExpenseModal(null, { isRecurring: true })}>
                                         New Recurring Expense
                                     </Button>
                                 </div>

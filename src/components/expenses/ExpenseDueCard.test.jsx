@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpenseDueCard from './ExpenseDueCard'
 
@@ -54,8 +54,11 @@ describe('ExpenseDueCard', () => {
             onView={clickable ? vi.fn() : undefined}
         />)
         const label = screen.getByText(title)
+        const amount = screen.getByText('€29.00 EUR')
         expect(label).toHaveClass('min-w-0', 'truncate')
-        expect(label.parentElement).toHaveClass('max-w-full')
+        expect(label.parentElement).toContainElement(amount)
+        expect(label).toHaveClass('leading-5')
+        expect(amount).toHaveClass('leading-5')
         expect(label).toHaveAttribute('title', title)
         expect(screen.getByTestId('category-color-dot')).toHaveClass('shrink-0')
     })
@@ -248,7 +251,7 @@ describe('ExpenseDueCard', () => {
         expect(screen.getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
     })
 
-    it('uses a full-width secondary row for badge and actions', () => {
+    it('keeps the mobile pay action available below the date', () => {
         setMatchMedia(true)
 
         const expense = {
@@ -272,9 +275,8 @@ describe('ExpenseDueCard', () => {
         const secondaryRow = screen.getByTestId('expense-row-secondary-exp-7')
         const actionsRow = screen.getByTestId('expense-row-actions-exp-7')
 
-        expect(secondaryRow.className.includes('w-full')).toBe(true)
-        expect(secondaryRow.className.includes('justify-end')).toBe(true)
-        expect(actionsRow.className.includes('justify-end')).toBe(true)
+        expect(secondaryRow).not.toContainElement(actionsRow)
+        expect(within(actionsRow).getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
         expect(screen.getByText('A1')).toBeInTheDocument()
     })
 })

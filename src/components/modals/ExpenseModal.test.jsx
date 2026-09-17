@@ -615,6 +615,45 @@ describe('ExpenseModal', () => {
         expect(screen.queryByRole('button', { name: 'Delete Expense' })).not.toBeInTheDocument()
     })
 
+    it('shows a responsive trash action and asks before deleting an expense', async () => {
+        const user = userEvent.setup()
+        render(<ExpenseModal
+            isOpen
+            onClose={vi.fn()}
+            editingExpense={{
+                id: 'expense-1', title: 'Streaming service', date: '2026-04-13',
+                amount: 12, currency: 'EUR', paymentStatus: 'unpaid',
+                paymentMode: 'manual', billingStatus: 'unbilled',
+                isPersonal: true, billable: false, isRecurring: false, isTaxExempt: false,
+            }}
+        />)
+
+        const deleteButton = screen.getByRole('button', { name: 'Delete Expense' })
+        expect(deleteButton.querySelector('svg.lucide-trash-2')).toBeInTheDocument()
+        expect(deleteButton.querySelector('.hidden.md\\:inline')).toHaveTextContent('Delete Expense')
+        await user.click(deleteButton)
+        expect(screen.getByText('Delete expense?')).toBeInTheDocument()
+        expect(expensesMocks.deleteExpense).not.toHaveBeenCalled()
+    })
+
+    it('uses the same trash action for a recurring expense template', async () => {
+        const user = userEvent.setup()
+        recurrencesMocks.getRecurrence.mockReturnValue({
+            id: 'recurrence-1', title: 'Streaming service', currency: 'EUR', amount: 12,
+            amountType: 'fixed', paymentMode: 'auto', repeat: 'monthly',
+            monthlyType: 'specific', monthlyDay: 1, startDate: '2026-01-01',
+            isPersonal: true, billable: false, isTaxExempt: false, active: true,
+        })
+        render(<ExpenseModal isOpen onClose={vi.fn()} modalOptions={{ recurrenceId: 'recurrence-1' }} />)
+
+        const deleteButton = screen.getByRole('button', { name: 'Delete Expense' })
+        expect(deleteButton.querySelector('svg.lucide-trash-2')).toBeInTheDocument()
+        expect(deleteButton.querySelector('.hidden.md\\:inline')).toHaveTextContent('Delete Expense')
+        await user.click(deleteButton)
+        expect(screen.getByText('Delete recurring expense?')).toBeInTheDocument()
+        expect(recurrencesMocks.deleteRecurrence).not.toHaveBeenCalled()
+    })
+
     it('defaults new one-time expenses dated today to automatically paid and mirrors paid on', () => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2026-04-13T12:00:00Z'))

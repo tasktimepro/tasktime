@@ -26,6 +26,34 @@ async function seed(page) {
     });
 }
 
+test('keeps project, client, and Planner phone rails flush with their cards', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seed(page);
+
+    const checkRail = async (rail) => {
+        await expect(rail).toBeVisible();
+        const layout = await rail.evaluate(element => ({
+            bottomPadding: getComputedStyle(element).paddingBottom,
+            scrollable: element.scrollWidth > element.clientWidth,
+        }));
+        expect(layout.bottomPadding).toBe('0px');
+        expect(layout.scrollable).toBe(true);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    };
+
+    await page.goto('/projects');
+    await page.getByRole('heading', { name: 'Website', exact: true }).click();
+    await checkRail(page.getByTestId('project-metrics-row'));
+
+    await page.goto('/clients');
+    await page.getByRole('heading', { name: 'Studio', exact: true }).click();
+    await checkRail(page.getByTestId('client-metrics-row'));
+
+    await page.goto('/planner');
+    const daySelector = page.locator('main .scrollbar-hide').filter({ has: page.locator('button[aria-pressed]') });
+    await checkRail(daySelector);
+});
+
 test('keeps index icons neutral while preserving colored project identity in Planner and project details', async ({ page }) => {
     await seed(page);
     await page.evaluate(async () => {
@@ -203,19 +231,20 @@ test('keeps page scrolling available and dismisses a three-dot menu after a smal
     await main.evaluate((element) => { element.scrollTop = 0; });
     expect(await main.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
 
-    await page.getByRole('region', { name: 'To Do Today' })
-        .getByRole('button', { name: 'More actions' })
-        .click();
+    await page.locator('main').getByText('Tasks', { exact: true })
+        .locator('xpath=../../..')
+        .getByRole('button', { name: 'More actions' }).first().click();
 
     const menu = page.getByRole('menu');
     await expect(menu).toBeVisible();
+    const initialScroll = await main.evaluate((element) => element.scrollTop);
 
     await page.mouse.wheel(0, 4);
-    await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await expect.poll(() => main.evaluate((element, baseline) => element.scrollTop - baseline, initialScroll)).toBeGreaterThan(0);
     await expect(menu).toBeVisible();
 
     await page.mouse.wheel(0, 20);
-    await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeGreaterThan(8);
+    await expect.poll(() => main.evaluate((element, baseline) => element.scrollTop - baseline, initialScroll)).toBeGreaterThan(8);
     await expect(menu).toHaveCount(0);
 });
 

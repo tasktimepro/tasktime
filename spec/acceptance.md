@@ -122,6 +122,9 @@
   rows. Category dots keep their size, full titles remain available to accessible
   names/tooltips, and date/payment controls stay inside the row. The main expense
   list retains the same ellipsis behavior.
+- Shared due-expense rows use the same text size and line height for the title
+  and amount, aligned on one baseline in mobile, desktop, compact, clickable,
+  and non-clickable presentations.
 
 - Project names show a 14px folder outline in the original project color,
   inheriting the client color when absent and otherwise falling back to neutral.
@@ -139,7 +142,9 @@
   The Projects page has one decorative project
   icon beside its main heading using the neutral muted-foreground token, keeps
   individual card headings text-only, and
-  uses the same 24px active/archived grid gap as Clients. Project detail shows a
+  uses the same 24px active/archived grid gap as Clients. On phones, its header
+  has the same 24px gap before the first card as the Clients page; both retain
+  32px on desktop. Project detail shows a
   folder beside its title using project color, inherited client color, or the
   neutral fallback, without changing persisted data.
 - Project cards match Client card padding at phone and desktop breakpoints.
@@ -163,13 +168,29 @@
   present. Amounts align left beside their icons, with screen-reader labels and
   no visible Work/Expenses labels. Separate currencies wrap without page
   overflow. Neighboring metric cards remain equal in height on mobile and desktop.
+  Their phone scroll rails and the Planner phone day selector have no extra
+  bottom padding; each remains horizontally scrollable without page overflow.
 
-- Today and Upcoming retain task/recurrence/timer/expense actions. Upcoming is
-  visible without expanding Today, its header omits a redundant seven-day
-  subtitle and shows the full task-plus-expense item count in parentheses,
-  including zero. The collapsed list shows at most five items; its button says
-  “Show N more” using the hidden-item count, then “Show less” when expanded.
-  Expanding or collapsing does not change the heading total.
+- Today keeps task/recurrence/timer/expense actions. Its task rows keep the
+  timer shortcut and open task details through the title; time entry and task
+  menu actions remain in task details. Upcoming task rows keep their completion
+  checkboxes; completed tasks leave Upcoming under its existing filter. Upcoming
+  rows omit timer, time entry, task menu, and expense pay shortcuts; those actions
+  remain in task and expense details. On phones, Today and Upcoming use a
+  full-width title line and a supporting-text/date line for tasks and expenses.
+  Expense totals stay beside their titles; task checkboxes and expense icons
+  center vertically beside their rows. Today's timer stays with the task date,
+  and its expense pay action stays available below the date when applicable.
+  Task project/note previews stop after two lines on phones. The preview uses
+  plain note text so clipped links cannot receive hidden focus; the full note
+  and its links remain available in task details. Desktop note presentation is
+  unchanged.
+  Upcoming is visible without
+  expanding Today. Its header omits a redundant seven-day subtitle and shows
+  the full task-plus-expense item count in parentheses, including zero. The
+  collapsed list shows at most five items; its button says “Show N more” using
+  the hidden-item count, then “Show less” when expanded. Expanding or collapsing
+  does not change the heading total.
 - Today keeps completed task rows and expenses paid today visible for confirmation,
   without their date/recurrence/Overdue badges. Reopening a task or marking an
   expense unpaid restores the applicable schedule/overdue badge. Future fixed
@@ -182,8 +203,19 @@
   project timers remain interactive.
 - A running task timer uses the same animated danger-color dot in Planner and
   the global timer; the indicator exposes a non-color accessible label.
+- With an active global timer on phones, page content begins about 14px below
+  the collapsed timer card. When more timers are available, the "+N more" label
+  keeps its original position and does not overlap the page content.
 - At phone widths, Today and Upcoming precede horizontally scrollable summary
-  cards in DOM order, with no page overflow. Desktop uses adjacent action panels.
+  cards in DOM order. The summary rail has no extra bottom padding and spans
+  both phone edges while the first card starts at the 16px content inset.
+  Cards scroll past the left edge, the next card remains visible on the right,
+  and the last card keeps a 16px right inset. The page itself has no horizontal
+  overflow. Desktop uses adjacent action panels.
+- Reports Overview keeps its period selector beside the heading on phones as a
+  calendar-only control with an accessible name and the selected period in its
+  tooltip. Desktop shows the calendar, selected period, and dropdown indicator.
+  Changing viewport width preserves the selected period and menu behavior.
 - Daily billable plus non-billable actual duration equals the selected-period
   tracked total, including zero days and archived work; billed snapshots do not
   inflate actual hours. Current summary timeframes survive report-period changes.
@@ -229,6 +261,16 @@
 
 ## Expenses overview regression boundary
 
+- On phones, the top Expenses and Recurring section tabs share one row at equal
+  widths. The Recurring label is shortened, while Payment Methods and Your
+  Business are hidden from that tab row; their routes and content remain
+  available. The Manage categories menu opens aligned with the phone content
+  edge. Desktop retains all four original tabs, labels, and menu alignment.
+- The New Recurring Expense button fills its row on phones, including the empty
+  state, and keeps its natural width on desktop. In the expense editor, eligible
+  one-time and recurring delete actions show only a named trash icon on phones
+  and the icon with Delete Expense text on desktop. The phone delete, Cancel,
+  and Save controls share one row. Both delete flows still ask for confirmation.
 - The existing Outstanding/Upcoming/Paid tabs, expense rows, sorting, date/status
   scopes, and payment/edit flows retain their behavior and presentation. Older
   unpaid expenses remain visible in Outstanding when a newer period is selected.
@@ -246,8 +288,11 @@
 - History loading/failure cannot display partial overview totals as final; retry
   restores the view, and nested archived-record updates refresh it.
 - Phones keep original list actions ahead of the analytical panels, with a
-  horizontally scrollable summary rail and no page overflow at 320px. Desktop
-  places the analytical panels above the original tabs/list.
+  horizontally scrollable summary rail and no page overflow at 320px. The rail
+  has no extra bottom padding and spans both phone edges. The first card starts
+  at the 16px content inset, cards scroll past the left edge, the next card
+  remains visible on the right, and the last card keeps a 16px right inset.
+  Desktop places the analytical panels above the original tabs/list.
 - Chart values are keyboard and screen-reader accessible. An installed production
   PWA can first visit Expenses offline and load its chart without a prior online
   Expenses visit. Activity opens the original record and never claims money was sent.

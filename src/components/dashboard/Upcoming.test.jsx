@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Upcoming from './Upcoming';
 
-it('orders mixed upcoming work by date and keeps every item and its original action accessible', async () => {
+it('orders mixed upcoming work by date and keeps every detail link accessible', async () => {
     const user = userEvent.setup();
     const view = vi.fn();
     const tasks = Array.from({ length: 5 }, (_, index) => ({ id: `task-${index}`, title: `Task ${index}`, startDate: `2026-09-${12 + index}` }));

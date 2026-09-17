@@ -589,7 +589,7 @@ const ProjectDashboard = ({
                 <div
                     className={cn(
                         isMobileLayout
-                            ? '-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 scrollbar-hide'
+                            ? '-mx-4 flex gap-3 overflow-x-auto px-4 scrollbar-hide'
                             : 'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4'
                     )}
                     data-testid="project-metrics-row"

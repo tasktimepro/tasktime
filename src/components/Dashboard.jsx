@@ -723,7 +723,7 @@ const Dashboard = ({
     /**
      * Render task title with navigation
      */
-    const renderTaskTitle = useCallback((task, isCompleted, { disabled = false } = {}) => {
+    const renderTaskTitle = useCallback((task, isCompleted, { disabled = false, mobileGrid = false } = {}) => {
         const baseClasses = `block w-full text-sm font-medium text-left transition-colors whitespace-normal break-words sm:truncate ${
             isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
         }`;
@@ -743,12 +743,12 @@ const Dashboard = ({
         const hasNote = !!task.note;
 
         return (
-            <div className="space-y-1">
+            <div className={mobileGrid ? 'contents' : 'space-y-1'}>
                 <button
                     type="button"
                     onClick={() => handleTaskTitleClick(task)}
                     disabled={disabled}
-                    className={`${baseClasses} ${
+                    className={`${baseClasses} ${mobileGrid ? 'col-span-2 row-start-1' : ''} ${
                         disabled
                             ? 'cursor-not-allowed text-muted-foreground'
                             : `cursor-pointer ${isCompleted ? 'hover:text-muted-foreground' : 'hover-status-info-text-strong'}`
@@ -760,7 +760,7 @@ const Dashboard = ({
                     {title}
                 </button>
                 {(hasProject || hasNote) && (
-                    <p className={`text-xs text-muted-foreground whitespace-normal break-words sm:truncate ${isCompleted ? 'line-through' : ''}`}>
+                    <p className={`text-xs text-muted-foreground whitespace-normal break-words ${isCompleted ? 'line-through' : ''} ${mobileGrid ? 'col-start-1 row-start-2 min-w-0 self-center line-clamp-2' : 'sm:truncate'}`}>
                         {hasProject && (
                             <button
                                 type="button"
@@ -774,7 +774,7 @@ const Dashboard = ({
                         {hasProject && hasNote && <span className="mx-1">•</span>}
                         {hasNote && (
                             <span>
-                                {linkifyNodes(task.note, React.createElement, {
+                                {mobileGrid ? task.note : linkifyNodes(task.note, React.createElement, {
                                     linkClassName: 'text-muted-foreground hover:text-foreground hover:underline'
                                 })}
                             </span>
@@ -971,9 +971,6 @@ const Dashboard = ({
                     renderTaskControls={renderTaskControls}
                     handleProjectTitleClick={handleProjectTitleClick}
                     onTaskTitleClick={handleTaskTitleClick}
-                    onEditTask={handleEditTask}
-                    onDeleteTask={handleDeleteTask}
-                    onArchiveTask={handleArchiveTask}
                     openExpenseView={openExpenseView}
                 />
 

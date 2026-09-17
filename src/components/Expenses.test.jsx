@@ -300,7 +300,7 @@ describe('Expenses', () => {
 
         expect(container.firstChild).not.toBeNull();
         expect(container.firstChild.className).toContain('space-y-4');
-        expect(container.firstChild.className).toContain('overflow-x-hidden');
+        expect(container.firstChild.className).not.toContain('overflow-x-hidden');
     });
 
     it('opens the category manager from the more actions menu', async () => {

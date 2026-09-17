@@ -25,7 +25,7 @@ export default function DashboardSummaryCards({ currentMonth, todayTime, todayLi
         { title: 'Unpaid invoices', value: <DashboardMoneyValue money={currentMonth.unpaid} currency={preferredCurrency} />, detail: invoiceDetail, icon: DocumentTextIcon },
     ];
     return (
-        <section aria-label="Dashboard summary" tabIndex={0} className="flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto rounded-xl pb-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4">
+        <section aria-label="Dashboard summary" tabIndex={0} className="-mx-4 flex min-w-0 snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 md:scroll-px-0 xl:grid-cols-4">
             {cards.map(card => {
                 const { title, value, detail, icon: Icon, sparkline, ready } = card;
                 const pending = (loading || error) && !ready;

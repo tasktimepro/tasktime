@@ -38,6 +38,87 @@ async function seedExpenses(page) {
     await expect(page.getByRole('heading', { name: 'This month spend' }).locator('..')).toContainText('€180.00');
 }
 
+test('shows two equal phone expense tabs and aligns the category menu to the content', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedExpenses(page);
+
+    for (const width of [390, 320, 768, 1440]) {
+        await page.setViewportSize({ width, height: 844 });
+        const tabs = page.getByRole('tablist').first();
+        const expenses = tabs.getByRole('tab', { name: 'Expenses', exact: true });
+        const recurring = tabs.getByRole('tab', { name: width < 768 ? 'Recurring' : 'Recurring Expenses', exact: true });
+        await expect(expenses).toBeVisible();
+        await expect(recurring).toBeVisible();
+        if (width < 768) {
+            await expect(tabs.getByRole('tab', { name: 'Payment Methods' })).toHaveCount(0);
+            await expect(tabs.getByRole('tab', { name: 'Your Business' })).toHaveCount(0);
+            const [listBox, expensesBox, recurringBox] = await Promise.all([tabs.boundingBox(), expenses.boundingBox(), recurring.boundingBox()]);
+            expect(Math.abs(expensesBox.width - recurringBox.width)).toBeLessThan(2);
+            expect(Math.abs(expensesBox.x - listBox.x)).toBeLessThan(2);
+            expect(Math.abs(recurringBox.x + recurringBox.width - listBox.x - listBox.width)).toBeLessThan(2);
+            expect(Math.abs(expensesBox.y - recurringBox.y)).toBeLessThan(2);
+        } else {
+            await expect(tabs.getByRole('tab', { name: 'Payment Methods' })).toBeVisible();
+            await expect(tabs.getByRole('tab', { name: 'Your Business' })).toBeVisible();
+        }
+        if (width === 390) await page.screenshot({ path: 'test-results/expenses-phone-tabs-390.png' });
+        await recurring.click();
+        await expect(page.getByRole('heading', { name: /^Recurring Expenses/ })).toBeVisible();
+        const createRecurring = page.getByRole('button', { name: 'New Recurring Expense' });
+        const [createBox, headerBox] = await Promise.all([createRecurring.boundingBox(), createRecurring.locator('..').boundingBox()]);
+        if (width < 768) expect(Math.abs(createBox.width - headerBox.width)).toBeLessThan(2);
+        else expect(createBox.width).toBeLessThan(headerBox.width - 20);
+        await expenses.click();
+        await expect(page.getByRole('heading', { name: /^Expenses/ })).toBeVisible();
+
+        await page.getByRole('button', { name: 'More actions' }).first().click();
+        const menu = page.getByRole('menuitem', { name: 'Manage categories' }).locator('..');
+        await expect(menu).toBeVisible();
+        const [menuBox, triggerBox] = await Promise.all([menu.boundingBox(), page.getByRole('button', { name: 'More actions' }).first().boundingBox()]);
+        if (width < 768) expect(Math.abs(menuBox.x - triggerBox.x)).toBeLessThan(2);
+        else expect(Math.abs(menuBox.x + menuBox.width - triggerBox.x - triggerBox.width)).toBeLessThan(2);
+        if (width === 390) await page.screenshot({ path: 'test-results/expenses-phone-category-menu-390.png' });
+        await page.keyboard.press('Escape');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [section, heading] of [['payment-methods', 'Payment Methods'], ['business-info', 'Your Business']]) {
+        await page.goto(`/expenses?section=${section}`);
+        await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+        await expect(page.getByRole('tablist').first().getByRole('tab', { name: heading, exact: true })).toHaveCount(0);
+    }
+});
+
+test('shows an icon-only expense delete control on phones and icon with text on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedExpenses(page);
+    const expenseCount = await page.evaluate(() => window.__TASKTIME_STORE__.expenses.size);
+    await page.getByRole('button', { name: 'Edit Expense' }).first().click();
+    const deleteButton = page.getByRole('button', { name: 'Delete Expense' });
+    await expect(deleteButton).toBeVisible();
+    await expect(deleteButton.locator('svg.lucide-trash-2')).toBeVisible();
+    await expect(deleteButton.getByText('Delete Expense')).toBeHidden();
+    expect((await deleteButton.boundingBox()).width).toBe(36);
+    const footerButtonOffset = () => page.evaluate(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        const remove = dialog.querySelector('button[aria-label="Delete Expense"]');
+        const cancel = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Cancel');
+        return Math.abs(remove.getBoundingClientRect().top - cancel.getBoundingClientRect().top);
+    });
+    expect(await footerButtonOffset()).toBeLessThan(2);
+    await page.setViewportSize({ width: 320, height: 700 });
+    expect(await footerButtonOffset()).toBeLessThan(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(deleteButton.getByText('Delete Expense')).toBeVisible();
+    expect((await deleteButton.boundingBox()).width).toBeGreaterThan(100);
+    await deleteButton.click();
+    await expect(page.getByText('Delete expense?')).toBeVisible();
+    expect(await page.evaluate(() => window.__TASKTIME_STORE__.expenses.size)).toBe(expenseCount);
+});
+
 test('reconciles spend, schedules, filters and recorded payment actions', async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -102,6 +183,33 @@ test('keeps the original list before insights on phones with accessible actions'
         if (width < 768) {
             expect(await page.getByRole('tab', { name: 'Outstanding (1)' }).evaluate(element => Boolean(element.compareDocumentPosition(document.querySelector('[data-testid="expense-insights"]')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
             expect(await summary.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+            const rail = await summary.evaluate(element => ({
+                bottomPadding: getComputedStyle(element).paddingBottom,
+                left: element.getBoundingClientRect().left,
+                right: element.getBoundingClientRect().right,
+                firstCardLeft: element.firstElementChild.getBoundingClientRect().left,
+                nextCardLeft: element.children[1].getBoundingClientRect().left,
+            }));
+            expect(rail.bottomPadding).toBe('0px');
+            expect(Math.abs(rail.left)).toBeLessThan(2);
+            expect(Math.abs(rail.right - width)).toBeLessThan(2);
+            expect(Math.abs(rail.firstCardLeft - 16)).toBeLessThan(2);
+            expect(rail.nextCardLeft).toBeLessThan(width);
+            const leftPeek = await summary.evaluate(element => {
+                element.scrollLeft = element.children[1].getBoundingClientRect().left - element.getBoundingClientRect().left - 16;
+                const firstCardRight = element.firstElementChild.getBoundingClientRect().right;
+                element.scrollLeft = 0;
+                return firstCardRight;
+            });
+            expect(leftPeek).toBeGreaterThan(0);
+            expect(leftPeek).toBeLessThan(16);
+            const endInset = await summary.evaluate(element => {
+                element.scrollLeft = element.scrollWidth;
+                const inset = element.getBoundingClientRect().right - element.lastElementChild.getBoundingClientRect().right;
+                element.scrollLeft = 0;
+                return inset;
+            });
+            expect(Math.abs(endInset - 16)).toBeLessThan(2);
             await expect(page.getByRole('button', { name: /Older unpaid expense/ }).first().getByRole('button', { name: 'Mark as Paid' })).toBeVisible();
         }
         await summary.scrollIntoViewIfNeeded();
