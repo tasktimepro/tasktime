@@ -1,3 +1,20 @@
+## September 18 core v1.6.1 phone UI patch released
+
+Core `f7d943476e6691a419664ad600cb82767e57bd25` is tagged and published as
+`v1.6.1`, and its tested app archive is live at `https://app.tasktime.pro`.
+The local Docker release gate and exact-source CI `35275494467` pass. Private
+preparation `35275536860` and deployment `35279686536` pass with the existing
+`live` billing mode and archive SHA-256
+`cb9168f1db75d8c163e7bf7b139fb2c39538aefaeb90d65fb4fd41781eeceb8c`.
+The preparation gate passed 102 Chromium journeys on the first attempt and one
+existing mock Drive navigation-abort fixture on its second retry; all five PWA
+checks passed. Live HTTP checks found 28 served files identical to the approved
+archive, matching HTML after Cloudflare's JavaScript-detection injection, and
+successful app routes. The public site and shared Worker were not deployed;
+published agent artifacts are unchanged. Physical-phone acceptance remains a
+separate owner check. Details are in `app-status.md` and the private readiness
+record.
+
 ## September 16 production launch released
 
 The new public site is live at `https://tasktime.pro`, and app v1.6.0 is live at

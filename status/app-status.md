@@ -1,3 +1,25 @@
+## September 18 v1.6.1 phone UI release live
+
+The Dashboard, Expenses, Projects, Planner, timer, and report-period phone UI
+refinements are released from core
+`f7d943476e6691a419664ad600cb82767e57bd25` as `v1.6.1`. The local Docker
+release gate and exact-source GitHub CI `35275494467` pass. The production
+preparation workflow `35275536860` passed with `billing_mode=live`; its archive
+SHA-256 is
+`cb9168f1db75d8c163e7bf7b139fb2c39538aefaeb90d65fb4fd41781eeceb8c`.
+Preparation recorded 102 Chromium journeys passing first try and the existing
+mock Drive navigation-abort fixture passing on its second retry, plus five PWA
+passes. Local and public CI gates passed without retries.
+
+Owner-approved deployment workflow `35279686536` passed and served the archive
+from `https://2e7dcb75.tasktime-app.pages.dev`. At `app.tasktime.pro`, 28 served
+files match the tested archive byte for byte. The live index matches after
+removing Cloudflare's injected JavaScript-detection snippet. The `/`,
+`/projects`, `/clients`, `/invoices`, `/reports`, `/expenses`, and `/account`
+routes returned HTTP 200; `tasktime.pro` and its www redirect also responded.
+The root site, shared Worker, billing configuration, customer data and published
+agent packages were not changed. Physical-phone acceptance remains separate.
+
 ## September 17 Dashboard Today and Upcoming actions — local
 
 The full Docker `make release-gate` now passes for this local app candidate:
