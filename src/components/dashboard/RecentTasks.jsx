@@ -62,60 +62,62 @@ const RecentTasks = ({
         const shouldDisable = !!projectTimer && !projectTimer.isPaused && !isTimerActive;
         const hideActions = !!projectTimer;
         const isCompleted = getTaskCompletedStatus(task);
+        const mobileContentColumn = task.recurring ? 'col-start-1' : 'col-start-2';
 
         return (
             <div key={task.id} className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${shouldDisable ? 'opacity-50' : ''}`}>
                 {isMobileLayout ? (
-                    <div className="flex items-start gap-3">
+                    <div className={`grid items-start gap-x-3 gap-y-1 ${task.recurring ? 'grid-cols-1' : 'grid-cols-[auto_minmax(0,1fr)]'}`}>
                         {!task.recurring && (
                             <CustomCheckbox
                                 checked={isCompleted}
                                 onChange={(checked) => handleCompleteTask(task, checked)}
                                 disabled={shouldDisable}
+                                className="col-start-1 row-start-1 self-center"
                             />
                         )}
-                        <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden">
-                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable })}
-                            <div className="flex w-full flex-wrap items-center justify-end gap-2">
-                                <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
-                                    {(task.startDate || task.recurring) && (
-                                        <StartDateBadge
-                                            startDate={task.startDate}
-                                            recurring={task.recurring}
-                                            completed={isCompleted}
-                                        />
-                                    )}
-                                    {task.recentTime > 0 && (
-                                        <div className={`text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                                            {formatDurationWithSeconds(task.recentTime)}
-                                        </div>
-                                    )}
-                                </div>
-                                {(!shouldDisable || !hideActions) && (
-                                    <div className="flex flex-wrap items-center justify-end gap-1">
-                                        {renderTaskControls(task, shouldDisable)}
-                                        {!hideActions && (
-                                            <>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                    title="Add time entry"
-                                                    onClick={() => handleOpenTimeEntries(taskForActions)}
-                                                >
-                                                    <ClockIcon className="h-5 w-5" />
-                                                </Button>
-                                                <TaskActionsMenu
-                                                    task={taskForActions}
-                                                    onEdit={onEditTask}
-                                                    onDelete={onDeleteTask}
-                                                    onArchive={onArchiveTask}
-                                                />
-                                            </>
-                                        )}
+                        <div className={`${mobileContentColumn} row-start-1 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 overflow-hidden`}>
+                            {renderTaskTitle(task, isCompleted, { disabled: shouldDisable, mobileGrid: true })}
+                        </div>
+                        <div className={`${mobileContentColumn} row-start-2 flex min-w-0 w-full flex-wrap items-center justify-end gap-2`}>
+                            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                                {(task.startDate || task.recurring) && (
+                                    <StartDateBadge
+                                        startDate={task.startDate}
+                                        recurring={task.recurring}
+                                        completed={isCompleted}
+                                    />
+                                )}
+                                {task.recentTime > 0 && (
+                                    <div className={`text-xs ${isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                        {formatDurationWithSeconds(task.recentTime)}
                                     </div>
                                 )}
                             </div>
+                            {(!shouldDisable || !hideActions) && (
+                                <div className="flex flex-wrap items-center justify-end gap-1">
+                                    {renderTaskControls(task, shouldDisable)}
+                                    {!hideActions && (
+                                        <>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                title="Add time entry"
+                                                onClick={() => handleOpenTimeEntries(taskForActions)}
+                                            >
+                                                <ClockIcon className="h-5 w-5" />
+                                            </Button>
+                                            <TaskActionsMenu
+                                                task={taskForActions}
+                                                onEdit={onEditTask}
+                                                onDelete={onDeleteTask}
+                                                onArchive={onArchiveTask}
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : (

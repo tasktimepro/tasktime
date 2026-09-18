@@ -94,7 +94,9 @@ export function createInvoiceTemplateHelpers(templates: Y.Map<string, InvoiceTem
         },
 
         delete(id: string): boolean {
-            return templates.delete(id);
+            if (!templates.has(id)) return false;
+            templates.delete(id);
+            return true;
         },
 
         getNextNumber(id: string): string | undefined {

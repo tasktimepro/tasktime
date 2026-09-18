@@ -472,9 +472,11 @@ const Account = ({
                             variant="destructive"
                             onClick={handleDeleteAllData}
                             leadingIcon={TrashIcon}
-                            disabled={deleteConfirmationText.trim().toLowerCase() !== 'delete all data' || isDeleting || providerNeedsReconnect}
+                            loading={isDeleting}
+                            loadingText="Deleting..."
+                            disabled={deleteConfirmationText.trim().toLowerCase() !== 'delete all data' || providerNeedsReconnect}
                         >
-                            {isDeleting ? 'Deleting...' : 'Delete All Data'}
+                            Delete All Data
                         </Button>
                     </div>
                 }

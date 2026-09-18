@@ -16,6 +16,8 @@ Choose patterns for the user's task, not implementation convenience. A novel int
 
 - Make the primary action and information hierarchy obvious.
 - Keep controls close to the content they affect and use familiar, specific labels.
+- Empty-state titles and descriptions omit full stops, including custom empty
+  views and no-results messages outside the shared EmptyState component.
 - Use tables for comparison, lists for scanning, cards for heterogeneous previews, modals for short focused work, and full pages for complex workflows.
 - Start mobile-first, then adapt density and composition for larger screens instead of merely stretching the mobile layout.
 - Reuse the existing spacing, color, typography, radius, shadow, motion, breakpoint, and z-index systems. Do not introduce arbitrary one-off values.

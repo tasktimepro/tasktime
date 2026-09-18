@@ -158,7 +158,7 @@ describe('ClientList', () => {
         ]
     })
 
-    it('deletes related expenses and recurrences when deleting a client', async () => {
+    it('requires confirmation and delegates the client cascade to the complete deletion hook', async () => {
         const user = userEvent.setup()
 
         render(
@@ -172,9 +172,10 @@ describe('ClientList', () => {
         await user.click(screen.getByLabelText('More actions'))
         await user.click(screen.getByText('Delete'))
 
-        expect(expensesHookMocks.deleteExpense).toHaveBeenCalledWith('expense-1')
-        expect(recurrencesHookMocks.deleteRecurrence).toHaveBeenCalledWith('recurrence-1')
-        expect(clientsHookMocks.deleteClient).toHaveBeenCalledWith('client-1')
+        expect(clientsHookMocks.deleteClient).not.toHaveBeenCalled()
+        await user.click(screen.getByText('Delete Client'))
+        expect(clientsHookMocks.deleteClient).toHaveBeenCalledWith('client-1', { alsoDeleteProjects: false, includeInvoiceDeletion: false })
+        expect(expensesHookMocks.deleteExpense).not.toHaveBeenCalled()
     })
 
     it('keeps the header actions inline with flexible wrapping instead of forcing a mobile stack', () => {
@@ -288,11 +289,8 @@ describe('ClientList', () => {
         await user.click(screen.getByText('Delete'))
         await user.click(screen.getByText('Delete Client & All Projects'))
 
-        expect(expensesHookMocks.unbillExpensesForInvoice).toHaveBeenCalledWith('invoice-project')
-        expect(expensesHookMocks.unbillExpensesForInvoice).toHaveBeenCalledWith('invoice-client-only')
-        expect(invoiceHookMocks.deleteInvoice).toHaveBeenCalledWith('invoice-project')
-        expect(invoiceHookMocks.deleteInvoice).toHaveBeenCalledWith('invoice-client-only')
-        expect(invoiceHookMocks.deleteInvoice).not.toHaveBeenCalledWith('invoice-other')
+        expect(clientsHookMocks.deleteClient).toHaveBeenCalledWith('client-1', { alsoDeleteProjects: true, includeInvoiceDeletion: true })
+        expect(invoiceHookMocks.deleteInvoice).not.toHaveBeenCalled()
     })
 
 })

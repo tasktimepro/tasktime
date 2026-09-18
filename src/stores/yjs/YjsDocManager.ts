@@ -187,14 +187,42 @@ export class YjsDocManager {
     }
 
     /**
-     * Wait until every update queued before this call is committed by
-     * IndexedDB. Writing a marker through each persistence connection creates
-     * a transaction-ordering barrier without depending on y-indexeddb internals.
+     * Commit a complete Yjs state and await the data transaction itself.
+     * The existing y-indexeddb `updates` store is compacted atomically, merging
+     * persisted updates first so another tab's unseen work is never discarded.
+     * A marker in the separate `custom` store cannot acknowledge these writes.
      */
     async flushPersistence(): Promise<void> {
-        await Promise.all(Array.from(this.docs.values())
-            .filter((managed) => managed.loaded)
-            .map((managed) => managed.persistence.set('tasktime-last-persistence-barrier', Date.now())));
+        await Promise.all(Array.from(this.docs.entries())
+            .filter(([, managed]) => managed.loaded)
+            .map(async ([name, { doc, persistence }]) => {
+                try {
+                    if (!persistence.synced || !persistence.db) {
+                        throw new Error('Local data is not fully loaded. Wait for loading to finish, then retry.');
+                    }
+                    await new Promise<void>((resolve, reject) => {
+                        const transaction = persistence.db!.transaction(['updates'], 'readwrite');
+                        transaction.oncomplete = () => resolve();
+                        transaction.onabort = () => reject(transaction.error || new Error('Local data persistence was aborted.'));
+                        const updates = transaction.objectStore('updates');
+                        const request = updates.getAll();
+                        request.onsuccess = () => {
+                            try {
+                                const state = Y.mergeUpdates([...request.result, Y.encodeStateAsUpdate(doc)]);
+                                updates.clear();
+                                updates.add(state);
+                            } catch (error) {
+                                transaction.abort();
+                                reject(error);
+                            }
+                        };
+                    });
+                } catch (cause) {
+                    const error = cause instanceof Error || cause instanceof DOMException ? cause : new Error(String(cause));
+                    this.emitPersistenceError(error, name);
+                    throw error;
+                }
+            }));
     }
 
     async listPersistedDocs(): Promise<DocName[]> {

@@ -137,7 +137,9 @@ export function createInvoiceHelpers(invoices: Y.Map<string, Invoice>): InvoiceH
         },
 
         delete(id: string): boolean {
-            return invoices.delete(id);
+            if (!invoices.has(id)) return false;
+            invoices.delete(id);
+            return true;
         },
 
         markPaid(id: string): Invoice | undefined {

@@ -1,3 +1,4 @@
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 /**
  * useProjects - React hook for projects collection
  * 
@@ -7,7 +8,7 @@
 import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import { useYjs } from '@/contexts/YjsContext';
-import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
+import { deleteWorkspaceRecords } from '@/stores/yjs/workspaceDeletion';
 import { toStorageDate } from '@/utils/dateUtils';
 import type { Project } from '@/stores/yjs/types';
 import type { Client } from '@/stores/yjs/types';
@@ -16,8 +17,8 @@ import { buildProjectEntity, buildProjectUpdates } from '@/domain/work/workEntit
 import { generateId } from '@/utils/idUtils';
 
 export function useProjects() {
-    const { store, isReady } = useYjs();
-    const { items, isLoading, get, create, update, remove } = useYjsCollection<Project>(
+    const { store } = useYjs();
+    const { items, isLoading, get, create, update } = useYjsCollection<Project>(
         (store) => store.projects,
         { collectionName: 'projects' }
     );
@@ -79,15 +80,11 @@ export function useProjects() {
         return items.filter(p => p.preferredClientId === clientId);
     }, [items]);
 
-    const deleteProject = useCallback((id: string) => {
-        const deleted = remove(id);
-
-        if (deleted && isReady) {
-            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
-        }
-
-        return deleted;
-    }, [remove, store, isReady]);
+    const deleteProject = useCallback(async (id: string, options: { includeInvoiceDeletion?: boolean } = {}) => {
+        await deleteWorkspaceRecords(store, { ...options, kind: 'project', id });
+        markMeaningfulActivity('project_delete');
+        return true;
+    }, [store]);
 
     return {
         // Data

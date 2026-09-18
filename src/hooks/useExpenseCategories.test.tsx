@@ -31,48 +31,40 @@ describe('useExpenseCategories', () => {
         mockGet.mockReset();
     });
 
-    it('does not seed the default categories by default', () => {
-        renderHook(() => useExpenseCategories());
+    it('keeps an empty collection empty across mounting and remounting', () => {
+        const { result, unmount } = renderHook(() => useExpenseCategories());
 
+        expect(result.current.allExpenseCategories).toEqual([]);
+        unmount();
+        renderHook(() => useExpenseCategories());
         expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    it('seeds the default categories when requested and the collection is empty', () => {
-        renderHook(() => useExpenseCategories({ seedDefaults: true }));
+    it('reads categories arriving after loading without creating or changing records', () => {
+        mockIsLoading = true;
+        const { result, rerender } = renderHook(() => useExpenseCategories());
 
-        expect(mockCreate).toHaveBeenCalledTimes(12);
-        expect(mockCreate.mock.calls[0][0]).toMatchObject({
-            name: 'Software & subscriptions',
-            group: 'software',
-            isDefault: true,
-            archived: false,
-        });
-    });
+        expect(result.current.isLoading).toBe(true);
+        mockIsLoading = false;
+        rerender();
+        expect(result.current.allExpenseCategories).toEqual([]);
 
-    it('does not seed defaults when categories already exist', () => {
         mockItems = [
             {
-                id: 'category-1',
-                name: 'Custom',
-                group: 'other',
-                isDefault: false,
-                archived: false,
+                id: 'legacy-default',
+                name: 'Travel',
+                group: 'travel',
+                isDefault: true,
+                archived: true,
             },
         ];
+        rerender();
 
-        const { result } = renderHook(() => useExpenseCategories({ seedDefaults: true }));
-
+        expect(result.current.allExpenseCategories).toEqual(mockItems);
+        expect(result.current.expenseCategories).toEqual([]);
         expect(mockCreate).not.toHaveBeenCalled();
-        expect(result.current.expenseCategories).toHaveLength(1);
-    });
-
-    it('does not seed defaults while the collection is loading', () => {
-        mockIsLoading = true;
-
-        const { result } = renderHook(() => useExpenseCategories({ seedDefaults: true }));
-
-        expect(mockCreate).not.toHaveBeenCalled();
-        expect(result.current.isLoading).toBe(true);
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockRemove).not.toHaveBeenCalled();
     });
 
     it('returns active categories sorted ahead of archived entries', () => {
@@ -92,6 +84,12 @@ describe('useExpenseCategories', () => {
                 archived: false,
             },
             {
+                id: 'category-custom-2',
+                name: 'Books',
+                isDefault: false,
+                archived: false,
+            },
+            {
                 id: 'category-default',
                 name: 'Travel',
                 group: 'travel',
@@ -104,10 +102,12 @@ describe('useExpenseCategories', () => {
 
         expect(result.current.expenseCategories.map((category) => category.id)).toEqual([
             'category-default',
+            'category-custom-2',
             'category-custom',
         ]);
         expect(result.current.allExpenseCategories.map((category) => category.id)).toEqual([
             'category-default',
+            'category-custom-2',
             'category-custom',
             'category-archived',
         ]);

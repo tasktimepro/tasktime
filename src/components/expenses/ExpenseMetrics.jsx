@@ -23,7 +23,7 @@ export default function ExpenseMetrics({ overview, currency, periodLabel, loadin
             visual: top && <svg viewBox="0 0 64 64" className="sensitive-data h-14 w-14 shrink-0 -rotate-90" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="hsl(var(--muted))" strokeWidth="5" /><circle cx="32" cy="32" r="26" fill="none" stroke="hsl(var(--status-info-accent))" strokeWidth="5" pathLength="100" strokeDasharray={top.percentage + ' 100'} strokeLinecap="round" /></svg> },
     ];
     return (
-        <section aria-label="Expense summary" tabIndex={0} className="-mx-4 flex min-w-0 snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 md:scroll-px-0 xl:grid-cols-4" aria-busy={loading}>
+        <section aria-label="Expense summary" tabIndex={0} className="-mx-4 flex min-w-0 snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-[2px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 md:scroll-px-0 xl:grid-cols-4" aria-busy={loading}>
             {cards.map(card => <div key={card.label} className={`relative flex min-w-0 basis-64 shrink-0 snap-start flex-col rounded-xl border bg-card p-4 shadow-sm ${card.action ? 'transition-colors hover:bg-muted/30' : ''}`}>
                 <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><card.icon className="h-4 w-4 shrink-0 status-info-text-strong" />{card.label}</h2>
                 <div className="mt-3 flex min-w-0 flex-1 items-center justify-between gap-3">

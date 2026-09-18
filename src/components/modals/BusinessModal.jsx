@@ -642,7 +642,7 @@ const BusinessModal = ({
 
                     {formData.custom.length === 0 && (
                         <p className="text-sm text-muted-foreground italic">
-                            No custom fields added. Click "Add Field" to add custom business details.
+                            No custom fields added; click "Add Field" to add custom business details
                         </p>
                     )}
                 </div>
@@ -724,7 +724,7 @@ const BusinessModal = ({
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground italic">
-                                    No logo selected. Invoices can still use the business name without a logo.
+                                    No logo selected; invoices can still use the business name without a logo
                                 </p>
                             )}
 

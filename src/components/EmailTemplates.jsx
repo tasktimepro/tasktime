@@ -86,7 +86,7 @@ const EmailTemplates = () => {
                     <Mail className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-2 text-sm font-medium text-foreground">No email templates</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Create your first email template.
+                        Create your first email template
                     </p>
                     <div className="mt-6">
                         <Button onClick={openCreate} leadingIcon={PlusIcon}>

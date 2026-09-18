@@ -2,7 +2,7 @@
  * StartDateBadge - Shows task start date or recurring schedule.
  */
 
-import { ArrowPathIcon } from '@/components/ui/icons';
+import { ArrowPathIcon, CalendarDaysIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/badge';
 import { getTodayString, toDisplayDate } from '@/utils/dateUtils.ts';
 import { formatRecurringLabel } from '@/utils/recurringUtils.ts';
@@ -31,12 +31,14 @@ const getRelativeLabel = (dateString) => {
  * @param {Object|null|undefined} props.recurring
  * @param {boolean} props.completed
  * @param {boolean} props.recurringOverdue
+ * @param {boolean} props.upcoming Shows the dated Upcoming preview with a schedule icon
+ * @param {boolean} props.upcomingRecurring Identifies an occurrence when its schedule record is unavailable
  */
-const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = false }) => {
+const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = false, upcoming = false, upcomingRecurring = false }) => {
     const today = getTodayString();
 
-    if (recurring) {
-        if (recurring.paused) {
+    if (recurring || (upcoming && upcomingRecurring)) {
+        if (recurring?.paused) {
             return <TaskRecurrenceDisabledBadge />;
         }
 
@@ -44,6 +46,15 @@ const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = fa
             return (
                 <Badge variant="warning">
                     Overdue
+                </Badge>
+            );
+        }
+
+        if (upcoming && startDate) {
+            return (
+                <Badge variant="secondary" className="flex items-center">
+                    <ArrowPathIcon className="h-3 w-3 mr-1" role="img" aria-label="Recurring" aria-hidden={false} />
+                    {getRelativeLabel(startDate)}
                 </Badge>
             );
         }
@@ -69,7 +80,8 @@ const StartDateBadge = ({ startDate, recurring, completed, recurringOverdue = fa
     const label = isOverdue ? 'Overdue' : getRelativeLabel(startDate);
 
     return (
-        <Badge variant={variant}>
+        <Badge variant={variant} className={upcoming && !isOverdue ? 'flex items-center' : undefined}>
+            {upcoming && !isOverdue && <CalendarDaysIcon className="h-3 w-3 mr-1" role="img" aria-label="Scheduled" aria-hidden={false} />}
             {label}
         </Badge>
     );

@@ -437,13 +437,9 @@ export function useExpenses(options: UseExpensesOptions = {}) {
 
         assertExpenseCanBeDeleted(expense);
 
-        const removed = map.delete(id);
-
-        if (removed) {
-            markMeaningfulActivity();
-        }
-
-        return removed;
+        map.delete(id);
+        markMeaningfulActivity();
+        return true;
     }, [isReady, findExpenseMap]);
 
     const markAsPaid = useCallback(async (id: string, options: MarkAsPaidOptions = {}) => {

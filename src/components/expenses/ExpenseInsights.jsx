@@ -48,7 +48,7 @@ export default function ExpenseInsights({ overview, currency, periodLabel, onVie
                         {overview.breakdown.length ? <ul className="mt-4 space-y-4">{(allCategories ? overview.breakdown : overview.breakdown.slice(0, 5)).map(item => <li key={item.id} className="space-y-1.5">
                             <div className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 break-words"><CategoryLabel category={item} /></span><span className="shrink-0 text-right"><ExpenseAmount money={item.money} currency={currency} /></span></div>
                             {item.percentage !== null && <div className="flex items-center gap-2"><div className="h-1 flex-1 overflow-hidden rounded-full bg-muted"><div className="sensitive-data h-full rounded-full bg-muted-foreground" style={{ width: item.percentage + '%', ...(/^#[a-f\d]{6}$/i.test(item.color || '') ? { backgroundColor: item.color } : {}) }} /></div><span className="sensitive-data w-9 text-right text-xs text-muted-foreground">{Math.round(item.percentage)}%</span></div>}
-                        </li>)}</ul> : <EmptyState icon={TagsIcon} iconSize="sm" title="No paid expenses in this period." className="my-auto py-6" />}
+                        </li>)}</ul> : <EmptyState icon={TagsIcon} iconSize="sm" title="No paid expenses in this period" className="my-auto py-6" />}
                         {overview.breakdown.length > 5 && <Button variant="link" size="sm" className="mt-3 h-auto px-0" onClick={() => setAllCategories(!allCategories)}>{allCategories ? 'Show less' : 'View full breakdown'}</Button>}
                     </div>
                 </div>
@@ -57,7 +57,7 @@ export default function ExpenseInsights({ overview, currency, periodLabel, onVie
                 <div className="mb-3 flex items-center justify-between gap-3"><h2 id="expense-activity-title" className="text-sm font-semibold">Recent activity</h2>
                     {overview.activity.length > 3 && <Button ref={activityTriggerRef} variant="outline" size="sm" onClick={() => setActivityOpen(true)}>Show more</Button>}
                 </div>
-                {overview.activity.length ? <ActivityRows activity={overview.activity.slice(0, 3)} currency={currency} onView={onView} /> : <EmptyState icon={ClockIcon} iconSize="sm" title="No recent activity." className="my-auto py-6" />}
+                {overview.activity.length ? <ActivityRows activity={overview.activity.slice(0, 3)} currency={currency} onView={onView} /> : <EmptyState icon={ClockIcon} iconSize="sm" title="No recent activity" className="my-auto py-6" />}
             </section>
         </div>
         {fallback && <p className="text-xs text-muted-foreground">Unavailable conversions are shown in their original currencies.</p>}
@@ -65,7 +65,7 @@ export default function ExpenseInsights({ overview, currency, periodLabel, onVie
             onCloseAutoFocus={event => { event.preventDefault(); activityTriggerRef.current?.focus(); }}
             description={`Last 30 days · ${toDisplayDate(overview.activityRange.startDate)} – ${toDisplayDate(overview.activityRange.endDate)}`}>
             {overview.recordedActivity.length ? <ActivityRows activity={overview.recordedActivity} currency={currency} onView={onView} />
-                : <p className="py-8 text-sm text-muted-foreground">No activity in the last 30 days.</p>}
+                : <p className="py-8 text-sm text-muted-foreground">No activity in the last 30 days</p>}
         </Modal>
     </div>;
 }

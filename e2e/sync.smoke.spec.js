@@ -1,3 +1,4 @@
+import * as Y from 'yjs';
 import { expect, test } from '@playwright/test';
 import {
     createRemoteDriveFixture,
@@ -15,6 +16,115 @@ import {
 } from './helpers/tasktime.js';
 
 test.describe('Cloud sync smoke', () => {
+    test('loads dashboard history and survives refresh without premature sync warnings', async ({ page }) => {
+        await page.addInitScript(() => localStorage.setItem('tasktime-onboarding-completed', 'true'));
+        const initial = createRemoteDriveFixture({ tasks: [{ id: 'active', title: 'Active task', projectId: null }] });
+        const manifest = JSON.parse(initial.fileBodies.get('playwright-manifest'));
+        const year = new Date().getFullYear();
+        const historicalStart = new Date(year, 0, 2, 10).getTime();
+        for (const [name, collection, records] of [
+            ['tasks-archived', 'tasks', [{ id: 'archived', title: 'Archived history task', projectId: null, archived: true }]],
+            [`entries-${year}`, 'timeEntries', [{ id: 'historical-entry', taskId: 'archived', start: historicalStart, end: historicalStart + 3_600_000 }]],
+        ]) {
+            const doc = new Y.Doc();
+            for (const record of records) doc.getMap(collection).set(record.id, new Y.Map(Object.entries(record)));
+            const id = `playwright-${name}`;
+            const stateFile = `tasktime-yjs-${name}.bin`;
+            manifest.documents[name] = { stateFile, stateVersion: 1, deltas: [], lastCompaction: initial.modifiedTime };
+            initial.files.push({ id, name: stateFile, modifiedTime: initial.modifiedTime });
+            initial.fileBodies.set(id, Buffer.from(Y.encodeStateAsUpdate(doc)));
+            doc.destroy();
+        }
+        initial.fileBodies.set('playwright-manifest', JSON.stringify(manifest));
+        const driveFixture = createStatefulDriveFixture(initial);
+        await installMockDirectDriveRoutes(page, driveFixture);
+        const warnings = [];
+        page.on('console', message => {
+            if (/Cannot sync: not connected|Validation warning|Rejected corrupt remote/.test(message.text())) warnings.push(message.text());
+        });
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.preferences.set('autoSyncEnabled', true);
+            store.preferences.set('autoSyncMode', 'sync');
+            store.preferences.set('backupEnabled', false);
+        });
+        await seedStoredGoogleSession(page, { sessionId: 'dashboard-history-session', userId: 'dashboard-history-user', email: 'dashboard-history@example.com' });
+        await page.goto('/');
+        for (let pass = 0; pass < 2; pass++) {
+            await expect(page.getByRole('region', { name: 'Dashboard summary' })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
+            await expect.poll(() => page.evaluate(async year => {
+                const store = window.__TASKTIME_STORE__;
+                const tasks = await store.loadArchivedTasks();
+                const entries = await store.loadEntriesForYear(year);
+                return { title: tasks.get('archived')?.get('title'), taskId: entries.get('historical-entry')?.get('taskId') };
+            }, year)).toEqual({ title: 'Archived history task', taskId: 'archived' });
+            expect(warnings).toEqual([]);
+            if (pass === 0) await page.reload();
+        }
+        expect(driveFixture.proxyRequestCount()).toBe(0);
+    });
+
+    test('restores existing records after first-load onboarding and cancelled expense forms without adding defaults', async ({ page }) => {
+        const existingTask = {
+            id: 'existing-onboarding-task',
+            title: 'Create my first project',
+            note: 'A saved task from an older version must be preserved.',
+            completed: false,
+            archived: false,
+        };
+        const existingCategories = [
+            { id: 'existing-travel', name: 'Travel', group: 'travel', isDefault: true, archived: false },
+            { id: 'existing-travel-copy', name: 'Travel', group: 'travel', isDefault: true, archived: false },
+            { id: 'existing-custom', name: 'My category', isDefault: false, archived: true, color: '#3b82f6' },
+        ];
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
+            tasks: [existingTask],
+            expenseCategories: existingCategories,
+        }));
+        await installMockDirectDriveRoutes(page, driveFixture);
+
+        await page.goto('/');
+        const onboardingDialog = page.getByRole('dialog', { name: 'TaskTime Pro setup' });
+        await expect(onboardingDialog).toBeVisible();
+        await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
+        await onboardingDialog.getByRole('button', { name: 'Next', exact: true }).click();
+        await onboardingDialog.getByRole('button', { name: 'Get Started', exact: true }).click();
+        await page.goto('/expenses');
+        await page.getByRole('button', { name: 'New Expense', exact: true }).click();
+        const expenseDialog = page.getByRole('dialog', { name: 'New Expense' });
+        await expenseDialog.getByRole('button', { name: 'Manage categories', exact: true }).click();
+        const categoriesDialog = page.getByRole('dialog', { name: 'Expense Categories', exact: true });
+        await expect(categoriesDialog.getByText('0 available for new expenses')).toBeVisible();
+        await categoriesDialog.getByRole('button', { name: 'Done', exact: true }).click();
+        await expenseDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+        await seedStoredGoogleSession(page, {
+            sessionId: 'playwright-empty-start-restore',
+            userId: 'playwright-empty-start-user',
+            email: 'playwright-empty-start@example.com',
+        });
+        await page.goto('/');
+        await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
+
+        const readRestoredRecords = () => page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            return {
+                tasks: Array.from(store.tasks.values(), (value) => value.toJSON()),
+                categories: Array.from(store.expenseCategories.values(), (value) => value.toJSON()),
+            };
+        });
+        await expect.poll(readRestoredRecords).toEqual({ tasks: [existingTask], categories: existingCategories });
+        expect(driveFixture.directUploads()).toHaveLength(0);
+
+        await page.reload();
+        await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
+        expect(await readRestoredRecords()).toEqual({ tasks: [existingTask], categories: existingCategories });
+        expect(driveFixture.directUploads()).toHaveLength(0);
+    });
+
     test('uploads through the direct Google transport without falling back to the Worker proxy', async ({ page }) => {
         const projectTitle = `Playwright Direct Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
@@ -44,6 +154,9 @@ test.describe('Cloud sync smoke', () => {
         await expect.poll(() => driveFixture.tokenRequestCount()).toBeGreaterThan(0);
         expect(failedRequests).toEqual([]);
         await expect.poll(() => driveFixture.directRequestCount()).toBeGreaterThan(0);
+        // The creation helper navigates to /projects. Finish the initial pull
+        // first so that deliberate navigation does not cancel a provider read.
+        await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
 
         await createPersonalProject(page, projectTitle);
         await syncNowFromAccount(page);

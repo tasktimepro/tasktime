@@ -20,7 +20,7 @@ import {
     type CloudSyncLockPermit,
     type DriveConnectionOptions,
     withCloudSyncExclusiveLock,
-} from './providers/GoogleDriveProvider';
+} from './providers/CloudSyncProvider';
 import { BackupManager, CloudBackupManager } from './providers/BackupManager';
 import type { BackupInfo } from './providers/BackupManager';
 import type { CloudManifestManager } from './providers/ManifestManager';
@@ -243,6 +243,23 @@ export class YjsStore {
 
     get isReady(): boolean {
         return this._isReady;
+    }
+
+    /** Loaded document placements used by complete workspace mutations. */
+    getLoadedDocuments(): Y.Doc[] {
+        return this.docManager.getLoadedDocs().map(name => this.docManager.getDocSync(name)!);
+    }
+
+    /** Wait for pending local document writes before acknowledging a mutation. */
+    async flushPersistence(): Promise<void> {
+        await this.docManager.flushPersistence();
+    }
+
+    /** Known cloud history must be present before an explicit cascade can plan it. */
+    assertWorkspaceDeletionReady(): void {
+        if (this.driveProvider && !this.driveProvider.isWorkspaceHistoryReady()) {
+            throw new Error('Cloud history is not fully loaded. Use Sync Now, then review and retry the deletion.');
+        }
     }
 
     // =========================================================================
@@ -2026,6 +2043,16 @@ export class YjsStore {
             entryMaps.push(await this.loadEntriesForYear(year));
         }
 
+        if (operation.kind === 'finalize' && operation.state === 'complete') {
+            if (!this.invoices.has(operation.invoiceId)) await this.loadArchivedInvoices();
+            const currentInvoice = readEntity<Invoice>(this.invoices.get(operation.invoiceId))
+                ?? readEntity<Invoice>(this.archivedInvoicesSync?.get(operation.invoiceId));
+            // Check after the last await: work can be deleted while history loads.
+            // Completed recovery must not undo a later delete, cancellation or
+            // new draft, or reclaim sources released by that action.
+            if (!currentInvoice || currentInvoice.status === 'canceled' || currentInvoice.status === 'draft') return;
+        }
+
         const operationToApply: InvoiceBillingOperation = operation.kind === 'cancel'
             ? {
                 ...operation,
@@ -2202,6 +2229,9 @@ export class YjsStore {
             if (map) this.updateEntityFieldsIfChanged(map as any, id, updates);
         });
         application.adjustmentEntriesToCreate.forEach(({ id, entry }) => {
+            if (operation.state === 'complete'
+                && !this.tasks.has(entry.taskId)
+                && !this.archivedTasks?.has(entry.taskId)) return;
             if (!locate(id)) {
                 (this.activeTimeEntries as any).set(id, objectToYMap({ id, ...entry }));
             }
@@ -2382,7 +2412,12 @@ export class YjsStore {
             return;
         }
 
-        const current = readEntity<Invoice>(this.invoices.get(operation.invoiceId));
+        const invoiceMap = this.invoices.has(operation.invoiceId)
+            ? this.invoices
+            : this.archivedInvoicesSync?.has(operation.invoiceId)
+                ? this.archivedInvoicesSync
+                : this.invoices;
+        const current = readEntity<Invoice>(invoiceMap.get(operation.invoiceId));
 
         if (operation.kind === 'cancel') {
             if (!current) {
@@ -2402,9 +2437,9 @@ export class YjsStore {
             // Canceled invoices require status, timestamp, and reason together.
             // Publish the field-level CRDT updates in one transaction so React
             // observers never receive an invalid intermediate canceled record.
-            this.coreDoc.transact(() => {
+            (invoiceMap === this.invoices ? this.coreDoc : this._archivedInvoicesDoc!).transact(() => {
                 this.updateEntityFieldsIfChanged(
-                    this.invoices as any,
+                    invoiceMap as any,
                     operation.invoiceId,
                     operation.application.invoiceUpdates,
                 );
@@ -2421,7 +2456,7 @@ export class YjsStore {
         }
 
         if (current.status === 'draft') {
-            this.updateEntityFieldsIfChanged(this.invoices as any, operation.invoiceId, {
+            this.updateEntityFieldsIfChanged(invoiceMap as any, operation.invoiceId, {
                 ...operation.application.invoiceUpdates,
                 billingSelectionSnapshot: operation.desiredInvoice.billingSelectionSnapshot,
             });

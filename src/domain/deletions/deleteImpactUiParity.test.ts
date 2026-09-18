@@ -46,6 +46,31 @@ const recurrence = (overrides: Partial<ExpenseRecurrence>): ExpenseRecurrence =>
 const sorted = (values: string[]) => [...values].sort();
 
 describe('delete impact planner UI parity fixtures', () => {
+    it.each(['task', 'project', 'client'] as const)('protects legacy billed-rate time from an agent %s cascade', (kind) => {
+        const sources = {
+            clients: [{ id: 'client-1', title: 'Client' }],
+            projects: [{ id: 'project-1', title: 'Project', preferredClientId: 'client-1' }],
+            activeTasks: [{ id: 'task-1', title: 'Task', projectId: 'project-1' }],
+            archivedTasks: [],
+            timeEntries: [{ id: 'legacy-entry', taskId: 'task-1', start: 1, end: 2, billedHourlyRate: 75 }],
+            timers: [],
+            invoices: [],
+            expenses: [],
+            expenseRecurrences: [],
+            plannerAttachments: [],
+        };
+        const plan = kind === 'task'
+            ? buildTaskDeleteImpactPlan({ ...sources, taskId: 'task-1' })
+            : kind === 'project'
+                ? buildProjectDeleteImpactPlan({ ...sources, projectId: 'project-1' })
+                : buildClientDeleteImpactPlan({ ...sources, clientId: 'client-1', alsoDeleteProjects: true });
+
+        expect(plan).toMatchObject({
+            billedTimeEntryIds: ['legacy-entry'],
+            canCascadeDeleteSafely: false,
+        });
+    });
+
     it('matches legacy UI main-task delete affected IDs for active and archived descendant tasks', () => {
         const activeTasks: Task[] = [
             { id: 'parent', title: 'Parent', projectId: 'project-1' },

@@ -136,7 +136,9 @@ export function createTaskHelpers(tasks: Y.Map<string, Task>): TaskHelpers {
         },
 
         delete(id: string): boolean {
-            return tasks.delete(id);
+            if (!tasks.has(id)) return false;
+            tasks.delete(id);
+            return true;
         },
 
         toggleComplete(id: string): Task | undefined {

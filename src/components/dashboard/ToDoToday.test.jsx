@@ -49,13 +49,14 @@ vi.mock('../../hooks/useToast.ts', () => ({
 }))
 
 vi.mock('../expenses/ExpenseDueCard', () => ({
-    default: ({ expense, category, isOverdue, isToday, isPreview, onView, onMarkPaid }) => (
+    default: ({ expense, category, isOverdue, isToday, isPreview, upcoming, onView, onMarkPaid }) => (
         <div data-testid={`expense-${expense.id}`}>
             <span>{expense.title}</span>
             {category && <span>Category {category.name}</span>}
             {isOverdue && <span>Overdue expense</span>}
             {isToday && <span>Today expense</span>}
             {isPreview && <span>Preview expense</span>}
+            {upcoming && <span>Upcoming expense badge</span>}
             <button type="button" onClick={onView}>View expense</button>
             {onMarkPaid && (
                 <button type="button" onClick={onMarkPaid}>Mark expense paid</button>
@@ -154,7 +155,7 @@ describe('ToDoToday', () => {
         })
 
         expect(screen.getByText('Nothing due today')).toBeInTheDocument()
-        expect(screen.getByText("You're all caught up.")).toBeInTheDocument()
+        expect(screen.getByText("You're all caught up")).toBeInTheDocument()
         expect(screen.getByText('Nothing due today').closest('div')?.className).toContain('pt-4')
     })
 
@@ -171,6 +172,22 @@ describe('ToDoToday', () => {
         expect(within(upcoming).getByText('Upcoming Task')).toBeInTheDocument()
         expect(within(upcoming).queryByText('Next 7 days')).not.toBeInTheDocument()
         expect(screen.queryByTestId(`task-row-content-${upcomingTask.id}`)).not.toBeInTheDocument()
+    })
+
+    it('uses the next occurrence date for a recurring task preview', () => {
+        renderComponent({
+            overdueTasks: [],
+            tasksForToday: [],
+            upcomingTasks: [{
+                ...upcomingTask,
+                startDate: yesterdayStr,
+                recurring: { type: 'weekly', weeklyDays: [1] },
+                recurringStatus: { nextDueDateStr: tomorrowStr },
+            }],
+        })
+
+        const badge = within(screen.getByRole('region', { name: 'Upcoming (1)' })).getByText('Tomorrow')
+        expect(badge.querySelector('svg')).toHaveClass('lucide-refresh-cw')
     })
 
     it('keeps the mobile timer action with the task date', () => {
@@ -212,6 +229,7 @@ describe('ToDoToday', () => {
         expect(props.onTaskTitleClick).toHaveBeenCalledWith(todayTask)
 
         expect(within(upcoming).getByText('Tomorrow')).toBeInTheDocument()
+        expect(within(upcoming).getByText('Tomorrow').querySelector('svg')).toHaveClass('lucide-calendar-days')
         expect(within(upcoming).getByRole('checkbox', { name: `Complete ${upcomingTask.title}` })).not.toBeChecked()
         expect(within(upcoming).queryByRole('button', { name: 'Start timer' })).not.toBeInTheDocument()
         expect(within(upcoming).queryByTitle('Add time entry')).not.toBeInTheDocument()
@@ -362,6 +380,18 @@ describe('ToDoToday', () => {
         expect(screen.queryByText('Delete task')).not.toBeInTheDocument()
     })
 
+    it.each([false, true])('dims disabled task content without dimming the divider (mobile: %s)', (mobile) => {
+        setMatchMedia(mobile)
+        hookMocks.getTimerForTask = vi.fn(() => ({ taskId: 'different-task', isPaused: false }))
+        renderComponent()
+
+        const row = screen.getByText('Overdue Task').closest('.px-2')
+        expect(row).not.toHaveClass('opacity-50')
+        expect(row).not.toHaveClass('hover:bg-muted')
+        expect(row.parentElement).toHaveClass('divide-y')
+        expect(row.firstElementChild).toHaveClass('opacity-50')
+    })
+
     it.each([
         ['the task that owns the running timer', { taskId: overdueTask.id, isPaused: false }],
         ['a different task when its project timer is paused', { taskId: 'different-task', isPaused: true }],
@@ -435,6 +465,7 @@ describe('ToDoToday', () => {
 
         const upcoming = within(screen.getByRole('region', { name: 'Upcoming (1)' }))
         expect(upcoming.getByText('Upcoming Expense')).toBeInTheDocument()
+        expect(upcoming.getByText('Upcoming expense badge')).toBeInTheDocument()
         expect(upcoming.queryByRole('button', { name: 'Mark expense paid' })).not.toBeInTheDocument()
         await user.click(upcoming.getByRole('button', { name: 'View expense' }))
         expect(openExpenseView).toHaveBeenCalledWith(expense)

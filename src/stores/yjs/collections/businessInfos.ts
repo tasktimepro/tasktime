@@ -101,7 +101,9 @@ export function createBusinessInfoHelpers(businessInfos: Y.Map<string, BusinessI
         },
 
         delete(id: string): boolean {
-            return businessInfos.delete(id);
+            if (!businessInfos.has(id)) return false;
+            businessInfos.delete(id);
+            return true;
         },
 
         setDefault(id: string): BusinessInfo | undefined {

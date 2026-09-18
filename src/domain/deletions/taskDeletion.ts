@@ -1,4 +1,5 @@
 import { getTaskIdsWithDescendants } from '@/utils/taskUtils';
+import { hasExplicitBillingMarker } from '@/domain/invoices/invoiceEligibility';
 import type { Invoice, MultiTimerState, PlannerAttachment, Task, TimeEntry } from '@/stores/yjs/types';
 
 export interface TaskDeleteImpactPlan {
@@ -69,7 +70,7 @@ export function buildTaskDeleteImpactPlan(input: BuildTaskDeleteImpactPlanInput)
     const billedTimeEntryIds = input.timeEntries
         .filter((entry) => (
             taskIdSet.has(entry.taskId)
-            && Boolean(entry.billedAt || entry.billedInvoiceId)
+            && hasExplicitBillingMarker(entry)
         ))
         .map((entry) => entry.id)
         .sort();

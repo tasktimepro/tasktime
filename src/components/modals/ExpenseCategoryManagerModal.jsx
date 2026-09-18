@@ -5,10 +5,11 @@ import PropTypes from 'prop-types';
 import Modal from '../Modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Notice } from '@/components/ui/notice';
-import { ArchiveBoxIcon, ArchiveRestoreIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, TrashIcon } from '@/components/ui/icons';
+import { ArchiveBoxIcon, ArchiveRestoreIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, TagsIcon, TrashIcon } from '@/components/ui/icons';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -82,7 +83,7 @@ const ExpenseCategoryManagerModal = ({
         archiveExpenseCategory,
         restoreExpenseCategory,
         deleteExpenseCategory,
-    } = useExpenseCategories({ seedDefaults: true });
+    } = useExpenseCategories();
     const { expenses } = useExpenses({ includeArchived: true });
     const { recurrences } = useExpenseRecurrences();
 
@@ -316,9 +317,19 @@ const ExpenseCategoryManagerModal = ({
                                 Add category
                             </Button>
                         </div>
-                        <div className="space-y-3">
-                            {activeCategories.map(renderCategoryRow)}
-                        </div>
+                        {activeCategories.length > 0 ? (
+                            <div className="space-y-3">
+                                {activeCategories.map(renderCategoryRow)}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                icon={TagsIcon}
+                                title={archivedCategories.length > 0 ? 'No active categories' : 'No categories yet'}
+                                description={archivedCategories.length > 0
+                                    ? 'Add a category or restore an archived one to organize your expenses'
+                                    : 'Add a category to organize your expenses'}
+                            />
+                        )}
                     </div>
 
                     {archivedCategories.length > 0 ? (

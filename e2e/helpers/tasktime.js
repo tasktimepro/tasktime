@@ -16,7 +16,7 @@ function objectToYMap(data) {
     return ymap;
 }
 
-function applyCoreEntities(doc, { projects = [], tasks = [], clients = [] }) {
+function applyCoreEntities(doc, { projects = [], tasks = [], clients = [], expenseCategories = [] }) {
     const projectsMap = doc.getMap('projects');
     const tasksMap = doc.getMap('tasks');
     const clientsMap = doc.getMap('clients');
@@ -32,11 +32,15 @@ function applyCoreEntities(doc, { projects = [], tasks = [], clients = [] }) {
     for (const client of clients) {
         clientsMap.set(client.id, objectToYMap(client));
     }
+
+    for (const category of expenseCategories) {
+        doc.getMap('expenseCategories').set(category.id, objectToYMap(category));
+    }
 }
 
-function encodeCoreState({ projects = [], tasks = [], clients = [] }) {
+function encodeCoreState({ projects = [], tasks = [], clients = [], expenseCategories = [] }) {
     const doc = new Y.Doc();
-    applyCoreEntities(doc, { projects, tasks, clients });
+    applyCoreEntities(doc, { projects, tasks, clients, expenseCategories });
 
     return Buffer.from(Y.encodeStateAsUpdate(doc));
 }
@@ -108,6 +112,7 @@ export function createRemoteDriveFixture({
     projects = [],
     tasks = [],
     clients = [],
+    expenseCategories = [],
     timeEntries = [],
 }) {
     const modifiedTime = new Date().toISOString();
@@ -144,7 +149,7 @@ export function createRemoteDriveFixture({
         ],
         fileBodies: new Map([
             [manifestId, JSON.stringify(manifest)],
-            [coreStateId, encodeCoreState({ projects, tasks, clients })],
+            [coreStateId, encodeCoreState({ projects, tasks, clients, expenseCategories })],
             [activeEntriesStateId, encodeEntriesActiveState({ timeEntries })],
         ]),
     };

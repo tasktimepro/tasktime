@@ -147,7 +147,8 @@ export function createTimeEntryHelpers(store: YjsStore): TimeEntryHelpers {
         delete(id: string): boolean {
             // Try active first
             if (store.activeTimeEntries.has(id)) {
-                return store.activeTimeEntries.delete(id);
+                store.activeTimeEntries.delete(id);
+                return true;
             }
 
             // Note: Deleting from archived docs requires loading them

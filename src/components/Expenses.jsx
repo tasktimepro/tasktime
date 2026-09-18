@@ -929,7 +929,7 @@ const Expenses = ({
                                 <ArrowPathIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                                 <h4 className="mt-2 text-sm font-medium text-foreground">No recurring expenses</h4>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Create a recurring expense to automate repeating expenses.
+                                    Create a recurring expense to automate repeating expenses
                                 </p>
                                 <div className="mt-6">
                                     <Button className="w-full md:w-auto" leadingIcon={PlusIcon} onClick={() => openExpenseModal(null, { isRecurring: true })}>

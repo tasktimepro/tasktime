@@ -124,7 +124,9 @@ export function createProjectHelpers(projects: Y.Map<string, Project>): ProjectH
         },
 
         delete(id: string): boolean {
-            return projects.delete(id);
+            if (!projects.has(id)) return false;
+            projects.delete(id);
+            return true;
         },
 
         archive(id: string): Project | undefined {

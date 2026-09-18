@@ -228,21 +228,28 @@ const ToDoToday = ({
             (task.startDate && task.startDate < todayStr)
         );
         const canOpenDetails = Boolean(onTaskTitleClick) && !shouldDisable;
+        const hasDateBadge = !isCompleted && Boolean(task.startDate || task.recurring);
+        const taskControls = rowContext === 'today' && !shouldDisable
+            ? renderTaskControls(task, shouldDisable)
+            : null;
 
-        const dateBadge = isCompleted ? null : (
+        const dateBadge = hasDateBadge ? (
             <StartDateBadge
-                startDate={task.startDate}
+                startDate={rowContext === 'upcoming' && task.recurring
+                    ? task.recurringStatus?.nextDueDateStr
+                    : task.startDate}
                 recurring={task.recurring}
                 completed={isCompleted}
                 recurringOverdue={Boolean(task.recurringStatus?.isOverdue)}
+                upcoming={rowContext === 'upcoming'}
             />
-        );
+        ) : null;
 
         const dateBadgeNode = isOverdue && canOpenDetails ? (
             <button
                 type="button"
                 onClick={() => onTaskTitleClick(task)}
-                className="cursor-pointer"
+                className="inline-flex items-center cursor-pointer"
                 title="Open task details"
                 aria-label="Open task details"
             >
@@ -253,9 +260,9 @@ const ToDoToday = ({
         );
 
         return (
-            <div key={task.id} className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${shouldDisable ? 'opacity-50' : ''}`}>
+            <div key={task.id} className={`px-2 py-2 sm:px-3 sm:py-2.5 ${shouldDisable ? '' : 'hover:bg-muted'}`}>
                 {isMobileLayout ? (
-                    <div className="flex items-center gap-3">
+                    <div className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 ${shouldDisable ? 'opacity-50' : ''}`}>
                         <CustomCheckbox
                             id={`dashboard-${rowContext}-${task.id}`}
                             label={`Complete ${task.title}`}
@@ -263,21 +270,24 @@ const ToDoToday = ({
                             checked={isCompleted}
                             onChange={(checked) => handleCompleteTask(task, checked)}
                             disabled={shouldDisable}
+                            className="col-start-1 row-start-1 self-center"
                         />
-                        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 gap-y-1 overflow-hidden" data-testid={`task-row-content-${task.id}`}>
+                        <div className="col-start-2 row-start-1 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 overflow-hidden" data-testid={`task-row-content-${task.id}`}>
                             {renderTaskTitle(task, isCompleted, { disabled: shouldDisable, mobileGrid: true })}
-                            <div className="col-start-2 row-start-2 flex items-center justify-end gap-2" data-testid={`task-row-secondary-${task.id}`}>
+                        </div>
+                        {(hasDateBadge || taskControls) && (
+                            <div className="col-start-2 row-start-2 flex min-w-0 items-center justify-end gap-2" data-testid={`task-row-secondary-${task.id}`}>
                                 {dateBadgeNode}
-                                {rowContext === 'today' && !shouldDisable && (
+                                {taskControls && (
                                     <div className="flex items-center justify-end" data-testid={`task-row-actions-${task.id}`}>
-                                        {renderTaskControls(task, shouldDisable)}
+                                        {taskControls}
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        )}
                     </div>
                 ) : (
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center gap-3 ${shouldDisable ? 'opacity-50' : ''}`}>
                         <CustomCheckbox
                             id={`dashboard-${rowContext}-${task.id}`}
                             label={`Complete ${task.title}`}
@@ -295,9 +305,9 @@ const ToDoToday = ({
                                 {formatDurationWithSeconds(task.recentTime || 0)}
                             </div>
                         )}
-                        {rowContext === 'today' && !shouldDisable && (
+                        {taskControls && (
                             <div className="flex flex-shrink-0 space-x-1">
-                                {renderTaskControls(task, shouldDisable)}
+                                {taskControls}
                             </div>
                         )}
                     </div>
@@ -324,6 +334,7 @@ const ToDoToday = ({
             isToday={options.isToday}
             isPreview={expense.isPreview}
             recurrence={expense.recurrenceId ? recurrencesById.get(expense.recurrenceId) : null}
+            upcoming={options.context === 'upcoming'}
             onView={() => openExpenseView?.(expense)}
             onMarkPaid={options.context === 'upcoming' || expense.isPreview
                     || (expense.paymentMode === 'auto' && expense.amountType !== 'variable')
@@ -368,7 +379,7 @@ const ToDoToday = ({
                                 icon={ListTodoIcon}
                                 iconSize="sm"
                                 title="Nothing due today"
-                                description="You're all caught up."
+                                description="You're all caught up"
                                 className="pt-4 pb-6"
                             />
                         )}

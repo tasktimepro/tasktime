@@ -149,7 +149,9 @@ export function createPlannerAttachmentHelpers(
         },
 
         delete(id: string): boolean {
-            return attachments.delete(id);
+            if (!attachments.has(id)) return false;
+            attachments.delete(id);
+            return true;
         },
 
         deleteByReference(referenceId: string): number {

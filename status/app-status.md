@@ -1,3 +1,271 @@
+## September 18 account deletion loading feedback — validated locally, unreleased
+
+The Delete All Account Data confirmation now passes its existing `isDeleting`
+state to the shared Button `loading`/`loadingText` props. While deletion is
+pending, the trash icon becomes the standard spinner and the button remains
+disabled. A focused deferred-provider regression covers pending, duplicate
+click, and retry states. All 33 Account tests, the Chromium backup/delete/restore
+journey, lint, typecheck, and production build pass. The deletion sequence and
+failure behavior are unchanged. No commit, push, or deployment has occurred.
+
+## September 18 expense deletion feedback fix — validated locally, unreleased
+
+Yjs `Map.delete` returns `void`. The expense hook treated that return as a
+success boolean, so the delete succeeded while the confirmation dialog stayed
+open and showed `Expense no longer exists.` The hook now reports success after
+finding, validating, and deleting the record; a later request for the same ID
+still returns false. The shared collection hook and older Yjs collection
+helpers follow the same existence-before-delete rule. The local Yjs type
+declaration now reflects the library API, preventing this pattern from passing
+TypeScript checks again. No persisted schema or delete protection changed.
+
+Real Yjs hook regressions failed before the fix and pass after it. The complete
+Docker unit and per-file coverage gate passes: 292 files, 3,023 tests passed,
+one existing skip. Lint, typecheck and the production build pass. Eight Chromium expense journeys
+pass, including create-delete-confirmation-close, success toast, no false
+error, and persistence across reload. The earlier core integrity audit and
+existing orphan recovery boundary remain as described below. No commit, push,
+release, or deployment has occurred.
+
+## September 18 core integrity audit — validated locally; existing data recovery open
+
+The historical deletion gap is reproduced and fixed through one store operation
+shared by task/project/client hooks and agent commands. It loads lazy years and
+archives, rejects unreadable dependencies, pending billing and unapproved
+financial scopes before mutation, removes all loaded copies, and persists
+leaf/dependent changes before parents. UI success/navigation awaits completion;
+client deletion always confirms. Agent expected-ID and stricter billing guards
+remain in force, including legacy billed-rate markers and a recheck during
+multi-document application.
+
+Manual/backup lazy loads do not prove that cloud history was downloaded. A
+read-only provider revision readiness check blocks deletion until Sync Now has
+applied known history. It does not silently change either mode's pull policy.
+
+A second reproduced bug was completed invoice-finalization replay recreating a
+later-deleted invoice or reclaiming released sources. Replay now respects later
+canceled/draft/missing invoices, preserves archived placement, and does not
+recreate synthetic adjustments for deleted tasks. Force deletion also blocks an
+invoice still claiming moved time or quoted work outside its approved scope.
+Completed replay checks current invoice state after all awaited history loading,
+so a delete during that loading cannot be undone. Pending invoice
+recovery and the existing pricing, precision, billability, currency and immutable
+snapshot rules remain unchanged. No persisted schema or dependency was added.
+
+The pre-existing persistence marker was not a data-transaction commit barrier.
+Explicit flush now merges persisted and current Yjs updates in one atomic
+transaction on the existing data store, awaits commit, and rejects incomplete
+loading or aborts. This retains unseen cross-tab updates and deletion markers
+without growing a full-state record on every barrier. Commit, abort, incomplete
+loading, unreadable data, cross-tab preservation and reload have regression coverage.
+
+The final complete Docker release-check sequence passes: zero audit vulnerabilities,
+lint, typecheck, build-artifact checks, 3,021 unit tests (one existing skip), all
+per-file coverage thresholds, 111 Chromium journeys, five production-preview PWA
+checks, app/recovery builds and site-contract export. The two new reload journeys
+verify historical cascade cleanup and preservation of unseen persisted writes.
+The source/test hash inventory stayed unchanged through the final sequence.
+Four focused reload journeys also pass in Chromium, Firefox and WebKit (12
+checks), covering deletion, unseen persisted writes, moved-task billability and
+cached currency rates.
+
+The final coverage invocation used two workers and a 30-second per-test runtime
+allowance for this loaded development environment; assertions and coverage
+thresholds were unchanged. Earlier runs exposed two UI fixture races: report
+readiness must wait for its callback effect, and invoice period assertions must
+wait for the expected text. Both now pass in the complete suite. The persistence
+manager and shared deletion operation are permanently included in the 75%
+per-file gate; branch coverage is 91.55% and 93.62% respectively.
+
+Boundaries: this is not a distributed transaction across offline devices. Work
+arriving after a completed delete remains retained and diagnosed, not silently
+erased; this audit does not repair the previously identified orphaned records
+in the owner's Edge workspace.
+No live repair, commit, push, release, or deployment is part of this audit.
+
+## September 18 dashboard deletion follow-up — validated locally; existing data recovery open
+
+Read-only inspection of the owner-selected Edge instance confirmed deleted task
+records with retained active time entries after sync completes. This is a
+persistent relationship issue; the sync validation change correctly reports it.
+Dashboard's top-level delete handler supplied empty time-entry and timer lists
+to the shared cascade planner. It now passes the actual loaded collections and
+includes archived descendants when selecting a subtree. Existing saved orphans
+remain untouched; their recovery/removal needs an explicit owner decision.
+
+Three red/green regressions cover active, archived and mixed task subtrees,
+matching entry/timer cleanup and unrelated-record preservation. The focused
+74-test run and isolated Chromium confirmation/cancel/reload journey pass.
+The full Docker release gate passes: zero audit vulnerabilities, lint/typecheck,
+artifact checks, 2,970 unit tests (one existing skip), 110 Chromium journeys,
+five production-preview PWA checks, app/recovery builds and site-contract export.
+Read-only reinspection confirmed the affected live records were unchanged.
+This is a local, uncommitted correction to the existing dashboard cascade;
+no persisted contract change, automatic orphan repair, live data mutation,
+commit or deployment is included.
+
+## September 18 shared cloud-sync connection and validation — validated locally
+
+Moved the Google/Dropbox engine into `providers/CloudSyncProvider.ts`; the old
+Google-named module is a compatibility re-export. Provider IDs, lock names,
+persistence scopes, stored schemas, and existing facade APIs remain unchanged.
+Connection now subscribes before I/O, retains concurrent edits without scheduling
+a disconnected sync, retries genuine remaining automatic-mode work after setup,
+and includes history opened during downloads or the final manifest write.
+Manual pristine bootstrap is strictly pull-only, including concurrent local edits.
+
+Semantic validation runs after complete successful passes and reconciliation,
+using applied manifest versions/deltas rather than local document presence alone.
+References into unloaded task/invoice archives remain deferred even when the
+archive currently exists only in local IndexedDB. Genuine missing references
+still warn and retain their records; repeated unresolved warnings are coalesced
+and a warning can recur after local repair. Corrupt binary updates still fail
+before mutation. No automatic orphan repair, record deletion, or migration.
+
+Red/green regressions cover both providers, all modes, edits during setup,
+late document loading, partial pull recovery, base/delta dependencies, absent
+local archives, genuine orphaned entries, and diagnostic recovery. The complete
+screenshot fixture validates with the reported task/entry pair intact.
+The frozen-source Docker release gate passes: zero audit vulnerabilities,
+lint/typecheck, artifact checks, 2,967 unit tests (one pre-existing skip),
+109 Chromium journeys, five production-preview PWA checks, and app/recovery
+builds plus site-contract export. Four focused Firefox/WebKit checks also pass.
+The first WebKit upload attempt exposed fixture navigation before the initial
+pull finished; the test now awaits In sync and retains all request-failure
+assertions. Provider and validator coverage are permanently included in the
+75% per-file gate; their lowest metrics are 78.92% and 81.81% branches respectively.
+Source hashes remained unchanged through final verification; diff checks pass.
+
+Local and uncommitted. No deployment, live provider/account mutation, or incident
+resolution; actual account relationship health remains a separate live check.
+
+## September 18 empty-state punctuation sweep — validated locally
+
+Removed full stops from 53 empty-state strings across 24 components: expenses,
+dashboard, clients/projects/tasks, invoice tabs and forms, templates, business and
+payment settings, reports, sync backups, and agent activity. Multi-sentence empty
+messages now use a semicolon so the copy has no full stops. User content, errors,
+loading ellipses, and non-empty explanatory text retain their punctuation.
+Updated existing exact-text assertions and the design/acceptance guidance.
+The full Docker unit run passed 2,888 tests but hit ten five-second timeouts and
+one subsequent assertion failure across ten suites under parallel load. Those
+ten suites pass unchanged with two workers and the normal timeout: 310 passed,
+one existing skipped test. Across the initial run and recheck all 2,899 runnable
+tests pass. Docker lint, repository TypeScript checking, production build, and
+diff checks pass. A source audit found no remaining full stops in shared
+EmptyState literal titles/descriptions or the replaced custom empty-state copy.
+Local and uncommitted; no publication or deployment.
+
+## September 18 empty first-load workspace — validated locally
+
+The category manager now uses the shared EmptyState with a category icon,
+"No categories yet" and brief creation guidance. If only archived categories
+remain, it says "No active categories" and mentions restoring one. The existing
+header Add category action remains the single creation button.
+This presentation follow-up passes the three existing category-modal tests,
+the empty-category Chromium journey, and Docker lint.
+
+Removed automatic onboarding task and expense-category creation, including the
+category seeding option/catalog. Opening or cancelling forms and reloading an
+empty collection now remain read-only with respect to workspace records.
+Existing saved starter records and category references are preserved; duplicate
+cleanup remains an explicit data operation and is not part of startup or sync.
+The App regression failed on the seeded task before the fix; Chromium regressions
+failed on the saved onboarding task and the 12 categories created by merely
+opening an expense form. All 243 focused unit/provider tests pass. The changed
+hook meets per-file coverage (95.23% statements, 83.33% branches, 90% functions,
+94.73% lines). All 20 onboarding/expense/sync Chromium journeys pass across the
+initial run and two focused reruns: the new onboarding readiness locator was
+corrected to the actual Dashboard summary region, and an existing direct-sync
+test passed unchanged after an aborted dev-server stylesheet reload. The new
+restoration journey verifies exact legacy/default/custom/archived records,
+including existing duplicates, with zero uploads on pristine Manual restore.
+Docker lint, repository TypeScript checking, production build and diff checks
+pass. Existing unrelated UI work remains intact.
+Local and uncommitted; no deployment or live-account mutation.
+
+## September 18 Disabled Today row dividers — local
+
+Disabled Today task rows now apply opacity to their content instead of the outer
+row, leaving list dividers at full border visibility on phones and desktops.
+Disabled rows no longer gain a hover fill. Task action and modal lock behavior
+is unchanged. The owner asked to handle visual validation, so no browser or
+build checks were run. Local and uncommitted.
+
+## September 18 phone content clearance with multiple timers — local
+
+The shared phone content top padding now adds 5px while a visible global timer
+stack contains more than one timer, clearing the "+N more" chip on every phone
+view. It returns to the prior 4.75rem value with one timer; the no-timer and
+desktop padding, timer card, and chip positions remain unchanged. The existing
+browser regression expectations were updated for the two states. The owner
+asked to handle visual verification, so this follow-up was not run in a browser.
+Local and uncommitted.
+
+## September 18 Today desktop duration alignment — local
+
+The desktop Today duration already uses the same text size and flex alignment
+as the Tasks widget. The differing element was the clickable overdue badge:
+its plain button wrapped an inline-flex badge in an extra line box. That button
+now uses inline-flex alignment, matching the badge sizing beside the duration.
+The earlier one-pixel duration transform was removed. The owner asked to review
+the visual result directly, so this final CSS adjustment was not browser-tested.
+Local and uncommitted.
+
+## September 18 Tasks widget phone alignment — local
+
+The phone Tasks widget now centers each checkbox against the title and optional
+project/note preview, excluding the schedule and action row. With no preview,
+the checkbox stays title-aligned. The project/note preview stops after two
+lines, matching Today, and uses plain note text on phones so clipped links
+cannot retain hidden focus. Desktop layout and links, recurring rows without
+checkboxes, and task actions remain unchanged. The focused Chromium regression
+failed before the fix and passes at 320/390px in actual light and dark themes;
+it also verifies the desktop note link after resizing to 1024px. Docker lint,
+typecheck, and the production build pass. Local and uncommitted.
+
+## September 18 Dashboard phone rows with optional details — local
+
+Today and Upcoming task badges sit at the right below the title or project/note
+preview on phones, immediately beside today's timer when present. Expense dates
+and eligible Mark Paid actions share a right-aligned row, which moves directly
+below the title when supplier/note text is absent. Leading checkboxes and
+expense icons center against the title and supporting text when present, or
+the title alone otherwise; the action row is excluded from that centering.
+Desktop rows and item/action behavior remain unchanged. The missing-detail
+Chromium regression failed before the original fix and the badge/action spacing
+check failed before this follow-up; both pass at 320/390px in actual light and
+dark themes. The existing Today/Upcoming action journey passes at
+320/390/768/1440px; the long expense title journey passes at
+320/390/1024/1440px. All 88 related component tests, lint, typecheck, and the
+production build pass. Local and uncommitted.
+
+## September 18 Upcoming date badges — local
+
+Upcoming now shows the actual occurrence date in the browser's compact
+short-month format.
+Recurring expenses keep the recurrence icon; dated one-time tasks and expenses
+use a calendar icon. Tomorrow retains its relative label. The existing task
+selection, completion and expense actions, plus Today/overdue schedule badges,
+are unchanged. A missing recurrence record still leaves a generated expense
+occurrence recognizable through its stored recurring identity. Before the
+locale-format restoration, seven related component test files passed 87 tests;
+Chromium checks passed for Today/Upcoming actions at 320/390/768/1440px and a
+recurring expense at 320/390/1440px. Docker lint, typecheck, and the production
+build also passed before that restoration. The owner asked to skip retesting the
+restored browser-locale format. Local and uncommitted.
+
+## September 18 phone rail clearance — local
+
+The Dashboard and Expenses summary rails, project and client metric rails, and
+Planner day selector now leave 2px below their cards on phones so the bottom
+edges and small shadows are not clipped by horizontal scrolling. Their edge-to-
+edge scroll alignment and desktop layouts remain unchanged. Focused Chromium
+and WebKit journeys pass for all five rails at phone widths; the existing
+Dashboard and Expenses journeys also cover desktop. Lint, typecheck, and the
+local production build pass. Local and uncommitted; physical iPhone acceptance
+remains separate.
+
 ## September 18 v1.6.1 phone UI release live
 
 The Dashboard, Expenses, Projects, Planner, timer, and report-period phone UI

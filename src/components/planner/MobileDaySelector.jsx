@@ -25,7 +25,7 @@ const MobileDaySelector = ({
     const today = useTodayDate();
 
     return (
-        <div className="-mx-3 flex gap-2 overflow-x-auto px-3 scrollbar-hide sm:-mx-5 sm:px-5">
+        <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-[2px] scrollbar-hide sm:-mx-5 sm:px-5">
             {weekDays.map((day) => {
                 const isSelected = day.dateStr === selectedDateStr;
                 const isToday = isSameDay(day.date, today);

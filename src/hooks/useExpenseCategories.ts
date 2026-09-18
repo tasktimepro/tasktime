@@ -1,21 +1,6 @@
-import { useEffect, useMemo, useRef, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import type { ExpenseCategory } from '@/stores/yjs/types';
-
-const DEFAULT_EXPENSE_CATEGORIES: Array<Pick<ExpenseCategory, 'name' | 'group'>> = [
-    { name: 'Software & subscriptions', group: 'software' },
-    { name: 'Office supplies', group: 'office' },
-    { name: 'Professional services', group: 'professional' },
-    { name: 'Banking & payment fees', group: 'banking' },
-    { name: 'Travel', group: 'travel' },
-    { name: 'Meals', group: 'meals' },
-    { name: 'Equipment', group: 'equipment' },
-    { name: 'Rent & utilities', group: 'utilities' },
-    { name: 'Taxes & government fees', group: 'taxes' },
-    { name: 'Insurance', group: 'insurance' },
-    { name: 'Marketing', group: 'marketing' },
-    { name: 'Other', group: 'other' },
-];
 
 const sortCategories = (categories: ExpenseCategory[]) => {
     return [...categories].sort((left, right) => {
@@ -31,33 +16,15 @@ const sortCategories = (categories: ExpenseCategory[]) => {
     });
 };
 
-type UseExpenseCategoriesOptions = {
-    seedDefaults?: boolean;
-};
-
-export function useExpenseCategories(options: UseExpenseCategoriesOptions = {}) {
+/**
+ * Read saved categories without seeding: an empty browser may restore an
+ * existing cloud workspace later, or the user may intentionally have none.
+ */
+export function useExpenseCategories() {
     const { items, isLoading, get, create, update, remove } = useYjsCollection<ExpenseCategory>(
         (store) => store.expenseCategories,
         { collectionName: 'expenseCategories' }
     );
-    const seededDefaults = useRef(false);
-
-    useEffect(() => {
-        if (!options.seedDefaults || isLoading || seededDefaults.current || items.length > 0) {
-            return;
-        }
-
-        seededDefaults.current = true;
-
-        DEFAULT_EXPENSE_CATEGORIES.forEach((category) => {
-            create({
-                name: category.name,
-                group: category.group,
-                isDefault: true,
-                archived: false,
-            });
-        });
-    }, [create, isLoading, items.length, options.seedDefaults]);
 
     const sortedCategories = useMemo(() => sortCategories(items), [items]);
     const activeCategories = useMemo(
@@ -93,5 +60,3 @@ export function useExpenseCategories(options: UseExpenseCategoriesOptions = {}) 
         restoreExpenseCategory,
     };
 }
-
-export { DEFAULT_EXPENSE_CATEGORIES };

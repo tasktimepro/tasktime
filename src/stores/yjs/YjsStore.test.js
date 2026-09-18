@@ -75,13 +75,14 @@ vi.mock('./YjsDocManager', async () => {
     }
 })
 
-vi.mock('./providers/GoogleDriveProvider', () => {
+vi.mock('./providers/CloudSyncProvider', () => {
     class ProviderMock {
         constructor(...args) {
             this.constructorArgs = args
             this.markDocsForFullStateUpload = vi.fn()
             this.setSyncMode = vi.fn()
             this.getManifest = vi.fn(() => ({}))
+            this.isWorkspaceHistoryReady = vi.fn(() => true)
             this.onSyncComplete = vi.fn()
             this.connect = vi.fn(async () => {})
             this.disconnect = vi.fn()
@@ -123,6 +124,7 @@ vi.mock('./providers/BackupManager', () => {
 })
 
 import { YjsStore } from './YjsStore.ts'
+import { deleteWorkspaceRecords } from './workspaceDeletion'
 
 function objectToYMap(data) {
     const map = new Y.Map()
@@ -191,6 +193,54 @@ describe('YjsStore reconnect sync tracking', () => {
 
         store.destroy()
     })
+
+    it.each(['deleted', 'archived', 'canceled', 'draft', 'task-deleted', 'deleted-during-replay'])(
+        'does not replay completed finalization over a later %s invoice state',
+        async (laterState) => {
+            const store = new YjsStore()
+            await store.initialize()
+            const desiredInvoice = { id: 'invoice-replay', clientId: 'client-replay', invoiceNumber: 'INV-REPLAY', date: '2026-09-18', status: 'sent', items: [], total: 100, subtotal: 100 }
+            store.clients.set('client-replay', objectToYMap({ id: 'client-replay', title: 'Client' }))
+            store.tasks.set('task-replay', objectToYMap({ id: 'task-replay', title: 'Task' }))
+            store.activeTimeEntries.set('entry-replay', objectToYMap({ id: 'entry-replay', taskId: 'task-replay', start: Date.now() - 3600000, end: Date.now() }))
+            const application = {
+                adjustmentEntryIdsToDelete: [], adjustmentEntriesToUpdate: [],
+                adjustmentEntriesToCreate: [{ id: 'adjustment-replay', entry: { taskId: 'task-replay', start: 100, end: 200, source: 'invoice-adjustment', billedInvoiceId: desiredInvoice.id } }],
+                timeEntryUpdates: [{ id: 'entry-replay', updates: { billedInvoiceId: desiredInvoice.id, billedAt: 1000 } }],
+                expenseUpdates: [], taskCutoffUpdates: [], quotedTaskUpdates: [], projectLinkUpdates: [],
+                invoiceTemplateSequenceUpdate: null, invoiceUpdates: { status: 'sent' },
+                billedEntryCount: 1, billedExpenseCount: 0, updatedTaskCount: 0,
+                updatedProjectInvoiceReferences: false, advancedInvoiceSequence: false,
+            }
+            await store.commitInvoiceFinalization({ operationId: 'finalize-replay', desiredInvoice, application, createdAt: 1000 })
+            const archivedInvoices = await store.loadArchivedInvoices()
+            if (laterState === 'task-deleted') {
+                await deleteWorkspaceRecords(store, { kind: 'task', id: 'task-replay' })
+            } else if (laterState === 'archived') {
+                archivedInvoices.set(desiredInvoice.id, objectToYMap({ ...desiredInvoice, status: 'paid', paidAt: Date.now() }))
+                store.invoices.delete(desiredInvoice.id)
+            } else {
+                const entry = store.activeTimeEntries.get('entry-replay')
+                entry.delete('billedInvoiceId')
+                entry.delete('billedAt')
+                if (laterState === 'deleted') store.invoices.delete(desiredInvoice.id)
+                else if (laterState !== 'deleted-during-replay') store.invoices.set(desiredInvoice.id, objectToYMap({ ...desiredInvoice, status: laterState, ...(laterState === 'canceled' ? { canceledAt: 2000, cancellationReason: 'Client canceled' } : {}) }))
+            }
+            let before = [store.invoices.toJSON(), archivedInvoices.toJSON(), store.activeTimeEntries.toJSON()]
+            if (laterState === 'deleted-during-replay') {
+                vi.spyOn(store, 'getAvailableYears').mockImplementationOnce(async () => {
+                    store.invoices.delete(desiredInvoice.id)
+                    before = [store.invoices.toJSON(), archivedInvoices.toJSON(), store.activeTimeEntries.toJSON()]
+                    return []
+                })
+            }
+
+            await store.reconcileInvoiceBillingOperations({ includeCompleted: true })
+
+            expect([store.invoices.toJSON(), archivedInvoices.toJSON(), store.activeTimeEntries.toJSON()]).toEqual(before)
+            store.destroy()
+        },
+    )
 
     it.each(BILLING_OPERATION_PHASES)(
         'replays invoice finalization after interruption at %s',

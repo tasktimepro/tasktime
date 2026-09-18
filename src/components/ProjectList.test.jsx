@@ -134,7 +134,7 @@ describe('ProjectList', () => {
         vi.spyOn(window, 'confirm').mockReturnValue(true)
     })
 
-    it('deletes related expenses and recurrences when deleting a project', async () => {
+    it('delegates the confirmed project cascade to the complete deletion hook', async () => {
         const user = userEvent.setup()
 
         render(
@@ -150,9 +150,8 @@ describe('ProjectList', () => {
         await user.click(screen.getByText('Delete'))
         await user.click(screen.getByText('Delete Project'))
 
-        expect(expensesHookMocks.deleteExpense).toHaveBeenCalledWith('expense-1')
-        expect(recurrencesHookMocks.deleteRecurrence).toHaveBeenCalledWith('recurrence-1')
-        expect(projectsHookMocks.deleteProject).toHaveBeenCalledWith('project-1')
+        expect(projectsHookMocks.deleteProject).toHaveBeenCalledWith('project-1', { includeInvoiceDeletion: false })
+        expect(expensesHookMocks.deleteExpense).not.toHaveBeenCalled()
     })
 
     it('opens the client from its project-card link without opening the project', async () => {

@@ -35,7 +35,7 @@
   follows the destination; eligible cancellation releases original claims by
   identity without restoring the task's previous project. Invoice previews and
   selectors resolve complete legacy merged-task evidence before project filters.
-- Finalization snapshots billing/currency/branding data and applies source billing state once.
+- Finalization snapshots billing/currency/branding data and applies source billing state once. Completed replay respects later deletion, cancellation, draft state, and archived placement; pending recovery can still finish its prepared invoice.
 - Finalization reconciles compatible legacy duplicate task copies, preserves merged-parent pricing/rate inheritance, and rejects conflicting copies or unsupported nested merged tasks before source billing state changes.
 - Payments record their financial context. **Mark as unpaid** is a confirmed correction for a mistakenly recorded payment: it removes `paidAt` and the payment-currency snapshot, preserves the finalized invoice and its billing-source claims, and returns the invoice to effective Outstanding or Overdue. It does not record or issue a refund.
 - Undo latest invoice uses stored billing snapshots to restore eligible source records safely.

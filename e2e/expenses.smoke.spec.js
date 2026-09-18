@@ -3,6 +3,86 @@ import { expensesHeadingName, openExpensesPage } from './helpers/tasktime.js';
 
 test.describe('Expenses smoke', () => {
 
+    test('deletes a newly created expense and closes both dialogs without a false error', async ({ page }) => {
+        const title = `Delete check ${Date.now()}`;
+        await openExpensesPage(page);
+        await page.getByRole('button', { name: 'New Expense', exact: true }).click();
+
+        const newExpense = page.getByRole('dialog', { name: 'New Expense' });
+        await newExpense.getByPlaceholder('Enter expense title').fill(title);
+        await newExpense.getByLabel(/Amount/i).fill('12.34');
+        await newExpense.getByRole('button', { name: 'Create Expense' }).click();
+        await expect(newExpense).not.toBeVisible();
+
+        const expenseRow = page.getByRole('button', { name: new RegExp(title) })
+            .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
+        await expect(expenseRow).toBeVisible();
+        await expenseRow.getByRole('button', { name: 'Edit Expense' }).click();
+
+        const editExpense = page.getByRole('dialog', { name: 'Edit Expense' });
+        await editExpense.getByRole('button', { name: 'Delete Expense' }).click();
+        const confirmDelete = page.getByRole('dialog', { name: 'Delete expense?' });
+        await expect(confirmDelete).toBeVisible();
+        await confirmDelete.getByRole('button', { name: 'Delete', exact: true }).click();
+
+        await expect(confirmDelete).not.toBeVisible();
+        await expect(editExpense).not.toBeVisible();
+        await expect(page.getByText('Expense deleted', { exact: true })).toBeVisible();
+        await expect(page.getByText('Expense no longer exists.', { exact: true })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: title, exact: true })).toHaveCount(0);
+
+        await page.evaluate(() => window.__TASKTIME_STORE__.docManager.flushPersistence());
+        await page.reload();
+        await expect(page.getByRole('heading', { name: expensesHeadingName })).toBeVisible();
+        await expect(page.getByRole('heading', { name: title, exact: true })).toHaveCount(0);
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.expenses.size)).toBe(0);
+    });
+
+    test('keeps categories empty through cancelled forms, deletion, and reload', async ({ page }) => {
+        await openExpensesPage(page);
+        await page.getByRole('button', { name: 'New Expense', exact: true }).click();
+
+        const expenseDialog = page.getByRole('dialog', { name: 'New Expense' });
+        await expect(expenseDialog).toBeVisible();
+        await expect(expenseDialog.getByPlaceholder('Enter expense title')).toBeVisible();
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.expenseCategories.size)).toBe(0);
+        await expenseDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+        const openCategories = async () => {
+            await page.getByRole('button', { name: 'More actions', exact: true }).click();
+            await page.getByRole('menuitem', { name: 'Manage categories' }).click();
+            await expect(page.getByRole('dialog', { name: 'Expense Categories', exact: true })).toBeVisible();
+        };
+        await openCategories();
+
+        const categoriesDialog = page.getByRole('dialog', { name: 'Expense Categories', exact: true });
+        await expect(categoriesDialog.getByText('0 available for new expenses')).toBeVisible();
+        await categoriesDialog.getByRole('button', { name: 'Add category', exact: true }).click();
+
+        const addDialog = page.getByRole('dialog', { name: 'Add category', exact: true });
+        await addDialog.getByLabel('Name', { exact: true }).fill('My own category');
+        await addDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.expenseCategories.size)).toBe(0);
+
+        await categoriesDialog.getByRole('button', { name: 'Add category', exact: true }).click();
+        await addDialog.getByLabel('Name', { exact: true }).fill('My own category');
+        await addDialog.getByRole('button', { name: 'Add Category', exact: true }).click();
+        await expect(categoriesDialog.getByText('1 available for new expenses')).toBeVisible();
+        await categoriesDialog.getByRole('button', { name: 'More actions', exact: true }).click();
+        await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+        await page.getByRole('dialog', { name: 'Delete category?' }).getByRole('button', { name: 'Delete', exact: true }).click();
+        await expect(categoriesDialog.getByText('0 available for new expenses')).toBeVisible();
+        await categoriesDialog.getByRole('button', { name: 'Done', exact: true }).click();
+        await openCategories();
+        await expect(categoriesDialog.getByText('0 available for new expenses')).toBeVisible();
+        await page.evaluate(() => window.__TASKTIME_STORE__.docManager.flushPersistence());
+        await page.reload();
+        await expect(page.getByRole('heading', { name: expensesHeadingName })).toBeVisible();
+        await openCategories();
+        await expect(categoriesDialog.getByText('0 available for new expenses')).toBeVisible();
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.expenses.size)).toBe(0);
+    });
+
     test('creates an expense, marks it paid, and keeps the paid state after reload', async ({ page }) => {
         const expenseTitle = `Playwright Expense ${Date.now()}`;
 

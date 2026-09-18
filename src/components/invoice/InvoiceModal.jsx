@@ -344,7 +344,7 @@ const InvoiceModal = ({
                                 {clients.length === 0 ? (
                                     <Notice
                                         title="No client information found"
-                                        description="Create one to include client details in the invoice."
+                                        description="Create one to include client details in the invoice"
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -413,21 +413,21 @@ const InvoiceModal = ({
                                 {projects.length === 0 ? (
                                     <Notice
                                         title="No projects found"
-                                        description="You can create a project or continue without one."
+                                        description="You can create a project or continue without one"
                                     />
                                 ) : (() => {
                                     if (availableProjects.length === 0 && selectedClient) {
                                         return (
                                             <Notice
                                                 title={`No projects found for ${selectedClient.title}`}
-                                                description="You can create a project for this client or continue without one."
+                                                description="You can create a project for this client or continue without one"
                                             />
                                         );
                                     } else if (availableProjects.length === 0) {
                                         return (
                                             <Notice
                                                 title="No projects available"
-                                                description="Select a client first to see their projects, or create a new project."
+                                                description="Select a client first to see their projects, or create a new project"
                                             />
                                         );
                                     }
@@ -649,7 +649,7 @@ const InvoiceModal = ({
                                 {businessInfos.length === 0 ? (
                                     <Notice
                                         title="No businesses found"
-                                        description={`Create one to include your business details in the ${isQuoteMode ? 'quote' : 'invoice'}.`}
+                                        description={`Create one to include your business details in the ${isQuoteMode ? 'quote' : 'invoice'}`}
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -718,7 +718,7 @@ const InvoiceModal = ({
                                 {paymentMethods.length === 0 ? (
                                     <Notice
                                         title="No payment methods found"
-                                        description={`Create one to include payment details in your ${isQuoteMode ? 'quote' : 'invoice'}.`}
+                                        description={`Create one to include payment details in your ${isQuoteMode ? 'quote' : 'invoice'}`}
                                     />
                                 ) : (
                                     <div className="space-y-2">
@@ -818,7 +818,7 @@ const InvoiceModal = ({
                                 {invoiceTemplates.length === 0 ? (
                                     <Notice
                                         title={isQuoteMode ? 'No document templates found' : 'No invoice templates found'}
-                                        description={isQuoteMode ? 'You can still continue with the default quote layout.' : 'Create a template to continue with invoice generation.'}
+                                        description={isQuoteMode ? 'You can still continue with the default quote layout' : 'Create a template to continue with invoice generation'}
                                     />
                                 ) : (
                                     <div className="space-y-2">

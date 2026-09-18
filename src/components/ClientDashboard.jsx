@@ -14,17 +14,12 @@ import { useClients } from '../hooks/useClients.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { getInvoiceTotal, getPaidInvoiceConvertedAmount, invoiceBelongsToProject, isInvoiceOutstanding, isInvoicePaid } from '../utils/invoiceUtils.ts';
 import { useProjects } from '../hooks/useProjects.ts';
-import { useTasks } from '../hooks/useTasks.ts';
-import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
-import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import { getProjectDeadlineStatus, isProjectInQuoteMode } from '../utils/projectPlanningUtils.ts';
 import { getProjectInvoicePreview } from '../utils/invoicePreviewUtils.ts';
-import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
-import { buildClientDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import ExpensesSection from './expenses/ExpensesSection';
 import {
     DropdownMenu,
@@ -72,13 +67,9 @@ const ClientDashboard = ({
     const [showArchivedProjects, setShowArchivedProjects] = useState(false);
     const [mobileInvoiceGenerator, setMobileInvoiceGenerator] = useState(null);
     const { updateClient, updateClientWithPolicyLock, deleteClient } = useClients();
-    const { deleteProject, updateProject } = useProjects();
-    const { deleteTask } = useTasks();
-    const { deleteEntry } = useTimeEntries();
-    const { deleteInvoice } = useInvoices();
+    const { updateProject } = useProjects();
     const { invoices: billingInvoices } = useInvoices({ includeArchived: true });
-    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
-    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
+    const { expenses } = useExpenses({ includeArchived: true });
     const { preferences } = usePreferences();
     const { showSuccess, showError } = useToast();
     const [exchangeRates, setExchangeRates] = useState(null);
@@ -310,64 +301,16 @@ const ClientDashboard = ({
         openProjectModal(null, { preselectedClientId: client.id });
     };
 
-    const performClientDeletion = useCallback((clientId, alsoDeleteProjects) => {
-        const related = projects.filter(project => project.preferredClientId === clientId);
-        const deletePlan = buildClientDeleteImpactPlan({
-            clientId,
-            alsoDeleteProjects,
-            includeInvoiceDeletion: alsoDeleteProjects,
-            clients: [client],
-            projects,
-            activeTasks: tasks,
-            archivedTasks: [],
-            timeEntries,
-            timers: [],
-            invoices,
-            expenses,
-            expenseRecurrences: recurrences,
-            plannerAttachments: [],
-        });
-
-        if (!deletePlan) {
-            return;
+    const performClientDeletion = useCallback(async (clientId, alsoDeleteProjects) => {
+        try {
+            await deleteClient(clientId, { alsoDeleteProjects, includeInvoiceDeletion: alsoDeleteProjects });
+            showSuccess('Client deleted successfully');
+            return true;
+        } catch (error) {
+            showError(error.message || 'Unable to delete client');
+            return false;
         }
-
-        const applicationPlan = buildClientDeleteApplicationPlan(deletePlan);
-
-        if (alsoDeleteProjects) {
-            const relatedProjectIds = applicationPlan.projectIdsToDelete;
-
-            relatedProjectIds.forEach(id => deleteProject(id));
-
-            const relatedTaskIds = applicationPlan.taskIdsToDelete;
-            relatedTaskIds.forEach(id => deleteTask(id));
-
-            const relatedTimeEntryIds = applicationPlan.timeEntryIdsToDelete;
-            relatedTimeEntryIds.forEach(id => deleteEntry(id));
-
-            const relatedInvoiceIds = applicationPlan.invoiceIdsToDelete;
-            relatedInvoiceIds.forEach(id => unbillExpensesForInvoice(id));
-            relatedInvoiceIds.forEach(id => deleteInvoice(id));
-
-            applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
-
-            applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
-        } else {
-            applicationPlan.projectConversionUpdates
-                .forEach(({ id, updates }) => updateProject(id, updates));
-
-            applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
-
-            applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
-        }
-
-        deleteClient(clientId);
-
-        const message = alsoDeleteProjects
-            ? `Client and ${related.length} related project(s) deleted successfully.`
-            : 'Client deleted successfully.';
-        showSuccess(message);
-    }, [client, projects, tasks, timeEntries, invoices, expenses, recurrences, deleteProject, deleteTask, deleteEntry, deleteInvoice, updateProject, deleteClient, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showSuccess]);
+    }, [deleteClient, showSuccess, showError]);
 
     const handleEditClient = () => {
         openClientModal?.(client);
@@ -392,14 +335,14 @@ const ClientDashboard = ({
         setShowDeleteModal(true);
     };
 
-    const handleConfirmDelete = () => {
-        performClientDeletion(client.id, false);
+    const handleConfirmDelete = async () => {
+        if (!await performClientDeletion(client.id, false)) return;
         setShowDeleteModal(false);
         onBackToClients();
     };
 
-    const handleForceDelete = () => {
-        performClientDeletion(client.id, true);
+    const handleForceDelete = async () => {
+        if (!await performClientDeletion(client.id, true)) return;
         setShowDeleteModal(false);
         onBackToClients();
     };
@@ -728,7 +671,7 @@ const ClientDashboard = ({
             <div
                 className={cn(
                     isMobileLayout
-                        ? '-mx-4 flex gap-3 overflow-x-auto px-4 scrollbar-hide'
+                        ? '-mx-4 flex gap-3 overflow-x-auto px-4 pb-[2px] scrollbar-hide'
                         : 'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4'
                 )}
                 data-testid="client-metrics-row"
@@ -829,7 +772,7 @@ const ClientDashboard = ({
                     {activeClientProjects.length === 0 && archivedClientProjects.length === 0 ? (
                         <div className="text-center py-8">
                             <ProjectIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground mb-4">No projects for this client yet.</p>
+                            <p className="text-muted-foreground mb-4">No projects for this client yet</p>
                             <Button
                                 onClick={handleCreateProject}
                                 leadingIcon={PlusIcon}
@@ -930,7 +873,7 @@ const ClientDashboard = ({
                     <CardContent className={cn(isMobileLayout && 'px-3 pb-3 pt-0')}>
                         <EmptyState
                             icon={ClockIcon}
-                            description="No time entries for this client yet."
+                            description="No time entries for this client yet"
                             className="py-8"
                         />
                     </CardContent>

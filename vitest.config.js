@@ -20,6 +20,10 @@ export default defineConfig({
             include: [
                 'src/utils/**',
                 'src/recovery/localWorkspaceRecovery.ts',
+                'src/stores/yjs/providers/CloudSyncProvider.ts',
+                'src/stores/yjs/validation.ts',
+                'src/stores/yjs/workspaceDeletion.ts',
+                'src/stores/yjs/YjsDocManager.ts',
                 'src/hooks/**',
                 'src/components/dashboard/dashboardMetrics.ts',
                 'src/components/dashboard/hooks/**',

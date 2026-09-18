@@ -243,14 +243,10 @@ export function useYjsCollection<T extends { id: string }>(
     }, [options.collectionName, yMap]);
 
     const remove = useCallback((id: string): boolean => {
-        if (!yMap) return false;
-        const removed = yMap.delete(id);
-
-        if (removed) {
-            markMeaningfulActivity(getCollectionAction(options.collectionName, 'delete'));
-        }
-
-        return removed;
+        if (!yMap?.has(id)) return false;
+        yMap.delete(id);
+        markMeaningfulActivity(getCollectionAction(options.collectionName, 'delete'));
+        return true;
     }, [options.collectionName, yMap]);
 
     return {

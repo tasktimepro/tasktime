@@ -101,7 +101,9 @@ export function createPaymentMethodHelpers(paymentMethods: Y.Map<string, Payment
         },
 
         delete(id: string): boolean {
-            return paymentMethods.delete(id);
+            if (!paymentMethods.has(id)) return false;
+            paymentMethods.delete(id);
+            return true;
         },
 
         setDefault(id: string): PaymentMethod | undefined {

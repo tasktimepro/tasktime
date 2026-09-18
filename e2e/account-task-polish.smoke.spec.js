@@ -35,8 +35,10 @@ test('keeps project, client, and Planner phone rails flush with their cards', as
         const layout = await rail.evaluate(element => ({
             bottomPadding: getComputedStyle(element).paddingBottom,
             scrollable: element.scrollWidth > element.clientWidth,
+            bottomClearance: element.getBoundingClientRect().bottom - Math.max(...Array.from(element.children, child => child.getBoundingClientRect().bottom)),
         }));
-        expect(layout.bottomPadding).toBe('0px');
+        expect(layout.bottomPadding).toBe('2px');
+        expect(layout.bottomClearance).toBeGreaterThanOrEqual(1.5);
         expect(layout.scrollable).toBe(true);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     };

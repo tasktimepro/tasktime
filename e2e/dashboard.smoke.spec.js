@@ -61,7 +61,90 @@ async function seedDashboard(page, liveClock = false) {
 }
 
 test.describe('Dashboard smoke', () => {
-    test('keeps the phone timer close to Today with the original extra-timer label position', async ({ page }) => {
+    test('deleting a dashboard task removes its saved time and preserves unrelated records after reload', async ({ page }) => {
+        await seedDashboard(page);
+        await page.evaluate(async () => {
+            const store = window.__TASKTIME_STORE__;
+            const start = Date.now() - 3600000;
+            store.tasks.set('delete-parent', { id: 'delete-parent', title: 'Campaign review to delete', projectId: 'internal', lastActive: start });
+            store.tasks.set('delete-child', { id: 'delete-child', title: 'Campaign review notes', projectId: 'internal', parentTaskId: 'delete-parent' });
+            for (const taskId of ['delete-parent', 'delete-child']) {
+                store.activeTimeEntries.set(`${taskId}-entry`, { id: `${taskId}-entry`, taskId, start, end: start + 1800000 });
+            }
+            const history = await store.loadEntriesForYear(2023);
+            history.set('delete-historical-entry', { id: 'delete-historical-entry', taskId: 'delete-child', start: new Date(2023, 1, 1).getTime(), end: new Date(2023, 1, 1).getTime() + 7200000 });
+            await store.flushPersistence();
+        });
+        await page.reload();
+
+        const row = page.locator('.px-2.py-2').filter({ has: page.getByRole('button', { name: 'Campaign review to delete', exact: true }) });
+        await row.getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+        const confirmation = page.getByRole('dialog', { name: 'Delete task?' });
+        await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+        expect(await page.evaluate(() => window.__TASKTIME_STORE__.activeTimeEntries.has('delete-parent-entry'))).toBe(true);
+
+        await row.getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+        await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
+        const readDeletionState = () => page.evaluate(async () => {
+            const store = window.__TASKTIME_STORE__;
+            const history = await store.loadEntriesForYear(2023);
+            return {
+                parent: store.tasks.has('delete-parent'),
+                child: store.tasks.has('delete-child'),
+                parentEntry: store.activeTimeEntries.has('delete-parent-entry'),
+                childEntry: store.activeTimeEntries.has('delete-child-entry'),
+                historicalEntry: history.has('delete-historical-entry'),
+                unrelatedTask: store.tasks.has('billable'),
+                unrelatedEntry: store.activeTimeEntries.has('prior-month'),
+                invoice: store.invoices.has('overdue-invoice'),
+            };
+        });
+        const expected = { parent: false, child: false, parentEntry: false, childEntry: false, historicalEntry: false, unrelatedTask: true, unrelatedEntry: true, invoice: true };
+        await expect.poll(readDeletionState).toEqual(expected);
+        await page.evaluate(() => window.__TASKTIME_STORE__.docManager.flushPersistence());
+        await page.reload();
+        await expect(page.getByRole('region', { name: 'Reports Overview' })).toBeVisible();
+        await expect.poll(readDeletionState).toEqual(expected);
+    });
+
+    test('commits local deletions while preserving unseen persisted work across reload', async ({ page }) => {
+        await seedDashboard(page);
+        await page.evaluate(async () => {
+            const store = window.__TASKTIME_STORE__;
+            await store.flushPersistence();
+            // Simulate another tab's committed update before its broadcast arrives.
+            const otherDoc = new store.coreDoc.constructor();
+            let update;
+            otherDoc.on('update', value => { update = value; });
+            otherDoc.getMap('clients').set('unseen-client', { id: 'unseen-client', title: 'Retained client' });
+            await new Promise((resolve, reject) => {
+                const open = indexedDB.open('tasktime-yjs-core');
+                open.onerror = () => reject(open.error);
+                open.onsuccess = () => {
+                    const db = open.result;
+                    const transaction = db.transaction(['updates'], 'readwrite');
+                    transaction.objectStore('updates').add(update);
+                    transaction.oncomplete = () => { db.close(); resolve(); };
+                    transaction.onabort = () => { db.close(); reject(transaction.error); };
+                };
+            });
+            if (store.clients.has('unseen-client')) throw new Error('Fixture must start with unseen persisted work');
+            store.tasks.delete('upcoming');
+            await store.flushPersistence();
+            otherDoc.destroy();
+        });
+        await page.reload();
+        await expect(page.getByRole('region', { name: 'Reports Overview' })).toBeVisible();
+        expect(await page.evaluate(() => ({
+            retainedClient: window.__TASKTIME_STORE__.clients.has('unseen-client'),
+            deletedTask: window.__TASKTIME_STORE__.tasks.has('upcoming'),
+            retainedTask: window.__TASKTIME_STORE__.tasks.has('billable'),
+        }))).toEqual({ retainedClient: true, deletedTask: false, retainedTask: true });
+    });
+
+    test('adds phone content clearance for the extra-timer label', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await seedDashboard(page);
         await page.evaluate(() => {
@@ -74,6 +157,7 @@ test.describe('Dashboard smoke', () => {
         await expect(more).toBeVisible();
         const today = page.getByRole('region', { name: /^To Do Today/ });
         const timerCard = page.locator('main > .fixed .bg-card.shadow-md').first();
+        let twoTimerGapAt320 = 0;
 
         for (const width of [390, 320]) {
             await page.setViewportSize({ width, height: 844 });
@@ -83,18 +167,22 @@ test.describe('Dashboard smoke', () => {
             const timerGap = todayBox.y - timerBox.y - timerBox.height;
             const labelGap = todayBox.y - labelBox.y - labelBox.height;
             const labelOverhang = labelBox.y + labelBox.height - timerBox.y - timerBox.height;
-            expect(timerGap).toBeGreaterThanOrEqual(10);
-            expect(timerGap).toBeLessThanOrEqual(16);
+            expect(timerGap).toBeGreaterThanOrEqual(15);
+            expect(timerGap).toBeLessThanOrEqual(21);
             expect(Math.abs(labelOverhang - 12)).toBeLessThan(2);
             expect(labelGap).toBeGreaterThanOrEqual(0);
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
             if (width === 390) await page.screenshot({ path: 'test-results/dashboard-timer-390-dark.png' });
+            if (width === 320) twoTimerGapAt320 = timerGap;
         }
         await page.evaluate(() => window.__TASKTIME_STORE__.timers.delete('internal'));
         await expect(more).toHaveCount(0);
         const singleTimer = await timerCard.boundingBox();
         const singleToday = await today.boundingBox();
-        expect(singleToday.y - singleTimer.y - singleTimer.height).toBeLessThanOrEqual(16);
+        const singleTimerGap = singleToday.y - singleTimer.y - singleTimer.height;
+        expect(singleTimerGap).toBeLessThanOrEqual(16);
+        expect(twoTimerGapAt320 - singleTimerGap).toBeGreaterThanOrEqual(4);
+        expect(twoTimerGapAt320 - singleTimerGap).toBeLessThanOrEqual(6);
     });
 
     test('keeps the report period beside its heading with an icon-only phone trigger', async ({ page }) => {
@@ -165,9 +253,11 @@ test.describe('Dashboard smoke', () => {
             await expect(upcomingTask.getByTitle('Add time entry')).toHaveCount(0);
             await expect(upcomingTask.getByRole('button', { name: 'More actions' })).toHaveCount(0);
             await expect(upcomingTask.getByText('Sep 28')).toBeVisible();
+            await expect(upcomingTask.locator('svg.lucide-calendar-days')).toBeVisible();
             const upcomingExpense = upcoming.locator('.px-2.py-2').filter({ hasText: 'Software subscription' });
             await expect(upcomingExpense.getByRole('button', { name: 'Mark as paid' })).toHaveCount(0);
             await expect(upcomingExpense.getByText('Sep 28')).toBeVisible();
+            await expect(upcomingExpense.locator('svg.lucide-calendar-days')).toBeVisible();
             const amountLine = await upcomingExpense.locator('.sensitive-data').boundingBox();
             const titleLine = await upcomingExpense.getByText('Software subscription', { exact: true }).boundingBox();
             expect(Math.abs(titleLine.y + titleLine.height / 2 - amountLine.y - amountLine.height / 2)).toBeLessThan(1);
@@ -180,41 +270,39 @@ test.describe('Dashboard smoke', () => {
                 expect(noteStyle.lineClamp).toBe('2');
                 expect(noteStyle.height).toBeLessThanOrEqual(noteStyle.lineHeight * 2 + 1);
                 await expect(notePreview.locator('a')).toHaveCount(0);
-                const todayTaskRow = await todayTask.boundingBox();
                 const todayCheckbox = await todayTask.getByRole('checkbox').boundingBox();
                 const todayTitle = await todayTask.getByRole('button', { name: 'Build the dashboard', exact: true }).boundingBox();
                 const todayMeta = await notePreview.boundingBox();
                 const todayDate = await todayTask.getByText('Today', { exact: true }).boundingBox();
-                const taskRow = await upcomingTask.boundingBox();
                 const checkbox = await upcomingTask.getByRole('checkbox').boundingBox();
                 const taskTitle = await upcomingTask.getByRole('button', { name: 'Plan next month’s work with a longer task title', exact: true }).boundingBox();
                 const taskMeta = await upcomingTask.getByText('Website redesign', { exact: true }).boundingBox();
                 const taskDate = await upcomingTask.getByText('Sep 28').boundingBox();
-                const todayExpenseRow = await todayExpense.boundingBox();
                 const todayExpenseIcon = await todayExpense.locator('svg.lucide-hand-coins').boundingBox();
                 const todayExpenseTitle = await todayExpense.getByText('Design tool', { exact: true }).boundingBox();
                 const todayExpenseAmount = await todayExpense.locator('.sensitive-data').boundingBox();
                 const todayExpenseMeta = await todayExpense.getByText('Tool Vendor').boundingBox();
                 const todayExpenseDate = await todayExpense.getByText('Today', { exact: true }).boundingBox();
-                const expenseRow = await upcomingExpense.boundingBox();
+                const todayExpensePay = await todayExpense.getByRole('button', { name: 'Mark as paid' }).boundingBox();
                 const expenseIcon = await upcomingExpense.locator('svg.lucide-hand-coins').boundingBox();
                 const expenseTitle = await upcomingExpense.getByText('Software subscription', { exact: true }).boundingBox();
                 const expenseAmount = await upcomingExpense.locator('.sensitive-data').boundingBox();
                 const expenseMeta = await upcomingExpense.getByText('Cloud Harbor').boundingBox();
                 const expenseDate = await upcomingExpense.getByText('Sep 28').boundingBox();
                 const centerY = box => box.y + box.height / 2;
-                expect(Math.abs(centerY(todayCheckbox) - centerY(todayTaskRow))).toBeLessThan(7);
+                expect(Math.abs(centerY(todayCheckbox) - (todayTitle.y + todayMeta.y + todayMeta.height) / 2)).toBeLessThan(7);
                 expect(todayTitle.x + todayTitle.width).toBeGreaterThanOrEqual(todayDate.x + todayDate.width - 1);
-                expect(Math.abs(centerY(todayDate) - centerY(todayMeta))).toBeLessThan(7);
-                expect(Math.abs(centerY(checkbox) - centerY(taskRow))).toBeLessThan(7);
+                expect(todayDate.y).toBeGreaterThanOrEqual(todayMeta.y + todayMeta.height);
+                expect(Math.abs(centerY(checkbox) - (taskTitle.y + taskMeta.y + taskMeta.height) / 2)).toBeLessThan(7);
                 expect(taskTitle.x + taskTitle.width).toBeGreaterThanOrEqual(taskDate.x + taskDate.width - 1);
-                expect(Math.abs(centerY(taskDate) - centerY(taskMeta))).toBeLessThan(7);
-                expect(Math.abs(centerY(todayExpenseIcon) - centerY(todayExpenseRow))).toBeLessThan(7);
+                expect(taskDate.y).toBeGreaterThanOrEqual(taskMeta.y + taskMeta.height);
+                expect(Math.abs(centerY(todayExpenseIcon) - (todayExpenseTitle.y + todayExpenseMeta.y + todayExpenseMeta.height) / 2)).toBeLessThan(7);
                 expect(Math.abs(centerY(todayExpenseTitle) - centerY(todayExpenseAmount))).toBeLessThan(1);
-                expect(Math.abs(centerY(todayExpenseDate) - centerY(todayExpenseMeta))).toBeLessThan(7);
-                expect(Math.abs(centerY(expenseIcon) - centerY(expenseRow))).toBeLessThan(7);
+                expect(todayExpenseDate.y).toBeGreaterThanOrEqual(todayExpenseMeta.y + todayExpenseMeta.height);
+                expect(Math.abs(centerY(todayExpenseDate) - centerY(todayExpensePay))).toBeLessThan(8);
+                expect(Math.abs(centerY(expenseIcon) - (expenseTitle.y + expenseMeta.y + expenseMeta.height) / 2)).toBeLessThan(7);
                 expect(Math.abs(centerY(expenseTitle) - centerY(expenseAmount))).toBeLessThan(1);
-                expect(Math.abs(centerY(expenseDate) - centerY(expenseMeta))).toBeLessThan(7);
+                expect(expenseDate.y).toBeGreaterThanOrEqual(expenseMeta.y + expenseMeta.height);
             } else {
                 const desktopNote = todayTask.getByText('Website redesign', { exact: true }).locator('..');
                 expect(await desktopNote.evaluate(element => getComputedStyle(element).webkitLineClamp)).toBe('none');
@@ -245,6 +333,176 @@ test.describe('Dashboard smoke', () => {
 
         await upcomingTask.getByRole('checkbox', { name: 'Complete Plan next month’s work with a longer task title' }).click();
         await expect(upcomingTask).toHaveCount(0);
+    });
+
+    test('aligns phone task and expense actions with or without supporting text', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 844 });
+        await seedDashboard(page);
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.tasks.set('plain-today', { id: 'plain-today', title: 'Prepare launch assets', projectId: null, startDate: '2026-09-25' });
+            store.tasks.set('plain-upcoming', { id: 'plain-upcoming', title: 'Prepare developer handoff', projectId: null, startDate: '2026-09-27' });
+            store.expenses.set('plain-expense', {
+                id: 'plain-expense', title: 'Hosting renewal', date: '2026-09-25',
+                amount: 18, currency: 'EUR', amountType: 'fixed', paymentMode: 'manual',
+                paymentStatus: 'unpaid', isRecurring: false, isPersonal: false, billable: false,
+            });
+        });
+
+        const today = page.getByRole('region', { name: /^To Do Today/ });
+        const upcoming = page.getByRole('region', { name: /^Upcoming/ });
+        const plainTask = today.locator('.px-2.py-2').filter({ has: page.getByRole('button', { name: 'Prepare launch assets', exact: true }) });
+        const relatedTask = today.locator('.px-2.py-2').filter({ has: page.getByRole('button', { name: 'Build the dashboard', exact: true }) });
+        const plainUpcoming = upcoming.locator('.px-2.py-2').filter({ has: page.getByRole('button', { name: 'Prepare developer handoff', exact: true }) });
+        const plainExpense = today.locator('.px-2.py-2').filter({ hasText: 'Hosting renewal' });
+        const relatedUpcoming = upcoming.locator('.px-2.py-2').filter({ has: page.getByRole('button', { name: 'Plan next month’s work with a longer task title', exact: true }) });
+        const relatedExpense = upcoming.locator('.px-2.py-2').filter({ hasText: 'Software subscription' });
+        const centerY = box => box.y + box.height / 2;
+
+        for (const theme of ['light', 'dark']) {
+            await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: /^More/ }).click();
+            await page.getByRole('button', { name: theme === 'light' ? 'Switch to light mode' : 'Switch to dark mode' }).click();
+            await page.keyboard.press('Escape');
+            await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(theme === 'dark');
+            for (const width of [320, 390]) {
+                await page.setViewportSize({ width, height: 844 });
+
+                for (const row of [plainTask, relatedTask, plainUpcoming, relatedUpcoming]) {
+                    const title = await row.getByRole('button', { name: /Prepare launch assets|Build the dashboard|Prepare developer handoff|Plan next month/ }).boundingBox();
+                    const badge = await row.locator('[data-testid^="task-row-secondary-"] .rounded-full').boundingBox();
+                    const checkbox = await row.getByRole('checkbox').boundingBox();
+                    const preview = row === relatedTask || row === relatedUpcoming
+                        ? await row.getByText('Website redesign', { exact: true }).locator('..').boundingBox()
+                        : null;
+                    const headerBottom = preview ? preview.y + preview.height : title.y + title.height;
+                    expect(Math.abs(centerY(checkbox) - (title.y + headerBottom) / 2)).toBeLessThan(7);
+                    expect(badge.y).toBeGreaterThanOrEqual(title.y + title.height);
+                    if (row === plainUpcoming || row === relatedUpcoming) {
+                        const secondary = await row.locator('[data-testid^="task-row-secondary-"]').boundingBox();
+                        expect(Math.abs(badge.x + badge.width - secondary.x - secondary.width)).toBeLessThan(3);
+                    } else {
+                        const action = await row.getByRole('button', { name: 'Start Timer' }).boundingBox();
+                        expect(action.x - badge.x - badge.width).toBeGreaterThanOrEqual(0);
+                        expect(action.x - badge.x - badge.width).toBeLessThan(20);
+                    }
+                }
+
+                const plainBadge = await plainTask.getByText('Today').boundingBox();
+                const timer = await plainTask.getByRole('button', { name: 'Start Timer' }).boundingBox();
+                expect(timer.x).toBeGreaterThan(plainBadge.x + plainBadge.width);
+                expect(Math.abs((timer.y + timer.height / 2) - (plainBadge.y + plainBadge.height / 2))).toBeLessThan(8);
+
+                const expenseTitle = await plainExpense.getByText('Hosting renewal').boundingBox();
+                const expenseIcon = await plainExpense.locator('svg.lucide-hand-coins').boundingBox();
+                const expenseDate = await plainExpense.getByText('Today').boundingBox();
+                const pay = await plainExpense.getByRole('button', { name: 'Mark as paid' }).boundingBox();
+                expect(Math.abs(centerY(expenseIcon) - centerY(expenseTitle))).toBeLessThan(7);
+                expect(expenseDate.y).toBeGreaterThanOrEqual(expenseTitle.y + expenseTitle.height);
+                expect(pay.x).toBeGreaterThan(expenseDate.x + expenseDate.width);
+                expect(Math.abs(centerY(pay) - centerY(expenseDate))).toBeLessThan(8);
+                const relatedTitle = await relatedExpense.getByText('Software subscription', { exact: true }).boundingBox();
+                const relatedMeta = await relatedExpense.getByText('Cloud Harbor').boundingBox();
+                const relatedIcon = await relatedExpense.locator('svg.lucide-hand-coins').boundingBox();
+                expect(Math.abs(centerY(relatedIcon) - (relatedTitle.y + relatedMeta.y + relatedMeta.height) / 2)).toBeLessThan(7);
+                expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+                if (width === 320) await page.screenshot({ path: `test-results/dashboard-optional-meta-${theme}-320.png` });
+            }
+        }
+    });
+
+    test('centers Tasks widget checkboxes on the title preview and clamps long notes on phones', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 844 });
+        await seedDashboard(page);
+        await page.evaluate(() => {
+            const store = window.__TASKTIME_STORE__;
+            store.tasks.set('billable', {
+                ...store.tasks.get('billable'),
+                note: 'Polish the introduction, featured work, and mobile spacing before the client review. See https://example.com/review for the complete brief.',
+            });
+            store.tasks.set('plain-widget', {
+                id: 'plain-widget', title: 'Prepare launch assets', projectId: null,
+                createdAt: Date.now() + 1000,
+            });
+        });
+
+        const tasksCard = page.locator('div.rounded-xl.border.bg-card').filter({ has: page.getByText('Tasks', { exact: true }) });
+        const relatedTask = tasksCard.locator('.px-2.py-2').filter({ has: page.getByRole('button', { name: 'Build the dashboard', exact: true }) });
+        const plainTask = tasksCard.locator('.px-2.py-2').filter({ has: page.getByRole('button', { name: 'Prepare launch assets', exact: true }) });
+        const centerY = box => box.y + box.height / 2;
+
+        for (const theme of ['light', 'dark']) {
+            await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: /^More/ }).click();
+            await page.getByRole('button', { name: theme === 'light' ? 'Switch to light mode' : 'Switch to dark mode' }).click();
+            await page.keyboard.press('Escape');
+            await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(theme === 'dark');
+
+            for (const width of [320, 390]) {
+                await page.setViewportSize({ width, height: 844 });
+                const title = await relatedTask.getByRole('button', { name: 'Build the dashboard', exact: true }).boundingBox();
+                const preview = relatedTask.getByText('Website redesign', { exact: true }).locator('..');
+                const previewBox = await preview.boundingBox();
+                const checkbox = await relatedTask.getByRole('checkbox').boundingBox();
+                expect(Math.abs(centerY(checkbox) - (title.y + previewBox.y + previewBox.height) / 2)).toBeLessThan(7);
+                const previewStyle = await preview.evaluate(element => {
+                    const style = getComputedStyle(element);
+                    return { lineClamp: style.webkitLineClamp, height: element.getBoundingClientRect().height, lineHeight: parseFloat(style.lineHeight) };
+                });
+                expect(previewStyle.lineClamp).toBe('2');
+                expect(previewStyle.height).toBeLessThanOrEqual(previewStyle.lineHeight * 2 + 1);
+                await expect(preview.locator('a')).toHaveCount(0);
+
+                const plainTitle = await plainTask.getByRole('button', { name: 'Prepare launch assets', exact: true }).boundingBox();
+                const plainCheckbox = await plainTask.getByRole('checkbox').boundingBox();
+                expect(Math.abs(centerY(plainCheckbox) - centerY(plainTitle))).toBeLessThan(7);
+                await expect(relatedTask.getByRole('button', { name: 'Start Timer' })).toBeVisible();
+                await expect(relatedTask.getByTitle('Add time entry')).toBeVisible();
+                await expect(relatedTask.getByRole('button', { name: 'More actions' })).toBeVisible();
+                expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+                if (width === 320) await tasksCard.screenshot({ path: `test-results/dashboard-tasks-alignment-${theme}-320.png` });
+            }
+        }
+
+        await page.setViewportSize({ width: 1024, height: 844 });
+        const desktopPreview = relatedTask.getByText('Website redesign', { exact: true }).locator('..');
+        expect(await desktopPreview.evaluate(element => getComputedStyle(element).webkitLineClamp)).toBe('none');
+        await expect(desktopPreview.locator('a[href="https://example.com/review"]')).toBeVisible();
+    });
+
+    test.describe('British English Upcoming dates', () => {
+        test.use({ locale: 'en-GB' });
+
+        test('shows locale-appropriate September and October abbreviations', async ({ page }) => {
+            await page.setViewportSize({ width: 320, height: 844 });
+            await seedDashboard(page);
+            await page.evaluate(() => {
+                const store = window.__TASKTIME_STORE__;
+                store.expenseRecurrences.set('subscription', {
+                    id: 'subscription', title: 'Software subscription', startDate: '2026-09-19',
+                    repeat: 'monthly', monthlyType: 'date', monthlyDay: 19, active: true,
+                    amount: 29, currency: 'EUR', amountType: 'fixed', paymentMode: 'manual',
+                });
+                store.expenses.set('upcoming-expense', {
+                    ...store.expenses.get('upcoming-expense'), isRecurring: true, recurrenceId: 'subscription',
+                });
+                store.expenses.set('october-expense', {
+                    ...store.expenses.get('upcoming-expense'), id: 'october-expense',
+                    title: 'October service', date: '2026-10-01', isRecurring: false, recurrenceId: null,
+                });
+            });
+
+            const upcoming = page.getByRole('region', { name: /^Upcoming/ });
+            const expense = upcoming.locator('.px-2.py-2').filter({ hasText: 'Software subscription' });
+            const october = upcoming.locator('.px-2.py-2').filter({ hasText: 'October service' });
+            for (const width of [320, 390, 1440]) {
+                await page.setViewportSize({ width, height: 844 });
+                await expect(expense.getByText('28 Sept')).toBeVisible();
+                await expect(expense.locator('svg.lucide-refresh-cw')).toBeVisible();
+                await expect(expense.getByText('Monthly (19th)')).toHaveCount(0);
+                await expect(october.getByText('1 Oct')).toBeVisible();
+                await expect(october.locator('svg.lucide-calendar-days')).toBeVisible();
+                expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            }
+        });
     });
 
     test('ellipsizes long expense titles in Today, Upcoming and expense lists', async ({ page }) => {
@@ -595,12 +853,14 @@ test.describe('Dashboard smoke', () => {
                 const rail = await page.getByRole('region', { name: 'Dashboard summary' }).evaluate(element => ({
                     scrollable: element.scrollWidth > element.clientWidth,
                     bottomPadding: getComputedStyle(element).paddingBottom,
+                    bottomClearance: element.getBoundingClientRect().bottom - Math.max(...Array.from(element.children, child => child.getBoundingClientRect().bottom)),
                     left: element.getBoundingClientRect().left,
                     right: element.getBoundingClientRect().right,
                     firstCardLeft: element.firstElementChild.getBoundingClientRect().left,
                 }));
                 expect(rail.scrollable).toBe(true);
-                expect(rail.bottomPadding).toBe('0px');
+                expect(rail.bottomPadding).toBe('2px');
+                expect(rail.bottomClearance).toBeGreaterThanOrEqual(1.5);
                 expect(Math.abs(rail.left)).toBeLessThan(2);
                 expect(Math.abs(rail.right - width)).toBeLessThan(2);
                 expect(Math.abs(rail.firstCardLeft - 16)).toBeLessThan(2);

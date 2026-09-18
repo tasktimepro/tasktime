@@ -1737,7 +1737,7 @@ describe('InvoicesList', () => {
         )
 
         expect(screen.getByText('No invoices yet')).toBeInTheDocument()
-        expect(screen.getByText('Get started by generating your first invoice.')).toBeInTheDocument()
+        expect(screen.getByText('Get started by generating your first invoice')).toBeInTheDocument()
     })
 
     it('wraps tabs and actions safely on mobile', () => {

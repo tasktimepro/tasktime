@@ -27,9 +27,9 @@ const ExpenseList = ({
             : 'No expenses yet';
         const description = hasAnyExpenses
             ? (hasActiveFilters
-                ? 'Try adjusting filters or date range to see other expenses.'
-                : 'Try a different time range to see other expenses.')
-            : 'Create your first expense to start tracking spending.';
+                ? 'Try adjusting filters or date range to see other expenses'
+                : 'Try a different time range to see other expenses')
+            : 'Create your first expense to start tracking spending';
         const shouldShowCreate = !hasAnyExpenses && typeof onCreateFirst === 'function';
 
         return (

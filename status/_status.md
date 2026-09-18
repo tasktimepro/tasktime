@@ -1,3 +1,41 @@
+## September 18 v1.6.2 release candidate
+
+The core sync, deletion, invoice, empty-state and account feedback changes are
+ready for the approved production release. The complete local Docker release
+gate passes: dependency audit, lint, typecheck, build, 3,024 unit tests (one
+existing skip) with per-file coverage, 112 Chromium journeys, five PWA checks,
+and site contract/recovery exports. The site and app will be released from
+separate reviewed commits; live deployment evidence belongs to the private
+readiness record. Existing orphaned records require a separate explicit
+recovery decision and are not changed by this release.
+
+## September 18 account deletion loading feedback — validated locally, unreleased
+
+The confirmed Delete All Data button now uses the shared Button spinner while
+the existing cloud-wipe and local-clear flow runs. Account tests, the browser
+backup/delete/restore journey, lint, typecheck, and production build pass.
+Changes remain uncommitted and undeployed.
+
+## September 18 expense deletion feedback fix — validated locally, unreleased
+
+A real Yjs expense deletion removed the record but returned no value, so the
+editor wrongly reported that it no longer existed and left its confirmation
+open. Expense and shared collection deletion now report success from the
+pre-delete existence check, and the local Yjs type matches the library's void
+return. Related legacy collection helpers use the same rule. Focused tests,
+the full unit/coverage gate (3,023 passed, one existing skip), lint/typecheck,
+the production build, and eight Chromium expense journeys pass. Changes remain uncommitted and
+undeployed; details are in `app-status.md`.
+
+## September 18 core integrity audit validated locally — unreleased
+
+The sync/deletion/invoice audit closes reproduced historical cascade, completed
+billing replay and IndexedDB commit-acknowledgement gaps without new entity
+schemas or dependencies. The full Docker release-check sequence passes, including
+3,021 unit tests, per-file coverage, 111 Chromium journeys and five PWA checks.
+Changes remain uncommitted and undeployed; existing orphaned records still need
+an explicit recovery decision. See `app-status.md` for behavior and validation details.
+
 ## September 18 core v1.6.1 phone UI patch released
 
 Core `f7d943476e6691a419664ad600cb82767e57bd25` is tagged and published as

@@ -43,6 +43,10 @@ const ClientDeleteDialog = ({
                 )
             }
         >
+            <p className="text-sm text-muted-foreground mb-4">
+                Deleting this client also removes its related expenses and recurring expense schedules.
+                Deleting all projects also removes their tasks, saved time, and invoices.
+            </p>
             {hasRelatedProjects ? (
                 <div>
                     <p className="text-sm text-foreground mb-4">

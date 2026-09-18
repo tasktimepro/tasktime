@@ -2,11 +2,13 @@
 import { renderHook, act } from '@testing-library/react'
 import { vi } from 'vitest'
 import { useProjects } from './useProjects'
+import { deleteWorkspaceRecords } from '@/stores/yjs/workspaceDeletion'
 import { useYjsCollection } from './useYjsCollection'
 import { useYjs } from '@/contexts/YjsContext'
 import { createTestYMap } from '@/test/yjs-test-helpers'
 
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
+vi.mock('@/stores/yjs/workspaceDeletion', () => ({ deleteWorkspaceRecords: vi.fn() }))
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 
 const mockUseYjsCollection = useYjsCollection
@@ -143,43 +145,18 @@ describe('useProjects', () => {
         expect(update).toHaveBeenCalledWith('p1', { notes: null }, { origin })
     })
 
-    it('cleans up planner attachments when deleting a project', () => {
-        const plannerAttachments = createTestYMap({
-            'att-1': { id: 'att-1', type: 'project', referenceId: 'p1' },
-            'att-2': { id: 'att-2', type: 'task', referenceId: 't1' },
-            'att-3': { id: 'att-3', type: 'project', referenceId: 'p2' },
-        })
-        const remove = vi.fn(() => true)
-
-        setupMocks({ remove, plannerAttachments })
-
+    it('awaits the shared deletion and passes the explicit invoice choice', async () => {
+        setupMocks()
+        deleteWorkspaceRecords.mockResolvedValueOnce({})
         const { result } = renderHook(() => useProjects())
-
-        act(() => {
-            result.current.deleteProject('p1')
-        })
-
-        expect(remove).toHaveBeenCalledWith('p1')
-        // Only the attachment referencing p1 should be removed
-        expect(plannerAttachments.has('att-1')).toBe(false)
-        expect(plannerAttachments.has('att-2')).toBe(true)
-        expect(plannerAttachments.has('att-3')).toBe(true)
+        await expect(result.current.deleteProject('id', { includeInvoiceDeletion: true })).resolves.toBe(true)
+        expect(deleteWorkspaceRecords).toHaveBeenCalledWith(mockUseYjs().store, { kind: 'project', id: 'id', includeInvoiceDeletion: true })
     })
 
-    it('does not clean up attachments when project removal fails', () => {
-        const plannerAttachments = createTestYMap({
-            'att-1': { id: 'att-1', type: 'project', referenceId: 'p1' },
-        })
-        const remove = vi.fn(() => false)
-
-        setupMocks({ remove, plannerAttachments })
-
+    it('propagates a failed deletion without reporting success', async () => {
+        setupMocks()
+        deleteWorkspaceRecords.mockRejectedValueOnce(new Error('Unable to persist'))
         const { result } = renderHook(() => useProjects())
-
-        act(() => {
-            result.current.deleteProject('p1')
-        })
-
-        expect(plannerAttachments.has('att-1')).toBe(true)
+        await expect(result.current.deleteProject('id')).rejects.toThrow('Unable to persist')
     })
 })

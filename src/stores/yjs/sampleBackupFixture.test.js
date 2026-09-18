@@ -50,7 +50,7 @@ vi.mock('./YjsDocManager', async () => {
     }
 })
 
-vi.mock('./providers/GoogleDriveProvider', () => ({
+vi.mock('./providers/CloudSyncProvider', () => ({
     YjsDriveProvider: class {
         constructor() {
             this.markDocsForFullStateUpload = vi.fn()

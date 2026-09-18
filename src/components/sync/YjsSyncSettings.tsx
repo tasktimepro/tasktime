@@ -974,7 +974,7 @@ export default function YjsSyncSettings() {
                             </div>
                             {backups.length === 0 ? (
                                 <p className="text-xs text-muted-foreground py-2">
-                                    {backupsLoading ? 'Loading backups...' : 'No backups yet. Backups are created automatically after sync.'}
+                                    {backupsLoading ? 'Loading backups...' : 'No backups yet; backups are created automatically after sync'}
                                 </p>
                             ) : (
                                 <div className="rounded-md border border-border divide-y divide-border max-h-64 overflow-y-auto">

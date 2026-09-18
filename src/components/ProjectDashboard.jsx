@@ -1,3 +1,4 @@
+import { useInvoices } from '@/hooks/useInvoices';
 import UnbilledMetricContent from './UnbilledMetricContent';
 import { ArrowLeftIcon, BanknotesIcon, DocumentTextIcon, ChevronDownIcon, PencilIcon, ArchiveBoxIcon, TrashIcon, HandCoinsIcon, CheckIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
@@ -14,14 +15,8 @@ import { useToast } from '../hooks/useToast.ts';
 import { getInvoiceTotal, getPaidInvoiceConvertedAmount, getInvoicesForProject, isInvoiceOutstanding, isInvoicePaid, isMultiProjectInvoice } from '../utils/invoiceUtils.ts';
 import { useTimers } from '../hooks/useTimers.ts';
 import { useProjects } from '../hooks/useProjects.ts';
-import { useTasks } from '../hooks/useTasks.ts';
-import { useTimeEntries } from '../hooks/useTimeEntries.ts';
-import { useInvoices } from '../hooks/useInvoices.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
-import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
-import { buildProjectDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
-import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { getBillableDurationMs } from '../utils/timeEntryDurationUtils.ts';
 import {
     DropdownMenu,
@@ -87,14 +82,11 @@ const ProjectDashboard = ({
     const [activeTab, setActiveTab] = useState('tasks');
     const [mobileDocumentGenerator, setMobileDocumentGenerator] = useState(null);
     const { showError, showSuccess } = useToast();
-    const { getTimerForProject, clearTimer } = useTimers();
+    const { getTimerForProject } = useTimers();
     const { deleteProject, archiveProject, unarchiveProject, updateProject } = useProjects();
-    const { deleteTask } = useTasks();
-    const { deleteEntry } = useTimeEntries();
-    const { deleteInvoice } = useInvoices();
-    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
-    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
+    const { expenses } = useExpenses({ includeArchived: true });
     const { preferences } = usePreferences();
+    const { invoices: deletionInvoices = [] } = useInvoices({ includeArchived: true });
     const projectTimer = getTimerForProject(project.id);
     const projectCurrency = useMemo(
         () => getProjectCurrency(project, clients, preferences.currency),
@@ -104,8 +96,8 @@ const ProjectDashboard = ({
     // Get invoices for this project
     const projectInvoices = getInvoicesForProject(invoices, project.id);
     const projectHasSharedInvoices = useMemo(() => {
-        return projectInvoices.some((invoice) => isMultiProjectInvoice(invoice));
-    }, [projectInvoices]);
+        return getInvoicesForProject([...invoices, ...deletionInvoices], project.id).some((invoice) => isMultiProjectInvoice(invoice));
+    }, [invoices, deletionInvoices, project.id]);
 
     const projectExpenses = useMemo(() => {
         return expenses.filter((expense) => expense.projectId === project.id);
@@ -159,61 +151,16 @@ const ProjectDashboard = ({
         setIsInvoicesExpanded((prev) => !prev);
     };
 
-    const performProjectDeletion = useCallback((projectId, shouldDeleteInvoices = false) => {
-        const timerForProject = getTimerForProject(projectId);
-        const deletePlan = buildProjectDeleteImpactPlan({
-            projectId,
-            includeInvoiceDeletion: shouldDeleteInvoices,
-            projects: [project],
-            activeTasks: tasks.filter(task => !task.deletedAt),
-            archivedTasks: [],
-            timeEntries,
-            timers: timerForProject ? [timerForProject] : [],
-            invoices,
-            expenses,
-            expenseRecurrences: recurrences,
-            plannerAttachments: [],
-        });
-
-        if (!deletePlan) {
-            return;
+    const performProjectDeletion = useCallback(async (projectId, shouldDeleteInvoices = false) => {
+        try {
+            await deleteProject(projectId, { includeInvoiceDeletion: shouldDeleteInvoices });
+            showSuccess('Project deleted successfully');
+            return true;
+        } catch (error) {
+            showError(error.message || 'Unable to delete project');
+            return false;
         }
-
-        const applicationPlan = buildProjectDeleteApplicationPlan(deletePlan);
-
-        if (timerForProject) {
-            clearTimer(projectId);
-        }
-
-        const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
-        const sharedInvoices = projectInvoicesForDelete.filter((invoice) => isMultiProjectInvoice(invoice));
-
-        if (shouldDeleteInvoices && sharedInvoices.length > 0) {
-            showError('This project is referenced by a shared invoice and cannot be hard-deleted. Archive the project instead.');
-            return;
-        }
-
-        if (shouldDeleteInvoices) {
-            projectInvoicesForDelete.forEach(invoice => unbillExpensesForInvoice(invoice.id));
-            projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
-        }
-
-        applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
-
-        applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
-
-        deleteProject(applicationPlan.projectIdToDelete);
-        applicationPlan.taskIdsToDelete.forEach(taskId => deleteTask(taskId));
-
-        const timeEntryIdsToDelete = applicationPlan.timeEntryIdsToDelete;
-        timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
-
-        const deletedTaskCount = deletePlan.taskIdsToDelete.length;
-        const deletedTimeEntriesCount = timeEntryIdsToDelete.length;
-        const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
-        const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
-        showSuccess(baseMessage + invoiceMessage);
-    }, [project, tasks, timeEntries, expenses, recurrences, getTimerForProject, clearTimer, invoices, deleteInvoice, deleteProject, deleteTask, deleteEntry, deleteExpense, deleteRecurrence, unbillExpensesForInvoice, showError, showSuccess]);
+    }, [deleteProject, showSuccess, showError]);
 
     const handleEditProject = () => {
         openProjectModal?.(project);
@@ -233,14 +180,14 @@ const ProjectDashboard = ({
         setShowDeleteModal(true);
     };
 
-    const handleConfirmDelete = () => {
-        performProjectDeletion(project.id, false);
+    const handleConfirmDelete = async () => {
+        if (!await performProjectDeletion(project.id, false)) return;
         setShowDeleteModal(false);
         onBackToProjects();
     };
 
-    const handleForceDelete = () => {
-        performProjectDeletion(project.id, true);
+    const handleForceDelete = async () => {
+        if (!await performProjectDeletion(project.id, true)) return;
         setShowDeleteModal(false);
         onBackToProjects();
     };
@@ -555,7 +502,7 @@ const ProjectDashboard = ({
                 isOpen={showDeleteModal}
                 onClose={handleCloseDeleteModal}
                 project={project}
-                hasInvoices={projectInvoices.length > 0}
+                hasInvoices={getInvoicesForProject([...invoices, ...deletionInvoices], project.id).length > 0}
                 hasSharedInvoices={projectHasSharedInvoices}
                 onConfirmDelete={handleConfirmDelete}
                 onArchive={() => {
@@ -589,7 +536,7 @@ const ProjectDashboard = ({
                 <div
                     className={cn(
                         isMobileLayout
-                            ? '-mx-4 flex gap-3 overflow-x-auto px-4 scrollbar-hide'
+                            ? '-mx-4 flex gap-3 overflow-x-auto px-4 pb-[2px] scrollbar-hide'
                             : 'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4'
                     )}
                     data-testid="project-metrics-row"

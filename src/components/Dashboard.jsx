@@ -32,8 +32,6 @@ import {
     DEFAULT_PROJECT_FILTER,
     DEFAULT_TASK_FILTER,
 } from './dashboard/dashboardOverviewUtils.ts';
-import { buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
-import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { CornerDownRightIcon } from '@/components/ui/icons';
 import { usePlannerAttachments } from '@/hooks/usePlannerAttachments';
 import { useTodayString } from '@/hooks/useDayRollover';
@@ -102,24 +100,6 @@ const buildTodoNotificationBody = ({ taskCount, expenseCount, firstTitle }) => {
     return `${itemSummary} are due today.`;
 };
 
-const getTaskDeleteApplication = (taskId, tasks) => {
-    const plan = buildTaskDeleteImpactPlan({
-        taskId,
-        activeTasks: tasks.filter(task => !task.archived),
-        archivedTasks: tasks.filter(task => task.archived),
-        timeEntries: [],
-        timers: [],
-        invoices: [],
-        plannerAttachments: [],
-    });
-
-    return plan ? buildTaskDeleteApplicationPlan(plan) : {
-        taskIdsToDelete: [taskId],
-        timeEntryIdsToDelete: [],
-        timerKeysToClear: [],
-        plannerAttachmentIdsToDelete: [],
-    };
-};
 
 /**
  * Dashboard component - Main dashboard with metrics, recent tasks, projects, and invoicing overview
@@ -163,7 +143,6 @@ const Dashboard = ({
     } = useTasks({ includeArchived: true });
     const {
         entries: timeEntries,
-        deleteEntry,
         loadYear: loadTimeEntriesYear,
         getAvailableYears: getAvailableTimeEntryYears,
     } = useTimeEntries();
@@ -905,35 +884,16 @@ const Dashboard = ({
         });
     }, [notificationPermission, preferences.systemNotificationsEnabled, todayStr, todoNotificationItems]);
 
-    const handleDeleteTask = useCallback((task) => {
+    const handleDeleteTask = useCallback(async (task) => {
         if (!task) return;
-
-        const availableTasks = task.archived
-            ? [...activeTasks, ...archivedTasks]
-            : activeTasks;
-
-        const deleteApplication = task.parentTaskId
-            ? {
-                taskIdsToDelete: [task.id],
-                timeEntryIdsToDelete: timeEntries
-                    .filter(entry => entry.taskId === task.id)
-                    .map(entry => entry.id),
-                timerKeysToClear: timers
-                    .filter(timer => timer.taskId === task.id)
-                    .map(timer => timer.projectId),
-                plannerAttachmentIdsToDelete: [],
-            }
-            : getTaskDeleteApplication(task.id, availableTasks);
-        const taskIdsToDelete = deleteApplication.taskIdsToDelete;
-
-        deleteApplication.timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
-
-        deleteApplication.timerKeysToClear.forEach(timerKey => clearTimer(timerKey));
-
-        Promise.all(taskIdsToDelete.map(id => deleteTask(id))).then(() => {
+        try {
+            await deleteTask(task.id);
             showSuccess('Task deleted');
-        });
-    }, [activeTasks, archivedTasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
+
+        } catch (error) {
+            showError(error.message || 'Unable to delete task');
+        }
+    }, [deleteTask, showSuccess, showError]);
 
     const handleArchiveTask = useCallback((task) => {
         if (!task || task.projectId) return;

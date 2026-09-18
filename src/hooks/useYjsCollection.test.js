@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import * as Y from 'yjs'
 import { useYjsCollection } from './useYjsCollection'
 import { useYjs } from '@/contexts/YjsContext'
 import { createTestYMap } from '@/test/yjs-test-helpers'
@@ -41,6 +42,24 @@ describe('useYjsCollection', () => {
         })
 
         expect(result.current.items).toHaveLength(0)
+    })
+
+    it('reports actual Yjs map deletion success only once', async () => {
+        const doc = new Y.Doc()
+        const map = doc.getMap('items')
+        map.set('existing', { id: 'existing', name: 'Item' })
+        mockUseYjs.mockReturnValue({ store: { test: map }, isReady: true })
+
+        const { result } = renderHook(() => useYjsCollection((store) => store.test))
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        let deleted
+        act(() => {
+            deleted = result.current.remove('existing')
+        })
+        expect(deleted).toBe(true)
+        expect(map.has('existing')).toBe(false)
+        expect(result.current.remove('existing')).toBe(false)
     })
 
     it('subscribes to map changes', async () => {

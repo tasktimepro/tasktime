@@ -6,12 +6,6 @@
 
 ...
 
-[ ] Polishing updates
-    [ ] Mobile design and home landing enhancements
-        [ ] Update mobile screenshot
-        [ ] Improve mobile navigation menu
-        [ ] Make cards views horizontally scrollable
-
 Launch v1.6.0 is complete: app and public site are live, billing is enabled,
 and the agent releases are published. Evidence: `status/app-status.md` and
 `status/agent-status.md`; private operations retain deployment details.
@@ -50,6 +44,8 @@ We might bring some of this previous idea I had earlier into this too:
     [ ] This can also be an alert reminder settings in account that when a time passes a certain amount, we ping with a sound, and when we have push notifications, also have that choice
     - Pomodoro? Is this the same and does it apply here?
 I would perhaps just take the subtle sound effect for a ping option that can go on every 20, 30, 40, 60 minutes. As a gentle reminder that you're in focus mode and that a timer is ongoing
+
+[ ] Improve reports overview with some useful charts - see existing mocks in TaskTime folder
 
 ---
 

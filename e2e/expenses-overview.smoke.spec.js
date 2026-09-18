@@ -185,12 +185,14 @@ test('keeps the original list before insights on phones with accessible actions'
             expect(await summary.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
             const rail = await summary.evaluate(element => ({
                 bottomPadding: getComputedStyle(element).paddingBottom,
+                bottomClearance: element.getBoundingClientRect().bottom - Math.max(...Array.from(element.children, child => child.getBoundingClientRect().bottom)),
                 left: element.getBoundingClientRect().left,
                 right: element.getBoundingClientRect().right,
                 firstCardLeft: element.firstElementChild.getBoundingClientRect().left,
                 nextCardLeft: element.children[1].getBoundingClientRect().left,
             }));
-            expect(rail.bottomPadding).toBe('0px');
+            expect(rail.bottomPadding).toBe('2px');
+            expect(rail.bottomClearance).toBeGreaterThanOrEqual(1.5);
             expect(Math.abs(rail.left)).toBeLessThan(2);
             expect(Math.abs(rail.right - width)).toBeLessThan(2);
             expect(Math.abs(rail.firstCardLeft - 16)).toBeLessThan(2);

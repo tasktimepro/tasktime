@@ -9,14 +9,13 @@ import { addDays } from 'date-fns';
 import { useYjs } from '@/contexts/YjsContext';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { useYjsCollection } from './useYjsCollection';
-import type { MultiTimerState, PlannerAttachment, Task } from '@/stores/yjs/types';
+import type { MultiTimerState, Task } from '@/stores/yjs/types';
 import { getTodayString, toStorageDate } from '@/utils/dateUtils';
 import { findNextRecurringDueDate, findPreviousRecurringDueDate, isRecurringTaskDueOnDate } from '@/utils/recurringUtils';
 import { isRecurringCompletedOnDate } from '@/utils/recurringCompletionUtils';
-import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
 import { collectEntities, updateEntityFields } from '@/stores/yjs/entityUtils';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
-import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
+import { deleteWorkspaceRecords } from '@/stores/yjs/workspaceDeletion';
 import {
     buildRecurringSkipUpdates,
     buildTaskCompletionUpdates,
@@ -38,7 +37,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     const { store, isReady, loadArchivedTasks: loadArchived } = useYjs();
     
     // Active tasks from core doc
-    const { items: activeTasks, isLoading: activeLoading, get, create, update, remove } = 
+    const { items: activeTasks, isLoading: activeLoading, get, create, update } =
         useYjsCollection<Task>((store) => store.tasks, { collectionName: 'tasks' });
 
     const getOperationProjects = useCallback((): Project[] => {
@@ -248,61 +247,16 @@ export function useTasks(options: UseTasksOptions = {}) {
     }, [store]);
 
     const deleteTask = useCallback(async (id: string) => {
-        let archivedMap = store.archivedTasks;
-
-        if (!archivedMap) {
-            await loadArchived();
-            archivedMap = store.archivedTasks;
+        if (!store.tasks.has(id) && !store.archivedTasks?.has(id)) {
+            await store.loadArchivedTasks();
+            if (!store.tasks.has(id) && !store.archivedTasks?.has(id)) return false;
         }
-
-        const archivedTasksSnapshot = archivedMap
-            ? collectEntities<Task>(archivedMap as any)
-            : [];
-        const plan = buildTaskDeleteImpactPlan({
-            taskId: id,
-            activeTasks,
-            archivedTasks: archivedTasksSnapshot,
-            timeEntries: [],
-            timers: [],
-            invoices: [],
-            plannerAttachments: store.plannerAttachments
-                ? collectEntities<PlannerAttachment>(store.plannerAttachments as any)
-                : [],
-        });
-
-        if (!plan) {
-            return false;
-        }
-
-        const taskIdsToDelete = plan.taskIdsToDelete;
-        let removedAny = false;
-
-        taskIdsToDelete.forEach((taskId) => {
-            const removedFromActive = remove(taskId);
-
-            if (removedFromActive) {
-                cleanupAttachmentsForEntity(store.plannerAttachments as any, taskId);
-                removedAny = true;
-                return;
-            }
-
-            if (!archivedMap?.has(taskId)) {
-                return;
-            }
-
-            archivedMap.delete(taskId);
-            markMeaningfulActivity('task_delete');
-            cleanupAttachmentsForEntity(store.plannerAttachments as any, taskId);
-            removedAny = true;
-        });
-
-        if (archivedMap) {
-            setArchivedLoaded(true);
-            setArchivedTasks(collectEntities<Task>(archivedMap as any));
-        }
-
-        return removedAny;
-    }, [activeTasks, remove, store, loadArchived]);
+        await deleteWorkspaceRecords(store, { kind: 'task', id });
+        markMeaningfulActivity('task_delete');
+        setArchivedLoaded(true);
+        setArchivedTasks(collectEntities<Task>(store.archivedTasks as any));
+        return true;
+    }, [store]);
 
     // Get task hierarchy
     const getRootTasks = useCallback((projectId?: string) => {

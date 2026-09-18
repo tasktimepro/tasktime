@@ -22,6 +22,7 @@ const ExpenseDueCard = ({
     isPreview = false,
     recurrence = null,
     compact = false,
+    upcoming = false,
 }) => {
     const isMobileLayout = useIsMobileLayout();
     const isCompactMobile = isMobileLayout;
@@ -75,7 +76,16 @@ const ExpenseDueCard = ({
         return '';
     }, [recurrence]);
 
-    const dateBadge = isPaidDisplay ? null : recurrence ? (
+    const dateBadge = isPaidDisplay ? null : upcoming ? (
+        <StartDateBadge
+            startDate={expense.date}
+            recurring={recurrence}
+            upcomingRecurring={Boolean(expense.isRecurring || expense.recurrenceId)}
+            completed={isPaidDisplay}
+            recurringOverdue={showOverdue}
+            upcoming
+        />
+    ) : recurrence ? (
         showOverdue ? (
             <Badge variant="warning">
                 Overdue
@@ -123,14 +133,41 @@ const ExpenseDueCard = ({
         </>
     );
 
+    const secondaryRow = (!isCompactMobile || dateBadge || canMarkPaid) ? (
+        <div className={isCompactMobile
+            ? 'col-start-2 row-start-2 flex min-w-0 flex-wrap items-center justify-end gap-2 justify-self-end'
+            : 'flex w-full flex-wrap items-center justify-end gap-2'} data-testid={`expense-row-secondary-${expense.id}`}>
+            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+                {dateBadgeNode}
+            </div>
+            {canMarkPaid && (
+                <div className="flex flex-wrap items-center justify-end gap-2" data-testid={`expense-row-actions-${expense.id}`}>
+                    <Button
+                        size="xs"
+                        className="h-7 px-3"
+                        aria-label="Mark as paid"
+                        title="Mark as paid"
+                        onClick={() => onMarkPaid?.()}
+                        leadingIcon={CheckIcon}
+                        type="button"
+                    >
+                        Mark Paid
+                    </Button>
+                </div>
+            )}
+        </div>
+    ) : null;
+
     return (
         <div
             className={`px-2 py-2 hover:bg-muted sm:px-3 sm:py-2.5 ${showOverdue ? 'opacity-90' : ''}`}
         >
             {isMobileLayout || compact ? (
-                <div className={`flex gap-3 ${isCompactMobile ? 'items-center' : 'items-start'}`}>
-                    <HandCoinsIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <div className={`flex-1 min-w-0 overflow-hidden ${isCompactMobile ? 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 gap-y-1' : 'space-y-1.5'}`} data-testid={`expense-row-content-${expense.id}`}>
+                <div className={isCompactMobile
+                    ? 'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1'
+                    : 'flex items-start gap-3'}>
+                    <HandCoinsIcon className={`h-5 w-5 shrink-0 text-muted-foreground ${isCompactMobile ? 'col-start-1 row-start-1 self-center' : ''}`} />
+                    <div className={`min-w-0 overflow-hidden ${isCompactMobile ? 'col-start-2 row-start-1 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1' : 'flex-1 space-y-1.5'}`} data-testid={`expense-row-content-${expense.id}`}>
                         {isClickable ? (
                             <button
                                 type="button"
@@ -146,48 +183,13 @@ const ExpenseDueCard = ({
                             </div>
                         )}
                         {metaLine && (
-                            <p className={`text-xs text-muted-foreground whitespace-normal break-words ${isPaidDisplay ? 'line-through' : ''} ${isCompactMobile ? 'col-start-1 row-start-2 self-center' : ''}`}>
+                            <p className={`text-xs text-muted-foreground whitespace-normal break-words ${isPaidDisplay ? 'line-through' : ''} ${isCompactMobile ? 'col-span-2 row-start-2' : ''}`}>
                                 {metaLine}
                             </p>
                         )}
-                        <div className={isCompactMobile
-                            ? 'col-start-2 row-start-2 flex items-center justify-end gap-2 justify-self-end'
-                            : 'flex w-full flex-wrap items-center justify-end gap-2'} data-testid={`expense-row-secondary-${expense.id}`}>
-                            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
-                                {dateBadgeNode}
-                            </div>
-                            {canMarkPaid && !isCompactMobile && (
-                                <div className="flex flex-wrap items-center justify-end gap-2" data-testid={`expense-row-actions-${expense.id}`}>
-                                    <Button
-                                        size="xs"
-                                        className="h-7 px-3"
-                                        aria-label="Mark as paid"
-                                        title="Mark as paid"
-                                        onClick={() => onMarkPaid?.()}
-                                        leadingIcon={CheckIcon}
-                                        type="button"
-                                    >
-                                        Mark Paid
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                        {canMarkPaid && isCompactMobile && (
-                            <div className="col-span-2 row-start-3 justify-self-end" data-testid={`expense-row-actions-${expense.id}`}>
-                                <Button
-                                    size="xs"
-                                    className="h-7 px-3"
-                                    aria-label="Mark as paid"
-                                    title="Mark as paid"
-                                    onClick={() => onMarkPaid?.()}
-                                    leadingIcon={CheckIcon}
-                                    type="button"
-                                >
-                                    Mark Paid
-                                </Button>
-                            </div>
-                        )}
+                        {!isCompactMobile && secondaryRow}
                     </div>
+                    {isCompactMobile && secondaryRow}
                 </div>
             ) : (
                 <div className="flex items-center gap-3">

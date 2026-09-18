@@ -1,3 +1,4 @@
+import { markMeaningfulActivity } from '@/utils/usageMetrics';
 /**
  * useClients - React hook for clients collection
  * 
@@ -7,7 +8,7 @@
 import { useMemo, useCallback, useRef } from 'react';
 import { useYjsCollection } from './useYjsCollection';
 import { useYjs } from '@/contexts/YjsContext';
-import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
+import { deleteWorkspaceRecords } from '@/stores/yjs/workspaceDeletion';
 import type { Client } from '@/stores/yjs/types';
 import { buildClientEntity, buildClientUpdates } from '@/domain/work/workEntityOperations';
 import { generateId } from '@/utils/idUtils';
@@ -20,12 +21,12 @@ import {
 import { collectValidatedEntities } from '@/stores/yjs/validation';
 
 export function useClients() {
-    const { store, isReady } = useYjs();
+    const { store } = useYjs();
     const { resolution } = useBilling();
     // A queued Web Lock must not retain Pro from before expiry/account change.
     const currentResolution = useRef(resolution);
     currentResolution.current = resolution;
-    const { items, isLoading, get, create, update, remove } = useYjsCollection<Client>(
+    const { items, isLoading, get, create, update } = useYjsCollection<Client>(
         (store) => store.clients,
         { collectionName: 'clients' }
     );
@@ -106,15 +107,11 @@ export function useClients() {
         })
     ), [readCurrentClients, resolution, updateClient]);
 
-    const deleteClient = useCallback((id: string) => {
-        const deleted = remove(id);
-
-        if (deleted && isReady) {
-            cleanupAttachmentsForEntity(store.plannerAttachments as any, id);
-        }
-
-        return deleted;
-    }, [remove, store, isReady]);
+    const deleteClient = useCallback(async (id: string, options: { alsoDeleteProjects?: boolean; includeInvoiceDeletion?: boolean } = {}) => {
+        await deleteWorkspaceRecords(store, { ...options, kind: 'client', id });
+        markMeaningfulActivity('client_delete');
+        return true;
+    }, [store]);
 
     return {
         // Data

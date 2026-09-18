@@ -324,7 +324,7 @@ const ExpenseModal = ({
     const { clients } = useClients();
     const { projects, getProjectsByClient } = useProjects();
     const { businessInfos, defaultBusinessInfo } = useBusinessInfos();
-    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories({ seedDefaults: true });
+    const { expenseCategories, allExpenseCategories = expenseCategories } = useExpenseCategories();
     const { preferences } = usePreferences();
     const { paymentMethods, defaultPaymentMethod } = usePaymentMethods();
 
@@ -2060,7 +2060,7 @@ const ExpenseModal = ({
                                     <div className="flex min-h-9 items-center rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
                                         <span className={selectedBusiness?.taxNumber ? 'text-foreground' : 'text-muted-foreground'}>
                                             {formData.businessId
-                                                ? (selectedBusiness?.taxNumber || 'No tax no available in this business.')
+                                                ? (selectedBusiness?.taxNumber || 'No tax no available in this business')
                                                 : 'Select a business to see tax no.'}
                                         </span>
                                     </div>

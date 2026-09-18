@@ -54,7 +54,6 @@ import {
     setOnboardingCompleted,
     setOnboardingPending,
 } from './utils/onboardingUtils.ts';
-import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import { setUsageMetricsSessionId, startUsageMetrics } from './utils/usageMetrics.ts';
 import { buildTodoNotificationSchedules, getTodoNotificationReplaceHorizonUntil } from './utils/todoNotificationSchedule.ts';
 import { getCurrentPushSubscription, getPushSupportState, uploadPushSchedules } from './utils/pushNotificationClient.ts';
@@ -67,19 +66,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { APP_VERSION, TIMER_UPDATE_INTERVAL_MS } from './constants/app.ts';
 
-const getActiveTaskDeletePlanIds = (taskId, activeTasks) => {
-    const plan = buildTaskDeleteImpactPlan({
-        taskId,
-        activeTasks,
-        archivedTasks: [],
-        timeEntries: [],
-        timers: [],
-        invoices: [],
-        plannerAttachments: [],
-    });
-
-    return plan?.taskIdsToDelete || [taskId];
-};
 
 const Reports = lazy(() => import('./components/Reports'));
 
@@ -115,7 +101,6 @@ const MOBILE_SYNC_VISIBLE_KINDS = new Set([
     SYNC_STATUS_KIND.SYNCING,
     SYNC_STATUS_KIND.SYNCED,
 ]);
-const ONBOARDING_SEED_TASK_TITLE = 'Create my first project';
 const PUSH_SCHEDULE_SYNC_DEBOUNCE_MS = 2000;
 
 const PAGE_TITLE_MAP = {
@@ -249,7 +234,6 @@ function AppContent() {
 
     const { 
         tasks: activeTasks, 
-        createTask,
         deleteTask,
         archiveTask,
         isLoading: tasksLoading 
@@ -259,7 +243,6 @@ function AppContent() {
 
     const { 
         entries: timeEntries, 
-        deleteEntry,
         isLoading: entriesLoading 
     } = useTimeEntries();
 
@@ -314,7 +297,6 @@ function AppContent() {
     const focusedTimer = timers[0] || null;
     const timerIsActive = !!focusedTimer;
     const todayStr = useTodayString();
-    const onboardingSeedTaskCreatedRef = useRef(false);
     const lastExpenseGenerationDayRef = useRef(null);
     const expenseGenerationInFlightDayRef = useRef(null);
 
@@ -802,26 +784,16 @@ function AppContent() {
         prevActiveModalRef.current = activeModal;
     }, [activeModal, pendingTaskViewReturn, pendingExpenseViewReturn]);
 
-    const handleDeleteTask = useCallback((task) => {
+    const handleDeleteTask = useCallback(async (task) => {
         if (!task) return;
-
-        const taskIdsToDelete = task.parentTaskId
-            ? [task.id]
-            : getActiveTaskDeletePlanIds(task.id, activeTasks);
-
-        const entriesToDelete = timeEntries.filter(entry => taskIdsToDelete.includes(entry.taskId));
-        entriesToDelete.forEach(entry => deleteEntry(entry.id));
-
-        timers.forEach(timer => {
-            if (taskIdsToDelete.includes(timer.taskId)) {
-                clearTimer(timer.projectId);
-            }
-        });
-
-        taskIdsToDelete.forEach(id => deleteTask(id));
-        toast?.showSuccess('Task deleted');
+        try {
+            await deleteTask(task.id);
+            toast?.showSuccess('Task deleted');
         closeTaskView();
-    }, [activeTasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, toast, closeTaskView]);
+        } catch (error) {
+            toast?.showError(error.message || 'Unable to delete task');
+        }
+    }, [deleteTask, toast, closeTaskView]);
 
     const handleArchiveTask = useCallback((task) => {
         if (!task || task.projectId) return;
@@ -1175,17 +1147,10 @@ function AppContent() {
             setIsOnboardingPending(true);
         }
 
-        if (!onboardingSeedTaskCreatedRef.current && todayStr && !hasPersistedWorkspaceData) {
-            createTask({
-                title: ONBOARDING_SEED_TASK_TITLE,
-                note: 'Start the timer, head to projects, and create your first one.',
-                startDate: todayStr,
-            });
-            onboardingSeedTaskCreatedRef.current = true;
-        }
-
+        // Guidance must not create records before a returning user's cloud
+        // workspace has had a chance to restore into this empty browser.
         setShowOnboarding(true);
-    }, [activeView, createTask, hasPersistedWorkspaceData, isLoading, isOnboardingCompleted, isOnboardingPending, todayStr]);
+    }, [activeView, hasPersistedWorkspaceData, isLoading, isOnboardingCompleted, isOnboardingPending]);
 
     const handleCompleteOnboarding = useCallback(() => {
         setOnboardingPending(false);
@@ -1255,7 +1220,9 @@ function AppContent() {
     const needsExtraTopPadding = ['clients', 'projects', 'invoices', 'reports', 'expenses', 'account'].includes(activeView);
     const isMoreViewActive = ['clients', 'invoices', 'reports', 'account'].includes(activeView);
     const isMobilePrimarySelectionVisible = !isMoreMenuOpen;
-    const mobileTopPadding = showGlobalTimer && timerIsActive ? '4.75rem' : '1rem';
+    const mobileTopPadding = showGlobalTimer && timerIsActive
+        ? (timers.length > 1 ? 'calc(4.75rem + 5px)' : '4.75rem')
+        : '1rem';
     const mobileBottomPadding = '7rem';
     const desktopTopPadding = showGlobalTimer && timerIsActive ? '5.25rem' : needsExtraTopPadding ? '2rem' : '1.5rem';
     const desktopBottomPadding = '1.5rem';

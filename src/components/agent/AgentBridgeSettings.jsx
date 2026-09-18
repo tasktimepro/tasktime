@@ -483,7 +483,7 @@ export default function AgentBridgeSettings() {
                         )}
 
                         {visibleApprovalGrants.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No trusted approval grants.</p>
+                            <p className="text-sm text-muted-foreground">No trusted approval grants</p>
                         ) : (
                             <div className="divide-y divide-border rounded-md border border-border">
                                 {visibleApprovalGrants.map((grant) => {
@@ -546,7 +546,7 @@ export default function AgentBridgeSettings() {
                     </CardHeader>
                     <CardContent>
                         {activityHistory.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No agent activity yet.</p>
+                            <p className="text-sm text-muted-foreground">No agent activity yet</p>
                         ) : (
                             <div className="divide-y divide-border rounded-md border border-border">
                                 {activityHistory.map((activity, index) => (

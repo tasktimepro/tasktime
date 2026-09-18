@@ -14,7 +14,6 @@ import {
 import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, ChevronDownIcon, ChevronRightIcon, UserGroupIcon, SortIcon } from '@/components/ui/icons';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '../hooks/useToast.ts';
-import { useYjs } from '../contexts/YjsContext';
 import { toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useClients } from '../hooks/useClients.ts';
 import { useProjects } from '../hooks/useProjects.ts';
@@ -30,8 +29,6 @@ import ClientArchiveDialog from './modals/ClientArchiveDialog';
 import useIsMobileLayout from '../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { buildClientRecentUpdateMap, buildProjectRecentUpdateMap } from '../utils/activityUtils.ts';
-import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
-import { buildClientDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 
 /**
  * ClientList component - Displays and manages the list of clients
@@ -48,16 +45,15 @@ const ClientList = ({
     const [showArchiveProjectsModal, setShowArchiveProjectsModal] = useState(false);
     const [relatedProjects, setRelatedProjects] = useState([]);
     const { showError, showSuccess } = useToast();
-    const { store } = useYjs();
     
     // Yjs hooks for data access
     const { clients, updateClient, updateClientWithPolicyLock, deleteClient } = useClients();
-    const { projects, updateProject, deleteProject } = useProjects();
-    const { tasks, deleteTask } = useTasks();
-    const { entries: timeEntries, deleteEntry } = useTimeEntries();
-    const { invoices, deleteInvoice } = useInvoices();
-    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
-    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
+    const { projects, updateProject } = useProjects();
+    const { tasks } = useTasks();
+    const { entries: timeEntries } = useTimeEntries();
+    const { invoices } = useInvoices();
+    const { expenses } = useExpenses({ includeArchived: true });
+    const { recurrences } = useExpenseRecurrences();
     const { preferences, updatePreferences } = usePreferences();
 
     const clientSort = preferences.clientSort || 'createdAt';
@@ -139,15 +135,9 @@ const ClientList = ({
      * Handle client deletion - check for projects first
      */
     const handleDeleteClient = (clientId) => {
-        const related = getRelatedProjects(clientId);
-        if (related.length > 0) {
-            setRelatedProjects(related);
-            setClientToDelete(clients.find(c => c.id === clientId));
-            setShowDeleteModal(true);
-        } else {
-            // No related projects, can delete directly
-            performClientDeletion(clientId, false);
-        }
+        setRelatedProjects(getRelatedProjects(clientId));
+        setClientToDelete(clients.find(c => c.id === clientId));
+        setShowDeleteModal(true);
     };
 
     /**
@@ -166,84 +156,17 @@ const ClientList = ({
     };
 
     /**
-     * Perform actual client deletion (soft-delete with tombstones)
+     * Delete the confirmed client scope after loading and checking its history.
      */
-    const performClientDeletion = (clientId, alsoDeleteProjects) => {
-        const clientRelatedProjects = getRelatedProjects(clientId);
-        const deletePlan = buildClientDeleteImpactPlan({
-            clientId,
-            alsoDeleteProjects,
-            includeInvoiceDeletion: alsoDeleteProjects,
-            clients,
-            projects,
-            activeTasks: tasks,
-            archivedTasks: [],
-            timeEntries,
-            timers: [],
-            invoices,
-            expenses,
-            expenseRecurrences: recurrences,
-            plannerAttachments: [],
-        });
-
-        if (!deletePlan) {
-            return;
+    const performClientDeletion = async (clientId, alsoDeleteProjects) => {
+        try {
+            await deleteClient(clientId, { alsoDeleteProjects, includeInvoiceDeletion: alsoDeleteProjects });
+            showSuccess('Client deleted successfully');
+            return true;
+        } catch (error) {
+            showError(error.message || 'Unable to delete client');
+            return false;
         }
-
-        const applicationPlan = buildClientDeleteApplicationPlan(deletePlan);
-        
-        if (alsoDeleteProjects) {
-            // Get related projects and their task/time entry IDs
-            const relatedProjectIds = applicationPlan.projectIdsToDelete;
-            
-            // Delete tasks for related projects
-            const relatedTaskIds = applicationPlan.taskIdsToDelete;
-            
-            // Delete time entries for related tasks
-            // Note: Time entries are in a separate Yjs document (active-entries), so they cannot be included
-            // in the core document transaction below. We delete them first, but grouped in their own transaction.
-            const relatedTimeEntryIds = applicationPlan.timeEntryIdsToDelete;
-            
-            if (relatedTimeEntryIds.length > 0) {
-                store.activeEntriesDoc.transact(() => {
-                    relatedTimeEntryIds.forEach(id => deleteEntry(id));
-                });
-            }
-            
-            // Delete invoices for related projects (Invoices are in core doc)
-            const relatedInvoiceIds = applicationPlan.invoiceIdsToDelete;
-            const relatedExpenseIds = applicationPlan.expenseIdsToDelete;
-            const relatedRecurrenceIds = applicationPlan.recurrenceIdsToDelete;
-            
-            // Execute all core document deletions in a single transaction
-            // This ensures they are synced as a single atomic update
-            store.projects.doc.transact(() => {
-                relatedProjectIds.forEach(id => deleteProject(id));
-                relatedTaskIds.forEach(id => deleteTask(id));
-                relatedInvoiceIds.forEach(id => unbillExpensesForInvoice(id));
-                relatedInvoiceIds.forEach(id => deleteInvoice(id));
-                relatedExpenseIds.forEach(id => deleteExpense(id));
-                relatedRecurrenceIds.forEach(id => deleteRecurrence(id));
-                deleteClient(clientId);
-            });
-        } else {
-            // Remove client reference from projects and delete client in one transaction
-            store.projects.doc.transact(() => {
-                applicationPlan.projectConversionUpdates
-                    .forEach(({ id, updates }) => updateProject(id, updates));
-                applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
-
-                applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
-
-                deleteClient(clientId);
-            });
-        }
-
-        // Show appropriate success message
-        const message = alsoDeleteProjects 
-            ? `Client and ${clientRelatedProjects.length} related project(s) deleted successfully.`
-            : 'Client deleted successfully.';
-        showSuccess(message);
     };
 
     /**
@@ -284,9 +207,9 @@ const ClientList = ({
     /**
      * Confirm client deletion (for direct deletion without projects)
      */
-    const confirmDeleteClient = () => {
+    const confirmDeleteClient = async () => {
         if (clientToDelete) {
-            performClientDeletion(clientToDelete.id, false);
+            if (!await performClientDeletion(clientToDelete.id, false)) return;
             setClientToDelete(null);
         }
         setShowDeleteModal(false);
@@ -295,9 +218,9 @@ const ClientList = ({
     /**
      * Handle force delete client with projects
      */
-    const handleForceDelete = () => {
+    const handleForceDelete = async () => {
         if (clientToDelete) {
-            performClientDeletion(clientToDelete.id, true);
+            if (!await performClientDeletion(clientToDelete.id, true)) return;
             setShowDeleteModal(false);
             setClientToDelete(null);
             setRelatedProjects([]);
@@ -386,7 +309,7 @@ const ClientList = ({
                 <EmptyState
                     icon={UserGroupIcon}
                     title="No clients"
-                    description="Get started by creating your first client."
+                    description="Get started by creating your first client"
                     actionLabel="Create First Client"
                     actionIcon={PlusIcon}
                     onAction={() => openClientModal()}

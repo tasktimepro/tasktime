@@ -32,7 +32,6 @@ import { useToast } from '../hooks/useToast.ts';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
-import { useTimers } from '../hooks/useTimers.ts';
 import DeleteTaskWarnings from './task/DeleteTaskWarnings';
 import { getTaskDeletionBillingSummary, getTaskIdsWithDescendants } from '../utils/taskUtils.ts';
 import { buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
@@ -176,7 +175,7 @@ const TaskTree = ({
     const [showArchivedTasks, setShowArchivedTasks] = useState(false);
     const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState(null);
     const [taskSort, setTaskSort] = useState(() => getProjectTaskSort(project.taskSort));
-    const { showSuccess } = useToast();
+    const { showSuccess, showError } = useToast();
     const { updateProject } = useProjects();
     const [taskDisplay, setTaskDisplay] = useState(project.taskView === 'kanban' ? 'kanban' : 'list');
     const [activeTaskDragId, setActiveTaskDragId] = useState(null);
@@ -185,8 +184,7 @@ const TaskTree = ({
     
     // Yjs hooks for state
     const { tasks, createTask, updateTask, deleteTask } = useTasks({ projectId: project.id, includeArchived: true });
-    const { entries: timeEntries, deleteEntry } = useTimeEntries();
-    const { getTimerForProject, clearTimer } = useTimers();
+    const { entries: timeEntries } = useTimeEntries();
     const todayStr = useTodayString();
     const todayDate = useTodayDate();
     const taskListSensors = useSensors(
@@ -688,45 +686,16 @@ const TaskTree = ({
         setPendingDeleteTaskId(null);
     };
 
-    const confirmDeleteTask = useCallback(() => {
+    const confirmDeleteTask = useCallback(async () => {
         if (!pendingDeleteTaskId) return;
-
-        const taskToDelete = tasks.find(t => t.id === pendingDeleteTaskId);
-        const taskTitle = taskToDelete?.title || 'Task';
-        const isMainTask = !!(taskToDelete && !taskToDelete.parentTaskId);
-
-        const projectTimer = getTimerForProject(project.id);
-        const deleteApplication = isMainTask
-            ? getTaskDeleteApplication(pendingDeleteTaskId, tasks, timeEntries, [projectTimer].filter(Boolean))
-            : {
-                taskIdsToDelete: [pendingDeleteTaskId],
-                timeEntryIdsToDelete: timeEntries
-                    .filter(entry => entry.taskId === pendingDeleteTaskId)
-                    .map(entry => entry.id),
-                timerKeysToClear: projectTimer && projectTimer.taskId === pendingDeleteTaskId
-                    ? [project.id]
-                    : [],
-                plannerAttachmentIdsToDelete: [],
-            };
-        const taskIdsToDelete = deleteApplication.taskIdsToDelete;
-
-        // Delete time entries for these tasks
-        deleteApplication.timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
-
-        // Clear timer if it's for one of these tasks
-        deleteApplication.timerKeysToClear.forEach(timerKey => clearTimer(timerKey));
-
-        // Delete tasks
-        taskIdsToDelete.forEach(id => deleteTask(id));
-
-        // Show success message
-        const message = isMainTask && taskIdsToDelete.length > 1
-            ? `Task "${taskTitle}" and ${taskIdsToDelete.length - 1} subtask(s) deleted successfully`
-            : `Task "${taskTitle}" deleted successfully`;
-        
-        showSuccess(message);
-        setPendingDeleteTaskId(null);
-    }, [pendingDeleteTaskId, tasks, timeEntries, project.id, getTimerForProject, deleteEntry, clearTimer, deleteTask, showSuccess]);
+        try {
+            await deleteTask(pendingDeleteTaskId);
+            showSuccess('Task deleted successfully');
+            setPendingDeleteTaskId(null);
+        } catch (error) {
+            showError(error.message || 'Unable to delete task');
+        }
+    }, [pendingDeleteTaskId, deleteTask, showSuccess, showError]);
 
     /**
      * Start creating a subtask for a parent task
@@ -880,7 +849,7 @@ const TaskTree = ({
                 <EmptyState
                     icon={DocumentCheckIcon}
                     title="No tasks yet"
-                    description="Get started by creating your first task."
+                    description="Get started by creating your first task"
                     className="py-8"
                 />
             ) : (

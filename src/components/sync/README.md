@@ -13,7 +13,7 @@ compatible and must not require users to clear local or provider data.
 ## Architecture
 
 - Storage is local-first Yjs CRDT data persisted in IndexedDB.
-- `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own shared behavior. `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google-only compatibility facades. Dropbox entry points and explicit user-initiated provider transfers are deployed/enabled for approved/current accounts, with an explicit false emergency UI opt-out and independent fail-closed Worker endpoint/acquisition/transfer controls. No transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary.
+- `YjsCloudSyncProvider` in `providers/CloudSyncProvider.ts`, `CloudManifestManager`, and `CloudBackupManager` own shared behavior. `GoogleDriveProvider.ts` remains a compatibility re-export only. `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google-only compatibility facades. Dropbox entry points and explicit user-initiated provider transfers are deployed/enabled for approved/current accounts, with an explicit false emergency UI opt-out and independent fail-closed Worker endpoint/acquisition/transfer controls. No transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary.
 - The selected provider adapter stores Yjs base-state files, delta files, and one
   manifest in Google Drive appDataFolder or Dropbox App Folder.
 - The Worker retains OAuth code exchange, encrypted refresh-token storage, access-token issuance, and revocation. Routine Google Drive and Dropbox requests go directly from the browser to the selected provider.
@@ -94,6 +94,15 @@ The visible sync-status control remains navigable to Account > Cloud Sync during
 - Yjs CRDT updates are the authority for normal concurrent edits/deletes.
 - Remote updates should be rejected only if the binary update is corrupt.
 - Reference-integrity validation warnings must not block CRDT convergence.
+- Validate semantic integrity after a successful complete connection/sync pass,
+  including its base states, deltas, and required reconciliation. Local archive
+  presence is not remote readiness: every loaded document must contain the
+  current manifest revision before reference checks run. References into an
+  unloaded task/invoice archive remain deferred until its local state and any
+  remote revision are loaded, even when no cloud archive exists yet.
+  A genuinely missing reference is reported without deleting its source record;
+  an empty task collection does not make an orphaned entry valid. Repeated
+  identical unresolved warnings are coalesced within the provider session.
 - Invalid entities should be filtered or normalized at read/import boundaries.
 - Persisted-data normalization and cross-document reconciliation must be idempotent and emit no Yjs update once data is settled.
 - Cross-document references can be temporarily incomplete while lazy docs load.
@@ -114,6 +123,13 @@ The visible sync-status control remains navigable to Account > Cloud Sync during
 
 ## Pending Local Changes
 
+- Subscribe to local updates before connection I/O. Edits during connection
+  setup remain queued without starting an automatic sync against a disconnected
+  provider. After successful automatic-mode setup, retry only remaining local
+  work; failed setup retains it for recovery. Include lazy documents opened
+  during the connection pass. Manual bootstrap only pulls existing remote
+  documents, even if a local edit arrives during the download; it never uploads
+  or compacts them. Those edits wait for explicit Sync Now.
 - Local Yjs updates are queued as pending deltas while connected.
 - Local dirty/retry and disconnected-dirty evidence is scoped by durable provider ID plus connection generation. Existing generation-zero Google reads and mirrors `tasktime-sync-state` and `tasktime-disconnected-dirty-docs` so old tabs/builds retain recovery evidence; another provider or generation must never inherit or clear those legacy Google records.
 - Dirty docs must be marked for full-state upload on reconnect.
@@ -223,6 +239,6 @@ Check these before committing:
 
 Recommended tests after changes:
 
-- `make npm CMD="run test:run -- src/stores/yjs/YjsStore.test.js src/stores/yjs/providers/GoogleDriveProvider.test.js src/stores/yjs/providers/ManifestManager.test.js src/stores/yjs/validation.test.js src/stores/yjs/sampleBackupFixture.test.js src/components/sync/YjsSyncSettings.test.jsx src/components/sync/YjsSyncStatus.test.jsx src/components/sync/syncStatusDescriptor.test.js src/components/Account.test.jsx src/utils/syncPersistence.test.js"`
+- `make npm CMD="run test:run -- src/stores/yjs/YjsStore.test.js src/stores/yjs/providers/CloudSyncProvider.test.js src/stores/yjs/providers/ManifestManager.test.js src/stores/yjs/validation.test.js src/stores/yjs/sampleBackupFixture.test.js src/components/sync/YjsSyncSettings.test.jsx src/components/sync/YjsSyncStatus.test.jsx src/components/sync/syncStatusDescriptor.test.js src/components/Account.test.jsx src/utils/syncPersistence.test.js"`
 - `make build`
 - `make lint`

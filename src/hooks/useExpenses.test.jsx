@@ -787,6 +787,23 @@ describe('useExpenses', () => {
         expect(store.expenses.has('claimed')).toBe(true)
     })
 
+    it('reports a confirmed active deletion as successful and does not repeat it', () => {
+        const { store, loadArchivedExpenses } = buildStore({
+            active: [buildExpense({ id: 'new-expense' })],
+        })
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedExpenses })
+
+        const { result } = renderHook(() => useExpenses())
+
+        let deleted
+        act(() => {
+            deleted = result.current.deleteExpense('new-expense')
+        })
+        expect(deleted).toBe(true)
+        expect(store.expenses.has('new-expense')).toBe(false)
+        expect(result.current.deleteExpense('new-expense')).toBe(false)
+    })
+
     it('updates and deletes archived expenses when includeArchived is enabled', async () => {
         const { store, loadArchivedExpenses } = buildStore({
             archived: [buildExpense({ id: 'arch-1', amount: 15 })],
@@ -810,10 +827,12 @@ describe('useExpenses', () => {
 
         expect(readStored(store.archivedExpenses, 'arch-1')).toEqual(expect.objectContaining({ amount: 25 }))
 
+        let deleted
         act(() => {
-            result.current.deleteExpense('arch-1')
+            deleted = result.current.deleteExpense('arch-1')
         })
 
+        expect(deleted).toBe(true)
         expect(store.archivedExpenses.has('arch-1')).toBe(false)
     })
 

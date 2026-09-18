@@ -15,6 +15,20 @@ All persisted entities use string identifiers. Timestamps are epoch milliseconds
 
 Movement between documents must preserve entity identifiers and references.
 
+Explicit local persistence barriers await completion of a read/write transaction
+on y-indexeddb's existing `updates` store. They merge on-disk updates with current
+Yjs state before atomically compacting that store, retaining unseen writes from
+other tabs and deletion markers. A marker in the separate `custom` store is not
+a data-commit acknowledgement. Unhydrated or failed persistence rejects the
+barrier; this changes no database schema or entity contract.
+
+New browser workspaces contain no starter records. Empty collections do not
+authorize automatic seeding, including after a user deletes all categories or
+before cloud restore. Previously saved starter tasks and default categories
+remain ordinary persisted records; this policy does not change their schema,
+identity, archive state, references, import/export, or sync behavior. Missing
+preferences use read-time application defaults without populating the saved map.
+
 Tasks, time entries, invoices, and expenses may carry additive
 `_archiveTransition` metadata (`operationId`, `targetDoc`, `changedAt`). New
 cross-document moves write their destination first and retain this identity so
@@ -130,6 +144,13 @@ Supported finalized legacy invoices may retain composer `tasks[]` records with p
 The core Yjs document contains an internal `invoiceBillingOperations` map for cross-document finalization, undo, and cancellation recovery. Version 1 records have a stable operation ID, invoice ID, operation kind (`finalize|undo|cancel`), created/updated timestamps, prepared/complete state, last completed phase, and the deterministic desired-state application plan. Finalization records retain the desired invoice; undo records retain the removed invoice as reversal evidence; cancellation records retain the original invoice evidence, immutable cancellation metadata, deterministic source-release plan, and stable result counts.
 
 The journal is written before product data is mutated, is replayed at startup for pending operations, and is replayed after sync for both pending and completed operations so late-arriving document updates converge. Before the first cancellation journal write, the store revalidates the current persisted invoice eligibility; the persisted cancellation application is constrained to cancellation metadata and the documented source-release fields so a malformed plan cannot mutate unrelated invoice or source data. Replay must be conditional and idempotent: it must not replace a newer invoice payment state, a newer task cutoff, a different invoice's entry/expense/quote claim, a later project invoice reference, or an advanced template sequence. Completed cancellation replay also discovers late-arriving entries, adjustments, expenses, and quoted-task claims that still name the canceled invoice and releases only those claims; task cutoffs are restored only when their current value still equals the cancellation operation's expected final cutoff. A persisted terminal cancellation is the narrow exception for stale same-invoice sent/payment state from a pre-cancellation view: replay reasserts canceled and clears only that invoice's stale payment metadata while leaving other invoices and external systems untouched. Cancellation retains project links and never changes template sequence. Journal records are sync metadata in the core document and are intentionally omitted from portable backups; export must finish any pending operation before creating a backup snapshot.
+
+Completed finalization replay requires the invoice to still exist in its active
+or archived placement with a finalized status. It must not recreate an invoice
+that was subsequently deleted or reapply claims after cancellation or a return
+to draft. Completed replay also must not recreate a synthetic invoice adjustment
+whose task was explicitly deleted. Pending operation recovery remains responsible for creating its
+prepared desired invoice. This adds no journal fields or backup schema changes.
 
 ### ExpenseCategory
 

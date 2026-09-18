@@ -2,6 +2,8 @@
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { useTasks } from './useTasks'
+import { deleteWorkspaceRecords } from '@/stores/yjs/workspaceDeletion'
+import * as Y from 'yjs'
 import { useYjs } from '@/contexts/YjsContext'
 import { useYjsCollection } from './useYjsCollection'
 import * as recurringUtils from '@/utils/recurringUtils.ts'
@@ -10,6 +12,7 @@ import { createTestYMap } from '@/test/yjs-test-helpers'
 
 vi.mock('@/contexts/YjsContext', () => ({ useYjs: vi.fn() }))
 vi.mock('./useYjsCollection', () => ({ useYjsCollection: vi.fn() }))
+vi.mock('@/stores/yjs/workspaceDeletion', () => ({ deleteWorkspaceRecords: vi.fn() }))
 
 const mockUseYjs = useYjs
 const mockUseYjsCollection = useYjsCollection
@@ -120,151 +123,37 @@ describe('useTasks', () => {
         expect(loadArchivedTasks).not.toHaveBeenCalled()
     })
 
-    it('deletes archived tasks from the archived doc and updates archived state', async () => {
-        const archivedMap = createTestYMap({
-            archivedTask: { id: 'archivedTask', projectId: null, archived: true, parentTaskId: null },
-        })
-
-        const remove = vi.fn(() => false)
-        const loadArchivedTasks = vi.fn(async () => {})
-
-        mockUseYjs.mockReturnValue({
-            store: { archivedTasks: archivedMap, archiveTask: vi.fn(), unarchiveTask: vi.fn(), plannerAttachments: createTestYMap() },
-            isReady: true,
-            loadArchivedTasks,
-        })
-
-        mockUseYjsCollection.mockReturnValue({
-            items: [],
-            isLoading: false,
-            get: vi.fn(),
-            create: vi.fn(),
-            update: vi.fn(),
-            remove,
-        })
-
+    it.each(['active', 'archived'])('awaits the complete deletion before updating %s task state', async (placement) => {
+        const tasks = new Y.Doc().getMap('tasks')
+        const archivedTasks = new Y.Doc().getMap('tasks')
+        const target = placement === 'active' ? tasks : archivedTasks
+        target.set('task', { id: 'task', title: 'Task' })
+        const store = { tasks, archivedTasks, loadArchivedTasks: vi.fn(async () => archivedTasks) }
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedTasks: store.loadArchivedTasks })
+        mockUseYjsCollection.mockReturnValue({ items: [], isLoading: false, get: vi.fn(), create: vi.fn(), update: vi.fn() })
+        let finish
+        deleteWorkspaceRecords.mockImplementationOnce(() => new Promise(resolve => { finish = () => { target.delete('task'); resolve() } }))
         const { result } = renderHook(() => useTasks({ includeArchived: true }))
-
-        await waitFor(() => expect(result.current.archivedLoaded).toBe(true))
-
-        await act(async () => {
-            await result.current.deleteTask('archivedTask')
-        })
-
-        expect(remove).toHaveBeenCalledWith('archivedTask')
-        expect(loadArchivedTasks).not.toHaveBeenCalled()
-        await waitFor(() => expect(result.current.archivedTasks).toEqual([]))
+        let operation
+        act(() => { operation = result.current.deleteTask('task') })
+        expect(target.has('task')).toBe(true)
+        expect(deleteWorkspaceRecords).toHaveBeenCalledWith(store, { kind: 'task', id: 'task' })
+        await act(async () => { finish(); await operation })
+        expect(target.has('task')).toBe(false)
+        expect(result.current.archivedTasks).toEqual([])
     })
 
-    it('cleans up planner attachments when deleting an active task', async () => {
-        const plannerAttachments = createTestYMap({
-            'att-1': { id: 'att-1', type: 'task', referenceId: 't1' },
-            'att-2': { id: 'att-2', type: 'project', referenceId: 'p1' },
-        })
-        const remove = vi.fn(() => true)
-
-        mockUseYjs.mockReturnValue({
-            store: { archivedTasks: null, archiveTask: vi.fn(), unarchiveTask: vi.fn(), plannerAttachments },
-            isReady: true,
-            loadArchivedTasks: vi.fn(async () => {}),
-        })
-        mockUseYjsCollection.mockReturnValue({
-            items: [{ id: 't1', projectId: null, archived: false, parentTaskId: null }],
-            isLoading: false,
-            get: vi.fn(),
-            create: vi.fn(),
-            update: vi.fn(),
-            remove,
-        })
-
-        const { result } = renderHook(() => useTasks())
-
-        await act(async () => {
-            await result.current.deleteTask('t1')
-        })
-
-        expect(remove).toHaveBeenCalledWith('t1')
-        expect(plannerAttachments.has('att-1')).toBe(false)
-        expect(plannerAttachments.has('att-2')).toBe(true)
-    })
-
-    it('cascades descendant deletes across active and archived task collections', async () => {
-        const plannerAttachments = createTestYMap({
-            'att-parent': { id: 'att-parent', type: 'task', referenceId: 'parent' },
-            'att-child': { id: 'att-child', type: 'task', referenceId: 'child' },
-            'att-grandchild': { id: 'att-grandchild', type: 'task', referenceId: 'grandchild' },
-        })
-        const archivedMap = createTestYMap({
-            grandchild: { id: 'grandchild', projectId: null, archived: true, parentTaskId: 'child' },
-        })
-        const remove = vi.fn((id) => id === 'parent' || id === 'child')
-
-        mockUseYjs.mockReturnValue({
-            store: { archivedTasks: archivedMap, archiveTask: vi.fn(), unarchiveTask: vi.fn(), plannerAttachments },
-            isReady: true,
-            loadArchivedTasks: vi.fn(async () => {}),
-        })
-        mockUseYjsCollection.mockReturnValue({
-            items: [
-                { id: 'parent', projectId: null, archived: false, parentTaskId: null },
-                { id: 'child', projectId: null, archived: false, parentTaskId: 'parent' },
-            ],
-            isLoading: false,
-            get: vi.fn(),
-            create: vi.fn(),
-            update: vi.fn(),
-            remove,
-        })
-
+    it('propagates deletion failure and keeps archived state available for retry', async () => {
+        const tasks = new Y.Doc().getMap('tasks')
+        const archivedTasks = new Y.Doc().getMap('tasks')
+        archivedTasks.set('task', { id: 'task', title: 'Task' })
+        const store = { tasks, archivedTasks }
+        mockUseYjs.mockReturnValue({ store, isReady: true, loadArchivedTasks: vi.fn() })
+        mockUseYjsCollection.mockReturnValue({ items: [], isLoading: false, get: vi.fn(), create: vi.fn(), update: vi.fn() })
+        deleteWorkspaceRecords.mockRejectedValueOnce(new Error('Unable to persist'))
         const { result } = renderHook(() => useTasks({ includeArchived: true }))
-        await waitFor(() => expect(result.current.archivedLoaded).toBe(true))
-
-        await act(async () => {
-            await result.current.deleteTask('parent')
-        })
-
-        expect(remove).toHaveBeenCalledWith('parent')
-        expect(remove).toHaveBeenCalledWith('child')
-        expect(remove).toHaveBeenCalledWith('grandchild')
-        expect(archivedMap.has('grandchild')).toBe(false)
-        expect(plannerAttachments.has('att-parent')).toBe(false)
-        expect(plannerAttachments.has('att-child')).toBe(false)
-        expect(plannerAttachments.has('att-grandchild')).toBe(false)
-    })
-
-    it('cleans up planner attachments when deleting an archived task', async () => {
-        const plannerAttachments = createTestYMap({
-            'att-1': { id: 'att-1', type: 'task', referenceId: 'archivedTask' },
-            'att-2': { id: 'att-2', type: 'task', referenceId: 'other' },
-        })
-        const archivedMap = createTestYMap({
-            archivedTask: { id: 'archivedTask', projectId: null, archived: true, parentTaskId: null },
-        })
-        const remove = vi.fn(() => false)
-
-        mockUseYjs.mockReturnValue({
-            store: { archivedTasks: archivedMap, archiveTask: vi.fn(), unarchiveTask: vi.fn(), plannerAttachments },
-            isReady: true,
-            loadArchivedTasks: vi.fn(async () => {}),
-        })
-        mockUseYjsCollection.mockReturnValue({
-            items: [],
-            isLoading: false,
-            get: vi.fn(),
-            create: vi.fn(),
-            update: vi.fn(),
-            remove,
-        })
-
-        const { result } = renderHook(() => useTasks({ includeArchived: true }))
-        await waitFor(() => expect(result.current.archivedLoaded).toBe(true))
-
-        await act(async () => {
-            await result.current.deleteTask('archivedTask')
-        })
-
-        expect(plannerAttachments.has('att-1')).toBe(false)
-        expect(plannerAttachments.has('att-2')).toBe(true)
+        await expect(result.current.deleteTask('task')).rejects.toThrow('Unable to persist')
+        expect(result.current.archivedTasks.map(task => task.id)).toEqual(['task'])
     })
 
     it('repairs orphaned active subtasks once archived tasks are available', async () => {

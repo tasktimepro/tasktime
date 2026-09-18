@@ -12,7 +12,7 @@ vi.mock('@/utils/debugbundle', () => ({
     captureDebugBundleIncident: captureDebugBundleIncidentSpy,
 }))
 
-import { CloudProviderMovedError, YjsCloudSyncProvider, YjsDriveProvider } from './GoogleDriveProvider.ts'
+import { CloudProviderMovedError, YjsCloudSyncProvider, YjsDriveProvider } from './CloudSyncProvider.ts'
 import { CloudFileStoreError } from './CloudFileStore.ts'
 import { getSyncPersistenceState, markPendingChanges } from '@/utils/syncPersistence'
 
@@ -454,13 +454,13 @@ describe('YjsDriveProvider', () => {
             isDirty: vi.fn(() => false),
             save: vi.fn(async () => {}),
         }
-        provider.syncDoc = vi.fn(async () => {})
+        provider.pullDoc = vi.fn(async () => {})
         provider.subscribeToDoc = vi.fn()
 
         await provider.connect('manual', { bootstrapPullIfPristine: true })
 
         expect(provider.manifest.load).toHaveBeenCalled()
-        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.pullDoc).toHaveBeenCalledWith('core', expect.any(Y.Doc))
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
     })
 
@@ -475,12 +475,12 @@ describe('YjsDriveProvider', () => {
             isDirty: vi.fn(() => true),
             save: vi.fn(async () => {}),
         }
-        provider.syncDoc = vi.fn(async () => {})
+        provider.pullDoc = vi.fn(async () => {})
         provider.subscribeToDoc = vi.fn()
 
         await provider.connect('manual', { bootstrapPullIfPristine: true })
 
-        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.pullDoc).toHaveBeenCalledWith('core', expect.any(Y.Doc))
         expect(provider.manifest.save).not.toHaveBeenCalled()
     })
 
@@ -716,7 +716,7 @@ describe('YjsDriveProvider', () => {
         await provider.connect('sync')
 
         expect(getDoc).toHaveBeenCalledWith('entries-2026')
-        expect(provider.syncDoc).toHaveBeenCalledWith('entries-2026')
+        expect(provider.syncDoc).toHaveBeenCalledWith('entries-2026', true)
         expect(getSyncPersistenceState()).toEqual(expect.objectContaining({
             hasPendingChanges: false,
             pendingDocNames: [],
@@ -949,13 +949,13 @@ describe('YjsDriveProvider', () => {
             isDirty: vi.fn(() => false),
             save: vi.fn(async () => {}),
         }
-        provider.syncDoc = vi.fn(async () => {})
+        provider.pullDoc = vi.fn(async () => {})
         provider.subscribeToDoc = vi.fn()
 
         await provider.connect('manual', { bootstrapPullIfPristine: true })
 
-        expect(provider.syncDoc).toHaveBeenCalledTimes(1)
-        expect(provider.syncDoc).toHaveBeenCalledWith('core', true)
+        expect(provider.pullDoc).toHaveBeenCalledTimes(1)
+        expect(provider.pullDoc).toHaveBeenCalledWith('core', expect.any(Y.Doc))
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('core')
         expect(provider.subscribeToDoc).toHaveBeenCalledWith('expenses-archived')
     })
@@ -2271,7 +2271,7 @@ describe('YjsDriveProvider', () => {
         expect(liveDoc.getMap('projects').get('project-1').get('title')).toBe('Recovered From Fresh File ID')
     })
 
-    it('applies remote updates with broken references but logs a warning', () => {
+    it('retains broken-reference updates and warns when the pass is complete', () => {
         const liveDoc = new Y.Doc()
 
         const remoteDoc = new Y.Doc()
@@ -2294,6 +2294,8 @@ describe('YjsDriveProvider', () => {
         // CRDT convergence takes priority — update is applied despite reference issues
         expect(applied).toBe(true)
         expect(liveDoc.getMap('projects').get('project-1').get('title')).toBe('Broken Project')
+        expect(warnSpy).not.toHaveBeenCalled()
+        provider.validateSettledRemoteState()
         expect(warnSpy).toHaveBeenCalled()
 
         warnSpy.mockRestore()

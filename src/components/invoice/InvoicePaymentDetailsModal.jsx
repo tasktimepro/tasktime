@@ -317,7 +317,7 @@ const InvoicePaymentDetailsModal = ({
                         title="Stored payment conversion"
                         description={snapshot
                             ? `${formatCurrency(snapshot.sourceAmount, snapshot.sourceCurrency)} was recorded as ${formatCurrency(snapshot.preferredCurrencyAmount, snapshot.preferredCurrencyAtPayment)} (${formatRateInput(storedExchangeRate)}).`
-                            : 'No stored payment conversion exists yet.'}
+                            : 'No stored payment conversion exists yet'}
                     />
                 ) : (
                     liveRateError ? (

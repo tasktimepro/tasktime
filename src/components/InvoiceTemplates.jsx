@@ -303,7 +303,7 @@ const InvoiceTemplates = ({
                 <div className="text-center py-12">
                     <DocumentDuplicateIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-2 text-sm font-medium text-foreground">No templates</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Get started by creating your first invoice template.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Get started by creating your first invoice template</p>
                     <div className="mt-6">
                         <Button
                             onClick={() => openTemplateModal && openTemplateModal()}

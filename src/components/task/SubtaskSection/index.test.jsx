@@ -1,7 +1,8 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SubtaskSection from './index';
+vi.mock('@/hooks/useToast', () => ({ useToast: () => ({ showError: vi.fn() }) }));
 
 const hookState = vi.hoisted(() => ({
     tasks: [],
@@ -191,7 +192,7 @@ describe('SubtaskSection sorting', () => {
         hookState.isMobileLayout = false;
     });
 
-    it('opens a confirmation modal for subtask delete and only deletes on confirm', () => {
+    it('opens a confirmation modal for subtask delete and only deletes on confirm', async () => {
         const showSuccess = vi.fn();
         const subtasks = [
             { id: 's1', title: 'Subtask 1', completed: false, lastActive: 200 },
@@ -221,11 +222,9 @@ describe('SubtaskSection sorting', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Delete Subtask 1' }));
         fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-        expect(hookState.deleteEntry).toHaveBeenCalledWith('e1');
-        expect(hookState.deleteEntry).not.toHaveBeenCalledWith('e2');
-        expect(hookState.clearTimer).toHaveBeenCalledWith('p1');
+        expect(hookState.deleteEntry).not.toHaveBeenCalled();
         expect(hookState.deleteTask).toHaveBeenCalledWith('s1');
-        expect(showSuccess).toHaveBeenCalledWith('Subtask "Subtask 1" deleted successfully');
+        await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('Subtask deleted successfully'));
     });
 
     it('shows billed and unbilled warnings for subtask deletion when applicable', () => {

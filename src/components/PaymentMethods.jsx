@@ -92,7 +92,7 @@ const PaymentMethods = ({
                 <div className="text-center py-12">
                     <CreditCardIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h4 className="mt-2 text-sm font-medium text-foreground">No payment methods</h4>
-                    <p className="mt-1 text-sm text-muted-foreground">Get started by creating your first payment method.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Get started by creating your first payment method</p>
 
                     <div className="mt-6">
                         <Button

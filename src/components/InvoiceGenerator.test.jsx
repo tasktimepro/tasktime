@@ -2131,7 +2131,7 @@ describe('InvoiceGenerator', () => {
         })
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
-        expect(await screen.findByTestId('billing-period-preset')).toHaveTextContent('last-month')
+        await waitFor(() => expect(screen.getByTestId('billing-period-preset')).toHaveTextContent('last-month'))
 
         await user.click(screen.getByRole('button', { name: 'Save Invoice' }))
         await waitFor(() => {
@@ -2141,6 +2141,6 @@ describe('InvoiceGenerator', () => {
         modalConfig.billingPeriodPreset = null
 
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
-        expect(await screen.findByTestId('billing-period-preset')).toHaveTextContent('all-time')
+        await waitFor(() => expect(screen.getByTestId('billing-period-preset')).toHaveTextContent('all-time'))
     })
 })

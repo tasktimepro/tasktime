@@ -74,8 +74,8 @@ it('offers complete category and activity detail and opens the exact source expe
     expect(screen.getByText(/combined chart is unavailable/)).toBeInTheDocument();
     expect(screen.getByText(/Unavailable conversions/)).toBeInTheDocument();
     rerender(<ExpenseInsights overview={overview({ expenses: [] })} currency="EUR" periodLabel="This month" />);
-    expect(screen.getByText('No recent activity.')).toBeInTheDocument();
-    expect(screen.getByText('No paid expenses in this period.')).toBeInTheDocument();
+    expect(screen.getByText('No recent activity')).toBeInTheDocument();
+    expect(screen.getByText('No paid expenses in this period')).toBeInTheDocument();
 });
 
 it('makes monthly amounts available in an accessible table and keyboard tooltip', async () => {

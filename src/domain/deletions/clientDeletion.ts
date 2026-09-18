@@ -1,4 +1,5 @@
 import { invoiceBelongsToProject, isMultiProjectInvoice } from '@/utils/invoiceUtils';
+import { hasExplicitBillingMarker } from '@/domain/invoices/invoiceEligibility';
 import type { Client, Expense, ExpenseRecurrence, Invoice, MultiTimerState, PlannerAttachment, Project, Task, TimeEntry } from '@/stores/yjs/types';
 
 export interface ClientDeleteImpactPlan {
@@ -74,7 +75,7 @@ export function buildClientDeleteImpactPlan(input: BuildClientDeleteImpactPlanIn
     const billedTimeEntryIds = input.timeEntries
         .filter((entry) => (
             taskIdSet.has(entry.taskId)
-            && Boolean(entry.billedAt || entry.billedInvoiceId)
+            && hasExplicitBillingMarker(entry)
         ))
         .map((entry) => entry.id)
         .sort();

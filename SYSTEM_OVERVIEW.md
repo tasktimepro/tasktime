@@ -16,7 +16,19 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **React context identity:** Yjs and billing context objects live in UI-independent
   shared modules so lazy Reports imports after development hot updates retain
   their mounted providers. Store lifecycle and entitlement policy are unchanged.
+- **Explicit deletion:** Browser hooks and agent commands share archive-aware
+  deletion in `workspaceDeletion.ts`. Complete-history preflight and local
+  persistence barriers keep dependent cleanup ahead of parent deletion; known
+  unapplied cloud history requires Sync Now. Existing or offline-concurrent
+  orphan records are retained for explicit recovery, never automatically erased.
 - **Local persistence:** Yjs documents persisted to IndexedDB through `y-indexeddb`.
+  Explicit durability barriers merge persisted/current updates and await the
+  atomic data transaction's commit, preserving unseen cross-tab work; incomplete
+  hydration and aborted writes cannot acknowledge a successful mutation.
+- **First load:** Workspace collections start empty. Onboarding and category
+  reads never seed records, so a fresh browser remains eligible for pristine
+  cloud restore until actual user work exists. Existing starter records remain
+  saved data; preference defaults are read-time fallbacks.
 - **Cloud sync:** Production supports direct browser-to-Google Drive and direct browser-to-Dropbox App Folder sync with short-lived memory-only access tokens. The provider-neutral lifecycle shares sync, manifest, backup, hosted-service identity, agent behavior, and explicit user-initiated transfer while Worker controls fail closed independently for endpoints, new Dropbox connections, and transfers. Connections and transfers are deployed/enabled for approved/current accounts; no transfer starts automatically. Broad Dropbox availability to new public users remains gated on Dropbox App Console production access followed by the non-destructive post-approval sign-in/token/direct-file canary. Routine file bodies bypass the Worker. Dropbox's verified connected-account email is read browser-to-provider and retained in the origin-local auth record; the Worker keeps its pseudonymous subject for identity and entitlement. Only when the user explicitly starts paid Checkout may the browser submit that verified email as a separate billing contact for the mapped Stripe Customer. A verified moved-source marker stops automatic reconnects, primarily directs the user to the recorded destination, and permits source reuse only through an explicit source-only wipe followed by a push-only seed from the complete local workspace.
 - **Shared Google auth UI:** Storage re-reads clear signed-in identity when the
   shared session is absent, so local disconnect updates every mounted account
@@ -234,6 +246,10 @@ See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
   discarded on transport failure, and delayed billing side effects are fenced
   to the initiating account. Browser/agent client writes re-read the plan at
   lock acquisition rather than retaining an earlier Pro decision.
+- Cloud connection queues concurrent edits before I/O and defers automatic
+  retry until setup completes. Manual bootstrap is strictly pull-only. Semantic
+  remote validation runs after complete passes, using manifest revision readiness
+  for loaded documents and deferring references into unloaded archives.
 - Schema changes are additive or explicitly migrated and tested against historical data.
 - UI badges, invoice composition, and agent invoice commands share the same read-only eligibility operation. Current billing ranges include the complete selected end date and assign cross-midnight entries by their local start date; finalized legacy invoices with markerless source entries retain conservative historical period matching.
 - Invoice composition normalizes finite browser numeric values before preview and persistence; finalization reuses those semantics, reconciles only compatible duplicate task/project-breakdown copies, preserves supported merged-task pricing inheritance, and fails before claiming source records when financial evidence or merged topology conflicts.

@@ -614,13 +614,13 @@ const InvoiceTaskSelector = ({
                             if (totalAvailableTasks === 0) {
                                 return (
                                     <Notice
-                                        title="No billable tasks selected. Add a task or mark one as billable."
+                                        title="No billable tasks selected; add a task or mark one as billable"
                                     />
                                 );
                             } else if (selectedTasksCount === 0 && additionalTasks.length === 0) {
                                 return (
                                     <Notice
-                                        title="Please select or create at least one task to bill."
+                                        title="Please select or create at least one task to bill"
                                         className="mt-2"
                                     />
                                 );

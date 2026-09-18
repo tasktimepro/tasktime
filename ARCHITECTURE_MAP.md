@@ -12,7 +12,7 @@ Browser / PWA
 ├── src/config/localReviewPricing.ts       Shared loopback app + public pricing review values
 ├── src/stores/yjs/
 │   ├── YjsStore.ts                        Store facade and cross-document operations
-│   ├── YjsDocManager.ts                   Multi-document lifecycle + IndexedDB
+│   ├── YjsDocManager.ts                   Multi-document lifecycle + committed IndexedDB barriers
 │   ├── validation.ts + types.ts           Persisted schema boundary
 │   └── providers/                         Shared cloud-sync core + Google/Dropbox adapters
 ├── src/agent/
@@ -65,6 +65,10 @@ Production topology (independently approved artifact deployments)
   see `contracts/site-distribution.md`.
 - Components call hooks or focused domain/application functions; they do not create parallel persistence paths.
 - Hooks expose Yjs-backed collections and mutations through `YjsContext`/`YjsStore`.
+- `App.jsx` onboarding and `useExpenseCategories` only present existing data;
+  neither creates starter records on mount. Explicit creation stays in the
+  normal forms/hooks. Empty collections retain the existing store/provider
+  pristine-device restore path without a separate seeding or cleanup lifecycle.
 - Invoice UI hooks and agent commands share `stores/yjs/invoiceDraftOperations.ts`
   for guarded save, refresh, delete and finalization. `domain/invoices/invoiceDraftDocument.ts`
   translates existing UI composer snapshots and canonical agent lines. Source
@@ -135,6 +139,8 @@ Production topology (independently approved artifact deployments)
   surround the original `ExpenseList`; `ExpenseSpendingChart` reuses the
   precached Recharts bundle. See the Expenses overview in
   `spec/designs/billing-and-finance.md` for scopes and currency fallbacks.
+- `YjsCloudSyncProvider` lives in `providers/CloudSyncProvider.ts`; the previous
+  `GoogleDriveProvider.ts` module is a compatibility re-export.
 - `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own the provider-neutral algorithm; `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google compatibility facades. Provider-neutral context/UI APIs expose Dropbox by default; an explicit build-time false value is an emergency UI opt-out, while matching Worker controls remain the fail-closed runtime boundary.
 - `YjsContext.disconnectActiveCloudSession(...)` owns the active provider/session/generation lifecycle boundary used by Cloud Sync settings, Account sign-out/deletion, and agent deletion. User-facing flows expose only Disconnect and Wipe data & disconnect; provider-specific revoke and local-session operations remain internal adapters.
 - Sync providers operate on Yjs document updates and manifests; they do not redefine entity business rules. Operational recovery keys are scoped by durable provider ID and connection generation, while generation-zero Google mirrors the legacy keys for rolling compatibility.
@@ -210,6 +216,10 @@ Production topology (independently approved artifact deployments)
   domain interval validation after loading entry history and archived tasks.
   It rechecks the timer before writing so asynchronous loading cannot overwrite
   a concurrent lifecycle change or edit. Note-only updates retain their interval.
+- `stores/yjs/workspaceDeletion.ts` connects existing domain impact plans to complete
+  loaded history, provider revision readiness, financial preflight and durable
+  dependent-before-parent mutations. Task/project/client hooks and agent command
+  adapters share it; view-filtered arrays are not a deletion authority.
 - Invoice finalization, undo, and terminal cancellation use shared application plans under `src/domain/invoices/` plus the replay-safe `invoiceBillingOperations` journal in `YjsStore`; shared invoice number/task-record helpers keep composer values and compatible duplicate task snapshots canonical before source mutation, and browser/agent adapters do not calculate source release independently.
 - The local bridge transports commands but does not become a second data owner.
 - The native OpenClaw plugin is a lifecycle/tool adapter around the existing bridge. It starts services only in the full Gateway runtime, does not duplicate TaskTime command/security logic, and leaves generic stdio hosts supported.

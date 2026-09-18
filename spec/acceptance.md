@@ -10,6 +10,14 @@
 
 ## Local-first and compatibility
 
+- Empty-state titles and descriptions use no full stops across the app, including
+  shared EmptyState, custom list/tab placeholders, and no-data form/report notices.
+- First load, onboarding completion/reload, and opening or cancelling expense
+  and category forms leave a fresh workspace empty. Categories are created only
+  by explicit user actions; deleting the last category does not reseed on reopen
+  or reload. A later pristine-device cloud restore adds only saved remote records,
+  preserving legacy starter tasks and default/custom/archived categories without
+  inserting, deduplicating, or deleting records. Preference fallbacks remain reads.
 - A returning user can open an existing supported IndexedDB dataset after an upgrade without clearing browser data.
 - A supported historical backup or Drive record is validated/migrated and retains valid relationships.
 - Offline use allows local work; unavailable cloud actions fail visibly without corrupting local state.
@@ -38,6 +46,19 @@
 
 - Users can manage clients, projects, tasks/subtasks, notes, planner attachments, and goals through the corresponding screens.
 - A subtask cannot be configured as recurring.
+- Confirmed task/project/client deletion includes lazy yearly entries and archive
+  documents, removes matching records from all supported placements, and retains
+  unrelated work and protected financial records. Missing cloud history asks for
+  Sync Now without changing the selected sync mode. Approval/safety checks occur
+  before mutation; interrupted persistence retains remaining parents for retry.
+  Persistence acknowledgement waits for the data transaction to commit, retains
+  unseen persisted cross-tab updates, and rejects incomplete hydration or aborts.
+  Success waits for durable local completion, and cancel does not mutate data.
+  New references are rechecked before parent deletion. Existing or later-arriving
+  orphaned records remain retained for explicit recovery decisions.
+- Replaying a completed invoice finalization does not recreate a deleted invoice,
+  duplicate an archived invoice into core, or re-bill sources after cancellation
+  or a return to draft. Pending finalization recovery remains supported.
 - Two projects may have timers concurrently, but a project cannot hold two active timer states.
 - Pause/resume preserves elapsed duration without creating an entry.
 - The timer editor offers Today/Yesterday and Start Time with a live interval
@@ -62,6 +83,9 @@
   An open editor cannot overwrite newer pause/resume state, and a stale menu
   action cannot reverse an already completed action.
 - Category add/edit uses a separate modal and the existing Color Tag picker.
+  An empty active-category list uses the shared EmptyState with the category
+  icon and creation guidance; when archived categories exist, the copy also
+  points to restoration. The existing header Add category action stays visible.
   Its action is aligned opposite the active-category heading and the form is
   wider than a standard small form. Original colors and neutral fallbacks are
   consistent across selectors, expenses, Planner, reports, and category summaries;
@@ -168,8 +192,9 @@
   present. Amounts align left beside their icons, with screen-reader labels and
   no visible Work/Expenses labels. Separate currencies wrap without page
   overflow. Neighboring metric cards remain equal in height on mobile and desktop.
-  Their phone scroll rails and the Planner phone day selector have no extra
-  bottom padding; each remains horizontally scrollable without page overflow.
+  Their phone scroll rails and the Planner phone day selector leave 2px below
+  the cards so their lower edges are visible; each remains horizontally
+  scrollable without page overflow.
 
 - Today keeps task/recurrence/timer/expense actions. Its task rows keep the
   timer shortcut and open task details through the title; time entry and task
@@ -179,8 +204,12 @@
   remain in task and expense details. On phones, Today and Upcoming use a
   full-width title line and a supporting-text/date line for tasks and expenses.
   Expense totals stay beside their titles; task checkboxes and expense icons
-  center vertically beside their rows. Today's timer stays with the task date,
-  and its expense pay action stays available below the date when applicable.
+  center against the title and supporting text when present, or against the
+  title alone otherwise. Task schedule badges sit at the right below any
+  project/note preview, or directly below the title when no preview exists;
+  today's timer sits immediately beside the badge. Expense dates and eligible
+  pay actions share a right-aligned row below any supplier/note, or directly
+  below the title when that supporting text is absent.
   Task project/note previews stop after two lines on phones. The preview uses
   plain note text so clipped links cannot receive hidden focus; the full note
   and its links remain available in task details. Desktop note presentation is
@@ -191,11 +220,25 @@
   collapsed list shows at most five items; its button says “Show N more” using
   the hidden-item count, then “Show less” when expanded. Expanding or collapsing
   does not change the heading total.
+- Upcoming dated task and expense badges show a compact occurrence date in the
+  browser's short-month format with a calendar icon. Recurring expense previews
+  keep the recurrence icon but show the actual occurrence date instead of the
+  repeat rule. Tomorrow remains a relative label. Today, overdue, and other
+  schedule tags keep their existing behavior; the widget's item selection and
+  actions do not change.
+- On phones, the Tasks widget centers each available checkbox against its
+  title and project/note preview, or against the title alone when no preview
+  exists. The schedule, duration, timer, time-entry, and menu row remains below
+  that content. Project/note previews stop after two lines and show plain note
+  text so clipped links cannot receive hidden focus; desktop links and layout
+  remain unchanged.
 - Today keeps completed task rows and expenses paid today visible for confirmation,
   without their date/recurrence/Overdue badges. Reopening a task or marking an
   expense unpaid restores the applicable schedule/overdue badge. Future fixed
   automatic expense occurrences retain their upcoming schedule even if stored
   with a paid status. These display rules do not rewrite dates or payment history.
+- Disabled Today task rows dim their content while keeping list dividers at the
+  normal border visibility.
 - When one task has an unpaused timer, other tasks in the same project cannot
   open the task-details modal from Today, Upcoming, or the Dashboard Tasks card.
   Their title controls are natively disabled and overdue dates do not remain an
@@ -204,10 +247,12 @@
 - A running task timer uses the same animated danger-color dot in Planner and
   the global timer; the indicator exposes a non-color accessible label.
 - With an active global timer on phones, page content begins about 14px below
-  the collapsed timer card. When more timers are available, the "+N more" label
-  keeps its original position and does not overlap the page content.
+  the collapsed card for a single timer. When more timers are available, the
+  shared phone content offset adds 5px below the card to clear the "+N more"
+  label; the timer card and label keep their positions. Removing the extra
+  timer restores the single-timer spacing. Desktop spacing is unchanged.
 - At phone widths, Today and Upcoming precede horizontally scrollable summary
-  cards in DOM order. The summary rail has no extra bottom padding and spans
+  cards in DOM order. The summary rail leaves 2px below the cards and spans
   both phone edges while the first card starts at the 16px content inset.
   Cards scroll past the left edge, the next card remains visible on the right,
   and the last card keeps a 16px right inset. The page itself has no horizontal
@@ -289,7 +334,7 @@
   restores the view, and nested archived-record updates refresh it.
 - Phones keep original list actions ahead of the analytical panels, with a
   horizontally scrollable summary rail and no page overflow at 320px. The rail
-  has no extra bottom padding and spans both phone edges. The first card starts
+  leaves 2px below the cards and spans both phone edges. The first card starts
   at the 16px content inset, cards scroll past the left edge, the next card
   remains visible on the right, and the last card keeps a 16px right inset.
   Desktop places the analytical panels above the original tabs/list.
@@ -630,6 +675,16 @@
   prohibited billing/provider/invoice/email payloads.
 
 ## Sync modes
+
+- Google Drive and Dropbox retain edits made during initial connection without
+  an early disconnected sync attempt. Automatic modes flush remaining edits
+  after setup; Manual bootstrap leaves them pending for Sync Now. Dashboard
+  history opened during connection joins the pass and remains subscribed.
+- Base/delta sequences, archive arrival order, and interrupted pulls do not emit
+  premature missing-reference warnings. Successful complete passes still report
+  genuinely missing references, including entries with no remaining tasks;
+  data is retained, corrupt binary updates fail, and lazy task/invoice archives
+  trigger their deferred checks when available.
 
 - Manual mode auto-connects but does not normally pull/push without “Sync Now,” except documented pristine-device bootstrap.
 - Backup mode automatically pushes pending local changes and does not automatically pull normal remote changes on focus/online triggers.

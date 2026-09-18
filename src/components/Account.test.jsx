@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Account from './Account';
 
@@ -337,6 +337,40 @@ describe('Account', () => {
             message: `All data was deleted and ${providerName} was disconnected`,
         });
         expect(accountLayoutMocks.showSuccess).not.toHaveBeenCalled();
+    });
+
+    it('replaces the delete icon with the standard spinner while account deletion is pending', async () => {
+        accountLayoutMocks.isCloudConnected = true;
+        accountLayoutMocks.activeStorageProvider = 'dropbox';
+        accountLayoutMocks.activeSection = 'data';
+        let failWipe;
+        accountLayoutMocks.wipeCloudData.mockImplementation(() => new Promise((_, reject) => {
+            failWipe = reject;
+        }));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        renderAccount();
+        fireEvent.click(screen.getByRole('button', { name: 'Delete All Account Data' }));
+        fireEvent.change(screen.getByLabelText(/delete all data/i), {
+            target: { value: 'delete all data' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Delete All Data' }));
+
+        const deletingButton = screen.getByRole('button', { name: 'Deleting...' });
+        expect(deletingButton).toBeDisabled();
+        expect(deletingButton.firstElementChild).toHaveClass('animate-spin');
+        expect(deletingButton.querySelectorAll('svg')).toHaveLength(1);
+        fireEvent.click(deletingButton);
+        expect(accountLayoutMocks.wipeCloudData).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            failWipe(new Error('Provider unavailable'));
+        });
+
+        const retryButton = screen.getByRole('button', { name: 'Delete All Data' });
+        expect(retryButton).toBeEnabled();
+        expect(retryButton.querySelector('.animate-spin')).toBeNull();
+        expect(accountLayoutMocks.clearAllData).not.toHaveBeenCalled();
     });
 
     it('syncs Dropbox before signing out and clearing local data', async () => {

@@ -1,3 +1,4 @@
+import { useToast } from '@/hooks/useToast';
 import { useCallback, useMemo, useState } from 'react';
 import {
     closestCenter,
@@ -22,12 +23,9 @@ import { Notice } from '@/components/ui/notice';
 import { Button } from '@/components/ui/button';
 import { useTasks } from '../../../hooks/useTasks';
 import { useTimeEntries } from '../../../hooks/useTimeEntries';
-import { useTimers } from '../../../hooks/useTimers';
 import { useProjects } from '../../../hooks/useProjects';
 import DeleteTaskWarnings from '../DeleteTaskWarnings';
 import { getTaskDeletionBillingSummary } from '../../../utils/taskUtils.ts';
-import { buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
-import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import useIsMobileLayout from '../../../hooks/useIsMobileLayout';
 import { cn } from '@/lib/utils';
 import { toStorageDate } from '../../../utils/dateUtils.ts';
@@ -105,8 +103,8 @@ const SubtaskSection = ({
     });
     // Yjs hooks for state
     const { tasks, updateTask, deleteTask } = useTasks();
-    const { entries: timeEntries, deleteEntry } = useTimeEntries();
-    const { timers, clearTimer } = useTimers();
+    const { showError } = useToast();
+    const { entries: timeEntries } = useTimeEntries();
     const { projects } = useProjects();
     const [pendingDeleteSubtaskId, setPendingDeleteSubtaskId] = useState(null);
     const [showArchivedSubtasks, setShowArchivedSubtasks] = useState(false);
@@ -197,45 +195,16 @@ const SubtaskSection = ({
         setPendingDeleteSubtaskId(null);
     }, []);
 
-    const confirmDeleteSubtask = useCallback(() => {
-
+    const confirmDeleteSubtask = useCallback(async () => {
         if (!pendingDeleteSubtaskId) return;
-
-        const subtaskToDelete = pendingDeleteSubtask
-            || subtasks.find((item) => item.id === pendingDeleteSubtaskId)
-            || null;
-
-        const subtaskTitle = subtaskToDelete?.title || 'Subtask';
-        const deleteImpactPlan = buildTaskDeleteImpactPlan({
-            taskId: pendingDeleteSubtaskId,
-            activeTasks: subtasks.filter((subtask) => !subtask.archived),
-            archivedTasks: subtasks.filter((subtask) => subtask.archived),
-            timeEntries,
-            timers,
-            invoices: [],
-            plannerAttachments: [],
-        });
-        const deleteApplication = deleteImpactPlan
-            ? buildTaskDeleteApplicationPlan(deleteImpactPlan)
-            : {
-                taskIdsToDelete: [pendingDeleteSubtaskId],
-                timeEntryIdsToDelete: timeEntries
-                    .filter((entry) => entry.taskId === pendingDeleteSubtaskId)
-                    .map((entry) => entry.id),
-                timerKeysToClear: timers
-                    .filter((timer) => timer.taskId === pendingDeleteSubtaskId)
-                    .map((timer) => timer.projectId),
-                plannerAttachmentIdsToDelete: [],
-            };
-
-        deleteApplication.timeEntryIdsToDelete.forEach((entryId) => deleteEntry(entryId));
-
-        deleteApplication.timerKeysToClear.forEach((timerKey) => clearTimer(timerKey));
-
-        deleteApplication.taskIdsToDelete.forEach((taskId) => deleteTask(taskId));
-        showSuccess(`Subtask "${subtaskTitle}" deleted successfully`);
-        setPendingDeleteSubtaskId(null);
-    }, [pendingDeleteSubtaskId, pendingDeleteSubtask, subtasks, timeEntries, timers, deleteEntry, clearTimer, deleteTask, showSuccess]);
+        try {
+            await deleteTask(pendingDeleteSubtaskId);
+            showSuccess('Subtask deleted successfully');
+            setPendingDeleteSubtaskId(null);
+        } catch (error) {
+            showError(error.message || 'Unable to delete subtask');
+        }
+    }, [pendingDeleteSubtaskId, deleteTask, showSuccess, showError]);
 
     const handleSubtaskDragEnd = useCallback((event) => {
         if (!manualSortEnabled) return;

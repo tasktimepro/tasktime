@@ -867,13 +867,13 @@ const InvoicesList = ({
                  tabType === 'canceled' ? 'No canceled invoices' : 'No paid invoices'}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-                {tabType === 'draft' ? 'Save an invoice as a draft to finish preparing it later.' : tabType === 'outstanding'
-                    ? 'You have no current invoices awaiting payment.'
+                {tabType === 'draft' ? 'Save an invoice as a draft to finish preparing it later' : tabType === 'outstanding'
+                    ? 'You have no current invoices awaiting payment'
                     : tabType === 'overdue'
-                    ? 'All your invoices are up to date.'
+                    ? 'All your invoices are up to date'
                     : tabType === 'canceled'
-                    ? 'Canceled invoices remain here as read-only historical records.'
-                    : 'No invoices have been marked as paid yet.'
+                    ? 'Canceled invoices remain here as read-only historical records'
+                    : 'No invoices have been marked as paid yet'
                 }
             </p>
         </div>
@@ -1288,7 +1288,7 @@ const InvoicesList = ({
             <EmptyState
                 icon={DocumentTextIcon}
                 title="No invoices yet"
-                description="Get started by generating your first invoice."
+                description="Get started by generating your first invoice"
                 actionLabel={!hideNewInvoiceButton ? "Create First Invoice" : undefined}
                 actionIcon={!hideNewInvoiceButton ? PlusIcon : undefined}
                 onAction={!hideNewInvoiceButton ? () => onEditInvoice && onEditInvoice(null) : undefined}

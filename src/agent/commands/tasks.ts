@@ -1,9 +1,7 @@
+import { deleteWorkspaceRecords, loadWorkspaceDeletionSources } from '@/stores/yjs/workspaceDeletion';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { toStorageDate } from '@/utils/dateUtils';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
-import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
-import { collectEntities } from '@/stores/yjs/entityUtils';
-import { buildProjectDeleteApplicationPlan, buildTaskDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { buildTaskDeleteImpactPlan } from '@/domain/deletions/taskDeletion';
 import type { Client, Expense, ExpenseRecurrence, Invoice, MultiTimerState, PlannerAttachment, Project, Task, TimeEntry } from '@/stores/yjs/types';
@@ -327,20 +325,8 @@ export async function previewDeleteProjectCommand(context: AgentCommandContext, 
     assertPermission(context, 'read');
 
     const projectId = requireString(input.projectId, 'projectId');
-    const archivedMap = await context.store.loadArchivedTasks();
-    const plan = buildProjectDeleteImpactPlan({
-        projectId,
-        includeInvoiceDeletion: input.includeInvoiceDeletion === true,
-        projects: collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent preview delete project lookup'),
-        activeTasks: collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent preview delete project active tasks'),
-        archivedTasks: collectValidatedEntities<Task>('tasks', archivedMap as any, 'agent preview delete project archived tasks'),
-        timeEntries: context.store.getAllTimeEntries() as TimeEntry[],
-        timers: collectValidatedEntities<MultiTimerState>('timers', context.store.timers as any, 'agent preview delete project timers'),
-        invoices: collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent preview delete project invoices'),
-        expenses: collectValidatedEntities<Expense>('expenses', context.store.expenses as any, 'agent preview delete project expenses'),
-        expenseRecurrences: collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', context.store.expenseRecurrences as any, 'agent preview delete project recurrences'),
-        plannerAttachments: collectEntities<PlannerAttachment>(context.store.plannerAttachments as any),
-    });
+    const sources = await loadWorkspaceDeletionSources(context.store);
+    const plan = buildProjectDeleteImpactPlan({ ...sources, projectId, includeInvoiceDeletion: input.includeInvoiceDeletion === true });
 
     if (!plan) {
         throw new AgentCommandError('NOT_FOUND', 'Project not found.', { projectId });
@@ -378,41 +364,15 @@ export async function cascadeDeleteProjectCommand(context: AgentCommandContext, 
         });
     }
 
-    const archivedMap = await context.store.loadArchivedTasks();
-    let removedPlannerAttachmentCount = 0;
-    const applicationPlan = buildProjectDeleteApplicationPlan(preview);
-
-    context.store.activeEntriesDoc.transact(() => {
-        applicationPlan.timeEntryIdsToDelete.forEach((entryId) => {
-            context.store.activeTimeEntries.delete(entryId);
-        });
+    await deleteWorkspaceRecords(context.store, { kind: 'project', id: projectId }, {
+        validateRemaining: current => {
+            if (!current.canCascadeDeleteSafely) throw new AgentCommandError('CONFLICT', 'Billing references changed during deletion. The remaining work was kept.');
+        },
+        validate: current => {
+            if (JSON.stringify(current) !== JSON.stringify(preview)) throw new AgentCommandError('CONFLICT', 'Deletion scope changed. Preview it again before deleting.');
+        },
     });
-
-    context.store.coreDoc.transact(() => {
-        applicationPlan.timerKeysToClear.forEach((timerKey) => {
-            context.store.timers.delete(timerKey);
-        });
-
-        applicationPlan.expenseIdsToDelete.forEach((expenseId) => {
-            context.store.expenses.delete(expenseId);
-        });
-
-        applicationPlan.recurrenceIdsToDelete.forEach((recurrenceId) => {
-            context.store.expenseRecurrences.delete(recurrenceId);
-        });
-
-        applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
-            context.store.tasks.delete(deleteTaskId);
-            removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, deleteTaskId);
-        });
-
-        context.store.projects.delete(applicationPlan.projectIdToDelete);
-        removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, projectId);
-    });
-
-    applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
-        archivedMap.delete(deleteTaskId);
-    });
+    const removedPlannerAttachmentCount = preview.plannerAttachmentIdsToDelete.length;
 
     markMeaningfulActivity('project_delete');
 
@@ -435,20 +395,8 @@ export async function deleteProjectCommand(context: AgentCommandContext, input: 
 
     const projectId = requireString(input.projectId, 'projectId');
     assertConfirmedDelete(input, projectId, 'project');
-    const archivedMap = await context.store.loadArchivedTasks();
-    const plan = buildProjectDeleteImpactPlan({
-        projectId,
-        includeInvoiceDeletion: false,
-        projects: collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent delete project lookup'),
-        activeTasks: collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent delete project active task refs'),
-        archivedTasks: collectValidatedEntities<Task>('tasks', archivedMap as any, 'agent delete project archived task refs'),
-        timeEntries: context.store.getAllTimeEntries() as TimeEntry[],
-        timers: collectValidatedEntities<MultiTimerState>('timers', context.store.timers as any, 'agent delete project timer refs'),
-        invoices: collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent delete project invoice refs'),
-        expenses: collectValidatedEntities<Expense>('expenses', context.store.expenses as any, 'agent delete project expense refs'),
-        expenseRecurrences: collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', context.store.expenseRecurrences as any, 'agent delete project recurrence refs'),
-        plannerAttachments: collectEntities<PlannerAttachment>(context.store.plannerAttachments as any),
-    });
+    const sources = await loadWorkspaceDeletionSources(context.store);
+    const plan = buildProjectDeleteImpactPlan({ ...sources, projectId });
 
     if (!plan) {
         throw new AgentCommandError('NOT_FOUND', 'Project not found.', { projectId });
@@ -475,11 +423,15 @@ export async function deleteProjectCommand(context: AgentCommandContext, input: 
         });
     }
 
-    let removedPlannerAttachmentCount = 0;
-    context.store.coreDoc.transact(() => {
-        context.store.projects.delete(projectId);
-        removedPlannerAttachmentCount = cleanupAttachmentsForEntity(context.store.plannerAttachments as any, projectId);
+    await deleteWorkspaceRecords(context.store, { kind: 'project', id: projectId }, {
+        validateRemaining: current => {
+            if (!current.canCascadeDeleteSafely) throw new AgentCommandError('CONFLICT', 'Billing references changed during deletion. The remaining work was kept.');
+        },
+        validate: current => {
+            if (JSON.stringify(current) !== JSON.stringify(plan)) throw new AgentCommandError('CONFLICT', 'Deletion scope changed. Preview it again before deleting.');
+        },
     });
+    const removedPlannerAttachmentCount = plan.plannerAttachmentIdsToDelete.length;
 
     markMeaningfulActivity('project_delete');
 
@@ -650,16 +602,8 @@ export async function previewDeleteTaskCommand(context: AgentCommandContext, inp
     assertPermission(context, 'read');
 
     const taskId = requireString(input.taskId, 'taskId');
-    const archivedMap = await context.store.loadArchivedTasks();
-    const plan = buildTaskDeleteImpactPlan({
-        taskId,
-        activeTasks: collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent preview delete task active refs'),
-        archivedTasks: collectValidatedEntities<Task>('tasks', archivedMap as any, 'agent preview delete task archived refs'),
-        timeEntries: context.store.getAllTimeEntries() as TimeEntry[],
-        timers: collectValidatedEntities<MultiTimerState>('timers', context.store.timers as any, 'agent preview delete task timers'),
-        invoices: collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent preview delete task invoices'),
-        plannerAttachments: collectEntities<PlannerAttachment>(context.store.plannerAttachments as any),
-    });
+    const sources = await loadWorkspaceDeletionSources(context.store);
+    const plan = buildTaskDeleteImpactPlan({ ...sources, taskId });
 
     if (!plan) {
         throw new AgentCommandError('NOT_FOUND', 'Task not found.', { taskId });
@@ -692,33 +636,15 @@ export async function cascadeDeleteTaskCommand(context: AgentCommandContext, inp
         });
     }
 
-    const archivedMap = await context.store.loadArchivedTasks();
-    const taskIdSet = new Set(preview.taskIdsToDelete);
-    let removedPlannerAttachmentCount = 0;
-    const applicationPlan = buildTaskDeleteApplicationPlan(preview);
-
-    context.store.activeEntriesDoc.transact(() => {
-        applicationPlan.timeEntryIdsToDelete.forEach((entryId) => {
-            context.store.activeTimeEntries.delete(entryId);
-        });
+    await deleteWorkspaceRecords(context.store, { kind: 'task', id: taskId }, {
+        validateRemaining: current => {
+            if (!current.canCascadeDeleteSafely) throw new AgentCommandError('CONFLICT', 'Billing references changed during deletion. The remaining work was kept.');
+        },
+        validate: current => {
+            if (JSON.stringify(current) !== JSON.stringify(preview)) throw new AgentCommandError('CONFLICT', 'Deletion scope changed. Preview it again before deleting.');
+        },
     });
-
-    context.store.coreDoc.transact(() => {
-        applicationPlan.timerKeysToClear.forEach((timerKey) => {
-            context.store.timers.delete(timerKey);
-        });
-
-        applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
-            context.store.tasks.delete(deleteTaskId);
-            removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, deleteTaskId);
-        });
-    });
-
-    applicationPlan.taskIdsToDelete.forEach((deleteTaskId) => {
-        if (taskIdSet.has(deleteTaskId)) {
-            archivedMap.delete(deleteTaskId);
-        }
-    });
+    const removedPlannerAttachmentCount = preview.plannerAttachmentIdsToDelete.length;
 
     markMeaningfulActivity('task_delete');
 
@@ -739,16 +665,8 @@ export async function deleteTaskCommand(context: AgentCommandContext, input: Del
 
     const taskId = requireString(input.taskId, 'taskId');
     assertConfirmedDelete(input, taskId, 'task');
-    const archivedMap = await context.store.loadArchivedTasks();
-    const plan = buildTaskDeleteImpactPlan({
-        taskId,
-        activeTasks: collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent delete task active refs'),
-        archivedTasks: collectValidatedEntities<Task>('tasks', archivedMap as any, 'agent delete task archived refs'),
-        timeEntries: context.store.getAllTimeEntries() as TimeEntry[],
-        timers: collectValidatedEntities<MultiTimerState>('timers', context.store.timers as any, 'agent delete task timer refs'),
-        invoices: collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent delete task invoices'),
-        plannerAttachments: collectEntities<PlannerAttachment>(context.store.plannerAttachments as any),
-    });
+    const sources = await loadWorkspaceDeletionSources(context.store);
+    const plan = buildTaskDeleteImpactPlan({ ...sources, taskId });
 
     if (!plan) {
         throw new AgentCommandError('NOT_FOUND', 'Task not found.', { taskId });
@@ -764,19 +682,15 @@ export async function deleteTaskCommand(context: AgentCommandContext, input: Del
         });
     }
 
-    let removedPlannerAttachmentCount = 0;
-
-    context.store.coreDoc.transact(() => {
-        if (!plan.archived) {
-            context.store.tasks.delete(taskId);
-        }
-
-        removedPlannerAttachmentCount = cleanupAttachmentsForEntity(context.store.plannerAttachments as any, taskId);
+    await deleteWorkspaceRecords(context.store, { kind: 'task', id: taskId }, {
+        validateRemaining: current => {
+            if (!current.canCascadeDeleteSafely) throw new AgentCommandError('CONFLICT', 'Billing references changed during deletion. The remaining work was kept.');
+        },
+        validate: current => {
+            if (JSON.stringify(current) !== JSON.stringify(plan)) throw new AgentCommandError('CONFLICT', 'Deletion scope changed. Preview it again before deleting.');
+        },
     });
-
-    if (plan.archived) {
-        archivedMap.delete(taskId);
-    }
+    const removedPlannerAttachmentCount = plan.plannerAttachmentIdsToDelete.length;
 
     markMeaningfulActivity('task_delete');
 

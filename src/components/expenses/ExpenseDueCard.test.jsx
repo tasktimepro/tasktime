@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExpenseDueCard from './ExpenseDueCard'
+import { toDisplayDate } from '@/utils/dateUtils.ts'
 
 describe('ExpenseDueCard', () => {
     it('keeps the amount and actions visible in a compact dashboard column on desktop', () => {
@@ -175,6 +176,30 @@ describe('ExpenseDueCard', () => {
     })
 
     it.each([
+        [false, null, 'lucide-calendar-days'],
+        [true, { repeat: 'monthly', monthlyType: 'date', monthlyDay: 19 }, 'lucide-refresh-cw'],
+    ])('shows the dated Upcoming badge for recurring=%s expenses', (_recurring, recurrence, iconClass) => {
+        render(<ExpenseDueCard
+            upcoming
+            expense={{ id: 'future-expense', title: 'Subscription', date: '2026-02-21', amount: 19, currency: 'EUR', paymentStatus: 'unpaid' }}
+            recurrence={recurrence}
+        />)
+
+        const badge = screen.getByText(toDisplayDate('2026-02-21', { month: 'short', day: 'numeric' }))
+        expect(badge.querySelector('svg')).toHaveClass(iconClass)
+        expect(screen.queryByText('Monthly (19th)')).not.toBeInTheDocument()
+    })
+
+    it('keeps the recurrence icon when an occurrence has no loaded schedule record', () => {
+        render(<ExpenseDueCard
+            upcoming
+            expense={{ id: 'orphan-occurrence', title: 'Subscription', date: '2026-02-21', isRecurring: true, paymentStatus: 'unpaid' }}
+        />)
+
+        expect(screen.getByText(toDisplayDate('2026-02-21', { month: 'short', day: 'numeric' })).querySelector('svg')).toHaveClass('lucide-refresh-cw')
+    })
+
+    it.each([
         { mobile: false, recurring: false },
         { mobile: true, recurring: false },
         { mobile: false, recurring: true },
@@ -251,7 +276,7 @@ describe('ExpenseDueCard', () => {
         expect(screen.getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
     })
 
-    it('keeps the mobile pay action available below the date', () => {
+    it('keeps the mobile pay action beside the date after supporting text', () => {
         setMatchMedia(true)
 
         const expense = {
@@ -275,8 +300,23 @@ describe('ExpenseDueCard', () => {
         const secondaryRow = screen.getByTestId('expense-row-secondary-exp-7')
         const actionsRow = screen.getByTestId('expense-row-actions-exp-7')
 
-        expect(secondaryRow).not.toContainElement(actionsRow)
+        expect(secondaryRow).toContainElement(actionsRow)
+        expect(screen.getByTestId('expense-row-content-exp-7').nextElementSibling).toBe(secondaryRow)
+        expect(secondaryRow).toHaveClass('row-start-2')
         expect(within(actionsRow).getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
         expect(screen.getByText('A1')).toBeInTheDocument()
+    })
+
+    it('moves the phone date and pay action directly below a title without supporting text', () => {
+        setMatchMedia(true)
+        render(<ExpenseDueCard
+            expense={{ id: 'no-meta', title: 'Hosting renewal', date: '2026-02-06', amount: 18, currency: 'EUR', amountType: 'fixed' }}
+            onMarkPaid={vi.fn()}
+        />)
+
+        const secondaryRow = screen.getByTestId('expense-row-secondary-no-meta')
+        expect(secondaryRow).toHaveClass('row-start-2')
+        expect(within(secondaryRow).getByText('Today')).toBeInTheDocument()
+        expect(within(secondaryRow).getByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
     })
 })

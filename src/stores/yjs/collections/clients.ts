@@ -86,7 +86,9 @@ export function createClientHelpers(clients: Y.Map<string, Client>): ClientHelpe
         },
 
         delete(id: string): boolean {
-            return clients.delete(id);
+            if (!clients.has(id)) return false;
+            clients.delete(id);
+            return true;
         },
 
         observe(callback: () => void): () => void {

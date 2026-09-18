@@ -1,10 +1,8 @@
+import { deleteWorkspaceRecords, loadWorkspaceDeletionSources } from '@/stores/yjs/workspaceDeletion';
 import { markMeaningfulActivity } from '@/utils/usageMetrics';
 import { toStorageDate } from '@/utils/dateUtils';
 import { collectValidatedEntities } from '@/stores/yjs/validation';
-import { cleanupAttachmentsForEntity } from '@/stores/yjs/collections/plannerAttachments';
-import { collectEntities } from '@/stores/yjs/entityUtils';
 import { buildClientDeleteImpactPlan } from '@/domain/deletions/clientDeletion';
-import { buildClientDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
 import type { Client, Expense, ExpenseRecurrence, Invoice, MultiTimerState, PlannerAttachment, Project, Task, TimeEntry } from '@/stores/yjs/types';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
@@ -316,22 +314,8 @@ export async function previewDeleteClientCommand(context: AgentCommandContext, i
     assertPermission(context, 'read');
 
     const clientId = requireString(input.clientId, 'clientId');
-    const archivedMap = await context.store.loadArchivedTasks();
-    const plan = buildClientDeleteImpactPlan({
-        clientId,
-        alsoDeleteProjects: input.alsoDeleteProjects === true,
-        includeInvoiceDeletion: input.includeInvoiceDeletion === true,
-        clients: collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent preview delete client lookup'),
-        projects: collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent preview delete client projects'),
-        activeTasks: collectValidatedEntities<Task>('tasks', context.store.tasks as any, 'agent preview delete client active tasks'),
-        archivedTasks: collectValidatedEntities<Task>('tasks', archivedMap as any, 'agent preview delete client archived tasks'),
-        timeEntries: context.store.getAllTimeEntries() as TimeEntry[],
-        timers: collectValidatedEntities<MultiTimerState>('timers', context.store.timers as any, 'agent preview delete client timers'),
-        invoices: collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent preview delete client invoices'),
-        expenses: collectValidatedEntities<Expense>('expenses', context.store.expenses as any, 'agent preview delete client expenses'),
-        expenseRecurrences: collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', context.store.expenseRecurrences as any, 'agent preview delete client recurrences'),
-        plannerAttachments: collectEntities<PlannerAttachment>(context.store.plannerAttachments as any),
-    });
+    const sources = await loadWorkspaceDeletionSources(context.store);
+    const plan = buildClientDeleteImpactPlan({ ...sources, clientId, includeInvoiceDeletion: input.includeInvoiceDeletion === true, alsoDeleteProjects: input.alsoDeleteProjects === true });
 
     if (!plan) {
         throw new AgentCommandError('NOT_FOUND', 'Client not found.', { clientId });
@@ -375,58 +359,16 @@ export async function cascadeDeleteClientCommand(context: AgentCommandContext, i
         });
     }
 
-    const archivedMap = await context.store.loadArchivedTasks();
-    let removedPlannerAttachmentCount = 0;
+    await deleteWorkspaceRecords(context.store, { kind: 'client', id: clientId, alsoDeleteProjects }, {
+        validateRemaining: current => {
+            if (!current.canCascadeDeleteSafely) throw new AgentCommandError('CONFLICT', 'Billing references changed during deletion. The remaining work was kept.');
+        },
+        validate: current => {
+            if (JSON.stringify(current) !== JSON.stringify(preview)) throw new AgentCommandError('CONFLICT', 'Deletion scope changed. Preview it again before deleting.');
+        },
+    });
+    const removedPlannerAttachmentCount = preview.plannerAttachmentIdsToDelete.length;
     const deletedTaskIds = [...preview.activeTaskIdsToDelete, ...preview.archivedTaskIdsToDelete].sort();
-    const applicationPlan = buildClientDeleteApplicationPlan(preview);
-
-    context.store.activeEntriesDoc.transact(() => {
-        preview.timeEntryIdsToDelete.forEach((entryId) => {
-            context.store.activeTimeEntries.delete(entryId);
-        });
-    });
-
-    context.store.coreDoc.transact(() => {
-        preview.timerKeysToClear.forEach((timerKey) => {
-            context.store.timers.delete(timerKey);
-        });
-
-        preview.expenseIdsToDelete.forEach((expenseId) => {
-            context.store.expenses.delete(expenseId);
-        });
-
-        preview.recurrenceIdsToDelete.forEach((recurrenceId) => {
-            context.store.expenseRecurrences.delete(recurrenceId);
-        });
-
-        if (alsoDeleteProjects) {
-            applicationPlan.taskIdsToDelete.forEach((taskId) => {
-                context.store.tasks.delete(taskId);
-                removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, taskId);
-            });
-
-            applicationPlan.projectIdsToDelete.forEach((projectId) => {
-                context.store.projects.delete(projectId);
-                removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, projectId);
-            });
-        } else {
-            applicationPlan.projectConversionUpdates.forEach(({ id: projectId, updates }) => {
-                updateValidatedEntity<Project>(context.store.projects as any, 'projects', projectId, {
-                    ...updates,
-                    updatedAt: getNow(context),
-                }, `agent cascade delete client convert project ${projectId}`);
-            });
-        }
-
-        context.store.clients.delete(clientId);
-        removedPlannerAttachmentCount += cleanupAttachmentsForEntity(context.store.plannerAttachments as any, clientId);
-    });
-
-    if (alsoDeleteProjects) {
-        preview.archivedTaskIdsToDelete.forEach((taskId) => {
-            archivedMap.delete(taskId);
-        });
-    }
 
     markMeaningfulActivity('client_delete');
 
@@ -446,27 +388,14 @@ export async function cascadeDeleteClientCommand(context: AgentCommandContext, i
     };
 }
 
-export function deleteClientCommand(context: AgentCommandContext, input: DeleteClientCommandInput): DeleteClientResult {
+export async function deleteClientCommand(context: AgentCommandContext, input: DeleteClientCommandInput): Promise<DeleteClientResult> {
     assertReady(context);
     assertPermission(context, 'write');
 
     const clientId = requireString(input.clientId, 'clientId');
     assertConfirmedClientDelete(input, clientId);
-    const plan = buildClientDeleteImpactPlan({
-        clientId,
-        alsoDeleteProjects: false,
-        includeInvoiceDeletion: false,
-        clients: collectValidatedEntities<Client>('clients', context.store.clients as any, 'agent delete client lookup'),
-        projects: collectValidatedEntities<Project>('projects', context.store.projects as any, 'agent delete client project refs'),
-        activeTasks: [],
-        archivedTasks: [],
-        timeEntries: [],
-        timers: [],
-        invoices: collectValidatedEntities<Invoice>('invoices', context.store.invoices as any, 'agent delete client invoice refs'),
-        expenses: collectValidatedEntities<Expense>('expenses', context.store.expenses as any, 'agent delete client expense refs'),
-        expenseRecurrences: collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', context.store.expenseRecurrences as any, 'agent delete client recurrence refs'),
-        plannerAttachments: collectEntities<PlannerAttachment>(context.store.plannerAttachments as any),
-    });
+    const sources = await loadWorkspaceDeletionSources(context.store);
+    const plan = buildClientDeleteImpactPlan({ ...sources, clientId });
 
     if (!plan) {
         throw new AgentCommandError('NOT_FOUND', 'Client not found.', { clientId });
@@ -482,11 +411,15 @@ export function deleteClientCommand(context: AgentCommandContext, input: DeleteC
         });
     }
 
-    let removedPlannerAttachmentCount = 0;
-    context.store.coreDoc.transact(() => {
-        context.store.clients.delete(clientId);
-        removedPlannerAttachmentCount = cleanupAttachmentsForEntity(context.store.plannerAttachments as any, clientId);
+    await deleteWorkspaceRecords(context.store, { kind: 'client', id: clientId }, {
+        validateRemaining: current => {
+            if (!current.canCascadeDeleteSafely) throw new AgentCommandError('CONFLICT', 'Billing references changed during deletion. The remaining work was kept.');
+        },
+        validate: current => {
+            if (JSON.stringify(current) !== JSON.stringify(plan)) throw new AgentCommandError('CONFLICT', 'Deletion scope changed. Preview it again before deleting.');
+        },
     });
+    const removedPlannerAttachmentCount = plan.plannerAttachmentIdsToDelete.length;
 
     markMeaningfulActivity('client_delete');
 

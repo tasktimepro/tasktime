@@ -17,6 +17,10 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **DATA-4:** Preserve entity relationships during normal mutations, cascade deletion, import, export, archive, and restore.
 - **DATA-5:** Reject or safely normalize malformed external data without silently discarding valid records.
 - **DATA-6:** A persisted collection or field is not complete until every applicable storage and product consumer has been reviewed: types, validation, compatibility/migration, sync/archive, backup/export, import/restore, deletion, reports, UI, agents, and historical regression fixtures. Intentional exclusions must be specified.
+- **DATA-7:** A fresh browser starts with empty workspace collections. Onboarding,
+  collection reads, and opening forms must not create starter tasks or expense
+  categories. Empty collections remain valid after deletion, reload, and sync;
+  existing saved starter records retain their identities and relationships.
 
 ## Projects, clients, tasks, and planning
 

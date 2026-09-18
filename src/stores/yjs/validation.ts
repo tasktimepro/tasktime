@@ -896,7 +896,11 @@ function assertReference(condition: boolean, message: string): void {
 function validateSnapshotIntegrity(
     snapshot: ValidationSnapshot,
     context: string,
-    options: { validateTimeEntryTaskReferences?: boolean } = {}
+    options: {
+        validateTimeEntryTaskReferences?: boolean;
+        validateTaskReferences?: boolean;
+        validateInvoiceReferences?: boolean;
+    } = {}
 ): void {
     const projectIds = new Set(snapshot.projects.map((item) => item.id));
     const clientIds = new Set(snapshot.clients.map((item) => item.id));
@@ -914,7 +918,7 @@ function validateSnapshotIntegrity(
             assertReference(clientIds.has(project.preferredClientId), `${context}: project ${project.id} references missing client ${project.preferredClientId}`);
         }
 
-        if (project.invoiceIds) {
+        if (project.invoiceIds && options.validateInvoiceReferences !== false) {
             for (const invoiceId of project.invoiceIds) {
                 assertReference(invoiceIds.has(invoiceId), `${context}: project ${project.id} references missing invoice ${invoiceId}`);
             }
@@ -926,7 +930,7 @@ function validateSnapshotIntegrity(
             assertReference(projectIds.has(task.projectId), `${context}: task ${task.id} references missing project ${task.projectId}`);
         }
 
-        if (task.parentTaskId) {
+        if (task.parentTaskId && options.validateTaskReferences !== false) {
             assertReference(taskIds.has(task.parentTaskId), `${context}: task ${task.id} references missing parent task ${task.parentTaskId}`);
         }
     }
@@ -1013,7 +1017,7 @@ function validateSnapshotIntegrity(
             assertReference(businessInfoIds.has(expense.businessId), `${context}: expense ${expense.id} references missing business info ${expense.businessId}`);
         }
 
-        if (expense.invoiceId) {
+        if (expense.invoiceId && options.validateInvoiceReferences !== false) {
             assertReference(invoiceIds.has(expense.invoiceId), `${context}: expense ${expense.id} references missing invoice ${expense.invoiceId}`);
         }
 
@@ -1063,25 +1067,30 @@ function validateSnapshotIntegrity(
             assertReference(projectIds.has(attachment.referenceId), `${context}: planner attachment ${attachment.id} references missing project ${attachment.referenceId}`);
         }
 
-        if (attachment.type === 'task') {
+        if (attachment.type === 'task' && options.validateTaskReferences !== false) {
             assertReference(taskIds.has(attachment.referenceId), `${context}: planner attachment ${attachment.id} references missing task ${attachment.referenceId}`);
         }
     }
 
-    if (taskIds.size > 0 && options.validateTimeEntryTaskReferences) {
+    if ((taskIds.size > 0 || options.validateTaskReferences === true) && options.validateTimeEntryTaskReferences) {
         for (const entry of snapshot.timeEntries) {
             assertReference(taskIds.has(entry.taskId), `${context}: time entry ${entry.id} references missing task ${entry.taskId}`);
         }
     }
 
-    if (taskIds.size > 0) {
+    if (options.validateTaskReferences !== false && (taskIds.size > 0 || options.validateTaskReferences === true)) {
         for (const timer of snapshot.timers) {
             assertReference(taskIds.has(timer.taskId), `${context}: timer ${timer.projectId} references missing task ${timer.taskId}`);
         }
     }
 }
 
-export function validateDocManagerState(docManager: YjsDocManager, docName: DocName, candidateDoc: Y.Doc): void {
+export function validateDocManagerState(
+    docManager: YjsDocManager,
+    docName: DocName,
+    candidateDoc: Y.Doc,
+    readiness: { taskReferencesReady?: boolean; invoiceReferencesReady?: boolean } = {},
+): void {
     const loadedDocNames = new Set(docManager.getLoadedDocs());
 
     if (docName.startsWith('entries-')) {
@@ -1110,6 +1119,8 @@ export function validateDocManagerState(docManager: YjsDocManager, docName: DocN
     });
 
     validateSnapshotIntegrity(snapshot, `remote ${docName}`, {
-        validateTimeEntryTaskReferences: Boolean(archivedTasksDoc),
+        validateTimeEntryTaskReferences: readiness.taskReferencesReady ?? Boolean(archivedTasksDoc),
+        validateTaskReferences: readiness.taskReferencesReady,
+        validateInvoiceReferences: readiness.invoiceReferencesReady,
     });
 }

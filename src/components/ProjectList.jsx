@@ -15,16 +15,12 @@ import { MoreHorizontal } from 'lucide-react';
 import { fetchExchangeRates, formatCurrency, getCurrencySymbol, getProjectCurrency, normalizeCurrencyCode } from '../utils/currencyUtils.ts';
 import { toDisplayDate, toStorageDate } from '../utils/dateUtils.ts';
 import { useToast } from '../hooks/useToast.ts';
-import { useYjs } from '../contexts/YjsContext';
-import { buildProjectDeleteApplicationPlan } from '@/domain/deletions/deleteApplication';
-import { buildProjectDeleteImpactPlan } from '@/domain/deletions/projectDeletion';
 import { useProjects } from '../hooks/useProjects.ts';
 import { useTasks } from '../hooks/useTasks.ts';
 import { useTimeEntries } from '../hooks/useTimeEntries.ts';
 import { useInvoices } from '../hooks/useInvoices.ts';
 import { useExpenses } from '../hooks/useExpenses.ts';
 import { useExpenseRecurrences } from '../hooks/useExpenseRecurrences.ts';
-import { useTimers } from '../hooks/useTimers.ts';
 import { usePreferences } from '../hooks/usePreferences.ts';
 import { SORT_OPTIONS, sortItems } from '../utils/sortUtils.ts';
 import { getInvoicesForProject, isMultiProjectInvoice } from '../utils/invoiceUtils.ts';
@@ -49,17 +45,15 @@ const ProjectList = ({
     const [projectToDelete, setProjectToDelete] = useState(null);
     const [exchangeRates, setExchangeRates] = useState(null);
     const { showError, showSuccess } = useToast();
-    const { store } = useYjs();
     
     // Yjs hooks for data access
     const { projects, updateProject, deleteProject } = useProjects();
-    const { tasks, deleteTask } = useTasks();
-    const { entries: timeEntries, deleteEntry } = useTimeEntries();
-    const { invoices, deleteInvoice } = useInvoices();
+    const { tasks } = useTasks();
+    const { entries: timeEntries } = useTimeEntries();
+    const { invoices } = useInvoices();
     const { invoices: billingInvoices } = useInvoices({ includeArchived: true });
-    const { expenses, deleteExpense, unbillExpensesForInvoice } = useExpenses({ includeArchived: true });
-    const { recurrences, deleteRecurrence } = useExpenseRecurrences();
-    const { timers, clearTimer } = useTimers();
+    const { expenses } = useExpenses({ includeArchived: true });
+    const { recurrences } = useExpenseRecurrences();
     const { preferences, updatePreferences } = usePreferences();
 
     const projectSort = preferences.projectSort || 'createdAt';
@@ -188,11 +182,11 @@ const ProjectList = ({
      * Check if a project has associated invoices
      */
     const projectHasInvoices = (projectId) => {
-        return getInvoicesForProject(invoices, projectId).length > 0;
+        return getInvoicesForProject(billingInvoices, projectId).length > 0;
     };
 
     const projectHasSharedInvoices = (projectId) => {
-        return getInvoicesForProject(invoices, projectId).some((invoice) => isMultiProjectInvoice(invoice));
+        return getInvoicesForProject(billingInvoices, projectId).some((invoice) => isMultiProjectInvoice(invoice));
     };
 
     /**
@@ -218,80 +212,15 @@ const ProjectList = ({
     /**
      * Perform the actual project deletion
      */
-    const performProjectDeletion = (projectId, shouldDeleteInvoices = false) => {
-        const deletePlan = buildProjectDeleteImpactPlan({
-            projectId,
-            includeInvoiceDeletion: shouldDeleteInvoices,
-            projects,
-            activeTasks: tasks.filter(task => !task.deletedAt),
-            archivedTasks: [],
-            timeEntries,
-            timers,
-            invoices,
-            expenses,
-            expenseRecurrences: recurrences,
-            plannerAttachments: [],
-        });
-
-        if (!deletePlan) {
-            return;
+    const performProjectDeletion = async (projectId, shouldDeleteInvoices = false) => {
+        try {
+            await deleteProject(projectId, { includeInvoiceDeletion: shouldDeleteInvoices });
+            showSuccess('Project deleted successfully');
+            return true;
+        } catch (error) {
+            showError(error.message || 'Unable to delete project');
+            return false;
         }
-
-        const applicationPlan = buildProjectDeleteApplicationPlan(deletePlan);
-
-        const projectInvoicesForDelete = getInvoicesForProject(invoices, projectId);
-        const sharedInvoices = projectInvoicesForDelete.filter((invoice) => isMultiProjectInvoice(invoice));
-
-        if (shouldDeleteInvoices && sharedInvoices.length > 0) {
-            showError('This project is referenced by a shared invoice and cannot be hard-deleted. Archive the project instead.');
-            return;
-        }
-
-        const taskIdsArray = applicationPlan.taskIdsToDelete;
-
-        const projectTimer = timers.find(timer => timer.projectId === projectId);
-        if (projectTimer) {
-            clearTimer(projectId);
-        }
-
-        // Delete all time entries for deleted tasks (Separate document: entries-active)
-        const timeEntryIdsToDelete = applicationPlan.timeEntryIdsToDelete;
-            
-        if (timeEntryIdsToDelete.length > 0) {
-            // Group time entry deletions in their own transaction on the active-entries document
-            store.activeEntriesDoc.transact(() => {
-                timeEntryIdsToDelete.forEach(entryId => deleteEntry(entryId));
-            });
-        }
-
-        // Perform core updates in a single atomic transaction (projects, tasks, invoices)
-        store.projects.doc.transact(() => {
-            // Delete associated invoices if requested
-            if (shouldDeleteInvoices) {
-                projectInvoicesForDelete.forEach(invoice => unbillExpensesForInvoice(invoice.id));
-                projectInvoicesForDelete.forEach(invoice => deleteInvoice(invoice.id));
-            }
-
-            applicationPlan.expenseIdsToDelete.forEach(expenseId => deleteExpense(expenseId));
-
-            applicationPlan.recurrenceIdsToDelete.forEach(recurrenceId => deleteRecurrence(recurrenceId));
-
-            // Delete the project
-            deleteProject(applicationPlan.projectIdToDelete);
-            
-            // Delete all tasks for this project (including subtasks)
-            taskIdsArray.forEach(taskId => deleteTask(taskId));
-        });
-        
-        const deletedTaskCount = taskIdsArray.length;
-        const deletedTimeEntriesCount = timeEntryIdsToDelete.length;
-        
-        // Close the edit form if the deleted project was being edited - Removed since using modal manager
-
-        // Show appropriate success message
-        const baseMessage = `Project deleted successfully. ${deletedTaskCount} task${deletedTaskCount !== 1 ? 's' : ''} and ${deletedTimeEntriesCount} time entr${deletedTimeEntriesCount !== 1 ? 'ies' : 'y'} removed.`;
-        const invoiceMessage = shouldDeleteInvoices ? ' Associated invoices were also deleted.' : '';
-        showSuccess(baseMessage + invoiceMessage);
     };
 
     /**
@@ -515,9 +444,9 @@ const ProjectList = ({
     /**
      * Confirm project deletion (for direct deletion without invoices)
      */
-    const confirmDeleteProject = () => {
+    const confirmDeleteProject = async () => {
         if (projectToDelete) {
-            performProjectDeletion(projectToDelete.id, false);
+            if (!await performProjectDeletion(projectToDelete.id, false)) return;
             setProjectToDelete(null);
         }
         setShowDeleteModal(false);
@@ -537,9 +466,9 @@ const ProjectList = ({
     /**
      * Handle force delete project with invoices
      */
-    const handleForceDelete = () => {
+    const handleForceDelete = async () => {
         if (projectToDelete) {
-            performProjectDeletion(projectToDelete.id, true);
+            if (!await performProjectDeletion(projectToDelete.id, true)) return;
             setShowDeleteModal(false);
             setProjectToDelete(null);
         }
@@ -604,7 +533,7 @@ const ProjectList = ({
                 <EmptyState
                     icon={ProjectIcon}
                     title="No projects"
-                    description="Get started by creating your first project."
+                    description="Get started by creating your first project"
                     actionLabel="Create First Project"
                     actionIcon={PlusIcon}
                     onAction={() => openProjectModal()}

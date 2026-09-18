@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import Dashboard from './Dashboard';
 import { STALE_EXCHANGE_RATES_ERROR } from '../utils/currencyUtils';
 
@@ -12,6 +12,10 @@ const {
     mockUseCurrencyConversion,
     mockUseTasks,
     mockTimeEntries,
+    mockDeleteEntry,
+    mockTimers,
+    mockClearTimer,
+    mockRecentTasks,
     mockLoadTimeEntriesYear,
     mockGetAvailableTimeEntryYears,
     mockExpenses,
@@ -24,6 +28,10 @@ const {
     mockToDoToday: vi.fn(() => <div data-testid="todo-today">To do today</div>),
     mockUseCurrencyConversion: vi.fn(),
     mockTimeEntries: [],
+    mockDeleteEntry: vi.fn(),
+    mockTimers: [],
+    mockClearTimer: vi.fn(),
+    mockRecentTasks: vi.fn(({ taskFilter }) => <div data-testid="recent-tasks">Recent tasks {taskFilter}</div>),
     mockLoadTimeEntriesYear: vi.fn(),
     mockGetAvailableTimeEntryYears: vi.fn(),
     mockExpenses: [],
@@ -79,7 +87,7 @@ vi.mock('../hooks/useTimeEntries', () => ({
     useTimeEntries: () => ({
         entries: mockTimeEntries,
         createEntry: vi.fn(),
-        deleteEntry: vi.fn(),
+        deleteEntry: mockDeleteEntry,
         loadYear: mockLoadTimeEntriesYear,
         getAvailableYears: mockGetAvailableTimeEntryYears,
     }),
@@ -87,8 +95,8 @@ vi.mock('../hooks/useTimeEntries', () => ({
 
 vi.mock('../hooks/useTimers', () => ({
     useTimers: () => ({
-        timers: [],
-        clearTimer: vi.fn(),
+        timers: mockTimers,
+        clearTimer: mockClearTimer,
     }),
 }));
 
@@ -143,7 +151,7 @@ vi.mock('./dashboard/ToDoToday', () => ({
 }));
 
 vi.mock('./dashboard/RecentTasks', () => ({
-    default: ({ taskFilter }) => <div data-testid="recent-tasks">Recent tasks {taskFilter}</div>,
+    default: (...args) => mockRecentTasks(...args),
 }));
 
 vi.mock('./dashboard/ProjectsOverview', () => ({
@@ -157,6 +165,8 @@ vi.mock('./dashboard/MetricsCards', () => ({
 vi.mock('@/components/modals/AddTimeEntryModal', () => ({
     default: () => null,
 }));
+
+const defaultUseTasks = mockUseTasks.getMockImplementation();
 
 describe('Dashboard', () => {
     beforeEach(() => {
@@ -182,7 +192,12 @@ describe('Dashboard', () => {
         mockToDoToday.mockReset();
         mockToDoToday.mockImplementation(() => <div data-testid="todo-today">To do today</div>);
         mockUseTasks.mockClear();
+        mockUseTasks.mockImplementation(defaultUseTasks);
         mockTimeEntries.length = 0;
+        mockDeleteEntry.mockReset();
+        mockTimers.length = 0;
+        mockClearTimer.mockReset();
+        mockRecentTasks.mockClear();
         mockLoadTimeEntriesYear.mockReset();
         mockLoadTimeEntriesYear.mockResolvedValue(undefined);
         mockGetAvailableTimeEntryYears.mockReset();
@@ -229,6 +244,37 @@ describe('Dashboard', () => {
 
         expect(todo.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(metrics.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it.each([[false, false], [true, true], [false, true]])('delegates a dashboard cascade to the complete deletion hook (parent archived: %s, child archived: %s)', async (archived, childArchived) => {
+        const parent = { id: 'parent', title: 'Campaign review', projectId: 'project', archived };
+        const child = { id: 'child', title: 'Review notes', projectId: 'project', parentTaskId: parent.id, archived: childArchived };
+        const unrelated = { id: 'other', title: 'Other task', projectId: 'other-project' };
+        const deleteTask = vi.fn().mockResolvedValue(true);
+        const defaults = mockUseTasks.getMockImplementation()();
+        mockUseTasks.mockReturnValue({
+            ...defaults,
+            activeTasks: [parent, child, unrelated].filter(task => !task.archived),
+            archivedTasks: [parent, child].filter(task => task.archived),
+            deleteTask,
+        });
+        mockTimeEntries.push(
+            { id: 'parent-entry', taskId: parent.id, start: 1000, end: 2000 },
+            { id: 'child-entry', taskId: child.id, start: 2000, end: 3000 },
+            { id: 'other-entry', taskId: unrelated.id, start: 3000, end: 4000 },
+        );
+        mockTimers.push(
+            { projectId: 'project', taskId: child.id, start: Date.now(), paused: true },
+            { projectId: 'other-project', taskId: unrelated.id, start: Date.now(), paused: true },
+        );
+
+        renderDashboard();
+        const { onDeleteTask } = mockRecentTasks.mock.calls[0][0];
+        await act(async () => onDeleteTask(parent));
+
+        expect(deleteTask.mock.calls).toEqual([['parent']]);
+        expect(mockDeleteEntry).not.toHaveBeenCalled();
+        expect(mockShowSuccess).toHaveBeenCalledWith('Task deleted');
     });
 
     it('renders a disabled task title as non-interactive', () => {

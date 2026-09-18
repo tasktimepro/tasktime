@@ -263,6 +263,7 @@ function createContext(): AgentCommandContext & {
     const timers = coreDoc.getMap('timers');
     const expenses = coreDoc.getMap('expenses');
     const archivedExpenses = new Y.Doc().getMap('expenses');
+    const archivedInvoices = new Y.Doc().getMap('invoices');
     const clients = coreDoc.getMap('clients');
     const preferences = coreDoc.getMap('preferences');
     const invoices = coreDoc.getMap('invoices');
@@ -322,6 +323,10 @@ function createContext(): AgentCommandContext & {
         preferences,
         invoices,
         invoiceBillingOperations,
+        archivedInvoicesSync: archivedInvoices,
+        getLoadedDocuments: () => [coreDoc, archivedTasks.doc, archivedExpenses.doc, archivedInvoices.doc, ...loadedEntryMaps.map(map => map.doc)],
+        flushPersistence: vi.fn(async () => {}),
+        assertWorkspaceDeletionReady: vi.fn(),
         reconcileInvoiceBillingOperations: vi.fn(async () => undefined),
         invoiceTemplates,
         businessInfos,
@@ -592,7 +597,7 @@ function createContext(): AgentCommandContext & {
         setCloudSyncPreferences: vi.fn(),
         forceDriveSync: vi.fn(async () => undefined),
         forceCloudSync: vi.fn(async () => undefined),
-        loadArchivedInvoices: vi.fn(async () => coreDoc.getMap('invoices-archived')),
+        loadArchivedInvoices: vi.fn(async () => archivedInvoices),
         loadArchivedTasks: vi.fn(async () => archivedTasks),
         loadArchivedExpenses: vi.fn(async () => archivedExpenses),
         archiveTask: vi.fn(async (taskId: string) => {
@@ -679,6 +684,25 @@ function createContext(): AgentCommandContext & {
 }
 
 describe('agent commands', () => {
+    it('includes initially unloaded historical time in task deletion previews and cascades', async () => {
+        const context = createContext();
+        context.maps.tasks.set('historical-task', { id: 'historical-task', title: 'Historical work', projectId: 'project-1' });
+        const history = new Y.Doc().getMap('timeEntries');
+        history.set('historical-entry', { id: 'historical-entry', taskId: 'historical-task', start: 1, end: 60001 });
+        context.store.getAvailableYears = vi.fn(async () => [2024]);
+        context.store.loadEntriesForYear = vi.fn(async () => history) as any;
+
+        const preview = await previewDeleteTaskCommand(context, { taskId: 'historical-task' });
+        expect(preview.timeEntryIdsToDelete).toEqual(['historical-entry']);
+        await cascadeDeleteTaskCommand(context, {
+            taskId: 'historical-task', confirmDelete: true, confirmationText: 'historical-task',
+            expectedTaskIds: preview.taskIdsToDelete, expectedTimeEntryIds: preview.timeEntryIdsToDelete,
+            expectedTimerKeys: preview.timerKeysToClear, expectedPlannerAttachmentIds: preview.plannerAttachmentIdsToDelete,
+        });
+        expect(history.has('historical-entry')).toBe(false);
+        expect(context.maps.tasks.has('historical-task')).toBe(false);
+    });
+
     beforeEach(() => {
         vi.clearAllMocks();
         vi.spyOn(window.URL, 'createObjectURL').mockImplementation(downloadMocks.createObjectURL);
@@ -738,6 +762,7 @@ describe('agent commands', () => {
         }));
         context.maps.plannerAttachments.set('task-delete-attachment', objectToYMap({
             id: 'task-delete-attachment',
+            mode: 'static', sortOrder: 1, createdAt: 1,
             referenceId: 'task-delete-agent',
             type: 'task',
         }));
@@ -828,11 +853,15 @@ describe('agent commands', () => {
             id: 'task-cascade-parent-attachment',
             referenceId: 'task-cascade-parent',
             type: 'task',
+
+            mode: 'static', sortOrder: 1, createdAt: 1,
         }));
         context.maps.plannerAttachments.set('task-cascade-child-attachment', objectToYMap({
             id: 'task-cascade-child-attachment',
             referenceId: 'task-cascade-child',
             type: 'task',
+
+            mode: 'static', sortOrder: 1, createdAt: 1,
         }));
 
         const cascadePreview = await previewDeleteTaskCommand(context, {
@@ -1160,6 +1189,7 @@ describe('agent commands', () => {
         }));
         context.maps.plannerAttachments.set('client-delete-attachment', objectToYMap({
             id: 'client-delete-attachment',
+            mode: 'static', sortOrder: 1, createdAt: 1,
             referenceId: 'client-delete-agent',
             type: 'client',
         }));
@@ -1177,16 +1207,16 @@ describe('agent commands', () => {
             canCascadeDeleteSafely: true,
         }));
 
-        expect(() => deleteClientCommand(context, {
+        await expect(deleteClientCommand(context, {
             clientId: 'client-delete-agent',
-        })).toThrow(/confirmDelete/);
-        expect(() => deleteClientCommand(context, {
+        })).rejects.toThrow(/confirmDelete/);
+        await expect(deleteClientCommand(context, {
             clientId: 'client-delete-agent',
             confirmDelete: true,
             confirmationText: 'wrong-client',
-        })).toThrow(/confirmationText/);
+        })).rejects.toThrow(/confirmationText/);
 
-        const deletedClient = deleteClientCommand(context, {
+        const deletedClient = await deleteClientCommand(context, {
             clientId: 'client-delete-agent',
             confirmDelete: true,
             confirmationText: 'client-delete-agent',
@@ -1245,6 +1275,8 @@ describe('agent commands', () => {
             id: 'client-cascade-convert-attachment',
             referenceId: 'client-cascade-convert',
             type: 'client',
+
+            mode: 'static', sortOrder: 1, createdAt: 1,
         }));
 
         const clientConvertPreview = await previewDeleteClientCommand(context, {
@@ -1359,11 +1391,15 @@ describe('agent commands', () => {
             id: 'client-cascade-delete-attachment',
             referenceId: 'client-cascade-delete-projects',
             type: 'client',
+
+            mode: 'static', sortOrder: 1, createdAt: 1,
         }));
         context.maps.plannerAttachments.set('project-client-cascade-delete-attachment', objectToYMap({
             id: 'project-client-cascade-delete-attachment',
             referenceId: 'project-client-cascade-delete',
             type: 'project',
+
+            mode: 'static', sortOrder: 1, createdAt: 1,
         }));
 
         const clientDeleteProjectsPreview = await previewDeleteClientCommand(context, {
@@ -1418,11 +1454,11 @@ describe('agent commands', () => {
         expect(context.maps.plannerAttachments.has('client-cascade-delete-attachment')).toBe(false);
         expect(context.maps.plannerAttachments.has('project-client-cascade-delete-attachment')).toBe(false);
 
-        expect(() => deleteClientCommand(context, {
+        await expect(deleteClientCommand(context, {
             clientId: 'client-1',
             confirmDelete: true,
             confirmationText: 'client-1',
-        })).toThrow(/still referenced/);
+        })).rejects.toThrow(/still referenced/);
         await expect(previewDeleteClientCommand(context, {
             clientId: 'client-1',
             alsoDeleteProjects: false,
@@ -1448,11 +1484,11 @@ describe('agent commands', () => {
             subtotal: 0,
             total: 0,
         }));
-        expect(() => deleteClientCommand(context, {
+        await expect(deleteClientCommand(context, {
             clientId: 'client-invoice-reference',
             confirmDelete: true,
             confirmationText: 'client-invoice-reference',
-        })).toThrow(/still referenced/);
+        })).rejects.toThrow(/still referenced/);
         await expect(cascadeDeleteClientCommand(context, {
             clientId: 'client-invoice-reference',
             confirmDelete: true,
@@ -1477,11 +1513,11 @@ describe('agent commands', () => {
             isRecurring: false,
             isTaxExempt: false,
         }));
-        expect(() => deleteClientCommand(context, {
+        await expect(deleteClientCommand(context, {
             clientId: 'client-expense-reference',
             confirmDelete: true,
             confirmationText: 'client-expense-reference',
-        })).toThrow(/still referenced/);
+        })).rejects.toThrow(/still referenced/);
 
         context.maps.clients.set('client-recurrence-reference', objectToYMap({
             id: 'client-recurrence-reference',
@@ -1501,11 +1537,11 @@ describe('agent commands', () => {
             isTaxExempt: false,
             active: true,
         }));
-        expect(() => deleteClientCommand(context, {
+        await expect(deleteClientCommand(context, {
             clientId: 'client-recurrence-reference',
             confirmDelete: true,
             confirmationText: 'client-recurrence-reference',
-        })).toThrow(/still referenced/);
+        })).rejects.toThrow(/still referenced/);
 
         context.maps.clients.set('client-dispatch-delete', objectToYMap({
             id: 'client-dispatch-delete',
@@ -1632,6 +1668,7 @@ describe('agent commands', () => {
         }));
         context.maps.plannerAttachments.set('project-delete-attachment', objectToYMap({
             id: 'project-delete-attachment',
+            mode: 'static', sortOrder: 1, createdAt: 1,
             referenceId: 'project-delete-agent',
             type: 'project',
         }));
@@ -1737,11 +1774,15 @@ describe('agent commands', () => {
             id: 'project-cascade-attachment',
             referenceId: 'project-cascade-agent',
             type: 'project',
+
+            mode: 'static', sortOrder: 1, createdAt: 1,
         }));
         context.maps.plannerAttachments.set('task-project-cascade-attachment', objectToYMap({
             id: 'task-project-cascade-attachment',
             referenceId: 'task-project-cascade-active',
             type: 'task',
+
+            mode: 'static', sortOrder: 1, createdAt: 1,
         }));
 
         const projectCascadePreview = await previewDeleteProjectCommand(context, {

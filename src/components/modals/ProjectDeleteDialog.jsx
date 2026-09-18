@@ -101,7 +101,7 @@ const ProjectDeleteDialog = ({
                 </>
             ) : (
                 <p className="text-sm text-foreground">
-                    Are you sure you want to delete the project "<span className="font-semibold">{project.title}</span>"? This action cannot be undone and will delete all related tasks and time entries.
+                    Are you sure you want to delete the project "<span className="font-semibold">{project.title}</span>"? This action cannot be undone and will delete all related tasks, time entries, expenses, and recurring expense schedules, including archived history.
                 </p>
             )}
         </Modal>

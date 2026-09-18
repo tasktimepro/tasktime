@@ -603,7 +603,7 @@ const ClientModal = ({
 
                         {formData.custom.length === 0 && (
                             <p className="text-sm text-muted-foreground italic">
-                                No custom fields added. Click "Add Field" to add custom client details.
+                                No custom fields added; click "Add Field" to add custom client details
                             </p>
                         )}
                     </div>

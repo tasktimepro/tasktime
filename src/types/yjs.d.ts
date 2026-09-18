@@ -21,7 +21,8 @@ declare module 'yjs' {
         readonly size: number;
         get(key: K): V | undefined;
         set(key: K, value: V): V;
-        delete(key: K): boolean;
+        // Y.Map.delete returns void; callers must check existence before reporting success.
+        delete(key: K): void;
         has(key: K): boolean;
         forEach(callback: (value: V, key: K, map: Map<K, V>) => void): void;
         values(): IterableIterator<V>;
@@ -47,6 +48,7 @@ declare module 'y-indexeddb' {
     export class IndexeddbPersistence {
         constructor(name: string, doc: Doc);
         synced: boolean;
+        db: IDBDatabase | null;
         destroy(): Promise<void>;
         clearData(): Promise<void>;
         once(event: 'synced', callback: () => void): void;

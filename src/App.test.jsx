@@ -522,9 +522,10 @@ describe('App component', () => {
 
         expect(screen.getByRole('status')).toHaveTextContent('Loading reports')
         expect(await screen.findByTestId('reports-view')).toBeInTheDocument()
+        await waitFor(() => expect(reportsComponentState.readyHandler).toEqual(expect.any(Function)))
 
         act(() => {
-            reportsComponentState.readyHandler?.(true)
+            reportsComponentState.readyHandler(true)
         })
 
         await waitFor(() => {
@@ -532,7 +533,7 @@ describe('App component', () => {
         })
     })
 
-    it('seeds the first onboarding task when onboarding is shown', () => {
+    it('shows onboarding without creating workspace data on first load or rerender', () => {
         localStorage.getItem.mockImplementation((key) => {
             if (key === 'tasktime-onboarding-completed') {
                 return null
@@ -545,16 +546,15 @@ describe('App component', () => {
             return null
         })
 
-        render(<App />)
+        const { rerender } = render(<App />)
 
         expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument()
-        expect(tasksHookState.createTask).toHaveBeenCalledTimes(1)
-        expect(tasksHookState.createTask).toHaveBeenCalledWith(expect.objectContaining({
-            note: 'Start the timer, head to projects, and create your first one.',
-            title: 'Create my first project',
-            startDate: '2026-02-25',
-        }))
+        expect(tasksHookState.createTask).not.toHaveBeenCalled()
         expect(localStorage.setItem).toHaveBeenCalledWith('tasktime-onboarding-pending', 'true')
+
+        rerender(<App />)
+
+        expect(tasksHookState.createTask).not.toHaveBeenCalled()
     })
 
     it('reopens onboarding after refresh while it is still pending', () => {

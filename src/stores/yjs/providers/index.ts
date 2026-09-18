@@ -47,13 +47,13 @@ export {
     YjsCloudSyncProvider,
     YjsDriveProvider,
     withCloudSyncExclusiveLock,
-} from './GoogleDriveProvider';
+} from './CloudSyncProvider';
 export type {
     CloudSyncConnectionOptions,
     CloudSyncLockPermit,
     CloudSyncLockResult,
     DriveConnectionOptions,
-} from './GoogleDriveProvider';
+} from './CloudSyncProvider';
 
 export {
     DriveAccessTokenError,

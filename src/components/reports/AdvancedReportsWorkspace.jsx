@@ -2504,7 +2504,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                         {!selectedStatementClientId ? (
                             <Notice
                                 title="Select a single client to build a statement"
-                                description="Use the top-level client filter, or narrow the current slice until it only includes one client."
+                                description="Use the top-level client filter, or narrow the current slice until it only includes one client"
                             />
                         ) : (
                             <ReportSection
@@ -2694,7 +2694,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                         {!selectedWorkSummaryProjectId ? (
                             <Notice
                                 title="Select a single project to build a work summary"
-                                description="Use the top-level project filter, or narrow the current slice until it only includes one project."
+                                description="Use the top-level project filter, or narrow the current slice until it only includes one project"
                             />
                         ) : (
                             <ReportSection
@@ -2757,7 +2757,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                                 <div className="space-y-2">
                                     <h3 className="text-sm font-semibold text-foreground">Tasks</h3>
                                     {projectWorkSummaryRows.length === 0 ? (
-                                        <Notice title="No worked tasks in this period" description="There are no time entries for this project in the selected range." compact />
+                                        <Notice title="No worked tasks in this period" description="There are no time entries for this project in the selected range" compact />
                                     ) : (
                                         <div className="space-y-2">
                                             {projectWorkSummaryRows.map((row) => (
@@ -2820,7 +2820,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                             {(vatSummary.salesBuckets.length === 0 && vatSummary.expenseBuckets.length === 0) ? (
                                 <Notice
                                     title="No tax-relevant records in this period"
-                                    description="Adjust the date, business, client, project, or status filters to expand the slice."
+                                    description="Adjust the date, business, client, project, or status filters to expand the slice"
                                     compact
                                 />
                             ) : (
@@ -3032,7 +3032,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                         )}
                     >
                         {filteredInvoices.length === 0 ? (
-                            <Notice title="No invoices in this period" description="Adjust the date or status filters to expand the slice." compact />
+                            <Notice title="No invoices in this period" description="Adjust the date or status filters to expand the slice" compact />
                         ) : (
                             <div className="space-y-4">
                                 <div className="grid gap-4 xl:grid-cols-4">
@@ -3226,7 +3226,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                         {outstandingInvoices.length === 0 ? (
                             <Notice
                                 title="No outstanding invoices in this slice"
-                                description="Adjust the date or invoice status filters to expand the aging view."
+                                description="Adjust the date or invoice status filters to expand the aging view"
                                 compact
                             />
                         ) : (
@@ -3381,7 +3381,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                         )}
                     >
                         {filteredExpenses.length === 0 ? (
-                            <Notice title="No expenses in this period" description="Adjust the date or expense filters to expand the slice." compact />
+                            <Notice title="No expenses in this period" description="Adjust the date or expense filters to expand the slice" compact />
                         ) : (
                             <div className="space-y-4">
                                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -3551,7 +3551,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                         )}
                     >
                         {hoursRows.length === 0 ? (
-                            <Notice title="No time entries in this period" description="Adjust the period or project/client filters to expand the slice." compact />
+                            <Notice title="No time entries in this period" description="Adjust the period or project/client filters to expand the slice" compact />
                         ) : (
                             <div className="space-y-3">
                                 {hoursRows.map((row) => (
@@ -3597,7 +3597,7 @@ function AdvancedReportsWorkspace({ onReadyChange = null }) {
                             compact
                         />
                         {toInvoiceRows.length === 0 ? (
-                            <Notice title="No uninvoiced work found" description="Nothing billable is currently left open inside the selected slice." compact />
+                            <Notice title="No uninvoiced work found" description="Nothing billable is currently left open inside the selected slice" compact />
                         ) : (
                             <div className="space-y-3">
                                 {toInvoiceRows.map((row) => (

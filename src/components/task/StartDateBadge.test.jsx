@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import StartDateBadge from './StartDateBadge'
+import { toDisplayDate } from '@/utils/dateUtils.ts'
 
 describe('StartDateBadge', () => {
 
@@ -81,6 +82,24 @@ describe('StartDateBadge', () => {
 
         rerender(<StartDateBadge startDate="2025-01-11" completed={false} />)
         expect(getByText('Tomorrow')).toBeInTheDocument()
+    })
+
+    it('shows the occurrence date with a recurrence icon in Upcoming', () => {
+        const { getByRole, getByText, queryByText } = render(
+            <StartDateBadge startDate="2025-09-21" recurring={{ type: 'monthly', monthlyType: 'specific', monthlyDay: 21 }} upcoming />
+        )
+
+        const badge = getByText(toDisplayDate('2025-09-21', { month: 'short', day: 'numeric' }))
+        expect(badge.querySelector('svg')).toHaveClass('lucide-refresh-cw')
+        expect(getByRole('img', { name: 'Recurring' })).toBeInTheDocument()
+        expect(queryByText('Monthly (21st)')).not.toBeInTheDocument()
+    })
+
+    it('shows a calendar icon for a dated task in Upcoming', () => {
+        const { getByRole, getByText } = render(<StartDateBadge startDate="2025-10-15" upcoming />)
+
+        expect(getByText(toDisplayDate('2025-10-15', { month: 'short', day: 'numeric' })).querySelector('svg')).toHaveClass('lucide-calendar-days')
+        expect(getByRole('img', { name: 'Scheduled' })).toBeInTheDocument()
     })
 
     it('renders nothing when start date is missing', () => {
