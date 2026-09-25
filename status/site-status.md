@@ -1,5 +1,19 @@
 # Public Site Status
 
+## September 25 production publication — DebugBundle v3 and site analytics
+
+Independent site source `649a9ac5d541a9c1767b7a9d4eb004a150ae3e76`
+passed CI `36158850548` and production preparation `36159183927`. The
+prepared archive SHA-256 was
+`ecfe5d0d522917fbc00888012918431fe8ea05208b2759a7ed5d8ec86409963f`;
+Pages deployment `36167418680` succeeded with billing mode `off`. The live
+privacy page contains the analytics disclosure and direct DebugBundle link;
+the served diagnostics JavaScript matched the prepared archive byte for byte.
+The hosted site check passed HTTP 200 after deployment, and the site had no
+active DebugBundle incident. Email/Slack alert rules remain enabled; no
+synthetic outage or delivery test was performed. Live traction measurements
+need actual visits after publication and may undercount browser blockers.
+
 ## September 25 DebugBundle traction candidate — local, unreleased
 
 The independent site pins browser SDK 3.0.0 and adds privacy-strict aggregate

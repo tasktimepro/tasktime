@@ -1,3 +1,19 @@
+## September 25 v1.6.3 production publication
+
+Core source `cc6cf99572d9c0ada9a431e6bd720886d7b42c74` passed exact-source
+CI `36158868613` and production preparation `36159732287`. Its prepared
+`pages.tar.gz` SHA-256
+`ed72351721f0369be358c04116e1b4b54b4c041f100d5ad2afeca8a9a09dbaff`
+was deployed to the app Pages project in successful workflow `36167735235`
+with billing mode `live`, after the Worker trace-header prerequisite deployed.
+The live homepage and Account route reference the tested main JavaScript; that
+file, the manifest and service worker matched the prepared archive byte for
+byte. The app DebugBundle homepage check passed HTTP 200 after deployment.
+Five pre-existing app incidents remain open with no new active group observed;
+the reported retained Edge profile remains an owner-managed local check, not
+an agent-verified production journey. No tag, GitHub release or agent package
+publication was part of this Pages release.
+
 ## September 25 retained cloud session recovery — archive fix validated locally; retained-profile acceptance pending
 
 Follow-up local acceptance on September 25 reported concurrent Dropbox archive

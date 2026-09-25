@@ -1,3 +1,31 @@
+## September 25 production release — v1.6.3 app, public site and DebugBundle v3
+
+The owner instructed production publication and delegated prepared-archive hash
+review. The retained Edge-profile sync check remains owner-managed; the agent
+did not access that browser or claim its local session was replayed. Core source
+`cc6cf99572d9c0ada9a431e6bd720886d7b42c74` passed CI `36158868613` and
+production preparation `36159732287`; the app archive SHA-256 is
+`ed72351721f0369be358c04116e1b4b54b4c041f100d5ad2afeca8a9a09dbaff`.
+Production Pages deployment `36167735235` succeeded with billing mode `live`.
+The live homepage and Account route reference the prepared bundle; its main
+JavaScript, manifest and service worker matched that archive byte for byte.
+
+The private Worker CORS prerequisite deployed first as version
+`689f3378-73b2-477c-b4dc-17d19d32dfdf`; live health returned HTTP 200 and
+allowed the trace header from the app origin while withholding origin access
+from an unapproved site. Independent site source
+`649a9ac5d541a9c1767b7a9d4eb004a150ae3e76` passed CI `36158850548`
+and preparation `36159183927`; archive SHA-256
+`ecfe5d0d522917fbc00888012918431fe8ea05208b2759a7ed5d8ec86409963f`
+deployed in Pages run `36167418680`. Live privacy disclosure and DebugBundle
+link were present, and the diagnostics JavaScript matched the archive bytes.
+Both DebugBundle homepage checks passed HTTP 200 after deployment; alert routes
+remain enabled. No synthetic outage or alert-delivery test was performed.
+DebugBundle showed no new active incidents: five pre-existing app groups remain
+open for real-session follow-up and the site has none. The unrelated user edit
+in `TODO.md` remains local. No agent artifact changed or was republished; no
+core tag or GitHub release was created.
+
 ## September 25 cloud session recovery — archive fix validated locally; retained-profile acceptance pending
 
 Follow-up local acceptance on September 25 reported concurrent Dropbox archive
