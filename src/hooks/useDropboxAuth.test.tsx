@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetDropboxAuthStatusCache, useDropboxAuth } from './useDropboxAuth';
 
@@ -77,6 +77,7 @@ const storedDropboxLifecycle = {
 };
 
 describe('useDropboxAuth', () => {
+    afterEach(() => vi.useRealTimers());
     beforeEach(() => {
         vi.clearAllMocks();
         _resetDropboxAuthStatusCache();
@@ -253,6 +254,84 @@ describe('useDropboxAuth', () => {
         });
         expect(mocks.clearStoredDropboxSession).not.toHaveBeenCalled();
         expect(mocks.clearCloudStorageSession).not.toHaveBeenCalled();
+    });
+
+    it('automatically recovers a retained Dropbox session after a temporary status failure', async () => {
+        vi.useFakeTimers();
+        mocks.getStoredDropboxSession.mockResolvedValue({ provider: 'dropbox', sessionId: 'stored-dropbox-session' });
+        vi.mocked(fetch).mockResolvedValueOnce(Response.json({ code: 'TOKEN_SERVICE_UNAVAILABLE' }, { status: 503 }))
+            .mockResolvedValue(Response.json({ authenticated: true, provider: 'dropbox' }));
+        const { result } = renderHook(() => [useDropboxAuth(), useDropboxAuth()]);
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        expect(result.current.every(auth => auth.sessionId === 'stored-dropbox-session')).toBe(true);
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+
+        expect(result.current.every(auth => auth.isSignedIn)).toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(mocks.clearStoredDropboxSession).not.toHaveBeenCalled();
+        expect(mocks.claimActiveCloudStorageSession).not.toHaveBeenCalled();
+    });
+
+    it('does not restore a disconnected Dropbox session from a delayed status response', async () => {
+        mocks.getStoredDropboxSession.mockResolvedValue({ provider: 'dropbox', sessionId: 'stored-dropbox-session' });
+        vi.mocked(fetch).mockResolvedValueOnce(Response.json({ authenticated: true, provider: 'dropbox' }));
+        const { result } = renderHook(() => useDropboxAuth());
+        await waitFor(() => expect(result.current.isSignedIn).toBe(true));
+        let resolveStatus!: (response: Response) => void;
+        vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => { resolveStatus = resolve; }));
+        let refresh!: Promise<void>;
+        act(() => { refresh = result.current.refresh(); });
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+        mocks.clearStoredDropboxSession.mockImplementationOnce(async () => {
+            mocks.getStoredDropboxSession.mockResolvedValue(null);
+            return true;
+        });
+        await act(async () => { await result.current.disconnect(); });
+        await act(async () => {
+            resolveStatus(Response.json({ authenticated: true, provider: 'dropbox' }));
+            await refresh;
+        });
+        expect(result.current.sessionId).toBeNull();
+        expect(result.current.isSignedIn).toBe(false);
+    });
+
+    it('recovers an offline startup and keeps subsequent healthy wake signals request-free', async () => {
+        vi.useFakeTimers();
+        vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+        mocks.getStoredDropboxSession.mockResolvedValue({ provider: 'dropbox', sessionId: 'stored-dropbox-session' });
+        vi.mocked(fetch).mockResolvedValue(Response.json({ authenticated: true, provider: 'dropbox' }));
+        const { result } = renderHook(() => useDropboxAuth());
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        expect(fetch).not.toHaveBeenCalled();
+        expect(result.current.sessionId).toBe('stored-dropbox-session');
+        vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+        await act(async () => {
+            window.dispatchEvent(new Event('online'));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(result.current.isSignedIn).toBe(true);
+        await act(async () => {
+            window.dispatchEvent(new Event('online'));
+            document.dispatchEvent(new Event('visibilitychange'));
+            await vi.advanceTimersByTimeAsync(30_000);
+        });
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('recovers a stalled Dropbox status request after its timeout', async () => {
+        vi.useFakeTimers();
+        mocks.getStoredDropboxSession.mockResolvedValue({ provider: 'dropbox', sessionId: 'stored-dropbox-session' });
+        vi.mocked(fetch).mockImplementationOnce(() => new Promise(() => {}))
+            .mockResolvedValue(Response.json({ authenticated: true, provider: 'dropbox' }));
+        const { result } = renderHook(() => useDropboxAuth());
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.sessionId).toBe('stored-dropbox-session');
+        await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+        expect(result.current.isSignedIn).toBe(true);
+        expect(mocks.clearStoredDropboxSession).not.toHaveBeenCalled();
     });
 
     it('clears a stored session the Worker confirms is no longer authenticated', async () => {
@@ -767,7 +846,7 @@ describe('useDropboxAuth', () => {
     it('refreshes storage ownership when another hook instance connects Dropbox', async () => {
         mocks.getStoredDropboxSession
             .mockResolvedValueOnce(null)
-            .mockResolvedValueOnce({
+            .mockResolvedValue({
                 provider: 'dropbox',
                 sessionId: 'stored-dropbox-session',
                 createdAt: '2026-08-19T10:00:00.000Z',

@@ -37,6 +37,17 @@ describe('DropboxFileStore direct cloud contract', () => {
         tokenProvider.clearToken.mockReset();
     });
 
+    it('exposes exhausted network reads as recoverable connectivity failures', async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+        const store = new DropboxFileStore({ tokenProvider });
+        const result = store.list('sync').catch(error => error);
+        await vi.advanceTimersByTimeAsync(7000);
+        expect(await result).toBeInstanceOf(CloudFileStoreError);
+        expect(await result).toMatchObject({ code: 'transient-unavailable', provider: 'dropbox' });
+        expect(fetch).toHaveBeenCalledTimes(4);
+    });
+
     it('paginates one physical namespace and maps only file metadata', async () => {
         const fetchMock = vi.fn()
             .mockResolvedValueOnce(jsonResponse({
@@ -510,6 +521,9 @@ describe('DropboxFileStore direct cloud contract', () => {
         { tokenCode: 'PROVIDER_DISABLED', code: 'policy-disabled' },
         { tokenCode: 'SESSION_PROVIDER_MISMATCH', code: 'unauthenticated' },
         { tokenCode: 'RATE_LIMITED', code: 'rate-limited' },
+        { tokenCode: 'INVALID_TOKEN_RESPONSE', code: 'invalid-response' },
+        { tokenCode: 'ORIGIN_NOT_ALLOWED', code: 'policy-disabled' },
+        { tokenCode: 'TOKEN_SERVICE_UNAVAILABLE', code: 'transient-unavailable' },
     ])('maps token failure $tokenCode as $code', async ({ tokenCode, code }) => {
         const failingTokenProvider = {
             getToken: vi.fn().mockRejectedValue(new DropboxAccessTokenError(
@@ -524,7 +538,7 @@ describe('DropboxFileStore direct cloud contract', () => {
         await expect(store.getMetadata('sync', 'tasktime-yjs-core.bin')).rejects.toMatchObject({
             code,
             provider: 'dropbox',
-            ...(code === 'rate-limited' ? { retryAfterMs: 7000 } : {}),
+            ...(['rate-limited', 'transient-unavailable'].includes(code) ? { retryAfterMs: 7000 } : {}),
         });
         expect(failingTokenProvider.getToken).toHaveBeenCalledOnce();
     });

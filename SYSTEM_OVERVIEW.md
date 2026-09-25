@@ -33,7 +33,15 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
 - **Shared Google auth UI:** Storage re-reads clear signed-in identity when the
   shared session is absent, so local disconnect updates every mounted account
   and sync consumer without a page reload. This does not reset workspace data
-  or revoke the remote grant.
+  or revoke the remote grant. A transient Worker status failure retains that
+  session but leaves Drive transport unresolved; bounded visible-tab checks or
+  a later online/visible signal can select direct transport without a refresh.
+- **Cloud connection recovery:** Both providers bound status/token requests at
+  ten seconds and automatically retry temporary startup failures while visible
+  and online. Retries coalesce, honor Retry-After and stop after three attempts
+  until a later wake. Healthy wake checks add no auth traffic; stale completions
+  cannot restore disconnected sessions. Existing sync modes and persisted data
+  remain authoritative.
 - **Agent command layer:** `src/agent/commands/` exposes validated business actions over the browser bridge context.
 - **Local MCP bridge:** `src/agent/bridge/` and the built `@tasktimepro/agent-bridge` package provide loopback-only, explicitly paired agent access.
 - **Managed OpenClaw plugin:** the official native plugin registers generated TaskTime tools and owns one packaged bridge child for the supervised Gateway/profile lifetime; it does not own product data or duplicate command behavior.
@@ -285,7 +293,7 @@ See `spec/designs/billing-and-finance.md` for metric scopes and phone ordering.
   evidence.
 - Automatic recurring-task status reads never clear persisted skip evidence; paid cross-currency expense mutations prepare snapshots before committing; canonical agent unbilled queries load complete local history.
 - Sync mode trigger semantics in `AGENTS.md` are durable behavior.
-- Sync mode performs a lightweight manifest check every five minutes only while visible, coalesces tab-visible/browser-online signals within one second into one foreground pass, and lets genuine pending local work blocked by an active pass or cross-tab lock retry with bounded backoff after the lock can be released. External lazy-document loads serialize behind an active provider pass; lazy loads owned by that pass defer their manifest commit to the owner so revision-sensitive writes cannot overlap.
+- Sync mode performs a lightweight manifest check every five minutes only while visible, coalesces tab-visible/browser-online signals within one second into one foreground pass, and lets genuine pending local work blocked by an active pass or cross-tab lock retry with bounded backoff after the lock can be released. Connection, full-sync and lazy-document writers serialize against each other, including concurrent archive requests and browsers without Web Locks. Callback-owned loads serialize under the existing lock and drain before the pass resumes. Lazy loads track edits before I/O or waiting.
 - Provider-grant revocation is confirmed before the browser clears its Worker session; transient refresh, rate-limit, provider-status, and revocation failures preserve retryable credentials and runtime state. Google Drive and Dropbox expose the same Disconnect and Wipe data & disconnect flows, and Account sign-out/deletion reuse the active-provider lifecycle rather than assuming Google.
 - Direct transport keeps Google access tokens in one per-tab module instance only, clears them on expiry/session generation/cross-tab invalidation, removes any retired persisted-token record, deduplicates concurrent same-tab session validation, and keeps all Worker/Google API traffic outside service-worker Cache Storage. Direct reads/writes use retry-safe Google operations and the Worker does not receive routine Drive file bodies.
 - In the provider-neutral path, the active cloud session also authenticates

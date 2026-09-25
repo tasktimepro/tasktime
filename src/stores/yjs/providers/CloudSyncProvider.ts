@@ -25,6 +25,8 @@ import {
     type DriveTransport,
 } from './ManifestManager';
 import { CloudFileStoreError, type CloudProviderId } from './CloudFileStore';
+import { DriveAccessTokenError } from './DriveAccessTokenProvider';
+import { DropboxAccessTokenError } from './DropboxAccessTokenProvider';
 import type { CloudSyncMode, DocName, SyncState, SyncPhase } from '../types';
 import { validateDocManagerState } from '../validation';
 import {
@@ -99,6 +101,18 @@ function isCloudAuthorizationError(error: unknown): boolean {
 function isCloudTransportDisabledError(error: unknown): boolean {
     return error instanceof DriveTransportDisabledError
         || (error instanceof CloudFileStoreError && error.code === 'policy-disabled');
+}
+
+function syncFailureCategory(error: unknown): string {
+    // These codes are fixed, sanitized adapter outcomes. Never put response
+    // bodies, URLs, account identifiers, or raw error messages in the title.
+    if (error instanceof CloudFileStoreError) {
+        return error.code === 'transient-unavailable' ? 'connectivity' : error.code;
+    }
+    if (error instanceof DriveAccessTokenError || error instanceof DropboxAccessTokenError) {
+        return error.code === 'RATE_LIMITED' ? 'rate-limited' : 'token-service';
+    }
+    return 'unexpected';
 }
 
 function isKnownSyncDocName(docName: string): docName is DocName {
@@ -239,8 +253,10 @@ export class YjsCloudSyncProvider {
     private syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
     private syncRetryAttempt: number = 0;
     private isSyncing: boolean = false;
-    private activeSyncCompletion: Promise<void> | null = null;
     private syncCompleteCallbackActive: boolean = false;
+    private syncWorkTail: Promise<void> = Promise.resolve();
+    private callbackDocTail: Promise<void> = Promise.resolve();
+    private callbackDocError: unknown = null;
     private forceFullStateDocs: Set<DocName> = new Set();
     private verifyFullStateDocs: Set<DocName> = new Set();
     private lifecycleListenersAttached: boolean = false;
@@ -822,6 +838,13 @@ export class YjsCloudSyncProvider {
     // Connection Management
     // =========================================================================
 
+    /** Serialize this provider's manifest writers, including without Web Locks. */
+    private queueSyncWork(operation: () => Promise<void>): Promise<void> {
+        const pending = this.syncWorkTail.then(operation);
+        this.syncWorkTail = pending.catch(() => {});
+        return pending;
+    }
+
     /**
      * Connect to the selected cloud provider and start syncing
      * @param syncMode - Optional sync mode to determine connect behavior.
@@ -836,9 +859,9 @@ export class YjsCloudSyncProvider {
         if (this.connected) return;
 
         const lockResult = hasCloudSyncLockPermit(lockPermit)
-            ? { acquired: true as const, value: await this.connectInner(syncMode, options) }
+            ? { acquired: true as const, value: await this.queueSyncWork(() => this.connectInner(syncMode, options)) }
             : await withSyncLock(
-                () => this.connectInner(syncMode, options),
+                () => this.queueSyncWork(() => this.connectInner(syncMode, options)),
                 true,
             );
 
@@ -1405,8 +1428,8 @@ export class YjsCloudSyncProvider {
 
         // Acquire cross-tab lock (skip if another tab is syncing, unless force)
         const lockResult = hasCloudSyncLockPermit(lockPermit)
-            ? { acquired: true as const, value: await this.syncInner(force, options) }
-            : await withSyncLock(() => this.syncInner(force, options), force);
+            ? { acquired: true as const, value: await this.queueSyncWork(() => this.syncInner(force, options)) }
+            : await withSyncLock(() => this.queueSyncWork(() => this.syncInner(force, options)), force);
 
         if (!lockResult.acquired && !force) {
             this.log('sync: skipped, sync lock is currently held');
@@ -1418,17 +1441,8 @@ export class YjsCloudSyncProvider {
      * Inner sync implementation (runs under the Web Lock)
      */
     private async syncInner(force: boolean, options: SyncOptions): Promise<void> {
-        // Wait for current sync to finish if forcing
-        if (this.isSyncing && force) {
-            this.log('sync(force): waiting for current sync to complete...');
-            // Simple wait - check every 100ms for up to 5 seconds
-            for (let i = 0; i < 50 && this.isSyncing; i++) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            if (this.isSyncing) {
-                console.warn(`[${this.providerDetails.logPrefix}] Timeout waiting for sync, proceeding anyway`);
-            }
-        }
+        // A queued pass may outlive a disconnect or network transition.
+        if (!this.connected || !this.isOnline()) return;
 
         const allowPull = options.allowPull ?? true;
 
@@ -1455,11 +1469,6 @@ export class YjsCloudSyncProvider {
         }
 
         this.isSyncing = true;
-        let resolveActiveSync: (() => void) | null = null;
-        const activeSyncCompletion = new Promise<void>((resolve) => {
-            resolveActiveSync = resolve;
-        });
-        this.activeSyncCompletion = activeSyncCompletion;
         this.setState('syncing');
         let loadedDocs = this.docManager.getLoadedDocs();
         markSyncStarted(this.persistenceScope);
@@ -1552,11 +1561,21 @@ export class YjsCloudSyncProvider {
             // Sync Now never reports completion while that work is still
             // generating local deltas.
             this.syncCompleteCallbackActive = true;
+            this.callbackDocError = null;
             try {
                 await this.onSyncCompleteCallback?.();
             } finally {
+                // Callback-owned archive loads share the existing Web Lock.
+                // Drain even independently mounted consumers that joined this
+                // window before the outer pass can write its manifest again.
+                let tail: Promise<void>;
+                do {
+                    tail = this.callbackDocTail;
+                    await tail;
+                } while (tail !== this.callbackDocTail);
                 this.syncCompleteCallbackActive = false;
             }
+            if (this.callbackDocError) throw this.callbackDocError;
 
             // A pulled operation journal can require deterministic writes to
             // already-synced documents. Flush those callback-generated deltas
@@ -1590,14 +1609,16 @@ export class YjsCloudSyncProvider {
             if (!isCloudAuthorizationError(error)
                 && !isCloudTransportDisabledError(error)
                 && !(error instanceof BackupModeRemoteChangedError)) {
+                const failureCategory = syncFailureCategory(error);
                 this.captureIncident({
                     incidentKey: 'sync_failed',
-                    message: `TaskTime Pro ${this.providerDetails.shortName} sync failed`,
+                    message: `TaskTime Pro ${this.providerDetails.shortName} sync failed (${failureCategory})`,
                     error,
                     context: {
                         allowPull,
                         force,
                         mode: this.syncMode,
+                        failureCategory,
                     },
                 });
             }
@@ -1614,10 +1635,6 @@ export class YjsCloudSyncProvider {
             }
         } finally {
             this.isSyncing = false;
-            resolveActiveSync?.();
-            if (this.activeSyncCompletion === activeSyncCompletion) {
-                this.activeSyncCompletion = null;
-            }
             const hasPending = this.hasPendingDeltas();
             this.log('sync: finished', { pending: hasPending });
 
@@ -2216,6 +2233,26 @@ export class YjsCloudSyncProvider {
     async syncAndSubscribeDoc(docName: DocName, options: { allowPull?: boolean } = {}): Promise<void> {
         if (!this.connected) return;
 
+        // Capture edits even when the initial pull/upload fails or waits for a
+        // different writer. Failed cloud work must not detach local tracking.
+        this.subscribeToDoc(docName);
+        if (!this.isOnline() || (this.syncMode === 'manual' && options.allowPull !== true)) return;
+
+        if (this.syncCompleteCallbackActive) {
+            const pending = this.callbackDocTail.then(() => this.syncAndSubscribeDocInner(docName, options));
+            this.callbackDocTail = pending.catch(error => { this.callbackDocError ??= error; });
+            return pending;
+        }
+
+        await withSyncLock(
+            () => this.queueSyncWork(() => this.syncAndSubscribeDocInner(docName, options)),
+            true,
+        );
+    }
+
+    private async syncAndSubscribeDocInner(docName: DocName, options: { allowPull?: boolean }): Promise<void> {
+        if (!this.connected) return;
+
         // Lazy document loads can be triggered by navigation while offline. They
         // must remain available locally without attempting manifest, pull, or
         // push work; the normal online/reconnect flow will reconcile later.
@@ -2227,29 +2264,6 @@ export class YjsCloudSyncProvider {
         if (this.syncMode === 'manual' && options.allowPull !== true) {
             this.subscribeToDoc(docName);
             return;
-        }
-
-        // Navigation can mount a lazy document while a full sync is already
-        // updating the shared manifest. Keep that independent load behind the
-        // active pass so revision-sensitive providers such as Dropbox never
-        // receive overlapping manifest writes. Lazy documents loaded by the
-        // owning post-sync callback are safe to process inline; their manifest
-        // update is committed by the outer pass below.
-        if (this.isSyncing && !this.syncCompleteCallbackActive) {
-            const activeSyncCompletion = this.activeSyncCompletion;
-            if (activeSyncCompletion) {
-                await activeSyncCompletion;
-            }
-
-            if (!this.connected) return;
-            if (!this.isOnline()) {
-                this.subscribeToDoc(docName);
-                return;
-            }
-            if (this.syncMode === 'manual' && options.allowPull !== true) {
-                this.subscribeToDoc(docName);
-                return;
-            }
         }
 
         if (!this.manifest.getManifest()) {

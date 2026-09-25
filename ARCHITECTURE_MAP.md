@@ -144,10 +144,18 @@ Production topology (independently approved artifact deployments)
 - `YjsCloudSyncProvider`, `CloudManifestManager`, and `CloudBackupManager` own the provider-neutral algorithm; `YjsDriveProvider`, `ManifestManager`, `BackupManager`, and Drive-named store/context APIs remain Google compatibility facades. Provider-neutral context/UI APIs expose Dropbox by default; an explicit build-time false value is an emergency UI opt-out, while matching Worker controls remain the fail-closed runtime boundary.
 - `YjsContext.disconnectActiveCloudSession(...)` owns the active provider/session/generation lifecycle boundary used by Cloud Sync settings, Account sign-out/deletion, and agent deletion. User-facing flows expose only Disconnect and Wipe data & disconnect; provider-specific revoke and local-session operations remain internal adapters.
 - Sync providers operate on Yjs document updates and manifests; they do not redefine entity business rules. Operational recovery keys are scoped by durable provider ID and connection generation, while generation-zero Google mirrors the legacy keys for rolling compatibility.
-- The provider owns manifest-write serialization across normal passes and on-demand documents: external lazy loads wait behind an active pass, while callback-owned lazy loads join that pass and leave the final manifest commit to its owner.
+- The provider serializes connection, full-sync and lazy-document writers in both directions, including concurrent requests for the same archive. Web Locks cover other tabs; an internal queue preserves ordering when Web Locks are unavailable. Completion-callback loads use a separate serial queue under the owning lock, which is drained before the full pass resumes. Local edit subscriptions attach before any lazy I/O or queue wait.
 - Both provider transports are direct per connection: the selected adapter keeps
   its short-lived token in memory and sends routine file requests only to Google
   Drive or Dropbox API/content origins. The Worker has no provider-data route.
+- `useGoogleAuth` validates the retained Google session and explicit direct
+  policy before `YjsContext` connects the provider. A transient status result
+  keeps transport unresolved while bounded rechecks recover; it cannot fall
+  through to the retired Worker file route.
+- `utils/cloudAuthRecovery` supplies shared, bounded visible/online retries and
+  auth-request deadlines. Both auth hooks use it for retained-session status;
+  `YjsContext` uses it for temporary initial connection failures. Token providers
+  retain their existing in-memory ownership and stale-generation fencing.
 - `useDropboxAuth` also reads the verified account email directly from Dropbox
   after new/reconnected authorization and stores it only in the allowlisted
   origin-local auth-session record. UI consumers use that email for presentation;

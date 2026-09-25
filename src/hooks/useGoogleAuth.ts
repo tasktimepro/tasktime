@@ -7,11 +7,12 @@
  * - Requires VITE_SYNC_WORKER_URL to be set
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SYNC_WORKER_CONFIG } from '@/config/google';
 import { APP_VERSION } from '@/constants/app';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { driveAccessTokenProvider } from '@/stores/yjs/providers/DriveAccessTokenProvider';
+import { CloudAuthRecovery, cloudAuthRetryAfter, withCloudAuthTimeout } from '@/utils/cloudAuthRecovery';
 import {
     publishDriveAuthInvalidation,
     subscribeToDriveAuthInvalidation,
@@ -27,7 +28,7 @@ export interface GoogleUser {
     picture?: string;
 }
 
-export type DriveTransport = 'proxy' | 'direct';
+export type DriveTransport = 'direct';
 
 export interface ValidatedDriveStorageSession {
     sessionId: string;
@@ -40,7 +41,7 @@ interface AuthState {
     user: GoogleUser | null;
     accessToken: string | null;
     sessionId: string | null;
-    driveTransport: DriveTransport;
+    driveTransport: DriveTransport | null;
     error: string | null;
     hadPreviousSession: boolean;
 }
@@ -109,40 +110,60 @@ let forceReconnectState = false;
 // result instead of hitting /auth/status every time. The Worker manages
 // token refresh server-side, so the client only needs a rare liveness check.
 const SESSION_VALIDATION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const TRANSIENT_VALIDATION_TTL_MS = 1000;
 let lastValidationTime = 0;
 let lastValidationResult = false;
 let lastValidationSessionId: string | null = null;
-let lastValidationDriveTransport: DriveTransport = 'proxy';
+let lastValidationDriveTransport: DriveTransport | null = null;
+let lastValidationTransient = false;
+let lastValidationRetryAfterMs = 0;
 let validationInFlight: {
     sessionId: string;
-    force: boolean;
     promise: Promise<boolean>;
 } | null = null;
 let legacyTokenCleanupPromise: Promise<void> | null = null;
+let validationEpoch = 0;
+const statusRecovery = new CloudAuthRecovery();
 
 function ensureLegacyTokenCleanup(): Promise<void> {
     legacyTokenCleanupPromise ??= clearLegacyStoredToken();
     return legacyTokenCleanupPromise;
 }
 
-function parseDriveTransportPolicy(value: unknown): DriveTransport {
+function parseDriveTransportPolicy(value: unknown): DriveTransport | null {
 
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        return 'proxy';
+        return null;
     }
 
     const policy = value as { driveTransport?: unknown; transportPolicyVersion?: unknown };
 
     return policy.driveTransport === 'direct' && policy.transportPolicyVersion === 1
         ? 'direct'
-        : 'proxy';
+        : null;
 }
 
-function getLastValidatedDriveTransport(sessionId: string): DriveTransport {
+function getLastValidatedDriveTransport(sessionId: string): DriveTransport | null {
 
     return lastValidationSessionId === sessionId
         ? lastValidationDriveTransport
-        : 'proxy';
+        : null;
+}
+
+function getStatusRetryAfterMs(response: Response): number {
+    return Math.max(0, cloudAuthRetryAfter(response) - Date.now());
+}
+
+function clearWorkerSessionValidation(): void {
+    validationEpoch += 1;
+    lastValidationTime = 0;
+    lastValidationResult = false;
+    lastValidationSessionId = null;
+    lastValidationDriveTransport = null;
+    lastValidationTransient = false;
+    lastValidationRetryAfterMs = 0;
+    validationInFlight = null;
+    statusRecovery.clear();
 }
 
 const notifyAuthSubscribers = () => {
@@ -355,12 +376,22 @@ export const useGoogleAuth = () => {
         isSignedIn: false,
         isLoading: true,
         user: null,
-    accessToken: null,
-    sessionId: null,
-    driveTransport: 'proxy',
+        accessToken: null,
+        sessionId: null,
+        driveTransport: null,
         error: null,
         hadPreviousSession: readHadPreviousSessionFlag(),
     });
+    const restoreVersion = useRef(0);
+    const mounted = useRef(true);
+
+    const markTransientTransportForRecovery = useCallback((transport: DriveTransport | null) => {
+        if (transport === null && lastValidationTransient && lastValidationSessionId) {
+            statusRecovery.pending(lastValidationSessionId, lastValidationTime + lastValidationRetryAfterMs);
+        } else if (transport === 'direct') {
+            statusRecovery.clear();
+        }
+    }, []);
 
     // ============================================
     // WORKER MODE - Cloudflare Worker handles tokens
@@ -387,68 +418,83 @@ export const useGoogleAuth = () => {
         if (
             lastValidationSessionId === session.sessionId &&
             options?.force !== true
-            && now - lastValidationTime < SESSION_VALIDATION_TTL_MS
+            && now - lastValidationTime < (lastValidationTransient
+                ? Math.max(TRANSIENT_VALIDATION_TTL_MS, lastValidationRetryAfterMs)
+                : SESSION_VALIDATION_TTL_MS)
         ) {
             return lastValidationResult;
         }
 
-        const force = options?.force === true;
-        if (
-            validationInFlight?.sessionId === session.sessionId
-            && (!force || validationInFlight.force)
-        ) {
+        // A forced refresh can reuse an already-running validation for the
+        // same session; both requests would observe the same Worker state.
+        if (validationInFlight?.sessionId === session.sessionId) {
             return validationInFlight.promise;
         }
 
+        const epoch = ++validationEpoch;
         const promise = (async (): Promise<boolean> => {
             try {
-                const response = await fetch(withAppVersion(SYNC_WORKER_CONFIG.endpoints.authStatus), {
-                    method: 'GET',
-                    headers: {
-                        'X-Session-Id': session.sessionId,
-                        'X-TaskTime-App-Version': APP_VERSION,
-                    },
-                    cache: 'no-store',
-                    credentials: 'omit',
-                    referrerPolicy: 'no-referrer',
+                const { response, data } = await withCloudAuthTimeout(async signal => {
+                    const response = await fetch(withAppVersion(SYNC_WORKER_CONFIG.endpoints.authStatus), {
+                        method: 'GET',
+                        headers: {
+                            'X-Session-Id': session.sessionId,
+                            'X-TaskTime-App-Version': APP_VERSION,
+                        },
+                        cache: 'no-store',
+                        credentials: 'omit',
+                        referrerPolicy: 'no-referrer',
+                        signal,
+                    });
+                    return { response, data: response.ok ? await response.json() : null };
                 });
+                if (epoch !== validationEpoch) return false;
 
                 if (!response.ok) {
-                    // 5xx or unexpected status: treat as transient server error.
-                    // Only 2xx with authenticated:false means explicitly invalid.
-                    if (response.status === 429 || response.status >= 500) {
-                        lastValidationTime = now;
+                    // Timeouts, rate limits, and server errors can recover;
+                    // keep the stored session but do not select a file route.
+                    if (response.status === 0 || response.status === 408
+                        || response.status === 429 || response.status >= 500) {
+                        lastValidationTime = Date.now();
                         lastValidationResult = true;
                         lastValidationSessionId = session.sessionId;
-                        lastValidationDriveTransport = 'proxy';
+                        lastValidationDriveTransport = null;
+                        lastValidationTransient = true;
+                        lastValidationRetryAfterMs = getStatusRetryAfterMs(response);
                         return true;
                     }
                     lastValidationTime = now;
                     lastValidationResult = false;
                     lastValidationSessionId = session.sessionId;
-                    lastValidationDriveTransport = 'proxy';
+                    lastValidationDriveTransport = null;
+                    lastValidationTransient = false;
+                    lastValidationRetryAfterMs = 0;
                     return false;
                 }
 
-                const data = await response.json();
-                const isValid = data.authenticated === true;
+                const isValid = data?.authenticated === true;
                 lastValidationTime = now;
                 lastValidationResult = isValid;
                 lastValidationSessionId = session.sessionId;
-                lastValidationDriveTransport = isValid ? parseDriveTransportPolicy(data) : 'proxy';
+                lastValidationDriveTransport = isValid ? parseDriveTransportPolicy(data) : null;
+                lastValidationTransient = false;
+                lastValidationRetryAfterMs = 0;
                 return isValid;
             } catch {
+                if (epoch !== validationEpoch) return false;
                 // Network error (offline, DNS failure, Worker unreachable).
                 // Optimistically keep the session; don't wipe credentials for
                 // transient connectivity issues.
-                lastValidationTime = now;
+                lastValidationTime = Date.now();
                 lastValidationResult = true;
                 lastValidationSessionId = session.sessionId;
-                lastValidationDriveTransport = 'proxy';
+                lastValidationDriveTransport = null;
+                lastValidationTransient = true;
+                lastValidationRetryAfterMs = 0;
                 return true;
             }
         })();
-        const request = { sessionId: session.sessionId, force, promise };
+        const request = { sessionId: session.sessionId, promise };
         validationInFlight = request;
 
         try {
@@ -458,22 +504,23 @@ export const useGoogleAuth = () => {
         }
     }, [isOnline]);
 
-    const refreshDriveTransport = useCallback(async (): Promise<DriveTransport> => {
+    const refreshDriveTransport = useCallback(async (): Promise<DriveTransport | null> => {
         const session = await getStoredSession();
         if (!session || session.sessionId !== state.sessionId || !isOnline()) {
             driveAccessTokenProvider.clearToken();
-            setState(previous => ({ ...previous, driveTransport: 'proxy' }));
-            return 'proxy';
+            setState(previous => ({ ...previous, driveTransport: null }));
+            return null;
         }
 
         await validateWorkerSession(session, { force: true });
         const driveTransport = getLastValidatedDriveTransport(session.sessionId);
-        if (driveTransport === 'proxy') driveAccessTokenProvider.clearToken();
+        if (driveTransport === null) driveAccessTokenProvider.clearToken();
         setState(previous => previous.sessionId === session.sessionId
             ? { ...previous, driveTransport }
             : previous);
+        markTransientTransportForRecovery(driveTransport);
         return driveTransport;
-    }, [isOnline, state.sessionId, validateWorkerSession]);
+    }, [isOnline, markTransientTransportForRecovery, state.sessionId, validateWorkerSession]);
 
     /**
      * Resolve the current persisted Google session after a possible OAuth
@@ -574,6 +621,7 @@ export const useGoogleAuth = () => {
             }
 
             const driveTransport = getLastValidatedDriveTransport(sessionId);
+            markTransientTransportForRecovery(driveTransport);
 
             // 5. Store session
             failedStep = 'session-store';
@@ -616,16 +664,18 @@ export const useGoogleAuth = () => {
                     const isValidExistingSession = await validateWorkerSession(existingSession);
 
                     if (isValidExistingSession) {
+                        const driveTransport = getLastValidatedDriveTransport(existingSession.sessionId);
                         setState({
                             isSignedIn: true,
                             isLoading: false,
                             user: { id: existingSession.userId, email: existingSession.email },
                             accessToken: null,
                             sessionId: existingSession.sessionId,
-                            driveTransport: getLastValidatedDriveTransport(existingSession.sessionId),
+                            driveTransport,
                             error: null,
                             hadPreviousSession: true,
                         });
+                        markTransientTransportForRecovery(driveTransport);
                         driveAccessTokenProvider.setSession(existingSession.sessionId);
 
                         forceReconnectState = false;
@@ -658,7 +708,7 @@ export const useGoogleAuth = () => {
 
             throw authError;
         }
-    }, [validateWorkerSession]);
+    }, [markTransientTransportForRecovery, validateWorkerSession]);
 
     const signOutFromWorker: SignOutFromWorker = useCallback(async (...args: unknown[]) => {
         const [options] = args as Parameters<SignOutFromWorker>;
@@ -703,6 +753,8 @@ export const useGoogleAuth = () => {
             }
         }
 
+        restoreVersion.current += 1;
+        clearWorkerSessionValidation();
         if (state.sessionId) {
             await clearStoredSession(state.sessionId);
         }
@@ -717,7 +769,7 @@ export const useGoogleAuth = () => {
             user: null,
             accessToken: null,
             sessionId: null,
-            driveTransport: 'proxy',
+            driveTransport: null,
             error: null,
             hadPreviousSession: false,
         });
@@ -727,6 +779,8 @@ export const useGoogleAuth = () => {
 
     const invalidateStoredSession = useCallback(async (): Promise<void> => {
 
+        restoreVersion.current += 1;
+        clearWorkerSessionValidation();
         forceReconnectState = true;
 
         try {
@@ -747,7 +801,7 @@ export const useGoogleAuth = () => {
             user: null,
             accessToken: null,
             sessionId: null,
-            driveTransport: 'proxy',
+            driveTransport: null,
             error: null,
             hadPreviousSession: true,
         });
@@ -759,8 +813,10 @@ export const useGoogleAuth = () => {
     // RESTORE SESSION FROM STORAGE
     // ============================================
 
-    const syncFromStorage = useCallback(async () => {
+    const syncFromStorage = useCallback(async function restoreGoogleStorage({ forceStatus = false }: { forceStatus?: boolean } = {}): Promise<void> {
 
+        const version = ++restoreVersion.current;
+        const isCurrent = () => mounted.current && restoreVersion.current === version;
         void ensureLegacyTokenCleanup();
 
         if (!SYNC_WORKER_CONFIG.isEnabled) {
@@ -789,7 +845,7 @@ export const useGoogleAuth = () => {
                 user: null,
                 accessToken: null,
                 sessionId: null,
-                driveTransport: 'proxy',
+                driveTransport: null,
                 error: null,
                 hadPreviousSession: true,
             });
@@ -797,10 +853,12 @@ export const useGoogleAuth = () => {
         }
 
         const session = await getStoredSession();
+        if (!isCurrent()) return;
         if (session) {
             writeHadPreviousSessionFlag(true);
 
             if (!isOnline()) {
+                statusRecovery.pending(session.sessionId);
                 driveAccessTokenProvider.setSession(session.sessionId);
                 setState({
                     isSignedIn: true,
@@ -808,14 +866,17 @@ export const useGoogleAuth = () => {
                     user: { id: session.userId, email: session.email },
                     accessToken: null,
                     sessionId: session.sessionId,
-                    driveTransport: 'proxy',
+                    driveTransport: null,
                     error: null,
                     hadPreviousSession: true,
                 });
                 return;
             }
 
-            const isValid = await validateWorkerSession(session);
+            const isValid = await validateWorkerSession(session, { force: forceStatus });
+            const currentSession = await getStoredSession();
+            if (!isCurrent()) return;
+            if (currentSession?.sessionId !== session.sessionId) return restoreGoogleStorage();
 
             if (forceReconnectState) {
                 driveAccessTokenProvider.setSession(null);
@@ -825,7 +886,7 @@ export const useGoogleAuth = () => {
                     user: null,
                     accessToken: null,
                     sessionId: null,
-                    driveTransport: 'proxy',
+                    driveTransport: null,
                     error: null,
                     hadPreviousSession: true,
                 });
@@ -835,19 +896,23 @@ export const useGoogleAuth = () => {
             if (isValid) {
                 forceReconnectState = false;
                 driveAccessTokenProvider.setSession(session.sessionId);
+                const driveTransport = getLastValidatedDriveTransport(session.sessionId);
                 setState({
                     isSignedIn: true,
                     isLoading: false,
                     user: { id: session.userId, email: session.email },
                     accessToken: null,
                     sessionId: session.sessionId,
-                    driveTransport: getLastValidatedDriveTransport(session.sessionId),
+                    driveTransport,
                     error: null,
                     hadPreviousSession: true,
                 });
+                markTransientTransportForRecovery(driveTransport);
                 return;
             }
             await clearStoredSession(session.sessionId);
+            if (!isCurrent()) return;
+            statusRecovery.clear(session.sessionId);
             driveAccessTokenProvider.setSession(null);
             publishDriveAuthInvalidation('authorization-failed');
             setState(prev => ({
@@ -857,12 +922,13 @@ export const useGoogleAuth = () => {
                 user: null,
                 accessToken: null,
                 sessionId: null,
-                driveTransport: 'proxy',
+                driveTransport: null,
                 error: null,
                 hadPreviousSession: true,
             }));
             return;
         }
+        statusRecovery.clear();
         driveAccessTokenProvider.setSession(null);
         // Another mounted consumer may have disconnected the shared session.
         // Clear its identity here too so account and sync controls can reconnect.
@@ -873,10 +939,10 @@ export const useGoogleAuth = () => {
             user: null,
             accessToken: null,
             sessionId: null,
-            driveTransport: 'proxy',
+            driveTransport: null,
             hadPreviousSession: readHadPreviousSessionFlag(),
         }));
-    }, [validateWorkerSession, isOnline]);
+    }, [validateWorkerSession, isOnline, markTransientTransportForRecovery]);
 
     // ============================================
     // INITIALIZATION
@@ -884,6 +950,7 @@ export const useGoogleAuth = () => {
 
     useEffect(() => {
 
+        mounted.current = true;
         syncFromStorage();
 
         const handleExternalAuthChange = () => {
@@ -893,24 +960,25 @@ export const useGoogleAuth = () => {
         authSubscribers.add(handleExternalAuthChange);
 
         return () => {
+            mounted.current = false;
+            restoreVersion.current += 1;
             authSubscribers.delete(handleExternalAuthChange);
         };
 
     }, [syncFromStorage]);
 
     useEffect(() => {
-        const handleOnline = () => {
-            syncFromStorage();
-        };
-
+        // Healthy sessions keep the cached validation and the existing zero-
+        // request wake budget. Pending failures have their own shared recovery.
+        const handleOnline = () => { void syncFromStorage(); };
         window.addEventListener('online', handleOnline);
-
-        return () => {
-            window.removeEventListener('online', handleOnline);
-        };
+        return () => window.removeEventListener('online', handleOnline);
     }, [syncFromStorage]);
 
+    useEffect(() => statusRecovery.subscribe(() => syncFromStorage({ forceStatus: true })), [syncFromStorage]);
+
     useEffect(() => subscribeToDriveAuthInvalidation(() => {
+        clearWorkerSessionValidation();
         driveAccessTokenProvider.clearToken();
         void syncFromStorage();
     }), [syncFromStorage]);
@@ -928,11 +996,7 @@ export const useGoogleAuth = () => {
 
 /** Reset module-level caches. Test-only. */
 export function _resetValidationCache(): void {
-    lastValidationTime = 0;
-    lastValidationResult = false;
-    lastValidationSessionId = null;
-    lastValidationDriveTransport = 'proxy';
-    validationInFlight = null;
+    clearWorkerSessionValidation();
     forceReconnectState = false;
     legacyTokenCleanupPromise = null;
     driveAccessTokenProvider.setSession(null);

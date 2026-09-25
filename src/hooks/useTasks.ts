@@ -119,6 +119,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
     const [archivedLoading, setArchivedLoading] = useState(false);
     const [archivedLoaded, setArchivedLoaded] = useState(false);
+    const [archivedError, setArchivedError] = useState<string | null>(null);
     const archivedLoadTriggered = useRef(false);
 
     useEffect(() => {
@@ -126,6 +127,7 @@ export function useTasks(options: UseTasksOptions = {}) {
 
         setArchivedTasks(collectEntities<Task>(store.archivedTasks as any));
         setArchivedLoaded(true);
+        setArchivedError(null);
     }, [options.includeArchived, archivedLoaded, store]);
 
     // Load archived tasks when requested
@@ -134,6 +136,7 @@ export function useTasks(options: UseTasksOptions = {}) {
 
         archivedLoadTriggered.current = true;
         setArchivedLoading(true);
+        setArchivedError(null);
 
         loadArchived()
             .then(() => {
@@ -142,6 +145,12 @@ export function useTasks(options: UseTasksOptions = {}) {
                     setArchivedTasks(collectEntities<Task>(archivedMap as any));
                 }
                 setArchivedLoaded(true);
+            })
+            .catch(() => {
+                // The sync status/dashboard expose the failure; this detached
+                // effect must not also become an unhandled promise rejection.
+                setArchivedError('Unable to load archived tasks.');
+                archivedLoadTriggered.current = false;
             })
             .finally(() => {
                 setArchivedLoading(false);
@@ -501,6 +510,7 @@ export function useTasks(options: UseTasksOptions = {}) {
         isLoading: activeLoading || archivedLoading || Boolean(options.includeArchived && !archivedLoaded),
         archivedLoading,
         archivedLoaded,
+        archivedError,
         
         // CRUD
         getTask: get,

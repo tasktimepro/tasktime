@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
     createRemoteDriveFixture,
     createStatefulDriveFixture,
-    installMockDriveRoutes,
+    installMockDirectDriveRoutes,
     seedStoredGoogleSession,
 } from './helpers/tasktime.js';
 
@@ -11,14 +11,15 @@ for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 900 });
         await page.addInitScript(() => localStorage.setItem('tasktime-onboarding-completed', 'true'));
         const fixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
-        await installMockDriveRoutes(page, fixture);
+        await installMockDirectDriveRoutes(page, fixture);
         let releaseFiles;
         const fileGate = new Promise(resolve => { releaseFiles = resolve; });
         let fileRequested = false;
-        await page.route('**/drive/files**', async route => {
+        await page.route('**/drive/v3/files**', async route => {
+            if (route.request().method() === 'OPTIONS') return route.fallback();
             fileRequested = true;
             await fileGate;
-            await fixture.handleRoute(route);
+            await route.fallback();
         });
         await page.goto('/account?section=sync');
         await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
@@ -101,7 +102,7 @@ for (const width of [1440, 390]) {
 test('Google disconnect restores connection controls and clears account identity without a reload', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('tasktime-onboarding-completed', 'true'));
     const fixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
-    await installMockDriveRoutes(page, fixture);
+    await installMockDirectDriveRoutes(page, fixture);
     await page.goto('/account?section=sync');
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
     await seedStoredGoogleSession(page, {

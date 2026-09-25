@@ -8,7 +8,6 @@ import {
     editProjectFromList,
     getProjectCard,
     installMockDirectDriveRoutes,
-    installMockDriveRoutes,
     openProjectDashboard,
     projectsHeadingName,
     seedStoredGoogleSession,
@@ -175,6 +174,39 @@ test.describe('Cloud sync smoke', () => {
         expect(failedRequests).toEqual([]);
     });
 
+    test('recovers a temporary session-status failure without a page reload or proxy request', async ({ page }) => {
+        const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
+        await installMockDirectDriveRoutes(page, driveFixture);
+        let statusFailures = 0;
+        await page.route('**/auth/status**', async route => {
+            if (route.request().method() === 'OPTIONS' || statusFailures > 0) {
+                await route.fallback();
+                return;
+            }
+
+            statusFailures += 1;
+            await route.fulfill({
+                status: 503,
+                headers: { 'Access-Control-Allow-Origin': 'http://127.0.0.1:3101' },
+                json: { error: 'Temporarily unavailable' },
+            });
+        });
+
+        await page.goto('/projects');
+        await seedStoredGoogleSession(page, {
+            sessionId: 'recover-status-session',
+            userId: 'recover-status-user',
+            email: 'recover-status@example.test',
+        });
+        await page.reload();
+
+        await expect.poll(() => statusFailures).toBe(1);
+        await expect.poll(() => driveFixture.statusRequestCount(), { timeout: 10_000 }).toBeGreaterThan(0);
+        await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
+        expect(driveFixture.directRequestCount()).toBeGreaterThan(0);
+        expect(driveFixture.proxyRequestCount()).toBe(0);
+    });
+
     test('pulls remote data on first manual restore when local state is pristine', async ({ page }) => {
         const projectTitle = `Playwright Remote Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({
@@ -188,7 +220,7 @@ test.describe('Cloud sync smoke', () => {
             ],
         }));
 
-        await installMockDriveRoutes(page, driveFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -218,7 +250,7 @@ test.describe('Cloud sync smoke', () => {
         const projectTitle = `Playwright Reconnect Project ${Date.now()}`;
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
 
-        await installMockDriveRoutes(page, driveFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -264,7 +296,7 @@ test.describe('Cloud sync smoke', () => {
             ],
         }));
 
-        await installMockDriveRoutes(page, driveFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -343,7 +375,7 @@ test.describe('Cloud sync smoke', () => {
             ],
         }));
 
-        await installMockDriveRoutes(page, driveFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -425,7 +457,7 @@ test.describe('Cloud sync smoke', () => {
             ],
         }));
 
-        await installMockDriveRoutes(page, driveFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -497,7 +529,7 @@ test.describe('Cloud sync smoke', () => {
             projects: [baseProject],
         }));
 
-        await installMockDriveRoutes(page, driveFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -582,8 +614,8 @@ test.describe('Cloud sync smoke', () => {
         const contextB = await browser.newContext();
 
         try {
-            await installMockDriveRoutes(contextA, driveFixture);
-            await installMockDriveRoutes(contextB, driveFixture);
+            await installMockDirectDriveRoutes(contextA, driveFixture);
+            await installMockDirectDriveRoutes(contextB, driveFixture);
 
             const pageA = await contextA.newPage();
             const pageB = await contextB.newPage();
@@ -668,8 +700,8 @@ test.describe('Cloud sync smoke', () => {
         const contextB = await browser.newContext();
 
         try {
-            await installMockDriveRoutes(contextA, driveFixture);
-            await installMockDriveRoutes(contextB, driveFixture);
+            await installMockDirectDriveRoutes(contextA, driveFixture);
+            await installMockDirectDriveRoutes(contextB, driveFixture);
 
             const pageA = await contextA.newPage();
             const pageB = await contextB.newPage();
@@ -775,7 +807,7 @@ test.describe('Cloud sync smoke', () => {
         const context = await browser.newContext();
 
         try {
-            await installMockDriveRoutes(context, driveFixture);
+            await installMockDirectDriveRoutes(context, driveFixture);
 
             const pageA = await context.newPage();
             await pageA.goto('/projects');
@@ -840,7 +872,7 @@ test.describe('Cloud sync smoke', () => {
     test('restores a valid Drive session and opens sync settings from the connected status', async ({ page }) => {
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
 
-        await installMockDriveRoutes(page, driveFixture);
+        await installMockDirectDriveRoutes(page, driveFixture);
 
         await page.goto('/projects');
         await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
@@ -914,15 +946,10 @@ test.describe('Cloud sync smoke', () => {
         const driveFixture = createStatefulDriveFixture(createRemoteDriveFixture({}));
         let expireDriveRequests = false;
 
-        await page.route('**/auth/status**', async (route) => {
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ authenticated: true }),
-            });
-        });
+        await installMockDirectDriveRoutes(page, driveFixture);
 
-        await page.route('**/drive/files**', async (route) => {
+        await page.route('**/drive/v3/files**', async (route) => {
+            if (route.request().method() === 'OPTIONS') return route.fallback();
             if (expireDriveRequests) {
                 await route.fulfill({
                     status: 401,
@@ -932,7 +959,7 @@ test.describe('Cloud sync smoke', () => {
                 return;
             }
 
-            await driveFixture.handleRoute(route);
+            await route.fallback();
         });
 
         await page.goto('/projects');

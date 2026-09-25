@@ -28,7 +28,29 @@ describe('DropboxAccessTokenProvider', () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.unstubAllGlobals();
+    });
+
+    it.each(['fetch', 'body'])('releases a stalled %s and allows the next token request', async stage => {
+        vi.useFakeTimers();
+        let signal: AbortSignal | undefined;
+        vi.mocked(fetch).mockImplementationOnce(async (_url, init) => {
+            signal = init?.signal as AbortSignal;
+            if (stage === 'fetch') return new Promise<Response>(() => {});
+            return { ok: true, json: () => new Promise(() => {}) } as Response;
+        }).mockResolvedValueOnce(tokenResponse());
+        const provider = new DropboxAccessTokenProvider({ endpoint: ENDPOINT, now: () => NOW });
+        provider.setSession(SESSION_ID);
+        const failed = vi.fn();
+        void provider.getToken().catch(failed);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(failed).toHaveBeenCalledWith(expect.objectContaining({ code: 'TOKEN_SERVICE_UNAVAILABLE' }));
+        expect(signal?.aborted).toBe(true);
+        expect(provider.hasCachedToken()).toBe(false);
+        await expect(provider.getToken()).resolves.toBe('dropbox-access-token-fixture');
+        expect(fetch).toHaveBeenCalledTimes(2);
+        provider.clearToken();
     });
 
     it('requests lazily, deduplicates, and keeps the token in memory only', async () => {

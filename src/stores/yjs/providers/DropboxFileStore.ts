@@ -35,9 +35,9 @@ interface DropboxFailure {
     tags: Set<string>;
 }
 
-class DropboxNetworkError extends Error {
+class DropboxNetworkError extends CloudFileStoreError {
     constructor() {
-        super('Dropbox request unavailable');
+        super('transient-unavailable', 'Dropbox request unavailable', { provider: 'dropbox' });
         this.name = 'DropboxNetworkError';
     }
 }
@@ -711,7 +711,7 @@ export class DropboxFileStore implements CloudFileStore {
                         { provider: this.provider },
                     );
                 }
-                if (error.code === 'PROVIDER_DISABLED') {
+                if (['PROVIDER_DISABLED', 'NEW_CONNECTIONS_DISABLED', 'ORIGIN_NOT_ALLOWED'].includes(error.code)) {
                     throw new CloudFileStoreError(
                         'policy-disabled',
                         'Dropbox access is currently disabled.',
@@ -730,11 +730,16 @@ export class DropboxFileStore implements CloudFileStore {
                         },
                     );
                 }
-                throw new CloudFileStoreError(
-                    'transient-unavailable',
-                    'Dropbox token service is temporarily unavailable.',
-                    { provider: this.provider },
-                );
+                if (['TOKEN_SERVICE_UNAVAILABLE', 'INTERNAL_ERROR'].includes(error.code)) {
+                    throw new CloudFileStoreError(
+                        'transient-unavailable',
+                        'Dropbox token service is temporarily unavailable.',
+                        { provider: this.provider, retryAfterMs: (error.retryAfterSeconds ?? 0) * 1000 },
+                    );
+                }
+                throw new CloudFileStoreError('invalid-response', 'Dropbox token request could not be completed.', {
+                    provider: this.provider,
+                });
             }
             if (options.safeToRetry && retryCount < MAX_RETRIES) {
                 await new Promise(resolve => setTimeout(resolve, Math.min(1000 * (2 ** retryCount), 30_000)));

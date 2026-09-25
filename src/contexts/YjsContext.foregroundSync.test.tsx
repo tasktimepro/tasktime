@@ -50,6 +50,7 @@ const mocks = vi.hoisted(() => {
         disconnectDropbox: vi.fn(),
         invalidateSession: vi.fn(),
         refreshDriveTransport: vi.fn(),
+        authDriveTransport: 'direct' as 'direct' | null,
         authCallbacks: {
             refreshDriveTransport: vi.fn(),
         },
@@ -79,7 +80,7 @@ vi.mock('@/hooks/useGoogleAuth', () => ({
     useGoogleAuth: () => ({
         isSignedIn: true,
         sessionId: 'google-session',
-        driveTransport: 'direct',
+        driveTransport: mocks.authDriveTransport,
         isLoading: false,
         signIn: mocks.signIn,
         signOut: mocks.signOut,
@@ -139,10 +140,11 @@ vi.mock('@/components/Modal', () => ({
 }));
 
 import { useYjs, YjsProvider, type YjsContextValue } from './YjsContext';
-import { CloudProviderMovedError } from '@/stores/yjs';
+import { CloudFileStoreError, CloudProviderMovedError } from '@/stores/yjs';
 
 afterEach(() => {
     mocks.store.isCloudConnected.mockReturnValue(true);
+    mocks.authDriveTransport = 'direct';
     mocks.authCallbacks.refreshDriveTransport = mocks.refreshDriveTransport;
 });
 
@@ -180,6 +182,39 @@ describe('YjsProvider foreground sync scheduling', () => {
             configurable: true,
             value: 'visible',
         });
+    });
+
+    it('waits for a confirmed direct transport before reconnecting a retained session', async () => {
+        mocks.store.isCloudConnected.mockReturnValue(false);
+        mocks.store.connectDrive.mockReset().mockResolvedValue(undefined);
+        mocks.authDriveTransport = null;
+
+        const view = await renderConnectedProvider();
+        expect(mocks.store.connectDrive).not.toHaveBeenCalled();
+
+        mocks.authDriveTransport = 'direct';
+        view.rerender(<YjsProvider><div>connected</div></YjsProvider>);
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(mocks.store.connectDrive).toHaveBeenCalledOnce();
+        expect(mocks.store.connectDrive).toHaveBeenCalledWith(expect.objectContaining({
+            transport: 'direct',
+        }));
+    });
+
+    it('keeps an established provider connected while a later status check is unresolved', async () => {
+        mocks.authDriveTransport = null;
+        mocks.store.disconnectCloud.mockClear();
+        mocks.store.connectDrive.mockClear();
+
+        await renderConnectedProvider();
+
+        expect(mocks.store.isCloudConnected).toHaveBeenCalled();
+        expect(mocks.store.disconnectCloud).not.toHaveBeenCalled();
+        expect(mocks.store.connectDrive).not.toHaveBeenCalled();
     });
 
     it('coalesces tab-visible and online wake signals into one sync request', async () => {
@@ -298,6 +333,83 @@ describe('YjsProvider cloud connection lifecycle', () => {
             hostedServiceSessionId: 'google-session',
             isGoogleStorageActive: true,
         });
+    });
+
+    it.each(['google-drive', 'dropbox'] as const)('recovers a transient initial %s connection without a reload', async provider => {
+        vi.useFakeTimers();
+        if (provider === 'dropbox') {
+            Object.assign(mocks.identity, {
+                activeStorageProvider: 'dropbox', activeStorageSessionId: 'dropbox-session',
+                activeStorageGeneration: 7, hostedServiceSessionId: 'dropbox-session', isGoogleStorageActive: false,
+            });
+        }
+        const connect = provider === 'dropbox' ? mocks.store.connectCloud : mocks.store.connectDrive;
+        connect.mockRejectedValueOnce(new CloudFileStoreError('transient-unavailable', 'Temporarily unavailable', { provider }))
+            .mockImplementationOnce(async () => { mocks.store.isCloudConnected.mockReturnValue(true); });
+        const view = await renderConnectedProvider();
+        expect(connect).toHaveBeenCalledTimes(1);
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+
+        expect(connect).toHaveBeenCalledTimes(2);
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(connect).toHaveBeenCalledTimes(2);
+        view.unmount();
+        vi.useRealTimers();
+    });
+
+    it('bounds failed connection retries and honors provider backoff on a later wake', async () => {
+        vi.useFakeTimers();
+        mocks.store.connectDrive.mockRejectedValue(new CloudFileStoreError('rate-limited', 'Try later', {
+            provider: 'google-drive', retryAfterMs: 20_000,
+        }));
+        const view = await renderConnectedProvider();
+        await act(async () => { await vi.advanceTimersByTimeAsync(19_999); });
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(1);
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_001); });
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(4);
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(4);
+        await act(async () => {
+            window.dispatchEvent(new Event('online'));
+            document.dispatchEvent(new Event('visibilitychange'));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(5);
+        view.unmount();
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(5);
+        vi.useRealTimers();
+    });
+
+    it.each(['conflict', 'policy-disabled', 'missing-scope', 'unauthenticated'] as const)('does not automatically retry a terminal %s failure', async code => {
+        vi.useFakeTimers();
+        mocks.store.connectDrive.mockRejectedValue(new CloudFileStoreError(code, 'Action required', { provider: 'google-drive' }));
+        const view = await renderConnectedProvider();
+        await act(async () => {
+            window.dispatchEvent(new Event('online'));
+            await vi.advanceTimersByTimeAsync(60_000);
+        });
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(1);
+        view.unmount();
+        vi.useRealTimers();
+    });
+
+    it('cancels the old provider recovery when the selected provider changes', async () => {
+        vi.useFakeTimers();
+        mocks.store.connectDrive.mockRejectedValue(new CloudFileStoreError('transient-unavailable', 'Try later', { provider: 'google-drive' }));
+        const view = await renderConnectedProvider();
+        Object.assign(mocks.identity, {
+            activeStorageProvider: 'dropbox', activeStorageSessionId: 'new-dropbox-session',
+            activeStorageGeneration: 8, hostedServiceSessionId: 'new-dropbox-session', isGoogleStorageActive: false,
+        });
+        mocks.store.connectCloud.mockResolvedValue(undefined);
+        view.rerender(<YjsProvider><div>replacement</div></YjsProvider>);
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(mocks.store.connectDrive).toHaveBeenCalledTimes(1);
+        expect(mocks.store.connectCloud).toHaveBeenCalledTimes(1);
+        view.unmount();
+        vi.useRealTimers();
     });
 
     it('coalesces repeated renders while the same provider connection is still in flight', async () => {

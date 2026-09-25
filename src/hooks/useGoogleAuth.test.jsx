@@ -50,6 +50,8 @@ describe('useGoogleAuth', () => {
         vi.restoreAllMocks()
         vi.clearAllMocks()
         _resetValidationCache()
+        getStoredSession.mockReset().mockResolvedValue(null)
+        clearStoredSession.mockReset().mockImplementation(async () => { getStoredSession.mockResolvedValue(null); return true })
         // Mirror persisted writes when subscribers re-read after sign-in.
         storeSession.mockImplementation(async session => getStoredSession.mockResolvedValue(session))
         window.sessionStorage.clear()
@@ -90,13 +92,12 @@ describe('useGoogleAuth', () => {
 
     it('keeps hadPreviousSession true after an invalid stored session is cleared and auth re-checks run again', async () => {
         getStoredSession
-            .mockResolvedValueOnce({
+            .mockResolvedValue({
                 sessionId: 'session-123',
                 userId: 'user-1',
                 email: 'user@example.com',
                 createdAt: new Date().toISOString(),
             })
-            .mockResolvedValue(null)
 
         fetch.mockResolvedValueOnce({
             ok: false,
@@ -117,7 +118,7 @@ describe('useGoogleAuth', () => {
         })
 
         await waitFor(() => {
-            expect(getStoredSession).toHaveBeenCalledTimes(2)
+            expect(getStoredSession).toHaveBeenCalledTimes(3)
         })
 
         expect(result.current.hadPreviousSession).toBe(true)
@@ -143,7 +144,209 @@ describe('useGoogleAuth', () => {
 
         expect(result.current.isSignedIn).toBe(true)
         expect(result.current.sessionId).toBe('session-rate-limited')
+        expect(result.current.driveTransport).toBeNull()
         expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
+    it('keeps a stored session when auth status times out', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-status-timeout',
+            userId: 'user-status-timeout',
+            email: 'timeout@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch.mockResolvedValueOnce({ ok: false, status: 408 })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.driveTransport).toBeNull()
+        expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
+    it('recovers a transient status failure and selects direct Drive without a page refresh', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-recovering',
+            userId: 'user-recovering',
+            email: 'recovering@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch
+            .mockRejectedValueOnce(new TypeError('Network unavailable'))
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'direct',
+                    transportPolicyVersion: 1,
+                }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        expect(result.current.isSignedIn).toBe(true)
+        expect(result.current.driveTransport).toBeNull()
+        expect(fetch).toHaveBeenCalledTimes(1)
+
+        await waitFor(() => expect(result.current.driveTransport).toBe('direct'), { timeout: 4000 })
+        expect(fetch).toHaveBeenCalledTimes(2)
+        expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
+    it('waits for Retry-After before rechecking a rate-limited session status', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-retry-after',
+            userId: 'user-retry-after',
+            email: 'retry-after@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        fetch
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 429,
+                headers: { get: () => '2' },
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'direct',
+                    transportPolicyVersion: 1,
+                }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+        expect(result.current.driveTransport).toBeNull()
+        await new Promise(resolve => setTimeout(resolve, 1650))
+        expect(fetch).toHaveBeenCalledTimes(1)
+        await waitFor(() => expect(result.current.driveTransport).toBe('direct'), { timeout: 3000 })
+        expect(fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('waits for visibility before retrying a hidden tab after a status network failure', async () => {
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-hidden',
+            userId: 'user-hidden',
+            email: 'hidden@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+        fetch
+            .mockRejectedValueOnce(new TypeError('Network unavailable'))
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    authenticated: true,
+                    driveTransport: 'direct',
+                    transportPolicyVersion: 1,
+                }),
+            })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.isLoading).toBe(false))
+        expect(result.current.driveTransport).toBeNull()
+        expect(fetch).toHaveBeenCalledTimes(1)
+
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+        act(() => document.dispatchEvent(new Event('visibilitychange')))
+
+        await waitFor(() => expect(result.current.driveTransport).toBe('direct'))
+        expect(fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('bounds automatic status retries and accepts a later online recovery signal', async () => {
+        vi.useFakeTimers()
+        getStoredSession.mockResolvedValue({
+            sessionId: 'session-bounded',
+            userId: 'user-bounded',
+            email: 'bounded@example.com',
+            createdAt: new Date().toISOString(),
+        })
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+            fetch.mockRejectedValueOnce(new TypeError('Network unavailable'))
+        }
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                authenticated: true,
+                driveTransport: 'direct',
+                transportPolicyVersion: 1,
+            }),
+        })
+
+        const { result } = renderHook(() => useGoogleAuth())
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+        expect(result.current.driveTransport).toBeNull()
+        expect(fetch).toHaveBeenCalledTimes(1)
+
+        for (const delay of [1500, 5000, 15000]) {
+            await act(async () => { await vi.advanceTimersByTimeAsync(delay) })
+        }
+        expect(fetch).toHaveBeenCalledTimes(4)
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+        expect(fetch).toHaveBeenCalledTimes(4)
+
+        await act(async () => {
+            window.dispatchEvent(new Event('online'))
+            await vi.advanceTimersByTimeAsync(0)
+        })
+        expect(result.current.driveTransport).toBe('direct')
+        expect(fetch).toHaveBeenCalledTimes(5)
+    })
+
+    it('keeps healthy foreground wake signals free of auth requests', async () => {
+        getStoredSession.mockResolvedValue({ sessionId: 'healthy', userId: 'user', email: 'owner@example.test' })
+        fetch.mockResolvedValue({ ok: true, json: async () => ({ authenticated: true, driveTransport: 'direct', transportPolicyVersion: 1 }) })
+        const { result } = renderHook(() => useGoogleAuth())
+        await waitFor(() => expect(result.current.driveTransport).toBe('direct'))
+
+        await act(async () => {
+            window.dispatchEvent(new Event('online'))
+            document.dispatchEvent(new Event('visibilitychange'))
+        })
+
+        expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('recovers after a stalled status request times out without clearing the session', async () => {
+        vi.useFakeTimers()
+        getStoredSession.mockResolvedValue({ sessionId: 'stalled', userId: 'user', email: 'owner@example.test' })
+        fetch.mockImplementationOnce(() => new Promise(() => {}))
+            .mockResolvedValue({ ok: true, json: async () => ({ authenticated: true, driveTransport: 'direct', transportPolicyVersion: 1 }) })
+        const { result } = renderHook(() => useGoogleAuth())
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+        await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+        expect(result.current.isLoading).toBe(false)
+        expect(result.current.sessionId).toBe('stalled')
+        await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+        expect(result.current.driveTransport).toBe('direct')
+        expect(clearStoredSession).not.toHaveBeenCalled()
+    })
+
+    it('does not restore a signed-out session when its delayed recovery response arrives', async () => {
+        vi.useFakeTimers()
+        getStoredSession.mockResolvedValue({ sessionId: 'old-session', userId: 'user', email: 'owner@example.test' })
+        let resolveStatus
+        fetch.mockRejectedValueOnce(new TypeError('Offline'))
+            .mockImplementationOnce(() => new Promise(resolve => { resolveStatus = resolve }))
+        const { result } = renderHook(() => useGoogleAuth())
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+        await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+        expect(fetch).toHaveBeenCalledTimes(2)
+        clearStoredSession.mockImplementationOnce(async () => { getStoredSession.mockResolvedValue(null); return true })
+
+        await act(async () => { await result.current.signOut() })
+        await act(async () => {
+            resolveStatus({ ok: true, json: async () => ({ authenticated: true, driveTransport: 'direct', transportPolicyVersion: 1 }) })
+        })
+
+        expect(result.current.sessionId).toBeNull()
+        expect(result.current.isSignedIn).toBe(false)
     })
 
     it('restores signed-in state when session and Drive access are valid', async () => {
@@ -201,7 +404,7 @@ describe('useGoogleAuth', () => {
         }))
     })
 
-    it('force-refreshes a direct policy and switches the next connection to proxy without clearing the session', async () => {
+    it('does not switch to the retired proxy when a later status lacks direct policy', async () => {
         const storedSession = {
             sessionId: 'session-policy-rollback',
             userId: 'user-policy-rollback',
@@ -231,12 +434,12 @@ describe('useGoogleAuth', () => {
         await waitFor(() => expect(result.current.driveTransport).toBe('direct'))
 
         await act(async () => {
-            await expect(result.current.refreshDriveTransport()).resolves.toBe('proxy')
+            await expect(result.current.refreshDriveTransport()).resolves.toBeNull()
         })
 
         expect(result.current.isSignedIn).toBe(true)
         expect(result.current.sessionId).toBe(storedSession.sessionId)
-        expect(result.current.driveTransport).toBe('proxy')
+        expect(result.current.driveTransport).toBeNull()
         expect(clearStoredSession).not.toHaveBeenCalled()
         expect(fetch).toHaveBeenCalledTimes(2)
     })
@@ -323,7 +526,7 @@ describe('useGoogleAuth', () => {
         { driveTransport: 'direct' },
         { driveTransport: 'unsupported', transportPolicyVersion: 1 },
         {},
-    ])('fails closed to proxy for unsupported status policy %#', async (status) => {
+    ])('keeps the transport unresolved for unsupported status policy %#', async (status) => {
         getStoredSession.mockResolvedValue({
             sessionId: 'session-policy-fallback',
             userId: 'user-policy-fallback',
@@ -342,7 +545,7 @@ describe('useGoogleAuth', () => {
         })
 
         expect(result.current.isSignedIn).toBe(true)
-        expect(result.current.driveTransport).toBe('proxy')
+        expect(result.current.driveTransport).toBeNull()
         expect(result.current.accessToken).toBeNull()
     })
 
@@ -353,7 +556,7 @@ describe('useGoogleAuth', () => {
             email: 'offline@example.com',
             createdAt: new Date().toISOString(),
         })
-        vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+        const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
 
         const { result } = renderHook(() => useGoogleAuth())
 
@@ -363,7 +566,21 @@ describe('useGoogleAuth', () => {
 
         expect(result.current.isSignedIn).toBe(true)
         expect(result.current.sessionId).toBe('session-offline')
+        expect(result.current.driveTransport).toBeNull()
         expect(fetch).not.toHaveBeenCalled()
+
+        fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                authenticated: true,
+                driveTransport: 'direct',
+                transportPolicyVersion: 1,
+            }),
+        })
+        online.mockReturnValue(true)
+        act(() => window.dispatchEvent(new Event('online')))
+        await waitFor(() => expect(result.current.driveTransport).toBe('direct'))
+        expect(fetch).toHaveBeenCalledTimes(1)
     })
 
     it('preserves the local session and reports a retryable revoke failure truthfully', async () => {
@@ -1475,13 +1692,12 @@ describe('useGoogleAuth', () => {
 
     it('invalidates the local session into reconnect state without revoking access', async () => {
         getStoredSession
-            .mockResolvedValueOnce({
+            .mockResolvedValue({
                 sessionId: 'session-999',
                 userId: 'user-999',
                 email: 'recover@example.com',
                 createdAt: new Date().toISOString(),
             })
-            .mockResolvedValue(null)
 
         fetch.mockResolvedValueOnce({
             ok: true,
@@ -1521,6 +1737,7 @@ describe('useGoogleAuth', () => {
 
         const { result } = renderHook(() => useGoogleAuth())
 
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
         await act(async () => {
             await result.current.invalidateSession()
         })
@@ -1598,6 +1815,10 @@ describe('useGoogleAuth', () => {
             expect(getStoredSession).toHaveBeenCalledTimes(2)
             expect(fetch).toHaveBeenCalledTimes(1)
         })
+
+        act(() => window.dispatchEvent(new Event('online')))
+        await act(async () => { await Promise.resolve() })
+        expect(fetch).toHaveBeenCalledTimes(1)
 
         await act(async () => {
             resolveStatus({

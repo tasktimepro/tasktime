@@ -106,7 +106,7 @@ The visible sync-status control remains navigable to Account > Cloud Sync during
 - Invalid entities should be filtered or normalized at read/import boundaries.
 - Persisted-data normalization and cross-document reconciliation must be idempotent and emit no Yjs update once data is settled.
 - Cross-document references can be temporarily incomplete while lazy docs load.
-- A lazy document requested outside a sync waits for the active provider pass before doing provider or manifest work. A lazy document loaded from that pass's completion callback joins the pass and lets the owner commit the combined manifest, avoiding overlapping revision-sensitive writes.
+- Connection, full sync and lazy archive writers share serialization, including duplicate archive requests and browsers without Web Locks. Completion-callback loads serialize under the existing cross-tab lock; the owning pass waits for that queue and retains an error if a callback catches a failed load. Attach local update subscriptions before lazy I/O or waits so later edits remain queued after a failure.
 - Do not add non-CRDT overwrite behavior for normal sync.
 
 ## Manifest And File Rules
@@ -137,6 +137,17 @@ The visible sync-status control remains navigable to Account > Cloud Sync during
 - Failed pull/consistency work uses retry evidence separate from dirty-document evidence.
 - Dirty markers may clear only after the active provider is not `offline` or `error` and reports no local changes left to push.
 - Failed sync must not make UI flows behave as if sync succeeded.
+- Google session-status failures retain the local session without choosing a
+  file transport. Only an explicit supported direct policy starts a Drive
+  connection. Visible-tab status retries are bounded, honor Retry-After, and
+  later online/visible signals may recheck; no retry sends file data through
+  the retired Worker proxy.
+
+- Both providers automatically retry temporary status/initial-connection failures
+  with a shared bounded schedule. Status/token requests have a ten-second timeout;
+  retries honor Retry-After and only run while visible and online. Healthy wakes
+  add no auth traffic. Explicit auth/policy/conflict failures stay visible, and
+  disconnect/provider changes cancel recovery without altering local data.
 
 ## Import And Export
 

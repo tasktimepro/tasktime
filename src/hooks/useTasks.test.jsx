@@ -26,6 +26,18 @@ describe('useTasks', () => {
         vi.useRealTimers()
     })
 
+    it('retains an archive-load error without an unhandled rejection or claiming history is ready', async () => {
+        mockUseYjs.mockReturnValue({
+            store: { archivedTasks: null }, isReady: true,
+            loadArchivedTasks: vi.fn().mockRejectedValue(new Error('Cloud archive conflict')),
+        })
+        mockUseYjsCollection.mockReturnValue({ items: [], isLoading: false, get: vi.fn(), create: vi.fn(), update: vi.fn() })
+        const { result } = renderHook(() => useTasks({ includeArchived: true }))
+        await waitFor(() => expect(result.current.archivedError).toBe('Unable to load archived tasks.'))
+        expect(result.current.archivedLoaded).toBe(false)
+        expect(result.current.archivedLoading).toBe(false)
+    })
+
     it('loads archived tasks, filters by project, and exposes helpers', async () => {
         const archivedMap = createTestYMap({
             t3: { id: 't3', projectId: 'p1', archived: true, parentTaskId: null },

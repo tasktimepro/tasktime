@@ -1,3 +1,4 @@
+import { withCloudAuthTimeout } from '@/utils/cloudAuthRecovery';
 import { SYNC_WORKER_CONFIG } from '@/config/google';
 import { APP_VERSION } from '@/constants/app';
 
@@ -233,42 +234,43 @@ export class DriveAccessTokenProvider {
         generation: number,
         forceRefresh: boolean,
     ): Promise<string> {
-        let response: Response;
+        let value: unknown;
         try {
-            response = await fetch(withAppVersion(this.endpoint), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Id': sessionId,
-                    'X-TaskTime-App-Version': APP_VERSION,
-                },
-                body: JSON.stringify({ forceRefresh }),
-                cache: 'no-store',
-                credentials: 'omit',
-                referrerPolicy: 'no-referrer',
+            value = await withCloudAuthTimeout(async signal => {
+                const response = await fetch(withAppVersion(this.endpoint), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Id': sessionId,
+                        'X-TaskTime-App-Version': APP_VERSION,
+                    },
+                    body: JSON.stringify({ forceRefresh }),
+                    cache: 'no-store',
+                    credentials: 'omit',
+                    referrerPolicy: 'no-referrer',
+                    signal,
+                });
+                if (!response.ok) {
+                    const code = await readWorkerErrorCode(response);
+                    throw new DriveAccessTokenError(code, messageForWorkerError(code), {
+                        status: response.status,
+                        retryAfterSeconds: parseRetryAfter(response),
+                    });
+                }
+                try {
+                    return await response.json();
+                } catch {
+                    throw new DriveAccessTokenError(
+                        'INVALID_TOKEN_RESPONSE',
+                        'The Google Drive token service returned an invalid response.',
+                    );
+                }
             });
-        } catch {
+        } catch (error) {
+            if (error instanceof DriveAccessTokenError) throw error;
             throw new DriveAccessTokenError(
                 'TOKEN_SERVICE_UNAVAILABLE',
                 'The Google Drive token service is temporarily unavailable.',
-            );
-        }
-
-        if (!response.ok) {
-            const code = await readWorkerErrorCode(response);
-            throw new DriveAccessTokenError(code, messageForWorkerError(code), {
-                status: response.status,
-                retryAfterSeconds: parseRetryAfter(response),
-            });
-        }
-
-        let value: unknown;
-        try {
-            value = await response.json();
-        } catch {
-            throw new DriveAccessTokenError(
-                'INVALID_TOKEN_RESPONSE',
-                'The Google Drive token service returned an invalid response.',
             );
         }
 

@@ -63,6 +63,11 @@ Active and archived records retain the existing merge/validation rules;
 nested archived updates notify consumers. These are additive read-state fields,
 with no persisted expense or mutation contract change.
 
+`useTasks({ includeArchived: true })` exposes nullable `archivedError` when its
+background archive load fails. It consumes the rejected promise without claiming
+`archivedLoaded`; the existing loading/readiness contract remains in force. This
+is additive hook state, with no persisted task-schema change.
+
 `useInvoices.cancelInvoice` and the agent `cancel_invoice` command are adapters over one shared cancellation application. The operation accepts `invoiceId`, a trimmed 1–500 character `reason`, a stable `operationId`, and an optional finite `canceledAt`; adapters additionally require exact invoice-number confirmation and agent approval. It returns the retained canceled invoice plus stable counts for released time entries, deleted adjustment entries, released expenses, released quoted tasks, restored task cutoffs, and retained project links, with `retainedInvoiceNumber: true` and retry state through `alreadyApplied`. The operation rejects missing, draft, paid, and conflicting already-canceled invoices without partial product mutation and replays the same persisted operation idempotently.
 
 `useInvoices.markAsUnpaid` and the agent `mark_invoice_unpaid` command are payment-correction boundaries, not refund operations. They accept only an invoice whose current persisted status is `paid`, clear its payment evidence, and preserve every billing-source claim. Missing, non-paid, and canceled invoices fail without mutation; callers cannot use this transition to reopen or alter a sent, overdue, draft, or canceled invoice.
@@ -186,6 +191,10 @@ configured build therefore does not require the production app to permanently
 trust another Worker hostname.
 
 The Worker owns provider OAuth code exchange, encrypted refresh-token persistence, session validation, token issuance, revocation, and opaque hosted-identity linking. The browser owns product data semantics. A successful provider-bound status response selects direct Google Drive or Dropbox for the next connection. The browser sends its non-secret build identifier in `X-TaskTime-App-Version` and matching `appVersion` query parameter on status and token requests. Direct connections request a short-lived provider access token, retain it only in active-tab memory, and send routine sync file requests directly to the selected provider. The Worker must never return a refresh token or receive routine provider file bodies. Errors exposed to the browser must be sanitized; private deployment/KV/D1 details are not part of this public contract.
+
+A retained Google session is not by itself a file-transport decision. If its Worker status check is transiently unavailable, the browser keeps local data and the session and waits for an explicit supported direct policy. Missing or unsupported policy cannot select the retired `/drive/*` data route; a definitively rejected session follows the existing authorization boundary.
+
+Google Drive and Dropbox share bounded auth/connection recovery: status and token requests, including response-body reads, time out after ten seconds. Temporary status or initial connection failures retry at most three times while visible and online (1.5, 5 and 15 seconds between attempts, extended by a bounded `Retry-After`). Later online/visible signals can start another bounded recovery window; signals within one second coalesce. Healthy sessions do not gain extra Worker requests on wake. Concurrent status consumers share a request and recovery budget. Disconnect, provider/session replacement and unmount fence stale responses and cancel pending recovery. Authorization, scope, policy, invalid-response and data-conflict failures do not trigger automatic connection retries. Recovery uses the normal mode-specific connection path and never resets data, changes provider or creates dirty-document evidence.
 
 `POST /email/invoice` accepts the existing opaque `X-Session-Id` and an invoice, reminder, or quote email payload containing a base64 PDF attachment. The browser and Worker both require the decoded attachment to start with the PDF signature and contain a final PDF end-of-file marker before the provider call. TaskTime Pro does not persist the attachment bytes.
 

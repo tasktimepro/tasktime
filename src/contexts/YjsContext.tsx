@@ -34,14 +34,28 @@ import type * as Y from 'yjs';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { useCloudStorageLifecycle } from '@/hooks/useCloudStorageLifecycle';
 import { useDropboxAuth } from '@/hooks/useDropboxAuth';
+import { CloudAuthRecovery } from '@/utils/cloudAuthRecovery';
 import { resolveCloudStorageIdentity } from '@/stores/yjs/cloudStorageLifecycle';
-import { driveAccessTokenProvider } from '@/stores/yjs/providers/DriveAccessTokenProvider';
-import { dropboxAccessTokenProvider } from '@/stores/yjs/providers/DropboxAccessTokenProvider';
+import { DriveAccessTokenError, driveAccessTokenProvider } from '@/stores/yjs/providers/DriveAccessTokenProvider';
+import { DropboxAccessTokenError, dropboxAccessTokenProvider } from '@/stores/yjs/providers/DropboxAccessTokenProvider';
 import { useToast } from '@/hooks/useToast';
 import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import { shouldSyncOnLoad, wasSyncInterrupted, hasPersistedPendingChanges } from '@/utils/syncPersistence';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
+
+/** Retry only explicitly temporary failures; auth, policy and data conflicts stop. */
+function connectionRetryAt(error: unknown): number | null {
+    if (error instanceof CloudFileStoreError
+        && ['transient-unavailable', 'rate-limited'].includes(error.code)) {
+        return Date.now() + Math.min(Math.max(error.retryAfterMs ?? 0, 0), 3_600_000);
+    }
+    if ((error instanceof DriveAccessTokenError || error instanceof DropboxAccessTokenError)
+        && ['TOKEN_SERVICE_UNAVAILABLE', 'INTERNAL_ERROR', 'RATE_LIMITED'].includes(error.code)) {
+        return Date.now() + Math.min(Math.max((error.retryAfterSeconds ?? 0) * 1000, 0), 3_600_000);
+    }
+    return null;
+}
 
 declare global {
 
@@ -194,6 +208,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
     const consecutiveSyncErrors = useRef(0);
     const cloudConnectionAttempt = useRef<CloudConnectionAttempt | null>(null);
     const blockedCloudConnectionKey = useRef<string | null>(null);
+    const connectionRecovery = useMemo(() => new CloudAuthRecovery(), []);
+    const connectionRecoveryKey = useRef<string | null>(null);
     
     // Auth hook for Google Drive connection
     const {
@@ -504,7 +520,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
     // never authorizes hosted services while the selected provider owns storage.
     // NOTE: Do NOT include autoSyncEnabled/autoSyncMode in deps - those are handled
     // by the preference sync effect calling store.setCloudSyncPreferences().
-    useEffect(() => {
+    const connectSelectedProvider = useCallback(async () => {
         if (!isReady || authLoading || dropboxAuthLoading || storageLifecycleLoading) return;
 
         const hasWorkerAuth = Boolean(sessionId);
@@ -512,6 +528,7 @@ export function YjsProvider({ children }: YjsProviderProps) {
         if (store.isCloudConnected()
             && runtimeScope.provider === activeStorageProvider
             && runtimeScope.generation === activeStorageGeneration) {
+            connectionRecovery.clear();
             blockedCloudConnectionKey.current = null;
             setMovedToStorageProvider(null);
             setIsCloudConnected(true);
@@ -522,13 +539,19 @@ export function YjsProvider({ children }: YjsProviderProps) {
             return;
         }
 
-        if (isSignedIn && hasWorkerAuth && isGoogleStorageActive) {
+        // A retained session is not a transport decision. The retired Worker
+        // proxy must never receive file requests while status is unresolved.
+        if (isSignedIn && hasWorkerAuth && isGoogleStorageActive && driveTransport === 'direct') {
             const attemptKey = JSON.stringify([
                 'google-drive',
                 activeStorageGeneration ?? 0,
                 sessionId,
                 driveTransport,
             ]);
+            if (connectionRecoveryKey.current !== attemptKey) {
+                connectionRecovery.clear();
+                connectionRecoveryKey.current = attemptKey;
+            }
             if (blockedCloudConnectionKey.current === attemptKey) return;
             if (cloudConnectionAttempt.current?.key === attemptKey) return;
             const attempt = { key: attemptKey };
@@ -536,14 +559,15 @@ export function YjsProvider({ children }: YjsProviderProps) {
             setHasSynced(false);
             setIsConnecting(true);
 
-            store.connectDrive({
+            await store.connectDrive({
                 transport: driveTransport,
                 sessionId,
                 generation: activeStorageGeneration ?? 0,
-                tokenProvider: driveTransport === 'direct' ? driveAccessTokenProvider : null,
+                tokenProvider: driveAccessTokenProvider,
             })
                 .then(async () => {
                     if (cloudConnectionAttempt.current !== attempt) return;
+                    connectionRecovery.clear(attemptKey);
                     blockedCloudConnectionKey.current = null;
                     setMovedToStorageProvider(null);
                     setIsCloudConnected(true);
@@ -557,11 +581,19 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 })
                 .catch(async (error) => {
                     if (cloudConnectionAttempt.current !== attempt) return;
-                    if (handleMovedWorkspaceFailure(error, attemptKey)) return;
-                    if (await handleDriveBoundaryFailure(error)) {
+                    if (handleMovedWorkspaceFailure(error, attemptKey)) {
+                        connectionRecovery.clear(attemptKey);
                         return;
                     }
+                    if (await handleDriveBoundaryFailure(error)) {
+                        connectionRecovery.clear(attemptKey);
+                        return;
+                    }
+                    if (cloudConnectionAttempt.current !== attempt) return;
 
+                    const retryAt = connectionRetryAt(error);
+                    if (retryAt !== null) connectionRecovery.pending(attemptKey, retryAt);
+                    else connectionRecovery.clear(attemptKey);
                     setIsCloudConnected(false);
                     setSyncState('error');
                     setSyncPhase('error');
@@ -583,6 +615,10 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 activeStorageGeneration,
                 dropboxSessionId,
             ]);
+            if (connectionRecoveryKey.current !== attemptKey) {
+                connectionRecovery.clear();
+                connectionRecoveryKey.current = attemptKey;
+            }
             if (blockedCloudConnectionKey.current === attemptKey) return;
             if (cloudConnectionAttempt.current?.key === attemptKey) return;
             const attempt = { key: attemptKey };
@@ -596,13 +632,14 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 }),
             });
 
-            store.connectCloud({
+            await store.connectCloud({
                 provider: 'dropbox',
                 generation: activeStorageGeneration,
                 manifest,
             })
                 .then(() => {
                     if (cloudConnectionAttempt.current !== attempt) return;
+                    connectionRecovery.clear(attemptKey);
                     blockedCloudConnectionKey.current = null;
                     setMovedToStorageProvider(null);
                     setIsCloudConnected(true);
@@ -613,8 +650,18 @@ export function YjsProvider({ children }: YjsProviderProps) {
                 })
                 .catch(async (error) => {
                     if (cloudConnectionAttempt.current !== attempt) return;
-                    if (handleMovedWorkspaceFailure(error, attemptKey)) return;
-                    if (await handleCloudBoundaryFailure(error)) return;
+                    if (handleMovedWorkspaceFailure(error, attemptKey)) {
+                        connectionRecovery.clear(attemptKey);
+                        return;
+                    }
+                    if (await handleCloudBoundaryFailure(error)) {
+                        connectionRecovery.clear(attemptKey);
+                        return;
+                    }
+                    if (cloudConnectionAttempt.current !== attempt) return;
+                    const retryAt = connectionRetryAt(error);
+                    if (retryAt !== null) connectionRecovery.pending(attemptKey, retryAt);
+                    else connectionRecovery.clear(attemptKey);
                     setIsCloudConnected(false);
                     setSyncState('error');
                     setSyncPhase('error');
@@ -629,6 +676,8 @@ export function YjsProvider({ children }: YjsProviderProps) {
         }
 
         cloudConnectionAttempt.current = null;
+        connectionRecovery.clear();
+        connectionRecoveryKey.current = null;
         blockedCloudConnectionKey.current = null;
         setMovedToStorageProvider(null);
         store.disconnectCloud();
@@ -660,7 +709,15 @@ export function YjsProvider({ children }: YjsProviderProps) {
         handleDriveBoundaryFailure,
         handleCloudBoundaryFailure,
         handleMovedWorkspaceFailure,
+        connectionRecovery,
     ]);
+
+    useEffect(() => { void connectSelectedProvider(); }, [connectSelectedProvider]);
+    useEffect(() => connectionRecovery.subscribe(connectSelectedProvider), [connectionRecovery, connectSelectedProvider]);
+    useEffect(() => () => {
+        cloudConnectionAttempt.current = null;
+        connectionRecovery.clear();
+    }, [connectionRecovery]);
 
     // Update session ID when it changes (Worker mode)
     useEffect(() => {

@@ -193,10 +193,6 @@ function parseMultipartUpload(request) {
     let fileBuffer = null;
 
     for (const part of parts) {
-        if (!part.includes('Content-Disposition')) {
-            continue;
-        }
-
         const separatorIndex = part.indexOf('\r\n\r\n');
         if (separatorIndex === -1) {
             continue;
@@ -205,11 +201,12 @@ function parseMultipartUpload(request) {
         const headers = part.slice(0, separatorIndex);
         const body = part.slice(separatorIndex + 4).replace(/\r\n$/, '');
 
-        if (headers.includes('name="metadata"')) {
+        if (headers.includes('name="metadata"') || headers.includes('Content-Type: application/json')) {
             metadata = JSON.parse(body);
         }
 
-        if (headers.includes('name="file"')) {
+        if (headers.includes('name="file"')
+            || (headers.includes('Content-Type:') && !headers.includes('Content-Type: application/json'))) {
             fileBuffer = Buffer.from(body, 'latin1');
         }
     }
@@ -587,18 +584,6 @@ export function createStatefulDriveFixture(initialFixture) {
     };
 }
 
-export async function installMockDriveRoutes(target, driveFixture) {
-    await target.route('**/auth/status**', async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ authenticated: true }),
-        });
-    });
-
-    await target.route('**/drive/files**', driveFixture.handleRoute);
-}
-
 /**
  * Install a direct-transport fixture that proves browser uploads reach the
  * Google endpoint and never use the retained Worker proxy.
@@ -691,15 +676,6 @@ export async function installMockDirectDriveRoutes(target, driveFixture) {
                 method: request.method(),
                 contentType: request.headers()['content-type'] || '',
             });
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                headers: corsHeaders,
-                body: JSON.stringify(request.method() === 'POST'
-                    ? { id: driveFixture.getLatestGeneratedId() }
-                    : { modifiedTime: new Date().toISOString() }),
-            });
-            return;
         }
 
         await driveFixture.handleRoute(route);

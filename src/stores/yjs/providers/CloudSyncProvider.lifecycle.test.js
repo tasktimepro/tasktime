@@ -3,6 +3,7 @@ import * as Y from 'yjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { YjsCloudSyncProvider } from './CloudSyncProvider'
 import { YjsCloudSyncProvider as LegacyModuleProvider } from './GoogleDriveProvider'
+import { CloudFileStoreError } from './CloudFileStore'
 
 const { captureIncident } = vi.hoisted(() => ({ captureIncident: vi.fn() }))
 vi.mock('@/utils/debugbundle', () => ({ captureDebugBundleIncident: captureIncident }))
@@ -67,6 +68,107 @@ it('preserves the previous provider module export identity', () => {
 
 for (const providerId of ['google-drive', 'dropbox']) {
     describe(providerId, () => {
+        it('releases the archive queue after failure and retains subsequent local edits', async () => {
+            const { provider, docs, manifest } = fixture(providerId)
+            provider.connected = true
+            manifest.downloadFileAsArrayBuffer.mockRejectedValueOnce(new Error('Temporary archive read failure'))
+            await expect(provider.syncAndSubscribeDoc('tasks-archived')).rejects.toThrow()
+            record(docs.get('tasks-archived'), 'tasks', { id: 'after-failure', title: 'Keep this edit', projectId: null })
+            expect(provider.getPendingDocNames()).toContain('tasks-archived')
+            await provider.syncAndSubscribeDoc('tasks-archived')
+            expect(manifest.createFile).toHaveBeenCalledOnce()
+            expect(provider.getPendingDocNames()).toEqual([])
+            provider.disconnect()
+            docs.forEach(doc => doc.destroy())
+        })
+
+        it('does not report success when a completion callback catches an archive failure', async () => {
+            const { provider, docs, manifest } = fixture(providerId)
+            provider.connected = true
+            provider.docManager.getLoadedDocs = () => ['core']
+            provider.onSyncComplete(async () => {
+                manifest.downloadFileAsArrayBuffer.mockRejectedValueOnce(new Error('Archive unavailable'))
+                await provider.syncAndSubscribeDoc('tasks-archived').catch(() => {})
+            })
+            // Ordinary sync failures retain the connection and surface in state.
+            await provider.sync(true, { allowPull: false })
+            expect(provider.getState()).toBe('error')
+            provider.onSyncComplete(async () => {})
+            await provider.sync(true, { allowPull: false })
+            expect(provider.getState()).toBe('idle')
+            provider.disconnect()
+            docs.forEach(doc => doc.destroy())
+        })
+
+        it('keeps full sync behind a lazy writer and preserves edits made while it waits', async () => {
+            const { provider, docs, manifest } = fixture(providerId, ['core', 'tasks-archived'])
+            provider.connected = true
+            const started = deferred(), release = deferred()
+            manifest.downloadFileAsArrayBuffer = vi.fn(async () => {
+                started.resolve()
+                await release.promise
+                return Y.encodeStateAsUpdate(new Y.Doc()).buffer
+            })
+            const load = provider.syncAndSubscribeDoc('tasks-archived')
+            await started.promise
+            record(docs.get('tasks-archived'), 'tasks', { id: 'during-load', title: 'Keep this edit', projectId: null })
+            const fullSync = provider.sync(true, { allowPull: false })
+            await Promise.resolve()
+            expect(manifest.createFile).not.toHaveBeenCalled()
+            release.resolve()
+            await Promise.all([load, fullSync])
+            expect(manifest.createFile).toHaveBeenCalledOnce()
+            expect(docs.get('tasks-archived').getMap('tasks').has('during-load')).toBe(true)
+            expect(provider.getPendingDocNames()).toEqual([])
+            provider.disconnect()
+        })
+
+        it.each([false, true])('serializes concurrent dashboard archive writes (sync callback: %s)', async inCallback => {
+            const names = ['core', 'tasks-archived', 'invoices-archived', 'expenses-archived']
+            const { provider, docs, manifest } = fixture(providerId, names)
+            const loaded = ['core']
+            provider.docManager.getLoadedDocs = () => [...loaded]
+            provider.connected = true
+            let revision = 0
+            let activeWrites = 0
+            let peakWrites = 0
+            manifest.save = vi.fn(async () => {
+                const expectedRevision = revision
+                activeWrites += 1
+                peakWrites = Math.max(peakWrites, activeWrites)
+                await Promise.resolve()
+                await Promise.resolve()
+                activeWrites -= 1
+                if (expectedRevision !== revision) {
+                    throw new CloudFileStoreError('conflict', 'Stale manifest revision', { provider: providerId })
+                }
+                revision += 1
+            })
+            const loadHistory = async () => {
+                for (const name of names.slice(1)) {
+                    loaded.push(name)
+                    record(docs.get(name), 'test-records', { id: name, title: 'Existing local history' })
+                    provider.pendingDeltas.set(name, [Y.encodeStateAsUpdate(docs.get(name))])
+                }
+                // Dashboard + task/invoice consumers can request the same archive.
+                const results = await Promise.allSettled([
+                    ...names.slice(1), 'tasks-archived', 'invoices-archived',
+                ].map(name => provider.syncAndSubscribeDoc(name)))
+                expect(results.map(result => result.status)).toEqual(Array(5).fill('fulfilled'))
+            }
+            if (inCallback) {
+                provider.onSyncComplete(loadHistory)
+                await provider.sync(true, { allowPull: false })
+            } else {
+                await loadHistory()
+            }
+            expect(peakWrites).toBe(1)
+            expect(manifest.createFile).toHaveBeenCalledTimes(3)
+            expect(provider.getPendingDocNames()).toEqual([])
+            provider.disconnect()
+            docs.forEach(doc => doc.destroy())
+        })
+
         it.each(['manual', 'backup'])('does not treat an unpulled lazy archive as complete deletion evidence in %s mode', async mode => {
             const { provider, docs, manifest } = fixture(providerId)
             const archive = docs.get('tasks-archived')

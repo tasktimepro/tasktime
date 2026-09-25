@@ -1,3 +1,94 @@
+## September 25 retained cloud session recovery — archive fix validated locally; retained-profile acceptance pending
+
+Follow-up local acceptance on September 25 reported concurrent Dropbox archive
+uploads returning 409, an unhandled lazy-load rejection and Dashboard history
+failure after Account refresh/navigation in a retained Edge tab. Another reload
+recovered. The prior gates missed concurrent lazy writers: they waited behind a
+full sync but could race each other or a later full sync. This scheduling path
+predated the auth-recovery changes and is shared by Drive and Dropbox. The log
+and regression support this cause; the exact retained browser session has not
+been replayed. No live data reset or cloud mutation was performed.
+
+Connection, full-sync and lazy writers now serialize in both directions. A
+separate serial callback queue shares the owning Web Lock and drains before the
+outer pass resumes; failed loads cannot poison later work or falsely report
+success. Local edits subscribe before lazy I/O/waits. The task hook consumes
+archive-load rejection and exposes additive error state. Schemas, cloud names,
+conflict protections and mode-specific pull/push rules are unchanged.
+
+Four concurrent-writer regressions failed before the correction (two providers
+by ordinary/callback loading), and the task-hook regression exposed the
+unhandled rejection. The corrected tests pass, including subsequent edits and
+queue recovery after failure. Isolated real-app Account-to-Dashboard browser
+journeys now pass for both providers with retained local history, provider
+transport fixtures, no overlapping uploads/conflicts and no page errors.
+Renewed Docker validation passes: 293 unit suites / 3,071 tests (one existing
+skip), all configured per-file coverage thresholds, lint, typecheck, the
+production build, 119 Chromium smoke journeys and five PWA checks. The unit
+coverage run used two workers and a 30-second test timeout. Both provider
+recovery journeys, Manual merge/reconnect, Backup timers, multi-device/tab
+convergence and expired-session handling remain green. Logs:
+`/private/tmp/tasktime-archive-coverage.log`,
+`/private/tmp/tasktime-archive-smoke.log`,
+`/private/tmp/tasktime-archive-pwa.log`, and matching lint/typecheck logs.
+Owner acceptance on the reported retained Edge profile remains pending before
+publication; automated provider fixtures do not verify that live profile.
+
+Read-only production incident evidence showed repeated failed browser requests
+to the retired Worker `/drive/files` route. The app's status-check fallback
+could select that transport after a transient `/auth/status` failure in a
+retained tab; the exact initial status response was not captured. A page refresh
+could recover by receiving the current direct transport policy.
+
+`useGoogleAuth` retains the stored session on offline, timeout, rate-limit,
+server and network failures while leaving Drive transport unresolved.
+`YjsContext` connects only after an explicit supported direct policy; an already
+connected provider remains active during a later unresolved status check.
+Definitive authorization rejection follows the existing reconnect path.
+
+The follow-up release review reproduced and fixed additional gaps: Dropbox
+status failures needed manual recovery; healthy Google online events could
+revalidate unnecessarily; late status responses could restore disconnected
+sessions; stalled status/token requests lacked a deadline; and transient
+initial provider connection failures had no retry. The shared recovery utility
+coalesces mounted status consumers and wake signals, attempts at most three
+retries (1.5, 5, 15 seconds) while visible and online, and honors Retry-After,
+including a deadline extended while a retry timer is pending. A later wake can
+start another bounded window. Requests and body reads time out at ten seconds.
+Dropbox exhausted network errors now use the common transient category; invalid
+token responses and policy failures stay terminal, and token-service Retry-After
+survives adapter normalization. Disconnect/provider/session changes fence old
+completions and cancel pending connection retries. Manual, backup, sync, dirty-
+document scoping and provider-transfer semantics remain unchanged. No IndexedDB,
+Yjs or provider-file data is reset or migrated. Cloud sync incidents include a
+fixed, sanitized cause category.
+
+Browser Drive fixtures model the current Worker status/token control plane and
+Google file APIs; direct multipart uploads update fixture remote state. Four
+new real-app Chromium journeys cover temporary status and token-service failure
+for each provider, preserving existing local manual work with no automatic
+upload, wrong-provider request, or retired proxy call. Unit regressions failed
+before their corresponding fixes and pass afterward.
+
+Before the archive correction, Docker validation passed: audit (zero vulnerabilities),
+lint, typecheck, six artifact tests, 293 unit suites / 3,060 passing tests plus
+one existing skip, the configured per-file coverage gate, 117 Chromium smoke
+journeys, five production-preview PWA checks, app/recovery builds and site
+contract export. Coverage ran with two workers and a 30-second test timeout.
+The shared recovery utility has 100% statements/branches/functions; both auth
+hooks exceed the required 75% threshold in each configured metric. Existing
+manual reconnect/merge, backup-mode active timers, multi-device and multi-tab
+convergence, expired auth and moved-workspace safeguards all passed.
+Evidence logs: `/private/tmp/tasktime-review-coverage-final.log`,
+`/private/tmp/tasktime-review-smoke.log`, `/private/tmp/tasktime-review-pwa.log`,
+plus the matching audit/lint/typecheck/artifact/contract/recovery-build logs.
+
+Release scope is core app patch v1.6.3. Agent bridge, MCP Registry, OpenClaw,
+Claude and ClawHub shipped source/metadata are unchanged; they require no
+republishing for this slice. No Worker/site source change is needed. No live
+account acceptance, commit, push, tag, publication or deployment has occurred.
+The unrelated pre-existing `TODO.md` edit remains untouched.
+
 ## September 18 account deletion loading feedback — validated locally, unreleased
 
 The Delete All Account Data confirmation now passes its existing `isDeleting`

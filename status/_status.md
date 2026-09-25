@@ -1,3 +1,59 @@
+## September 25 cloud session recovery — archive fix validated locally; retained-profile acceptance pending
+
+Follow-up local acceptance on September 25 reported concurrent Dropbox archive
+uploads returning 409, an unhandled lazy-load rejection and Dashboard history
+failure after Account refresh/navigation in a retained Edge tab. Another reload
+recovered. The prior gates missed concurrent lazy writers: they waited behind a
+full sync but could race each other or a later full sync. This scheduling path
+predated the auth-recovery changes and is shared by Drive and Dropbox. The log
+and regression support this cause; the exact retained browser session has not
+been replayed. No live data reset or cloud mutation was performed.
+
+Connection, full-sync and lazy writers now serialize in both directions. A
+separate serial callback queue shares the owning Web Lock and drains before the
+outer pass resumes; failed loads cannot poison later work or falsely report
+success. Local edits subscribe before lazy I/O/waits. The task hook consumes
+archive-load rejection and exposes additive error state. Schemas, cloud names,
+conflict protections and mode-specific pull/push rules are unchanged.
+
+Four concurrent-writer regressions failed before the correction (two providers
+by ordinary/callback loading), and the task-hook regression exposed the
+unhandled rejection. The corrected tests pass, including subsequent edits and
+queue recovery after failure. Isolated real-app Account-to-Dashboard browser
+journeys now pass for both providers with retained local history, provider
+transport fixtures, no overlapping uploads/conflicts and no page errors.
+Renewed Docker validation passes: 293 unit suites / 3,071 tests (one existing
+skip), all configured per-file coverage thresholds, lint, typecheck, the
+production build, 119 Chromium smoke journeys and five PWA checks. The unit
+coverage run used two workers and a 30-second test timeout. Both provider
+recovery journeys, Manual merge/reconnect, Backup timers, multi-device/tab
+convergence and expired-session handling remain green. Logs:
+`/private/tmp/tasktime-archive-coverage.log`,
+`/private/tmp/tasktime-archive-smoke.log`,
+`/private/tmp/tasktime-archive-pwa.log`, and matching lint/typecheck logs.
+Owner acceptance on the reported retained Edge profile remains pending before
+publication; automated provider fixtures do not verify that live profile.
+
+Production DebugBundle incidents showed repeated failed requests to the retired
+Worker `/drive/files` route after a retained Chrome session woke. The app could
+select that route when `/auth/status` was temporarily unavailable. Google now
+retains its session with transport unresolved until explicit direct policy is
+confirmed. Google Drive and Dropbox share bounded status/initial-connection
+recovery, ten-second status/token request deadlines, Retry-After handling, and
+stale-response protection after disconnect or provider/session replacement.
+Healthy wake events add no auth requests. Existing data and sync modes remain
+unchanged. Dropbox adapter failures now preserve transient versus terminal
+categories. Incident titles include a sanitized failure category.
+
+Before the archive correction, Docker release checks passed: zero audit vulnerabilities, lint,
+typecheck, six artifact checks, 3,060 unit tests (one existing skip) with the
+configured per-file coverage gate, 117 Chromium journeys, five PWA checks,
+production app/recovery builds and site contract export. Four browser recovery
+journeys preserve pending local manual work for both providers. Release scope
+is core-app patch v1.6.3, with no agent package, Worker or site source change.
+No commit, push, release, deployment or live-account mutation has occurred.
+See `app-status.md` for scope and verification detail.
+
 ## September 18 v1.6.2 release candidate
 
 The core sync, deletion, invoice, empty-state and account feedback changes are

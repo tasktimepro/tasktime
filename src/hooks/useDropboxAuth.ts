@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { SYNC_WORKER_CONFIG } from '@/config/google';
+import { CloudAuthRecovery, cloudAuthRetryAfter, withCloudAuthTimeout } from '@/utils/cloudAuthRecovery';
 import { getDropboxAccountEmail } from '@/services/dropboxAccountProfile';
 import { dropboxAccessTokenProvider } from '@/stores/yjs/providers/DropboxAccessTokenProvider';
 import {
@@ -29,13 +30,16 @@ interface DropboxStatusResult {
     ok: boolean;
     status: number;
     body: Record<string, unknown>;
+    retryAt?: number;
 }
 
 let lastAuthenticatedSessionId: string | null = null;
 let lastAuthenticatedAt = 0;
+let statusEpoch = 0;
+const statusRecovery = new CloudAuthRecovery();
+let unavailableStatus: { sessionId: string; at: number; result: DropboxStatusResult } | null = null;
 let statusValidationInFlight: {
     sessionId: string;
-    force: boolean;
     promise: Promise<DropboxStatusResult>;
 } | null = null;
 
@@ -91,6 +95,10 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
 }
 
 function clearStatusValidation(sessionId?: string): void {
+    statusRecovery.clear(sessionId);
+    statusEpoch += 1;
+    statusValidationInFlight = null;
+    unavailableStatus = null;
     if (sessionId && lastAuthenticatedSessionId !== sessionId) return;
     lastAuthenticatedSessionId = null;
     lastAuthenticatedAt = 0;
@@ -99,6 +107,12 @@ function clearStatusValidation(sessionId?: string): void {
 function rememberAuthenticatedSession(sessionId: string): void {
     lastAuthenticatedSessionId = sessionId;
     lastAuthenticatedAt = Date.now();
+    unavailableStatus = null;
+    statusRecovery.clear(sessionId);
+}
+
+function isTransientStatus(status: number): boolean {
+    return status === 0 || status === 408 || status === 429 || status >= 500;
 }
 
 async function requestDropboxStatus(
@@ -116,28 +130,47 @@ async function requestDropboxStatus(
         };
     }
 
-    if (statusValidationInFlight?.sessionId === sessionId
-        && (!force || statusValidationInFlight.force)) {
+    if (!force && unavailableStatus?.sessionId === sessionId
+        && now < Math.max(unavailableStatus.at + 1000, unavailableStatus.result.retryAt ?? 0)) {
+        return unavailableStatus.result;
+    }
+    if (statusValidationInFlight?.sessionId === sessionId) {
         return statusValidationInFlight.promise;
     }
 
+    const epoch = ++statusEpoch;
     const promise = (async (): Promise<DropboxStatusResult> => {
-        const response = await fetch(SYNC_WORKER_CONFIG.endpoints.dropboxAuthStatus, {
-            method: 'GET',
-            headers: { 'X-Session-Id': sessionId },
-            cache: 'no-store',
-            credentials: 'omit',
-            referrerPolicy: 'no-referrer',
-        });
-        const body = await readJson(response);
-        if (response.ok && body.authenticated === true && body.provider === 'dropbox') {
-            rememberAuthenticatedSession(sessionId);
-        } else if (response.status === 401 || body.authenticated === false) {
-            clearStatusValidation(sessionId);
+        let result: DropboxStatusResult;
+        try {
+            result = await withCloudAuthTimeout(async signal => {
+                const response = await fetch(SYNC_WORKER_CONFIG.endpoints.dropboxAuthStatus, {
+                    method: 'GET',
+                    headers: { 'X-Session-Id': sessionId },
+                    cache: 'no-store',
+                    credentials: 'omit',
+                    referrerPolicy: 'no-referrer',
+                    signal,
+                });
+                const body = await readJson(response);
+                return { ok: response.ok, status: response.status, body, retryAt: cloudAuthRetryAfter(response) };
+            });
+        } catch {
+            result = { ok: false, status: 0, body: {} };
         }
-        return { ok: response.ok, status: response.status, body };
+        if (epoch !== statusEpoch) return result;
+        const { body } = result;
+        if (result.ok && body.authenticated === true && body.provider === 'dropbox') {
+            rememberAuthenticatedSession(sessionId);
+        } else if (result.status === 401 || (result.ok && body.authenticated === false)) {
+            clearStatusValidation(sessionId);
+        } else if (isTransientStatus(result.status)) {
+            lastAuthenticatedSessionId = null;
+            lastAuthenticatedAt = 0;
+            unavailableStatus = { sessionId, at: Date.now(), result };
+        }
+        return result;
     })();
-    const request = { sessionId, force, promise };
+    const request = { sessionId, promise };
     statusValidationInFlight = request;
 
     try {
@@ -152,7 +185,7 @@ function workerErrorMessage(response: Pick<Response, 'status'>, body: Record<str
     if (body.code === 'NEW_CONNECTIONS_DISABLED') return 'New Dropbox connections are temporarily paused.';
     if (body.code === 'TRANSFERS_DISABLED') return 'Dropbox transfers are temporarily paused.';
     if (body.code === 'RATE_LIMITED') return 'Dropbox sign-in is temporarily rate limited.';
-    if (response.status >= 500) return 'The Dropbox connection service is temporarily unavailable.';
+    if (response.status === 0 || response.status === 408 || response.status >= 500) return 'The Dropbox connection service is temporarily unavailable.';
     return 'Dropbox could not complete this request.';
 }
 
@@ -269,6 +302,7 @@ function publishAuthChange(
 export function useDropboxAuth() {
     const instanceId = useRef(crypto.randomUUID());
     const mounted = useRef(true);
+    const restoreVersion = useRef(0);
     const [state, setState] = useState<DropboxAuthState>({
         isSignedIn: false,
         isLoading: true,
@@ -279,15 +313,19 @@ export function useDropboxAuth() {
         error: null,
     });
 
-    const syncFromStorage = useCallback(async (
+    const syncFromStorage = useCallback(async function restoreDropboxStorage(
         { force = false }: { force?: boolean } = {},
-    ): Promise<void> => {
+    ): Promise<void> {
+        const version = ++restoreVersion.current;
+        const isCurrent = () => mounted.current && restoreVersion.current === version;
         if (force && mounted.current) {
             setState(current => ({ ...current, isLoading: true, error: null }));
         }
         const stored = await getStoredDropboxSession();
-        if (!mounted.current) return;
+        if (!isCurrent()) return;
         if (!stored) {
+            statusRecovery.clear();
+            dropboxAccessTokenProvider.setSession(null);
             setState({
                 isSignedIn: false,
                 isLoading: false,
@@ -303,7 +341,7 @@ export function useDropboxAuth() {
         try {
             lifecycle = await getCloudStorageLifecycle();
         } catch {
-            if (mounted.current) {
+            if (isCurrent()) {
                 setState({
                     isSignedIn: false,
                     isLoading: false,
@@ -316,7 +354,7 @@ export function useDropboxAuth() {
             }
             return;
         }
-        if (!mounted.current) return;
+        if (!isCurrent()) return;
         const storageRole = getCloudStorageSessionRole(
             lifecycle,
             'dropbox',
@@ -328,7 +366,7 @@ export function useDropboxAuth() {
         if (!storageSession) {
             clearStatusValidation(stored.sessionId);
             await clearStoredDropboxSession(stored.sessionId);
-            if (mounted.current) {
+            if (isCurrent()) {
                 setState({
                     isSignedIn: false,
                     isLoading: false,
@@ -341,25 +379,25 @@ export function useDropboxAuth() {
             }
             return;
         }
-        let statusResult: DropboxStatusResult;
-        try {
-            statusResult = await requestDropboxStatus(stored.sessionId, { force });
-        } catch {
-            if (mounted.current) {
-                setState({
-                    isSignedIn: false,
-                    isLoading: false,
-                    sessionId: stored.sessionId,
-                    accountEmail: stored.accountEmail ?? null,
-                    storageGeneration: storageSession.generation,
-                    storageRole,
-                    error: 'The Dropbox connection service is temporarily unavailable.',
-                });
+        const statusResult: DropboxStatusResult = navigator.onLine
+            ? await requestDropboxStatus(stored.sessionId, { force })
+            : { ok: false, status: 0, body: {} };
+        const { body } = statusResult;
+        const currentStored = await getStoredDropboxSession();
+        const currentLifecycle = await getCloudStorageLifecycle().catch(() => null);
+        if (!currentLifecycle) {
+            if (isCurrent()) {
+                statusRecovery.pending(stored.sessionId);
+                setState(current => ({ ...current, isLoading: false, error: 'Cloud storage state is temporarily unavailable.' }));
             }
             return;
         }
-        const { body } = statusResult;
-        if (!mounted.current) return;
+        const currentBinding = storageRole === 'active' ? currentLifecycle.active : currentLifecycle.stagedTarget;
+        if (!isCurrent()) return;
+        if (currentStored?.sessionId !== stored.sessionId
+            || currentBinding?.provider !== 'dropbox'
+            || currentBinding.sessionId !== stored.sessionId
+            || currentBinding.generation !== storageSession.generation) return restoreDropboxStorage();
         if (statusResult.ok && body.authenticated === true && body.provider === 'dropbox') {
             dropboxAccessTokenProvider.setSession(stored.sessionId);
             setState({
@@ -376,13 +414,18 @@ export function useDropboxAuth() {
             if (force) publishAuthChange('connected', stored.sessionId, instanceId.current);
             return;
         }
-        const isDefinitivelyInvalid = statusResult.status === 401 || body.authenticated === false;
+        const isDefinitivelyInvalid = statusResult.status === 401 || (statusResult.ok && body.authenticated === false);
+        if (isTransientStatus(statusResult.status)) {
+            statusRecovery.pending(stored.sessionId, statusResult.retryAt);
+        } else {
+            statusRecovery.clear(stored.sessionId);
+        }
         if (isDefinitivelyInvalid) {
             await clearStoredDropboxSession(stored.sessionId);
             await clearCloudStorageSession(storageSession, { force: true }).catch(() => undefined);
             if (force) publishAuthChange('disconnected', stored.sessionId, instanceId.current);
         }
-        if (!mounted.current) return;
+        if (!isCurrent()) return;
         setState({
             isSignedIn: false,
             isLoading: false,
@@ -403,8 +446,11 @@ export function useDropboxAuth() {
         void syncFromStorage();
         return () => {
             mounted.current = false;
+            restoreVersion.current += 1;
         };
     }, [syncFromStorage]);
+
+    useEffect(() => statusRecovery.subscribe(() => syncFromStorage({ force: true })), [syncFromStorage]);
 
     useEffect(() => {
         const handleChange = (value: unknown) => {
@@ -610,6 +656,8 @@ export function useDropboxAuth() {
                 throw new Error(workerErrorMessage(response, await readJson(response)));
             }
         }
+        restoreVersion.current += 1;
+        clearStatusValidation(sessionId);
         if (state.storageGeneration !== null) {
             await clearCloudStorageSession({
                 provider: 'dropbox',
@@ -639,7 +687,5 @@ export function useDropboxAuth() {
 
 /** Reset module-level status validation state. Test-only. */
 export function _resetDropboxAuthStatusCache(): void {
-    lastAuthenticatedSessionId = null;
-    lastAuthenticatedAt = 0;
-    statusValidationInFlight = null;
+    clearStatusValidation();
 }

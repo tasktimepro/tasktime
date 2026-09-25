@@ -1,3 +1,4 @@
+import { withCloudAuthTimeout } from '@/utils/cloudAuthRecovery';
 import { SYNC_WORKER_CONFIG } from '@/config/google';
 import { APP_VERSION } from '@/constants/app';
 
@@ -226,43 +227,46 @@ export class DropboxAccessTokenProvider {
         generation: number,
         forceRefresh: boolean,
     ): Promise<string> {
-        let response: Response;
+        let value: unknown;
         try {
-            response = await fetch(withAppVersion(this.endpoint), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Id': sessionId,
-                    'X-TaskTime-App-Version': APP_VERSION,
-                },
-                body: JSON.stringify({ forceRefresh }),
-                cache: 'no-store',
-                credentials: 'omit',
-                referrerPolicy: 'no-referrer',
+            value = await withCloudAuthTimeout(async signal => {
+                const response = await fetch(withAppVersion(this.endpoint), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Id': sessionId,
+                        'X-TaskTime-App-Version': APP_VERSION,
+                    },
+                    body: JSON.stringify({ forceRefresh }),
+                    cache: 'no-store',
+                    credentials: 'omit',
+                    referrerPolicy: 'no-referrer',
+                    signal,
+                });
+                if (!response.ok) {
+                    const code = await readWorkerErrorCode(response);
+                    throw new DropboxAccessTokenError(code, messageForWorkerError(code), {
+                        status: response.status,
+                        retryAfterSeconds: parseRetryAfter(response),
+                    });
+                }
+                try {
+                    return await response.json();
+                } catch {
+                    throw new DropboxAccessTokenError(
+                        'INVALID_TOKEN_RESPONSE',
+                        'The Dropbox token service returned an invalid response.',
+                    );
+                }
             });
-        } catch {
+        } catch (error) {
+            if (error instanceof DropboxAccessTokenError) throw error;
             throw new DropboxAccessTokenError(
                 'TOKEN_SERVICE_UNAVAILABLE',
                 'The Dropbox token service is temporarily unavailable.',
             );
         }
-        if (!response.ok) {
-            const code = await readWorkerErrorCode(response);
-            throw new DropboxAccessTokenError(code, messageForWorkerError(code), {
-                status: response.status,
-                retryAfterSeconds: parseRetryAfter(response),
-            });
-        }
 
-        let value: unknown;
-        try {
-            value = await response.json();
-        } catch {
-            throw new DropboxAccessTokenError(
-                'INVALID_TOKEN_RESPONSE',
-                'The Dropbox token service returned an invalid response.',
-            );
-        }
         const token = parseTokenResponse(value);
         if (generation !== this.generation || sessionId !== this.sessionId) {
             throw new DropboxAccessTokenError(

@@ -322,7 +322,8 @@ describe('YjsDriveProvider', () => {
         expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
             incidentKey: 'dropbox.sync_failed',
             name: 'TaskTimeCloudSyncError',
-            message: 'TaskTime Pro Dropbox sync failed',
+            message: 'TaskTime Pro Dropbox sync failed (connectivity)',
+            context: expect.objectContaining({ failureCategory: 'connectivity' }),
         }))
     })
 
@@ -1285,7 +1286,11 @@ describe('YjsDriveProvider', () => {
         provider.isOnline = () => true
         provider.manifest = {
             hasManifestChanged: vi.fn(async () => {
-                throw new Error('manifest read failed')
+                throw new CloudFileStoreError(
+                    'transient-unavailable',
+                    'Google Drive is temporarily unavailable.',
+                    { provider: 'google-drive' },
+                )
             }),
         }
 
@@ -1293,10 +1298,12 @@ describe('YjsDriveProvider', () => {
 
         expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
             incidentKey: 'drive.sync_failed',
+            message: 'TaskTime Pro Drive sync failed (connectivity)',
             context: expect.objectContaining({
                 allowPull: true,
                 force: false,
                 mode: 'sync',
+                failureCategory: 'connectivity',
             }),
         }))
         expect(provider.getState()).toBe('error')
@@ -2358,7 +2365,9 @@ describe('YjsDriveProvider', () => {
             throw new Error('Remote base state is missing')
         })
 
-        await provider.syncInner(true, { allowPull: true })
+        provider.connected = true
+        provider.isOnline = () => true
+        await provider.sync(true, { allowPull: true })
 
         expect(provider.getState()).toBe('error')
         expect(captureDebugBundleIncidentSpy).toHaveBeenCalledWith(expect.objectContaining({
