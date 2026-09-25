@@ -1802,3 +1802,43 @@ readiness record.
 - [x] Responsive PWA shell, offline indicator, service worker, and mobile navigation
 
 The July 2026 critical-path assurance phase supplies deeper edge-case, historical-compatibility, failure-injection, browser, PWA, and live-agent evidence for this baseline.
+## September 25 DebugBundle v3 and incident hygiene — local app candidate
+
+Core now pins `@debugbundle/sdk-browser` 3.0.0. The app keeps console visibility
+but removes its duplicate global DebugBundle capture handlers; the SDK already
+captures browser errors and unhandled rejections with native context. Handled
+sync and application incidents remain explicit. A red regression demonstrated
+the duplicate path before removal. The DebugBundle profile was reconciled with
+the independent app/site/Worker repositories and validates cleanly.
+
+The complete core Docker gate passes: zero audit vulnerabilities, lint,
+typecheck, build-artifact tests, 293 unit suites (3,069 passed, one existing
+skip) with per-file coverage, 119 Chromium smoke journeys, five PWA checks,
+production app/recovery builds and site contract export. Evidence:
+`/private/tmp/tasktime-debugbundle-core-gate.log`.
+
+Hosted DebugBundle now runs a passing 2xx homepage availability check for the
+app. An exact third-party Cloudflare beacon resource-error rule demotes that
+optional noise, and its existing incident was resolved. Sixteen historical
+incidents from retired `tasktime-web` were resolved as obsolete groups while
+retaining their records. Five `tasktime-app` incidents remain open: two current
+Drive sync groups last seen September 25, an older Drive failure, a remote
+Dropbox validation failure and an AbortError lacking source context. The live
+1.6.2 Drive bundle shows a timed-out `/auth/access-token` request; the existing
+local v1.6.3 recovery work is not production proof. No current sync or AbortError
+group was suppressed or marked fixed. This app candidate is uncommitted and
+undeployed; retained-profile acceptance and live verification remain open.
+
+September 25 follow-up: the hosted app health check is associated with the
+existing email and Slack new-incident rules; service-scoped recurrence rules
+now cover its regressed availability incident after recovery. The SDK sends
+trace headers only to the configured Worker's `/auth/` path once the private
+Worker has deployed additive app-origin CORS support, and attaches the exact
+build version as diagnostic deploy context. It does not trace direct provider
+file requests. Focused tests passed red/green. The full app release gate is
+green for this final candidate: zero audit vulnerabilities, lint, typecheck,
+293 unit suites (3,069 passed, one existing skip) with per-file coverage,
+119 Chromium checks, five PWA checks, production builds and site contract
+export. Evidence: `/private/tmp/tasktime-debugbundle-core-final-gate.log`.
+Do not infer production compatibility until the Worker CORS canary and
+retained Edge-profile acceptance pass.

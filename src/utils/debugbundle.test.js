@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_VERSION } from '@/constants/app'
 
 const initSpy = vi.fn()
 const captureExceptionSpy = vi.fn()
+const setContextSpy = vi.fn()
 
 vi.mock('@debugbundle/sdk-browser', () => ({
     createDebugBundleBrowserSdk: () => ({
         init: initSpy,
         captureException: captureExceptionSpy,
+        setContext: setContextSpy,
     }),
 }))
 
@@ -43,6 +46,7 @@ describe('debugbundle utility', () => {
     it('initializes once with a trimmed token and configured environment', async () => {
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', '  project-token  ')
         vi.stubEnv('VITE_DEBUGBUNDLE_ENVIRONMENT', '  staging  ')
+        vi.stubEnv('VITE_SYNC_WORKER_URL', 'https://sync.tasktime.pro')
 
         const { initializeDebugBundle } = await loadDebugBundleModule()
 
@@ -53,12 +57,15 @@ describe('debugbundle utility', () => {
             projectToken: 'project-token',
             environment: 'staging',
             service: 'tasktime-app',
+            tracePropagationTargets: ['https://sync.tasktime.pro/auth/'],
         })
+        expect(setContextSpy).toHaveBeenCalledWith('deploy', { version: APP_VERSION })
     })
 
     it('falls back to development and production environments when none is configured', async () => {
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
         vi.stubEnv('VITE_DEBUGBUNDLE_ENVIRONMENT', undefined)
+        vi.stubEnv('VITE_SYNC_WORKER_URL', undefined)
         vi.stubEnv('PROD', false)
 
         let debugBundleModule = await loadDebugBundleModule()
@@ -74,6 +81,7 @@ describe('debugbundle utility', () => {
         vi.clearAllMocks()
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
         vi.stubEnv('VITE_DEBUGBUNDLE_ENVIRONMENT', undefined)
+        vi.stubEnv('VITE_SYNC_WORKER_URL', undefined)
         vi.stubEnv('PROD', true)
 
         debugBundleModule = await loadDebugBundleModule()
@@ -158,25 +166,6 @@ describe('debugbundle utility', () => {
         })
     })
 
-    it('captures global browser failures and unhandled rejections with incident keys', async () => {
-        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
-
-        const {
-            captureDebugBundleGlobalError,
-            captureDebugBundleUnhandledRejection,
-            initializeDebugBundle,
-        } = await loadDebugBundleModule()
-
-        expect(initializeDebugBundle()).toBe(true)
-
-        captureDebugBundleGlobalError(new Error('boom'), { filename: 'main.jsx' })
-        captureDebugBundleUnhandledRejection('nope', { type: 'unhandledrejection' })
-
-        expect(captureExceptionSpy).toHaveBeenCalledTimes(2)
-        expect(captureExceptionSpy.mock.calls[0][0].debugbundleIncidentKey).toBe('browser.global_error')
-        expect(captureExceptionSpy.mock.calls[1][0].debugbundleIncidentKey).toBe('browser.unhandled_rejection')
-    })
-
     it('swallows sdk capture failures so incident reporting cannot break the app', async () => {
         vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
         captureExceptionSpy.mockImplementation(() => {
@@ -223,21 +212,4 @@ describe('debugbundle utility', () => {
         expect(captureExceptionSpy.mock.calls[0][0].debugbundleContext).toBeUndefined()
     })
 
-    it('does not throw when metadata cannot be attached to the original error', async () => {
-        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
-
-        const {
-            captureDebugBundleGlobalError,
-            initializeDebugBundle,
-        } = await loadDebugBundleModule()
-
-        expect(initializeDebugBundle()).toBe(true)
-
-        const frozenError = Object.freeze(new Error('frozen'))
-
-        expect(() => {
-            captureDebugBundleGlobalError(frozenError, { filename: 'main.jsx' })
-        }).not.toThrow()
-        expect(captureExceptionSpy).toHaveBeenCalledWith(frozenError)
-    })
 })

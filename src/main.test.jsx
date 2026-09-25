@@ -3,8 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const renderSpy = vi.fn()
 const createRootSpy = vi.fn(() => ({ render: renderSpy }))
 const initializeDebugBundleSpy = vi.fn()
-const captureDebugBundleGlobalErrorSpy = vi.fn()
-const captureDebugBundleUnhandledRejectionSpy = vi.fn()
 
 vi.mock('./App', () => ({
     default: () => null,
@@ -12,8 +10,6 @@ vi.mock('./App', () => ({
 
 vi.mock('./utils/debugbundle', () => ({
     initializeDebugBundle: initializeDebugBundleSpy,
-    captureDebugBundleGlobalError: captureDebugBundleGlobalErrorSpy,
-    captureDebugBundleUnhandledRejection: captureDebugBundleUnhandledRejectionSpy,
 }))
 
 vi.mock('react-dom/client', () => ({
@@ -79,10 +75,6 @@ describe('main entrypoint', () => {
         expect(consoleErrorSpy).toHaveBeenNthCalledWith(1, '[TaskTime Pro] Uncaught error:', uncaughtError)
         expect(consoleErrorSpy).toHaveBeenNthCalledWith(2, '[TaskTime Pro] Unhandled promise rejection:', 'nope')
         expect(initializeDebugBundleSpy).toHaveBeenCalledTimes(1)
-        expect(captureDebugBundleGlobalErrorSpy).toHaveBeenCalledWith(uncaughtError, expect.objectContaining({
-            message: 'boom',
-        }))
-        expect(captureDebugBundleUnhandledRejectionSpy).toHaveBeenCalledWith('nope', { type: 'unhandledrejection' })
 
         consoleErrorSpy.mockRestore()
     })

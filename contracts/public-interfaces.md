@@ -360,6 +360,13 @@ cannot display old remaining units as currently usable.
 
 `POST /auth/access-token` accepts the existing opaque `X-Session-Id`, optional non-secret `X-TaskTime-App-Version`, and no credential in its URL. It accepts only an optional boolean `forceRefresh` body field, returns a short-lived bearer token, its absolute expiry, Worker time, and known grant scope. Every success and failure response is `no-store`.
 
+The browser may add the optional non-secret `X-DebugBundle-Trace-Id` header to
+requests under the configured Worker `/auth/` path. The Worker permits that
+header in app-origin CORS preflight and does not use it as authentication or
+change existing auth request/response shapes. The shared Worker must be updated
+before enabling this browser SDK target in production; direct Google Drive and
+Dropbox file requests remain outside this trace target.
+
 The `/auth/dropbox/*` family is provider-bound and accepts no Dropbox file path or file body. Dropbox authorization uses App Folder access with the approved content/metadata read/write scopes plus `account_info.read` solely for connected-account presentation. `POST /auth/dropbox/access-token` returns a short-lived memory-only token for direct browser-to-Dropbox requests. The browser calls Dropbox's current-account endpoint directly, validates the verified/non-disabled email, and may add it to the origin-local Dropbox auth-session record. The Worker never receives that profile response, and the email never enters Yjs, provider sync, backup/export/import, logs, or metrics. The narrow exception is an explicit paid Checkout request: the browser may submit the locally verified email as `billingContactEmail`, which the Worker stores only as the billing contact and supplies to the owned Stripe Customer. File-scope-only stored sessions remain valid and expose a null email until explicit reconnect.
 
 Billing status retains the stable opaque `accountReference` and provider-scoped `displayLabel` as compatibility/support contracts. Plan & Billing presents the connected provider email when locally available and otherwise uses neutral connected-provider copy; it never exposes the stable reference as customer identity, and trial/billing authority never derives from the email. Checkout request version 1 accepts the optional normalized `billingContactEmail` in addition to `offerId`, `planConfigVersion`, and `idempotencyKey`. Old clients may omit it. The first accepted billing contact prefills a new or email-less mapped Stripe Customer; a pre-existing Stripe billing email is preserved rather than silently replaced after a provider reconnect or transfer.

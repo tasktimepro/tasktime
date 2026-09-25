@@ -1,5 +1,32 @@
 # Public Site Status
 
+## September 25 DebugBundle traction candidate — local, unreleased
+
+The independent site pins browser SDK 3.0.0 and adds privacy-strict aggregate
+site analytics with three named intent funnels. Its dedicated hosted project has
+matching saved funnels and a passing homepage availability check. The optional
+Cloudflare beacon failure is now a narrowly demoted capture rule; the previous
+site incident was resolved. No live usage data has arrived, because the new
+site artifact has not been published. The full site Docker gate passes (12
+native tests, 51 pages, 21 Chromium checks and zero audit findings). See the
+independent `tasktime-site/STATUS.md` for detail. Legal/privacy review and
+separate site publication remain pending.
+
+September 25 follow-up: the site check now has enabled owner-email and alerts
+Slack routes for both a new availability incident and a later regression. The
+three-failure/two-recovery check thresholds remain. The site gives named intent
+events up to 250 ms to flush before ordinary same-tab app navigation, with
+native modified/download/new-tab behavior preserved. The updated Docker site
+gate passes 15 native tests, 51 pages and 21 Chromium checks; notification
+delivery has not been simulated. The owner approved the privacy wording and
+DebugBundle link and requested publication. The final gate was refreshed after
+the link change with zero audit findings and the same passing test counts.
+Read-only production D1 usage queries on September 25 provide an app baseline:
+7 days had 3 active devices, approximately 2 people and 13 sessions; 30 days
+had 8 devices, approximately 6 people and 120 sessions. These count days with
+at least two meaningful actions, can undercount blocked telemetry, and do not
+measure public-site acquisition or the new funnels.
+
 ## September 15 diagnostics, VAT copy and social metadata — uncommitted
 
 The independent site now includes optional DebugBundle `1.7.1` capture using its

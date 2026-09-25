@@ -622,3 +622,32 @@ The repository now has a zero-diagnostic TypeScript baseline enforced by the rel
 ## Quality gate
 
 Behavior changes require red/green tests and Docker-backed checks. Documentation-only foundation changes require metadata, link, reference, and preservation validation; they do not require application tests unless executable files also change.
+## September 25 DebugBundle analytics, health and incident review
+
+Both public homepages now have passing hosted DebugBundle availability checks.
+The site project has privacy-strict aggregate analytics and three saved intent
+funnels; the independent site source pins SDK 3.0.0, passes its full Docker
+gate and remains unpublished, so live traction metrics are still empty. Core
+also pins SDK 3.0.0 and removes duplicate global error capture; its full Docker
+gate passes. Narrow Cloudflare beacon rules demote optional third-party noise,
+and 18 historical/noise incidents were resolved. Five current app incidents
+remain open pending production fix evidence or better AbortError context. The
+user's unrelated `TODO.md` edits are preserved. No commit, push or deployment
+occurred. See `app-status.md` and `site-status.md` for details.
+
+Follow-up: hosted failure alerts now cover both checks after their three-failure
+threshold, including a later regression after recovery. Site alerts use the
+existing owner email and alerts Slack channel; the app's existing new-incident
+routes were retained and recurrence routes added. The browser SDK now gives
+Worker `/auth/` calls explicit trace propagation with an additive private
+Worker CORS prerequisite, records the app build version as deploy context, and
+flushes site intent events briefly before ordinary same-tab app navigation.
+The Worker must be published before the app. The site and app remain separate
+release artifacts. The renewed local core, site and Worker gates pass;
+production app publication still awaits retained Edge-profile acceptance;
+both artifacts await exact-source CI/preparation and reviewed artifact digests.
+The owner approved the site privacy wording and requested publication.
+Release assessment: the unpublished core patch remains v1.6.3, with no
+published bridge, MCP Registry, OpenClaw, Claude or ClawHub artifact changes.
+The private Worker CORS update precedes that app release; the public site is
+an independent source and production artifact release.

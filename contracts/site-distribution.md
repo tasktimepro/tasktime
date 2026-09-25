@@ -18,10 +18,13 @@ independent Git repositories, not submodules or workspace packages. Neither is
 needed to install, test, or build core. Site has its own lockfile, Docker image,
 tests, and CI; it must build without the core checkout. Do not import parent
 source, share node_modules, or require a synchronized app release for site copy.
-Site may bundle its own optional browser diagnostics module, with a separate
-write-only origin-restricted project token. This does not authorize app hydration,
-workspace storage, a service worker or product analytics. Diagnostic failure must
-not block public navigation. The default social image is a site-owned 1200×630 JPEG.
+Site may bundle its own optional browser diagnostics and privacy-strict aggregate
+analytics module, with a separate write-only origin-restricted project token.
+Site analytics may count page views, referrer domains and named app-opening or
+pricing-interest steps, but must not include workspace data, form content,
+persistent visitor identity or cross-site tracking. This does not authorize app
+hydration, workspace storage or a service worker. Reporting failure must not block
+public navigation. The default social image is a site-owned 1200×630 JPEG.
 Small static icon/token/brand assets are owned copies; changing shared branding
 requires an intentional review in each repository, not a shared UI framework.
 

@@ -2,11 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
-import {
-  captureDebugBundleGlobalError,
-  captureDebugBundleUnhandledRejection,
-  initializeDebugBundle,
-} from './utils/debugbundle'
+import { initializeDebugBundle } from './utils/debugbundle'
 import { registerAppServiceWorker } from './utils/serviceWorkerRegistration'
 
 const VIEWPORT_HEIGHT_PROPERTY = '--viewport-height'
@@ -94,25 +90,15 @@ function registerViewportHeightSync() {
 
 registerViewportHeightSync()
 
-// Global error handlers - catch uncaught exceptions and unhandled promise rejections
-// so they don't silently disappear in production.
+// Keep local console visibility; the DebugBundle SDK owns global capture.
 window.addEventListener('error', (event) => {
   const error = event.error ?? event.message
 
   console.error('[TaskTime Pro] Uncaught error:', error)
-  captureDebugBundleGlobalError(error, {
-    colno: event.colno ?? null,
-    filename: event.filename ?? null,
-    lineno: event.lineno ?? null,
-    message: event.message ?? null,
-  })
 })
 
 window.addEventListener('unhandledrejection', (event) => {
   console.error('[TaskTime Pro] Unhandled promise rejection:', event.reason)
-  captureDebugBundleUnhandledRejection(event.reason, {
-    type: event.type,
-  })
 })
 
 createRoot(document.getElementById('root')).render(

@@ -27,7 +27,7 @@ Browser / PWA
         ├── Dropbox App Folder direct data path (production optional)
         ├── provider-neutral hosted identity (production control plane)
         ├── Shared Stripe/D1 billing + public catalog/signed-license control plane (deployed)
-        ├── DebugBundle endpoint (optional tasktime-app diagnostics; independent tasktime-site browser module)
+        ├── DebugBundle endpoint (optional app diagnostics; independent site diagnostics and aggregate analytics)
         └── exchange-rate / email / push integrations as configured
 
 Local agent process
@@ -156,6 +156,10 @@ Production topology (independently approved artifact deployments)
   auth-request deadlines. Both auth hooks use it for retained-session status;
   `YjsContext` uses it for temporary initial connection failures. Token providers
   retain their existing in-memory ownership and stale-generation fencing.
+- `utils/debugbundle` opts only the configured Worker `/auth/` path into the
+  browser SDK's cross-origin trace headers, after the private Worker's app-origin
+  CORS allowlist accepts `X-DebugBundle-Trace-Id`. Direct provider file requests
+  remain outside SDK trace propagation.
 - `useDropboxAuth` also reads the verified account email directly from Dropbox
   after new/reconnected authorization and stores it only in the allowlisted
   origin-local auth-session record. UI consumers use that email for presentation;

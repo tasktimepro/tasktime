@@ -4,6 +4,8 @@
  */
 
 import { createDebugBundleBrowserSdk } from '@debugbundle/sdk-browser'
+import { SYNC_WORKER_CONFIG } from '@/config/syncWorker'
+import { APP_VERSION } from '@/constants/app'
 
 let isInitialized = false
 const debugBundle = createDebugBundleBrowserSdk()
@@ -126,9 +128,19 @@ export function initializeDebugBundle() {
             projectToken,
             environment: getEnvironment(),
             service: 'tasktime-app',
+            ...(SYNC_WORKER_CONFIG.workerUrl ? {
+                // Only Worker auth calls need cross-origin trace headers for sync failures.
+                tracePropagationTargets: [`${SYNC_WORKER_CONFIG.workerUrl}/auth/`],
+            } : {}),
         })
     } catch {
         return false
+    }
+
+    try {
+        debugBundle.setContext('deploy', { version: APP_VERSION })
+    } catch {
+        // Diagnostics context must not prevent app initialization.
     }
 
     isInitialized = true
@@ -190,31 +202,4 @@ export function captureDebugBundleIncident({
     })
 
     return safeCaptureException(incidentError)
-}
-
-export function captureDebugBundleGlobalError(error, context) {
-    if (!isInitialized) {
-        return false
-    }
-
-    const normalizedError = normalizeUnknownError(error, 'Uncaught browser error')
-    attachIncidentMetadata(normalizedError, {
-        incidentKey: 'browser.global_error',
-        context,
-    })
-    return safeCaptureException(normalizedError)
-}
-
-export function captureDebugBundleUnhandledRejection(reason, context) {
-    if (!isInitialized) {
-        return false
-    }
-
-    const normalizedError = normalizeUnknownError(reason, 'Unhandled promise rejection')
-    attachIncidentMetadata(normalizedError, {
-        incidentKey: 'browser.unhandled_rejection',
-        context,
-        originalError: reason,
-    })
-    return safeCaptureException(normalizedError)
 }

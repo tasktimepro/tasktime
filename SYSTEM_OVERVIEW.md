@@ -73,7 +73,13 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   services.
 - **Operational evidence:** App and site use independent DebugBundle browser
   configuration and services (`tasktime-app`, `tasktime-site`). The site owns a
-  small optional bundled diagnostic module, without app storage or analytics.
+  small optional bundled diagnostics and privacy-strict aggregate analytics module,
+  without app storage, persistent visitor identity or cross-site tracking.
+  The app opts the shared Worker `/auth/` origin/path into browser SDK trace
+  propagation; the Worker permits the optional trace header on app-origin CORS
+  requests. Provider file requests are outside that target. Deploy Worker CORS
+  support before the app artifact that sends the header. The app also attaches
+  its exact build version as diagnostic deploy context.
   Local tests remain the first tool for deterministic failures. New subscription
   acquisition requires VAT-inclusive Stripe Prices and matching catalog copy;
   automatic tax stays enabled and server controls independently authorize acquisition.

@@ -2,7 +2,7 @@
   "profile_version": "v1",
   "project": {
     "name": "tasktime",
-    "repo_url": "",
+    "repo_url": "https://github.com/tasktimepro/tasktime",
     "primary_languages": [
       "TypeScript",
       "JavaScript"
@@ -12,8 +12,7 @@
     ],
     "deployment_targets": [
       "docker-compose",
-      "cloudflare-pages",
-      "cloudflare-workers"
+      "cloudflare-pages"
     ]
   },
   "services": [
@@ -39,58 +38,26 @@
         "/auth/callback"
       ],
       "depends_on": [
-        "tasktime-sync-worker"
+        "sync.tasktime.pro"
       ]
-    },
-    {
-      "name": "tasktime-sync-worker",
-      "kind": "worker",
-      "runtime": "Cloudflare Workers",
-      "framework": "Cloudflare Workers",
-      "paths": [
-        "cloudflare/src"
-      ],
-      "owns_routes": [
-        "/auth/init",
-        "/auth/callback",
-        "/auth/revoke",
-        "/auth/status",
-        "/drive/*",
-        "/email/invoice",
-        "/metrics/batch",
-        "/health"
-      ],
-      "depends_on": []
-    },
-    {
-      "name": "tasktime-blog",
-      "kind": "frontend",
-      "runtime": "Browser",
-      "framework": "Astro",
-      "paths": [
-        "blog/src"
-      ],
-      "owns_routes": [
-        "/blog",
-        "/blog/:slug",
-        "/privacy",
-        "/terms",
-        "/contact"
-      ],
-      "depends_on": []
     }
   ],
   "infrastructure": {
     "databases": [],
     "queues": [],
     "object_storage": [],
-    "external_services": []
+    "external_services": [
+      "sync.tasktime.pro",
+      "Google Drive",
+      "Dropbox",
+      "DebugBundle"
+    ]
   },
   "critical_paths": [
     {
       "name": "Browser app bootstrap and global runtime capture",
       "owner_service": "tasktime-app",
-      "notes": "Entry point and top-level render path for the production SPA; browser SDK initialization belongs here."
+      "notes": "src/main.jsx initializes the SDK; the SDK owns global error and rejection capture, while the app retains console visibility."
     },
     {
       "name": "Client routing and auth callback flow",
@@ -98,33 +65,28 @@
       "notes": "Path-based routing, including /auth/callback handling, is owned by the SPA hooks and App shell."
     },
     {
-      "name": "Google Drive sync auth and session lifecycle",
-      "owner_service": "tasktime-sync-worker",
-      "notes": "OAuth exchange, session persistence, and Drive proxy behavior span the browser auth hook and Cloudflare Worker auth routes."
-    },
-    {
-      "name": "Cloudflare Worker API surface",
-      "owner_service": "tasktime-sync-worker",
-      "notes": "The worker handles auth, Drive proxying, invoice email delivery, usage metrics, and health checks."
+      "name": "Google Drive and Dropbox sync auth and session lifecycle",
+      "owner_service": "tasktime-app",
+      "notes": "Browser auth and direct provider transport live under src/hooks and src/stores/yjs/providers. The shared Worker control plane is private infrastructure; routine file operations go directly to the provider."
     },
     {
       "name": "Production build and Pages deployment pipeline",
       "owner_service": "tasktime-app",
-      "notes": "The merged app+blog artifact is built in GitHub Actions and deployed to Cloudflare Pages, so hosted browser tokens must be injected at build time."
+      "notes": "Core builds dist-app independently from the Astro public site. Production browser tokens are injected into the app artifact at build time."
     }
   ],
   "repo": {
     "root_paths": [
-      "blog",
-      "cloudflare",
-      "coverage",
-      "dist",
+      "agent-bridge",
+      "contracts",
       "docs",
       "e2e",
       "public",
+      "rules",
       "scripts",
+      "spec",
       "src",
-      "test-results"
+      "status"
     ],
     "generated_paths": [
       ".debugbundle",
@@ -138,16 +100,16 @@
     ]
   },
   "developer_workflows": {
-    "install": "docker compose run --rm app npm install",
-    "build": "docker compose run --rm app npm run build",
-    "test": "docker compose run --rm app npm run test:run",
+    "install": "make install",
+    "build": "make build",
+    "test": "make npm CMD='run test:run'",
     "lint": "make lint"
   },
   "debugbundle": {
-    "profile_owner": "unassigned",
-    "last_reviewed_at": "2026-05-26T18:40:00.000Z",
+    "profile_owner": "tasktime-core",
+    "last_reviewed_at": "2026-09-25T13:15:00.000Z",
     "validation_status": "agent-validated",
     "skill_path": ".agents/skills/debugbundle",
-    "notes": "Validated for the Cloudflare Pages React SPA, Astro public site, and Cloudflare Worker deployment used by TaskTime Pro."
+    "notes": "Core app profile only. The Astro public site and shared Worker are independent private repositories with separate DebugBundle projects and release authority."
   }
 }
