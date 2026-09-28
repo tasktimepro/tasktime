@@ -1,3 +1,72 @@
+## September 28 core v1.6.4 yearly repeat update — validated locally
+
+The core app task repeat picker now exposes its existing yearly month/day
+schedule in task create and edit flows. The shared expense yearly date control
+now stays inside the dialog, with month buttons and a validated day field. The
+expense modal also preserves the selected yearly calendar day in western
+timezones. The data contract is unchanged. The candidate is core app patch
+v1.6.4; no agent, Worker, or site source changed. The full local release gate
+passes. The site's independently pinned core contract needs a separate review
+before it claims v1.6.4. This candidate remains
+uncommitted and unpublished. See `app-status.md` for local validation and
+browser evidence.
+
+## September 27 blog updates — published and verified
+
+The complete site-only blog update is live: 36 posts, relevant dark WebP covers,
+Owen Far bylines, title-first tag chips, conditional revision footers, and the
+Gemini CLI/Muse Code guides. Source `4d69b33` passed CI `36286263184` and
+preparation `36286283910` (zero audit findings, 17 native and 26 browser checks).
+Deployment `36286453437` published the exact reviewed archive. All 281 live
+files match, with only Cloudflare HTML transformations normalized; live phone
+and desktop article review and real branded 404 pass. Private infrastructure
+retains the deployment receipt and previous archive for rollback. Search Console
+indexing remains an existing separate follow-up. No app/Worker/agent release.
+The older unpublished entries below are historical checkpoints.
+
+## September 27 Gemini CLI and Muse Code posts — validated locally
+
+The independent site adds two practical agent workflow articles with matching
+task management, time tracking and invoicing titles. Client setup references,
+paired-bridge behavior and Free/Pro boundaries were reviewed. The 53-page build,
+17 native tests, 25 applicable browser checks and audit pass; phone/desktop
+captures were reviewed. Source remains uncommitted and unpublished. See
+`site-status.md` for details; no core app or agent artifact changed.
+
+## September 27 related dark blog covers — validated locally
+
+All 34 articles use 20 relevant dark WebP captures through a single `coverImage`
+property. Timer captures show eight seconds. Content, URLs and editorial dates
+are preserved. The full site gate passes: 17 native tests, 25 applicable browser
+checks, 51 pages and zero audit findings. Source remains uncommitted and
+unpublished; see `site-status.md`. No core app or agent artifact changed.
+
+## September 27 revision dates — validated locally
+
+Blog cards and article bylines retain only the publication date. Recorded
+revision dates appear at the bottom of articles, with search metadata intact.
+The full local site gate passes: 17 native tests, 25 applicable browser checks,
+51-page build and zero audit findings. Source remains uncommitted and unpublished.
+See `site-status.md` for the evidence.
+
+## September 27 blog tag chips — validated locally
+
+Blog cards and articles show the title first, followed by the description,
+category/tag chips and author/date byline. The restored chip layout passes the
+full local site gate: 17 native tests, 25 applicable browser checks, 51-page
+build and zero audit findings. Source remains uncommitted and unpublished.
+See `site-status.md` for the evidence.
+
+## September 26 blog presentation — validated locally
+
+The independent site now includes article heroes, archive previews, Owen Far's
+portrait/name and publication/revision bylines across 34 posts, with matching
+article metadata. Original content, URLs and editorial dates are preserved.
+Docker audit, 17 native tests, the 51-page build and all 25 applicable browser
+checks pass; the optional diagnostics check is skipped with its token disabled.
+Source is uncommitted and unpublished.
+See `site-status.md` and the independent site's `STATUS.md` for evidence.
+
 ## September 25 production release — v1.6.3 app, public site and DebugBundle v3
 
 The owner instructed production publication and delegated prepared-archive hash

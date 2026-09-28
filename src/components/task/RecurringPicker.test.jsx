@@ -78,28 +78,24 @@ describe('RecurringPicker', () => {
         }))
     })
 
-    it('applies yearly selection when enabled', async () => {
+    it.each([
+        ['task defaults', undefined],
+        ['restricted recurring expense options', ['monthly', 'yearly']]
+    ])('offers and applies a yearly schedule with %s', async (_scenario, allowedTypes) => {
 
         const onChange = vi.fn()
         const onClear = vi.fn()
         const user = userEvent.setup()
 
-        render(
-            <RecurringPicker
-                value={null}
-                onChange={onChange}
-                onClear={onClear}
-                allowedTypes={['monthly', 'yearly']}
-            />
-        )
+        render(<RecurringPicker value={null} onChange={onChange} onClear={onClear} allowedTypes={allowedTypes} />)
 
         await user.click(screen.getByRole('button', { name: 'Set repeat' }))
         await user.click(screen.getByRole('button', { name: 'Every Year' }))
 
-        await user.click(screen.getByLabelText('Yearly month'))
-        await user.click(await screen.findByRole('option', { name: '5' }))
-        await user.click(screen.getByLabelText('Yearly day'))
-        await user.click(await screen.findByRole('option', { name: '12' }))
+        await user.click(screen.getByRole('button', { name: 'May' }))
+        const day = screen.getByRole('spinbutton', { name: 'Yearly day' })
+        await user.clear(day)
+        await user.type(day, '12')
 
         await user.click(screen.getByRole('button', { name: 'Apply' }))
 
@@ -107,5 +103,50 @@ describe('RecurringPicker', () => {
             type: 'yearly',
             yearlyDate: '2023-05-12'
         }))
+    })
+
+    it('loads an existing yearly task schedule for editing', async () => {
+        const onChange = vi.fn()
+        const user = userEvent.setup()
+
+        render(
+            <RecurringPicker
+                value={{ type: 'yearly', yearlyDate: '2023-11-21' }}
+                onChange={onChange}
+                onClear={vi.fn()}
+            />
+        )
+
+        await user.click(screen.getByRole('button', { name: 'Yearly (Nov 21)' }))
+        expect(screen.getByRole('button', { name: 'Every Year' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'November' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('spinbutton', { name: 'Yearly day' })).toHaveValue(21)
+        await user.click(screen.getByRole('button', { name: 'Apply' }))
+
+        expect(onChange).toHaveBeenCalledWith({ type: 'yearly', yearlyDate: '2023-11-21' })
+    })
+
+    it('allows a later day without a long dropdown and validates month length', async () => {
+        const onChange = vi.fn()
+        const user = userEvent.setup()
+
+        render(<RecurringPicker value={{ type: 'yearly', yearlyDate: '2023-01-03' }} onChange={onChange} onClear={vi.fn()} />)
+
+        await user.click(screen.getByRole('button', { name: 'Yearly (Jan 3)' }))
+        const day = screen.getByRole('spinbutton', { name: 'Yearly day' })
+        await user.clear(day)
+        await user.type(day, '31')
+        expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'February' }))
+        expect(day).toHaveValue(28)
+        await user.clear(day)
+        await user.type(day, '29')
+        expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled()
+        expect(screen.getByRole('alert')).toHaveTextContent('Enter a day from 1 to 28.')
+        await user.clear(day)
+        await user.type(day, '28')
+        await user.click(screen.getByRole('button', { name: 'Apply' }))
+
+        expect(onChange).toHaveBeenCalledWith({ type: 'yearly', yearlyDate: '2023-02-28' })
     })
 })

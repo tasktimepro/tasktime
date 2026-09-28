@@ -46,6 +46,12 @@
 
 - Users can manage clients, projects, tasks/subtasks, notes, planner attachments, and goals through the corresponding screens.
 - A subtask cannot be configured as recurring.
+- New and edited top-level tasks can repeat weekly, monthly, or yearly. A yearly
+  schedule chooses a month and day and reopens with that saved date selected.
+  Task and expense yearly dates stay selectable inside the Repeat dialog at
+  phone and desktop sizes, with dialog scrolling in short landscape viewports;
+  days outside the chosen month cannot be applied. An expense keeps the selected
+  local calendar day in western timezones when its yearly recurrence is saved.
 - Confirmed task/project/client deletion includes lazy yearly entries and archive
   documents, removes matching records from all supported placements, and retains
   unrelated work and protected financial records. Missing cloud history asks for

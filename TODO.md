@@ -4,18 +4,6 @@
 
 [ ] Check about indexing blog issues - ONGOING
 
-...
-
-Launch v1.6.0 is complete: app and public site are live, billing is enabled,
-and the agent releases are published. Evidence: `status/app-status.md` and
-`status/agent-status.md`; private operations retain deployment details.
-
-Remaining operational follow-ups:
-[ ] Confirm Dropbox broad-public production status in its owning App Console and the post-approval connection canary.
-[ ] Verify Search Console sitemap submission and indexing (retain the existing blog-indexing investigation above).
-[ ] Observe the first legitimate paid purchase and post-cutover hosted email; no extra synthetic charge/send is required.
-[ ] Finish external Google/Dropbox console removal of obsolete redirect URLs after Worker authority cleanup.
-
 [x] Actually validate the skill/MCP with our own OpenClaw - RE-TEST
     - Test one use-case where the agent creates a task, starts the timer, go work on the actual task, stop the timer when it finished
     - We might need to make this flow part of the skill for people that want to use tasktime pro for task & time management
@@ -31,19 +19,10 @@ Remaining operational follow-ups:
     [ ] Glama
     [ ] MCP.so
 
-[ ] Think about publishing an official supported chatGPT plugin
+[ ] Setup chatGPT work as we did for DebugBundle
+    [ ] Keep publishing blog posts related to tasktime pro with the real world, including usage with agents and all agents including ChatGPT/Codex, Claude/Claude Code, Gemini, Muse, Copilot, etc.
 
-[ ] Focus mode - think how we can do this best.
-    - Today we work on multiple projects or tasks at a time because a lot of the work is managed by AI. With this focus mode, when I enter it, I imagine a super clean overlay on top of everything, with the options to attached existing tasks, or create new ones directly inline (can be assigned to projects too)
-    - These are the tasks you plan to do today/next so they remain here until you check them off - once checked, they disappear from this space
-    - We can nicely separate them based on project - the ones on "top" have no project assigned
-    - This view might be the best view to contain pomodoro? Let me know
-We might bring some of this previous idea I had earlier into this too:
-[ ] Timed sessions with sound alerts - I want to work on this for 1hour
-    - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on
-    [ ] This can also be an alert reminder settings in account that when a time passes a certain amount, we ping with a sound, and when we have push notifications, also have that choice
-    - Pomodoro? Is this the same and does it apply here?
-I would perhaps just take the subtle sound effect for a ping option that can go on every 20, 30, 40, 60 minutes. As a gentle reminder that you're in focus mode and that a timer is ongoing
+[ ] Think about publishing an official supported chatGPT plugin
 
 [ ] Improve reports overview with some useful charts - see existing mocks in TaskTime folder
 
@@ -71,9 +50,21 @@ I would perhaps just take the subtle sound effect for a ping option that can go 
 
 ## Ideas
 
+[ ] Focus mode - think how we can do this best.
+    - Today we work on multiple projects or tasks at a time because a lot of the work is managed by AI. With this focus mode, when I enter it, I imagine a super clean overlay on top of everything, with the options to attached existing tasks, or create new ones directly inline (can be assigned to projects too)
+    - These are the tasks you plan to do today/next so they remain here until you check them off - once checked, they disappear from this space
+    - We can nicely separate them based on project - the ones on "top" have no project assigned
+    - This view might be the best view to contain pomodoro? Let me know
+We might bring some of this previous idea I had earlier into this too:
+[ ] Timed sessions with sound alerts - I want to work on this for 1hour
+    - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on
+    [ ] This can also be an alert reminder settings in account that when a time passes a certain amount, we ping with a sound, and when we have push notifications, also have that choice
+    - Pomodoro? Is this the same and does it apply here?
+I would perhaps just take the subtle sound effect for a ping option that can go on every 20, 30, 40, 60 minutes. As a gentle reminder that you're in focus mode and that a timer is ongoing
+
 [ ] Global search
 
-[ ] Include theme color options in settings, default could be neutral
+[ ] Include theme color options in settings, default could be neutral and include a bit more this color throughout, for example in nav icons and maybe certain primary buttons
 
 [ ] Keep track of invoices that you downloaded - so perhaps have a "downloaded" check icon or something
 

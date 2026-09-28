@@ -19,6 +19,10 @@ Minimize the distance from identifying work to tracking it accurately.
 
 ## Recurrence controls and project settings
 
+- The shared Repeat dialog offers weekly, monthly, and yearly schedules for
+  top-level tasks; recurring expenses retain monthly and yearly choices. Yearly
+  selection keeps month buttons and a validated day field inside the dialog,
+  including a scrollable dialog on short viewports.
 - Disable recurrence and Enable recurrence appear only in recurring-task
   three-dot menus used by task details and list views. Disable uses a calendar-off
   icon and Enable uses a calendar-check icon, with the same alignment and spacing

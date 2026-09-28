@@ -1,5 +1,5 @@
 /**
- * RecurringPicker - Popup for selecting recurring task patterns
+ * RecurringPicker - Shared task and expense repeat schedule picker
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -8,7 +8,6 @@ import { ArrowPathIcon, CalendarDaysIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatRecurringLabel } from '@/utils/recurringUtils.ts';
 import { cn } from '@/lib/utils';
 
@@ -22,8 +21,12 @@ const WEEKDAY_OPTIONS = [
     { label: 'Su', value: 0 }
 ];
 
-const DEFAULT_ALLOWED_TYPES = ['weekly', 'monthly'];
+const DEFAULT_ALLOWED_TYPES = ['weekly', 'monthly', 'yearly'];
 const YEARLY_BASE_YEAR = 2023;
+const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
 
 const getMaxDayForMonth = (month) => {
     const safeMonth = Math.min(12, Math.max(1, Number(month) || 1));
@@ -118,16 +121,23 @@ const RecurringPicker = ({
             ? value
             : getDefaultConfig(allowedTypes, monthlyMode)
     ));
+    const [yearlyDayInput, setYearlyDayInput] = useState(() => String(getYearlyParts(value?.yearlyDate).day));
 
     useEffect(() => {
         if (!isOpen) {
-            setDraftConfig(
-                value && allowedTypes.includes(value.type)
-                    ? value
-                    : getDefaultConfig(allowedTypes, monthlyMode)
-            );
+            const nextConfig = value && allowedTypes.includes(value.type)
+                ? value
+                : getDefaultConfig(allowedTypes, monthlyMode);
+            setDraftConfig(nextConfig);
+            setYearlyDayInput(String(getYearlyParts(nextConfig.yearlyDate).day));
         }
     }, [isOpen, value, allowedTypes, monthlyMode]);
+
+    const yearlyMonth = getYearlyParts(draftConfig.yearlyDate).month;
+    const yearlyDay = Number(yearlyDayInput);
+    const isYearlyDayValid = /^\d{1,2}$/.test(yearlyDayInput)
+        && yearlyDay >= 1
+        && yearlyDay <= getMaxDayForMonth(yearlyMonth);
 
     const displayLabel = useMemo(() => {
         return value ? formatRecurringLabel(value) : 'Set repeat';
@@ -163,6 +173,10 @@ const RecurringPicker = ({
     };
 
     const handleTypeChange = (nextType) => {
+        if (nextType === 'yearly') {
+            setYearlyDayInput(String(getYearlyParts(draftConfig.yearlyDate).day));
+        }
+
         setDraftConfig((prev) => {
             if (nextType === 'weekly') {
                 return {
@@ -211,27 +225,31 @@ const RecurringPicker = ({
     };
 
     const handleYearlyMonthChange = (value) => {
-        const month = Number(value) || 1;
-        setDraftConfig((prev) => {
-            const { day } = getYearlyParts(prev.yearlyDate);
-            return {
-                ...prev,
-                type: 'yearly',
-                yearlyDate: toYearlyDate(month, day)
-            };
-        });
+        const month = Number(value);
+        const previousDay = /^\d{1,2}$/.test(yearlyDayInput)
+            ? Number(yearlyDayInput)
+            : getYearlyParts(draftConfig.yearlyDate).day;
+        const day = Math.min(getMaxDayForMonth(month), Math.max(1, previousDay));
+        setDraftConfig((prev) => ({
+            ...prev,
+            type: 'yearly',
+            yearlyDate: toYearlyDate(month, day)
+        }));
+        setYearlyDayInput(String(day));
     };
 
-    const handleYearlyDayChange = (value) => {
-        const day = Number(value) || 1;
-        setDraftConfig((prev) => {
-            const { month } = getYearlyParts(prev.yearlyDate);
-            return {
+    const handleYearlyDayChange = (event) => {
+        const input = event.target.value;
+        setYearlyDayInput(input);
+
+        const day = Number(input);
+        if (/^\d{1,2}$/.test(input) && day >= 1 && day <= getMaxDayForMonth(yearlyMonth)) {
+            setDraftConfig((prev) => ({
                 ...prev,
                 type: 'yearly',
-                yearlyDate: toYearlyDate(month, day)
-            };
-        });
+                yearlyDate: toYearlyDate(yearlyMonth, day)
+            }));
+        }
     };
 
     const typeOptions = useMemo(() => {
@@ -260,7 +278,7 @@ const RecurringPicker = ({
             </Button>
 
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                <DialogContent className="max-w-sm">
+                <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-sm overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <CalendarDaysIcon className="h-5 w-5" />
@@ -270,13 +288,14 @@ const RecurringPicker = ({
 
                     <div className="space-y-4">
                         {typeOptions.length > 0 && (
-                            <div className="flex gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                                 {typeOptions.map((option) => (
                                     <Button
                                         key={option.type}
                                         type="button"
                                         variant={draftConfig.type === option.type ? 'secondary' : inactiveVariant}
-                                        className="flex-1"
+                                        className={cn(typeOptions.length % 2 === 1 && option === typeOptions.at(-1) && 'col-span-2')}
+                                        aria-pressed={draftConfig.type === option.type}
                                         onClick={() => handleTypeChange(option.type)}
                                     >
                                         {option.label}
@@ -356,47 +375,47 @@ const RecurringPicker = ({
                             </div>
                         )}
 
-                        {draftConfig.type === 'yearly' && (() => {
-                            const { month, day } = getYearlyParts(draftConfig.yearlyDate);
-                            const maxDay = getMaxDayForMonth(month);
-                            const dayOptions = Array.from({ length: maxDay }, (_, index) => index + 1);
-                            const monthOptions = Array.from({ length: 12 }, (_, index) => index + 1);
-
-                            return (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-medium text-muted-foreground">Month</div>
-                                        <Select value={String(month)} onValueChange={handleYearlyMonthChange}>
-                                            <SelectTrigger aria-label="Yearly month">
-                                                <SelectValue placeholder="Month" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {monthOptions.map((option) => (
-                                                    <SelectItem key={option} value={String(option)}>
-                                                        {option}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-medium text-muted-foreground">Day</div>
-                                        <Select value={String(day)} onValueChange={handleYearlyDayChange}>
-                                            <SelectTrigger aria-label="Yearly day">
-                                                <SelectValue placeholder="Day" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {dayOptions.map((option) => (
-                                                    <SelectItem key={option} value={String(option)}>
-                                                        {option}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                        {draftConfig.type === 'yearly' && (
+                            <div className="space-y-3">
+                                <div className="space-y-2">
+                                    <div className="text-xs font-medium text-muted-foreground">Month</div>
+                                    <div role="group" aria-label="Yearly month" className="grid grid-cols-4 gap-2">
+                                        {MONTH_NAMES.map((name, index) => (
+                                            <Button
+                                                key={name}
+                                                type="button"
+                                                variant={yearlyMonth === index + 1 ? 'secondary' : 'outline'}
+                                                className="h-9 px-2"
+                                                aria-label={name}
+                                                aria-pressed={yearlyMonth === index + 1}
+                                                onClick={() => handleYearlyMonthChange(index + 1)}
+                                            >
+                                                {name.slice(0, 3)}
+                                            </Button>
+                                        ))}
                                     </div>
                                 </div>
-                            );
-                        })()}
+                                <div className="space-y-2">
+                                    <div className="text-xs font-medium text-muted-foreground">Day</div>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        max={getMaxDayForMonth(yearlyMonth)}
+                                        step={1}
+                                        inputMode="numeric"
+                                        aria-label="Yearly day"
+                                        aria-invalid={!isYearlyDayValid}
+                                        value={yearlyDayInput}
+                                        onChange={handleYearlyDayChange}
+                                    />
+                                    {!isYearlyDayValid && (
+                                        <p className="text-xs text-destructive-strong" role="alert">
+                                            Enter a day from 1 to {getMaxDayForMonth(yearlyMonth)}.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex items-center justify-between pt-2">
                             <Button
@@ -409,6 +428,7 @@ const RecurringPicker = ({
                             <Button
                                 type="button"
                                 onClick={handleApply}
+                                disabled={draftConfig.type === 'yearly' && !isYearlyDayValid}
                             >
                                 Apply
                             </Button>

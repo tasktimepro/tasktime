@@ -359,6 +359,39 @@ test('saving an open task editor preserves a newer pause and its active timer', 
     });
 });
 
+test('creates a yearly task from quick create and retains its date after reload', async ({ page }) => {
+    await seed(page);
+    await page.getByRole('button', { name: 'Open quick create menu' }).click();
+    await page.getByRole('menuitem', { name: 'New Task' }).click();
+
+    const taskDialog = page.getByRole('dialog', { name: 'New Task' });
+    await taskDialog.getByLabel('Task Title').fill('Annual license review');
+    await taskDialog.getByRole('button', { name: 'Set repeat' }).click();
+
+    const repeatDialog = page.getByRole('dialog', { name: 'Repeat' });
+    await repeatDialog.getByRole('button', { name: 'Every Year' }).click();
+    await repeatDialog.getByRole('button', { name: 'May' }).click();
+    await repeatDialog.getByRole('spinbutton', { name: 'Yearly day' }).fill('12');
+    await repeatDialog.getByRole('button', { name: 'Apply' }).click();
+    await expect(taskDialog.getByRole('button', { name: 'Yearly (May 12)' })).toBeVisible();
+    await taskDialog.getByRole('button', { name: 'Create', exact: true }).click();
+
+    const readTask = () => page.evaluate(() => Array.from(
+        window.__TASKTIME_STORE__.tasks.values(), task => task.toJSON(),
+    ).find(task => task.title === 'Annual license review'));
+    await expect.poll(readTask).toMatchObject({
+        recurring: { type: 'yearly', yearlyDate: '2023-05-12' },
+        startDate: null,
+    });
+    await page.evaluate(() => window.__TASKTIME_STORE__.docManager.flushPersistence());
+    await page.reload();
+    await expect(page.getByTestId('dashboard-hours-chart')).toBeVisible();
+    await expect.poll(readTask).toMatchObject({
+        recurring: { type: 'yearly', yearlyDate: '2023-05-12' },
+        startDate: null,
+    });
+});
+
 test('uses separate category forms and displays their original color in both themes', async ({ page }) => {
     await seed(page);
     await page.goto('/expenses');

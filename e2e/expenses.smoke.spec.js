@@ -3,6 +3,61 @@ import { expensesHeadingName, openExpensesPage } from './helpers/tasktime.js';
 
 test.describe('Expenses smoke', () => {
 
+    test('keeps yearly selection inside the repeat dialog and saves the expense', async ({ page }) => {
+        await page.addInitScript(() => localStorage.setItem('tasktime-dark-mode', 'true'));
+
+        for (const viewport of [{ width: 320, height: 700 }, { width: 667, height: 375 }, { width: 1440, height: 900 }]) {
+            await page.setViewportSize(viewport);
+            await openExpensesPage(page);
+            await page.getByRole('button', { name: 'New Expense', exact: true }).click();
+
+            const expenseDialog = page.getByRole('dialog', { name: 'New Expense' });
+            await expenseDialog.getByRole('combobox', { name: 'Expense type' }).click();
+            await page.getByRole('option', { name: 'Recurring', exact: true }).click();
+            await expenseDialog.getByRole('button', { name: 'Monthly (1st)' }).click();
+
+            const repeatDialog = page.getByRole('dialog', { name: 'Repeat' });
+            await repeatDialog.getByRole('button', { name: 'Every Year' }).click();
+            await expect(repeatDialog.getByRole('button', { name: 'January' })).toBeVisible();
+            await expect(repeatDialog.getByRole('button', { name: 'December' })).toBeVisible();
+            await expect(repeatDialog.getByRole('spinbutton', { name: 'Yearly day' })).toBeVisible();
+            await expect(repeatDialog.getByRole('listbox')).toHaveCount(0);
+            await repeatDialog.screenshot({ path: `test-results/yearly-repeat-${viewport.width}.png` });
+
+            const bounds = await repeatDialog.boundingBox();
+            expect(bounds.y).toBeGreaterThanOrEqual(0);
+            expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height + 1);
+            if (viewport.height < 400) {
+                expect(await repeatDialog.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+            }
+
+            await repeatDialog.getByRole('button', { name: 'December' }).click();
+            await repeatDialog.getByRole('spinbutton', { name: 'Yearly day' }).fill('31');
+            await repeatDialog.getByRole('button', { name: 'Apply' }).click();
+            await expect(expenseDialog.getByRole('button', { name: 'Yearly (Dec 31)' })).toBeVisible();
+            if (viewport.width !== 1440) {
+                await expenseDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+                continue;
+            }
+
+            await expenseDialog.getByPlaceholder('Enter expense title').fill('Yearly renewal');
+            await expenseDialog.getByLabel(/Amount/i).fill('12.34');
+            await expenseDialog.getByRole('button', { name: 'Create Expense' }).click();
+            await expect(expenseDialog).not.toBeVisible();
+
+            const readRecurrence = () => page.evaluate(() => Array.from(
+                window.__TASKTIME_STORE__.expenseRecurrences.values(), recurrence => recurrence.toJSON(),
+            ).find(recurrence => recurrence.title === 'Yearly renewal'));
+            await expect.poll(readRecurrence).toMatchObject({ repeat: 'yearly' });
+            expect((await readRecurrence()).startDate).toMatch(/-12-31$/);
+            await page.evaluate(() => window.__TASKTIME_STORE__.docManager.flushPersistence());
+            await page.reload();
+            await expect(page.getByRole('heading', { name: expensesHeadingName })).toBeVisible();
+            await expect.poll(readRecurrence).toMatchObject({ repeat: 'yearly' });
+            expect((await readRecurrence()).startDate).toMatch(/-12-31$/);
+        }
+    });
+
     test('deletes a newly created expense and closes both dialogs without a false error', async ({ page }) => {
         const title = `Delete check ${Date.now()}`;
         await openExpensesPage(page);
@@ -143,5 +198,36 @@ test.describe('Expenses smoke', () => {
         await expect(reloadedPaidRow).toBeVisible();
         await expect(reloadedPaidRow).toContainText('Paid');
         await expect(reloadedPaidRow).toContainText('12.34');
+    });
+});
+
+test.describe('Yearly expense in a western timezone', () => {
+    test.use({ timezoneId: 'America/Los_Angeles' });
+
+    test('keeps the selected local calendar day when saving a recurrence', async ({ page }) => {
+        await openExpensesPage(page);
+        await page.getByRole('button', { name: 'New Expense', exact: true }).click();
+
+        const expenseDialog = page.getByRole('dialog', { name: 'New Expense' });
+        await expenseDialog.getByRole('combobox', { name: 'Expense type' }).click();
+        await page.getByRole('option', { name: 'Recurring', exact: true }).click();
+        await expenseDialog.getByRole('button', { name: 'Monthly (1st)' }).click();
+
+        const repeatDialog = page.getByRole('dialog', { name: 'Repeat' });
+        await repeatDialog.getByRole('button', { name: 'Every Year' }).click();
+        await repeatDialog.getByRole('button', { name: 'December' }).click();
+        await repeatDialog.getByRole('spinbutton', { name: 'Yearly day' }).fill('31');
+        await repeatDialog.getByRole('button', { name: 'Apply' }).click();
+        await expect(expenseDialog.getByRole('button', { name: 'Yearly (Dec 31)' })).toBeVisible();
+
+        await expenseDialog.getByPlaceholder('Enter expense title').fill('Western timezone renewal');
+        await expenseDialog.getByLabel(/Amount/i).fill('12.34');
+        await expenseDialog.getByRole('button', { name: 'Create Expense' }).click();
+        await expect(expenseDialog).not.toBeVisible();
+
+        const recurrence = await page.evaluate(() => Array.from(
+            window.__TASKTIME_STORE__.expenseRecurrences.values(), value => value.toJSON(),
+        ).find(value => value.title === 'Western timezone renewal'));
+        expect(recurrence.startDate).toMatch(/-12-31$/);
     });
 });

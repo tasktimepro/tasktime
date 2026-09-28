@@ -1,4 +1,73 @@
+## September 27 blog updates — published and verified
+
+The complete site-only blog update is live: 36 posts, relevant dark WebP covers,
+Owen Far bylines, title-first tag chips, conditional revision footers, and the
+Gemini CLI/Muse Code guides. Source `4d69b33` passed CI `36286263184` and
+preparation `36286283910` (zero audit findings, 17 native and 26 browser checks).
+Deployment `36286453437` published the exact reviewed archive. All 281 live
+files match, with only Cloudflare HTML transformations normalized; live phone
+and desktop article review and real branded 404 pass. Private infrastructure
+retains the deployment receipt and previous archive for rollback. Search Console
+indexing remains an existing separate follow-up. No app/Worker/agent release.
+The older unpublished entries below are historical checkpoints.
+
 # Public Site Status
+
+## September 27 Gemini CLI and Muse Code posts — validated locally
+
+Added two human-tone workflow guides with distinct task management, time
+tracking and invoicing titles, practical prompts, verified client configuration
+references and dark Agent Access covers. The user confirmed Muse Code. The
+articles describe the standard paired stdio bridge, permissions, approvals,
+hosted-model data sharing and Free/Pro boundaries. No native client integration
+test or dedicated plugin release is claimed. The site now has 36 posts and
+53 pages. Docker audit, 17 native tests and all 25 applicable browser checks
+pass; phone/desktop article captures were reviewed. Source is uncommitted and
+unpublished; see `tasktime-site/STATUS.md` for evidence. No core/agent change.
+
+## September 27 related dark blog covers — validated locally
+
+All 34 articles have relevant covers from 20 synthetic-workspace captures,
+resized to 1200×600 WebP. Blog covers use only `coverImage` with descriptive
+alt text and render the same dark image in both site themes. Active timer
+captures show eight seconds. Original article bodies, URLs and dates remain
+unchanged. The full Docker site gate passes: zero audit findings, 17 native
+tests, 51 pages and 25 browser checks (optional diagnostics disabled). Cover
+gallery/archive review is complete. Source remains uncommitted and unpublished;
+see `tasktime-site/STATUS.md`. No core app or agent release is required.
+
+## September 27 revision dates — validated locally
+
+Blog cards and article bylines show publication dates only. A recorded revision
+date appears after the article body as "Last updated on"; posts without one
+omit the note. Search metadata and original dates are preserved. The Docker
+site gate passes: zero audit findings, 17 native tests, 51 pages and 25 browser
+checks (optional diagnostics disabled). The mobile article capture was reviewed.
+Source remains uncommitted and unpublished; evidence is in `tasktime-site/STATUS.md`.
+
+## September 27 blog tag chips — validated locally
+
+Titles and descriptions now precede a shared category/tag chip row on blog
+cards and articles. The original bordered chip treatment is restored, with
+author/date bylines below. The Docker site gate passes: zero audit findings,
+17 native tests, 51 pages and 25 browser checks (optional diagnostics disabled).
+Phone/desktop captures in both themes were reviewed. Source remains uncommitted
+and unpublished; evidence is in `tasktime-site/STATUS.md`.
+
+## September 26 blog heroes and author bylines — validated locally
+
+The independent site adds main heroes, archive previews, Owen Far's local
+portrait/name and semantic publication/revision dates to all 34 articles.
+Article bodies, URLs and original dates are preserved. Author/image metadata,
+responsive light/dark delivery and authoring guidance are updated. Docker
+validation verifies 17 native tests, 51 built pages, all 25 applicable Chromium
+checks and zero audit findings. The all-page metadata check now parses served
+HTML instead of repeatedly navigating; its renewed publication suite passes.
+The optional diagnostics check is skipped with its token disabled after
+automatic approval review rejected the fixture run over possible external
+transmission. See `tasktime-site/STATUS.md` for the serial-run evidence and
+visual review. Source is uncommitted and unpublished, with no core app or agent
+artifact change.
 
 ## September 25 production publication — DebugBundle v3 and site analytics
 

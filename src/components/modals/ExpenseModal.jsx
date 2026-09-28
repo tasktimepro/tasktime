@@ -28,7 +28,7 @@ import { usePreferences } from '../../hooks/usePreferences.ts';
 import { usePaymentMethods } from '../../hooks/usePaymentMethods.ts';
 import { buildExpenseFromRecurrence } from '@/utils/expenseUtils';
 import { DEFAULT_CURRENCY } from '@/utils/currencyUtils.ts';
-import { toStorageDate } from '@/utils/dateUtils.ts';
+import { parseStoredDate, toStorageDate } from '@/utils/dateUtils.ts';
 import { parseOptionalNumberInput } from '@/utils/numberInputUtils.ts';
 import { getExpenseDeletionBlockReason } from '@/domain/expenses/expenseOperations';
 
@@ -900,8 +900,7 @@ const ExpenseModal = ({
     };
 
     const getNextMonthlyStartDate = (monthlyType, monthlyDay, todayValue) => {
-        const resolvedToday = todayValue ? new Date(todayValue) : new Date();
-        const todayDate = Number.isNaN(resolvedToday.getTime()) ? new Date() : resolvedToday;
+        const todayDate = parseStoredDate(todayValue) || new Date();
         const year = todayDate.getFullYear();
         const month = todayDate.getMonth();
 
@@ -915,10 +914,8 @@ const ExpenseModal = ({
     };
 
     const getNextYearlyStartDate = (yearlyDate, todayValue) => {
-        const resolvedToday = todayValue ? new Date(todayValue) : new Date();
-        const todayDate = Number.isNaN(resolvedToday.getTime()) ? new Date() : resolvedToday;
-        const baseDate = yearlyDate ? new Date(yearlyDate) : todayDate;
-        const baseValid = Number.isNaN(baseDate.getTime()) ? todayDate : baseDate;
+        const todayDate = parseStoredDate(todayValue) || new Date();
+        const baseValid = parseStoredDate(yearlyDate) || todayDate;
         const year = todayDate.getFullYear();
         const month = baseValid.getMonth();
         const day = baseValid.getDate();

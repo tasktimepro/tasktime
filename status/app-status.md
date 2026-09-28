@@ -1,3 +1,27 @@
+## September 28 core v1.6.4 yearly repeat update — validated locally
+
+The shared task repeat picker now offers Every Year with month/day selection in
+new and edited top-level task forms, including inline list and kanban creation.
+The yearly date control also serves recurring expenses. Following a reproduced
+long, unscrollable day menu in that flow, yearly selection now uses twelve
+in-dialog month buttons and a bounded numeric day field. Existing yearly task
+settings reopen correctly; the persisted recurrence shape and scheduling logic
+are unchanged. The browser tests save a yearly task and expense, then verify
+their dates after reload. Month/day selection stays within the Repeat dialog at
+320px and 1440px; a 667×375 landscape view scrolls inside the dialog. Dark-mode
+captures were reviewed at all three sizes. A western-timezone regression first
+reproduced a Dec 31 to Dec 30 shift in the expense form; the modal now parses
+stored calendar dates locally for yearly and monthly calculations. Focused
+task/expense journeys, including the timezone case, pass in Chromium, Firefox,
+and WebKit. The final v1.6.4 Docker gate passes: zero audit vulnerabilities,
+lint, typecheck, six artifact checks, 293 unit suites / 3,072 passing tests
+with one existing skip and per-file coverage, 122 Chromium journeys, five PWA
+checks, app/recovery builds, and site-contract export. The gate log is
+`/private/tmp/tasktime-yearly-v164-final-gate.log`. Release scope is core app
+patch only; agent, Worker, and site source are unchanged. The site's
+independently pinned contract requires a separate snapshot review before it
+claims the new app version. Source is uncommitted and unpublished.
+
 ## September 25 v1.6.3 production publication
 
 Core source `cc6cf99572d9c0ada9a431e6bd720886d7b42c74` passed exact-source
