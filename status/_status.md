@@ -1,15 +1,19 @@
-## September 28 core v1.6.4 yearly repeat update — validated locally
+## September 28 core v1.6.4 yearly repeat update — published and verified
 
 The core app task repeat picker now exposes its existing yearly month/day
 schedule in task create and edit flows. The shared expense yearly date control
 now stays inside the dialog, with month buttons and a validated day field. The
 expense modal also preserves the selected yearly calendar day in western
-timezones. The data contract is unchanged. The candidate is core app patch
-v1.6.4; no agent, Worker, or site source changed. The full local release gate
-passes. The site's independently pinned core contract needs a separate review
-before it claims v1.6.4. This candidate remains
-uncommitted and unpublished. See `app-status.md` for local validation and
-browser evidence.
+timezones. The data contract is unchanged. Core source `e2cd3e3` passed the
+local and exact-source CI gates, then production preparation `36481193899`
+built the reviewed `live` billing archive. Deployment `36485535817` published
+those exact bytes to `tasktime-app`. The homepage and Account route return 200
+and reference the new bundle; all 28 served non-HTML archive files match live
+bytes. The previous v1.6.3 archive is retained and verified for rollback.
+No agent, Worker, or site source changed. The site's independently pinned core
+contract needs a separate review before it claims v1.6.4. Retained-profile
+production interaction remains an owner acceptance check. See `app-status.md`
+for exact hashes, validation and browser evidence.
 
 ## September 27 blog updates — published and verified
 

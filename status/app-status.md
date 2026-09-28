@@ -1,4 +1,4 @@
-## September 28 core v1.6.4 yearly repeat update — validated locally
+## September 28 core v1.6.4 yearly repeat update — published and verified
 
 The shared task repeat picker now offers Every Year with month/day selection in
 new and edited top-level task forms, including inline list and kanban creation.
@@ -20,7 +20,22 @@ checks, app/recovery builds, and site-contract export. The gate log is
 `/private/tmp/tasktime-yearly-v164-final-gate.log`. Release scope is core app
 patch only; agent, Worker, and site source are unchanged. The site's
 independently pinned contract requires a separate snapshot review before it
-claims the new app version. Source is uncommitted and unpublished.
+claims the new app version. Core source
+`e2cd3e3f30f052d30ec51b603da423e14d352115` passed exact-source CI
+`36479411868`; production preparation `36481193899` passed its own gate with
+billing mode `live` and produced `pages.tar.gz` SHA-256
+`79b8c4d4d4ac178bd6fdb7d3d74667bcad8fe54f7a0b2b6d41c2b81972ae405b`.
+Deployment `36485535817` verified its provenance and bytes, then published
+that archive to Cloudflare Pages project `tasktime-app`. The live homepage and
+Account route return 200 and reference `assets/index-Blc12c2c.js`; all 28
+served non-HTML files match the prepared archive byte for byte. `_redirects`
+is a deployment configuration file, not a served asset. The v1.6.3 production
+archive remains retained in Actions and at
+`/private/tmp/tasktime-v163-rollback/pages.tar.gz`, with verified SHA-256
+`ed72351721f0369be358c04116e1b4b54b4c041f100d5ad2afeca8a9a09dbaff`;
+the pre-release live main JavaScript matched that rollback archive. No tag,
+GitHub release, or agent package was published. Authenticated retained-profile
+and browser/device acceptance were not exercised on live user data.
 
 ## September 25 v1.6.3 production publication
 
