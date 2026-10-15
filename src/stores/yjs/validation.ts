@@ -17,6 +17,7 @@ import type {
     MultiTimerState,
     PaymentMethod,
     PlannerAttachment,
+    FocusItem,
     Preferences,
     Project,
     Task,
@@ -671,9 +672,26 @@ const preferencesSchema = z.object({
     weeklyGoalTargetEarnings: finiteNumberSchema.nullable().optional(),
     systemNotificationsEnabled: z.boolean().optional(),
     systemNotificationTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    focusReminderMinutes: z.union([z.literal(0), z.literal(20), z.literal(30), z.literal(40), z.literal(60)]).optional(),
     backupEnabled: z.boolean().optional(),
     backupFrequencyHours: integerNumberSchema.min(1).optional(),
 }).passthrough() satisfies z.ZodType<Preferences>;
+
+const focusItemSchema = z.object({
+    id: nonEmptyStringSchema,
+    taskId: nonEmptyStringSchema,
+    selectionId: nonEmptyStringSchema,
+    occurrenceDate: storageDateSchema.refine((value) => {
+        const [year, month, day] = value.split('-').map(Number);
+        const date = new Date(0);
+        date.setFullYear(year, month - 1, day);
+        return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+    }, 'Focus occurrence must be a real calendar date.').optional(),
+    position: finiteNumberSchema,
+    addedAt: finiteNumberSchema,
+}).passthrough().superRefine((item, context) => {
+    if (item.id !== item.taskId) context.addIssue({ code: z.ZodIssueCode.custom, message: 'Focus item ID must match task ID.' });
+}) satisfies z.ZodType<FocusItem>;
 
 const timerSchema = z.object({
     projectId: nonEmptyStringSchema,
@@ -702,6 +720,7 @@ export const collectionSchemas = {
     expenses: expenseSchema,
     expenseRecurrences: expenseRecurrenceSchema,
     plannerAttachments: plannerAttachmentSchema,
+    focusItems: focusItemSchema,
     dailyGoals: dailyGoalSchema,
     preferences: preferencesSchema,
     timers: timerSchema,
@@ -725,6 +744,7 @@ type ValidationSnapshot = {
     expenses: Expense[];
     expenseRecurrences: ExpenseRecurrence[];
     plannerAttachments: PlannerAttachment[];
+    focusItems: FocusItem[];
     dailyGoals: DailyGoal[];
     preferences: Preferences;
     timers: MultiTimerState[];
@@ -804,6 +824,7 @@ function emptySnapshot(): ValidationSnapshot {
         expenses: [],
         expenseRecurrences: [],
         plannerAttachments: [],
+        focusItems: [],
         dailyGoals: [],
         preferences: {},
         timers: [],
@@ -849,6 +870,7 @@ function buildSnapshotFromDocs(docs: {
         snapshot.expenses = collectValidatedEntities<Expense>('expenses', core.getMap('expenses') as Y.Map<string, unknown>, 'core.expenses');
         snapshot.expenseRecurrences = collectValidatedEntities<ExpenseRecurrence>('expenseRecurrences', core.getMap('expenseRecurrences') as Y.Map<string, unknown>, 'core.expenseRecurrences');
         snapshot.plannerAttachments = collectValidatedEntities<PlannerAttachment>('plannerAttachments', core.getMap('plannerAttachments') as Y.Map<string, unknown>, 'core.plannerAttachments');
+        snapshot.focusItems = collectValidatedEntities<FocusItem>('focusItems', core.getMap('focusItems') as Y.Map<string, unknown>, 'core.focusItems');
         snapshot.dailyGoals = collectValidatedEntities<DailyGoal>('dailyGoals', core.getMap('dailyGoals') as Y.Map<string, unknown>, 'core.dailyGoals');
         snapshot.timers = collectValidatedEntities<MultiTimerState>('timers', core.getMap('timers') as Y.Map<string, unknown>, 'core.timers');
         snapshot.preferences = readPreferencesMap(core.getMap('preferences') as Y.Map<string, unknown>);

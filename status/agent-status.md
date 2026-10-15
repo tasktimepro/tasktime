@@ -24,6 +24,18 @@ the missing-card failure. No published artifact contents changed.
 
 ## Current focus
 
+- Focus (`feature/focus`, October 10, local/uncommitted): read/write scoped
+  `list_focus_tasks`, `add_focus_task`, `remove_focus_task`, and
+  `move_focus_task` use the shared core Yjs selection operations. The canonical
+  bridge, OpenClaw native runtime/manifest, and both vendored bridge copies
+  were rebuilt and match at SHA-256 `f83d7a26ed69aa0e0099defb2692fa727424aadb228fe3f41b8de36d67fc6496`.
+  `release:agent` passes bridge, bundle, and live pairing smoke, including
+  Focus add/list/remove. Evidence:
+  `/private/tmp/tasktime-focus-agent-gate-final.log`.
+  Agent command tests cover selection identity, ordering, and idempotency.
+  Published agent artifacts and installed agents remain unchanged. A Focus
+  release needs fresh version/artifact assessment and separate authorization.
+
 - Final audit and authorized local checkpoint (2026-09-14): invoice preparation,
   editing, client-only expense refresh, deletion and finalization share the UI's
   guarded operations. Public refresh metadata now names both project/client

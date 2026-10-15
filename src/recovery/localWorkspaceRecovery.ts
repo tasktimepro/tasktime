@@ -9,7 +9,7 @@ export interface PersistedRecoveryDocument {
 const CORE_COLLECTIONS = [
     'projects', 'clients', 'paymentMethods', 'expenseCategories', 'taxReturnPeriods',
     'businessInfos', 'businessBrandAssets', 'invoiceTemplates', 'emailTemplates',
-    'expenseRecurrences', 'dailyGoals', 'plannerAttachments',
+    'expenseRecurrences', 'dailyGoals', 'plannerAttachments', 'focusItems',
 ] as const;
 const DOCUMENT_PATTERN = /^(core|entries-active|entries-\d{4}|tasks-archived|invoices-archived|expenses-archived)$/;
 

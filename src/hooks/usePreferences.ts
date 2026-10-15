@@ -28,6 +28,7 @@ const DEFAULT_PREFERENCES: Preferences = {
     weeklyGoalTargetEarnings: null,
     systemNotificationsEnabled: false,
     systemNotificationTime: '09:00',
+    focusReminderMinutes: 0,
 };
 
 export function usePreferences() {

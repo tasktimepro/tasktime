@@ -104,6 +104,7 @@ import {
     updatePlannerAttachmentCommand,
     updateProjectNotesCommand,
 } from './planner';
+import { addFocusTaskCommand, listFocusTasksCommand, moveFocusTaskCommand, removeFocusTaskCommand } from './focus';
 import {
     createExpenseCommand,
     createExpenseRecurrenceCommand,
@@ -243,6 +244,10 @@ export type AgentCommandName =
     | 'attach_planner_item'
     | 'update_planner_attachment'
     | 'remove_planner_attachment'
+    | 'list_focus_tasks'
+    | 'add_focus_task'
+    | 'remove_focus_task'
+    | 'move_focus_task'
     | 'list_daily_goals'
     | 'set_daily_goal'
     | 'remove_daily_goal'
@@ -826,6 +831,30 @@ export const AGENT_COMMAND_REGISTRY: Registry = {
         description: 'Remove one planner attachment without deleting the referenced client, project, or task.',
         scopes: ['write'],
         handler: removePlannerAttachmentCommand,
+    },
+    list_focus_tasks: {
+        name: 'list_focus_tasks',
+        description: 'List the saved Focus shortlist grouped by current project, including unavailable references.',
+        scopes: ['read'],
+        handler: listFocusTasksCommand,
+    },
+    add_focus_task: {
+        name: 'add_focus_task',
+        description: 'Add one existing task or recurring occurrence to Focus without changing its project or timer.',
+        scopes: ['write'],
+        handler: addFocusTaskCommand,
+    },
+    remove_focus_task: {
+        name: 'remove_focus_task',
+        description: 'Remove the expected Focus selection without completing or deleting the task.',
+        scopes: ['write'],
+        handler: removeFocusTaskCommand,
+    },
+    move_focus_task: {
+        name: 'move_focus_task',
+        description: 'Move the expected Focus selection up or down in its current project group.',
+        scopes: ['write'],
+        handler: moveFocusTaskCommand,
     },
     list_daily_goals: {
         name: 'list_daily_goals',

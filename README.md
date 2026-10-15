@@ -18,12 +18,25 @@ The app stores user work data locally with Yjs and IndexedDB, supports optional 
 ## Highlights
 
 - Projects, clients, hierarchical tasks, project notes, and weekly planning
+- Focus: a saved cross-project shortlist with quick task creation, existing-task attachment, and optional gentle timer reminders
 - Multiple project timers with pause, stop, and automatic time-entry creation
 - Expenses, tax-return periods, recurring expenses, and backup/restore flows
 - Save invoice drafts to finish later, continue or explicitly refresh selected work from the Drafts tab, then finalize when ready. The UI and agent share this workflow; drafts leave work unbilled and do not reserve final invoice numbers.
 - Terminal cancellation of finalized unpaid invoices, templates, PDF export, payments, quotes, and reports
 - Local-first storage with browser persistence and optional provider-backed sync
 - Agent-ready local MCP bridge with scopes, approval tokens, and generated tool docs
+
+Open **Focus** from the desktop sidebar or phone navigation (or press
+Alt+Shift+F) to plan your next few hours without leaving the current view.
+Attach existing tasks or create one inline under a project; unassigned work
+appears first, followed by project groups. Checking a task complete removes it
+from Focus and saves its running timer first. **Remove** leaves the task
+unfinished. The list carries over until you finish or remove its tasks.
+
+The optional reminder offers a quiet ping every 20, 30, 40, or 60 minutes
+while a selected task's timer is running. Sound must be enabled on this device
+and can be delayed when the browser or device sleeps. It does not start a
+countdown, change time entries, or create a Pomodoro cycle.
 
 ## Quick Start
 

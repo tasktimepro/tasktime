@@ -14,6 +14,10 @@ export default defineConfig({
         environment: 'jsdom',
         setupFiles: './src/test/setup.js',
         include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+        // Bound DOM-heavy suites so coverage instrumentation does not starve
+        // concurrent user-event tests on the Docker release gate.
+        maxWorkers: 4,
+        testTimeout: 15000,
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],

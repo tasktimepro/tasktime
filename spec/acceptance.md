@@ -44,6 +44,11 @@
 
 ## Work and time
 
+- Focus opens from desktop and phone navigation over the current route. Back closes an entry opened in-app, Forward can reopen it, and Exit never navigates an externally opened page backward. Reload keeps the list; Escape closes the topmost Focus picker before the overlay. Unassigned tasks appear first, then project groups, with stable per-group ordering.
+- An existing active task or subtask can be selected once; multi-select validates before an atomic save. Quick creation keeps a chosen project for repeated entry and creates the real task and selection together. Selection does not change dates, billing, project order or timer state. A task completed elsewhere disappears after sync; a missing reference stays visible as unavailable until explicitly removed.
+- Completing from Focus stops and saves the selected task's running/paused timer before changing task state. A stop error leaves it unfinished. Completion or removal offers an Undo guarded against a newer selection or later task edit; Undo never deletes time entries. Recurring selections retain a concrete occurrence across midnight and do not silently change date after a schedule edit.
+- Reminder defaults Off, offers 20/30/40/60 minutes and a preview, requires local audio activation and a same-origin sound lock, and only pings while a selected actionable task's timer runs. Pausing all eligible timers cancels the deadline. A late browser wake does not replay missed sounds, and exiting releases ownership without stopping timers.
+- Focus and its preference survive Yjs reload, provider sync, portable backup/import, account replacement and recovery export. Historical backup versions remain importable; version `1.6` exports include Focus. Agent read/add/remove/move commands enforce their normal scopes and selection identity.
 - Users can manage clients, projects, tasks/subtasks, notes, planner attachments, and goals through the corresponding screens.
 - A subtask cannot be configured as recurring.
 - New and edited top-level tasks can repeat weekly, monthly, or yearly. A yearly

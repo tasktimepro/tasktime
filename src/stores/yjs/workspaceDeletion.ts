@@ -166,6 +166,7 @@ export async function deleteWorkspaceRecords(
     deleteWorkspaceRecordIds(store, 'timeEntries', selected.entries);
     deleteWorkspaceRecordIds(store, 'timers', plan.timerKeysToClear);
     deleteWorkspaceRecordIds(store, 'plannerAttachments', plan.plannerAttachmentIdsToDelete);
+    deleteWorkspaceRecordIds(store, 'focusItems', selected.tasks);
     deleteWorkspaceRecordIds(store, 'expenses', selected.expenses);
     deleteWorkspaceRecordIds(store, 'expenseRecurrences', selected.recurrences);
     await persistPhase('dependents');

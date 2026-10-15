@@ -44,6 +44,7 @@ import CloudSyncStatusPanel from './components/sync/CloudSyncStatusPanel';
 import { getYjsSyncStatusDescriptor, SYNC_STATUS_KIND } from './components/sync/syncStatusDescriptor';
 import MobileBottomNav from './components/app/MobileBottomNav';
 import MobileMoreSheet from './components/app/MobileMoreSheet';
+import { FocusOverlay } from './components/focus/FocusOverlay';
 import { ToastProvider } from './components/ToastContainer';
 import { ToastContext } from './contexts/ToastContext.ts';
 import { formatDurationWithSeconds } from './utils/dateUtils.ts';
@@ -867,6 +868,34 @@ function AppContent() {
 
     // === URL State ===
     const { urlParams, navigateToProjects, navigateToProject, navigateToClients, navigateToClient, navigateToInvoices, navigateToReports, navigateToExpenses, navigateToAccount, navigateToDashboard, navigateToPlanner, updateUrl } = useUrlState();
+    const focusOverlayRef = useRef(null);
+    const openFocus = useCallback(() => {
+        if (new URLSearchParams(window.location.search).get('focus') === '1') return;
+        if (preferences.focusReminderMinutes) void focusOverlayRef.current?.enableSound();
+        const url = new URL(window.location.href);
+        url.searchParams.set('focus', '1');
+        window.history.pushState({ ...(window.history.state || {}), tasktimeFocusEntry: true }, '', url);
+    }, [preferences.focusReminderMinutes]);
+    const closeFocus = useCallback(() => {
+        if (window.history.state?.tasktimeFocusEntry) {
+            window.history.back();
+            return;
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.delete('focus');
+        window.history.replaceState({ ...(window.history.state || {}), tasktimeFocusEntry: false }, '', url);
+    }, []);
+    useEffect(() => {
+        const shortcut = (event) => {
+            if (event.altKey && event.shiftKey && event.key.toLowerCase() === 'f') {
+                event.preventDefault();
+                if (new URLSearchParams(window.location.search).get('focus') === '1') closeFocus();
+                else openFocus();
+            }
+        };
+        window.addEventListener('keydown', shortcut);
+        return () => window.removeEventListener('keydown', shortcut);
+    }, [openFocus, closeFocus]);
     const routeScrollKey = useMemo(() => {
         return [
             urlParams.view,
@@ -1255,6 +1284,13 @@ function AppContent() {
             isActive: isMobilePrimarySelectionVisible && activeView === 'expenses',
             onClick: () => navigateToExpenses(),
         },
+        {
+            key: 'focus',
+            label: 'Focus',
+            Icon: EyeIcon,
+            isActive: urlParams.focus,
+            onClick: openFocus,
+        },
     ];
     const mobileMoreNavItems = [
         {
@@ -1405,6 +1441,14 @@ function AppContent() {
                                     Dashboard
                                 </button>
                             )}
+                        </li>
+                        <li>
+                            <button type="button" onClick={handleSidebarCollapsedAction(openFocus)}
+                                className={`flex items-center rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${isSidebarCollapsed ? 'mx-auto w-10 justify-center px-2' : 'w-full'}`}
+                                aria-label="Open Focus" title="Focus (Alt+Shift+F)">
+                                <EyeIcon className={`h-5 w-5 shrink-0 ${isSidebarCollapsed ? '' : 'mr-3'}`} />
+                                {!isSidebarCollapsed && 'Focus'}
+                            </button>
                         </li>
                         <li>
                             {isSidebarCollapsed ? (
@@ -2002,6 +2046,14 @@ function AppContent() {
                 />
             </>
         )}
+
+        <FocusOverlay
+            ref={focusOverlayRef}
+            open={urlParams.focus}
+            onClose={closeFocus}
+            onViewTask={(task, date) => openTaskView(task, { dateStr: date })}
+            onPromptTimeEntry={(task, date) => openTaskViewOverlay('time-entries', task, date, null)}
+        />
 
         {taskViewState.task && (
             <TaskViewModal

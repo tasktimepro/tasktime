@@ -879,7 +879,8 @@ const MCP_TOOL_DEFINITIONS = [
             weeklyGoalTargetHours: { type: ["number", "null"] },
             weeklyGoalTargetEarnings: { type: ["number", "null"] },
             systemNotificationsEnabled: optionalBoolean,
-            systemNotificationTime: optionalString
+            systemNotificationTime: optionalString,
+            focusReminderMinutes: { type: "number", enum: [0, 20, 30, 40, 60] }
           },
           additionalProperties: false
         }
@@ -1255,6 +1256,45 @@ const MCP_TOOL_DEFINITIONS = [
         plannerAttachmentId: optionalString
       },
       required: ["plannerAttachmentId"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "list_focus_tasks",
+    description: "List the saved Focus shortlist and current project/task context.",
+    scopes: ["read"],
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "add_focus_task",
+    description: "Add an existing task or dated recurring occurrence to Focus.",
+    scopes: ["write"],
+    inputSchema: {
+      type: "object",
+      properties: { taskId: optionalString, occurrenceDate: optionalString, idempotencyKey: optionalString },
+      required: ["taskId"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "remove_focus_task",
+    description: "Remove an expected Focus selection without changing its task.",
+    scopes: ["write"],
+    inputSchema: {
+      type: "object",
+      properties: { taskId: optionalString, selectionId: optionalString, idempotencyKey: optionalString },
+      required: ["taskId", "selectionId"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "move_focus_task",
+    description: "Move an expected Focus selection within its current project group.",
+    scopes: ["write"],
+    inputSchema: {
+      type: "object",
+      properties: { taskId: optionalString, selectionId: optionalString, direction: { type: "string", enum: ["up", "down"] }, idempotencyKey: optionalString },
+      required: ["taskId", "selectionId", "direction"],
       additionalProperties: false
     }
   },

@@ -89,9 +89,9 @@ automatic leaves the provisional label intact until finalization allocates it.
 
 ## Backup JSON
 
-Current export version: `1.5`.
+Current export version: `1.6`.
 
-Supported import versions: `1.0`, `1.1`, `1.3`, `1.4`, `1.5`.
+Supported import versions: `1.0`, `1.1`, `1.3`, `1.4`, `1.5`, `1.6`. Versions before `1.6` import with an empty Focus list. An older importer rejects a `1.6` backup rather than silently discarding Focus. Older app builds may preserve unknown Yjs maps during ordinary sync but their own portable export cannot preserve collections they do not enumerate.
 
 Top-level payload:
 
@@ -115,6 +115,7 @@ expenses: Expense[]
 expenseRecurrences: ExpenseRecurrence[]
 dailyGoals: DailyGoal[]
 plannerAttachments: PlannerAttachment[]
+focusItems: FocusItem[]
 preferences: Preferences
 ```
 
@@ -421,7 +422,7 @@ Command groups include:
 
 - projects, clients, tasks, cascade previews/deletions, archives
 - timers and time entries
-- planner attachments, goals, and project notes
+- planner attachments, Focus selections, goals, and project notes
 - expenses, recurrences, categories, and tax periods
 - invoice/quote preview, drafts, finalization, payments, cancellation, undo, PDF, and email
 - business information/assets, payment methods, invoice/email templates, preferences

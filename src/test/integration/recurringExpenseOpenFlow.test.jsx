@@ -4,6 +4,10 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import App from '../../App'
 import { buildExpenseFromRecurrence } from '../../utils/expenseUtils.ts'
 
+vi.mock('../../components/focus/FocusOverlay', () => ({
+    FocusOverlay: () => null,
+}))
+
 const integrationState = vi.hoisted(() => ({
     view: 'planner',
     todayStr: '2026-02-25',

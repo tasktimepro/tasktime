@@ -64,6 +64,7 @@ Production topology (independently approved artifact deployments)
   visibility does not change the independent builds or public website output;
   see `contracts/site-distribution.md`.
 - Components call hooks or focused domain/application functions; they do not create parallel persistence paths.
+- Focus composes `components/focus/FocusOverlay.tsx`, `hooks/useFocusItems.ts`, pure `domain/focus/focusOperations.ts`, and shared `stores/yjs/focusOperations.ts`. The latter owns atomic task-plus-selection creation and guarded selection mutations over the existing core document; agent commands call the same operations. `hooks/useFocusReminder.ts` and `utils/focusReminderScheduler.ts` own local-only sound/deadline behavior under a dedicated Web Lock.
 - Hooks expose Yjs-backed collections and mutations through `YjsContext`/`YjsStore`.
 - `App.jsx` onboarding and `useExpenseCategories` only present existing data;
   neither creates starter records on mount. Explicit creation stays in the

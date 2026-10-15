@@ -29,6 +29,8 @@ Requirement identifiers are stable references for acceptance criteria, design do
 - **WORK-3:** Support list and kanban project task views, project notes, estimates, deadlines, budgets, colors, sorting, and quote mode where implemented.
 - **WORK-4:** Plan clients, projects, tasks, and expenses by week/day without duplicating the referenced entity.
 - **WORK-5:** Track daily and weekly goals using the user's week-start preference.
+- **WORK-FOCUS:** Provide a persistent cross-project Focus shortlist of real tasks. Users can add existing active tasks, create a top-level task inline with optional project, reorder within derived project groups, remove a selection independently of completion, and complete a selected task or recurring occurrence. Completion must use canonical task state and stop/save that task's timer first. The list survives reload and sync without a daily reset or changing task schedule, project order, billing, or timers merely by selection.
+- **WORK-FOCUS-REMINDER:** Offer an optional local 20/30/40/60 minute subtle sound while Focus is open and a selected actionable task has a running timer. Sound requires an explicit device gesture and single-tab ownership. Browser suspension may delay or skip pings; no timed session, break cycle, push scheduling, or time entry is created by the reminder.
 - **WORK-6:** Free permits one active client and Trial/Pro permit unlimited active
   clients. Active means `client.archived !== true`, including legacy records
   without the field. Create, explicit unarchive, and generic

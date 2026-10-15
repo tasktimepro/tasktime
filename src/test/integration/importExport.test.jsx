@@ -287,6 +287,7 @@ describe('Import/Export integration', () => {
                 expenseRecurrences: [],
                 dailyGoals: [],
                 plannerAttachments: [],
+                focusItems: [],
                 preferences: payload.preferences
             })
         })

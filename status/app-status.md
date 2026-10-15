@@ -1897,3 +1897,37 @@ green for this final candidate: zero audit vulnerabilities, lint, typecheck,
 export. Evidence: `/private/tmp/tasktime-debugbundle-core-final-gate.log`.
 Do not infer production compatibility until the Worker CORS canary and
 retained Edge-profile acceptance pass.
+## October 10 Focus — local `feature/focus` implementation
+
+Focus opens as a full-window dialog over the current route and keeps the
+selected tasks across reload. Desktop sidebar and phone navigation expose it.
+Users can attach existing tasks in a validated batch, create normal tasks
+inline under a chosen project, move items within project groups, complete a
+task after saving its timer, remove it independently, and Undo a matching
+selection/completion. Recurring selections retain their selected occurrence;
+changed schedules are shown as unavailable for explicit removal. A 20/30/40/60
+minute reminder uses local Web Audio and a dedicated Web Lock only while a
+selected actionable task timer is running. Sound requires a local Enable
+gesture, and missed browser wake deadlines are skipped. Focus selections are
+in the existing core Yjs document and backup version `1.6`; older backups
+default to an empty list. Chromium, Firefox and WebKit journeys at 1280px,
+390px and 320px pass, including timer-backed completion and
+time-entry-preserving Undo. The single-owner sound journey passes in Chromium;
+Firefox/WebKit sound automation is explicitly skipped because the test uses
+Chromium Web Locks. The final Focus browser file passes 16 tests (two sound
+skips), including nested task-detail/Escape layering in all three engines;
+evidence: `/private/tmp/tasktime-focus-browsers-final.log`. The packaged MCP
+live smoke exercised Focus add/list/remove.
+`release:agent` passes with aligned canonical, OpenClaw and Claude bridge bytes.
+The complete core release gate passes: zero audited vulnerabilities, 298 unit
+suites / 3,099 passing tests (one existing skip) with per-file coverage, 127
+Chromium smoke checks, five installed-PWA checks, production/recovery builds,
+and site-contract export. Evidence:
+`/private/tmp/tasktime-focus-release-gate-final3.log`. The final agent gate
+also passes, with live Focus commands and matching vendored bridge bytes;
+evidence: `/private/tmp/tasktime-focus-agent-gate-final.log`. A subsequent
+production-build PWA run adds first-use offline Focus creation and persistence
+after reload; all six PWA checks pass (`/private/tmp/tasktime-focus-pwa-final.log`).
+No commit,
+publish or deployment has been performed. Real-device audio and owner workflow
+acceptance remain open.

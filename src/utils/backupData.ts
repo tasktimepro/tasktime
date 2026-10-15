@@ -11,6 +11,7 @@ import type {
     InvoiceTemplate,
     PaymentMethod,
     PlannerAttachment,
+    FocusItem,
     Preferences,
     Project,
     Task,
@@ -20,8 +21,8 @@ import type {
 import { validateCollectionEntity, validatePreferencesRecord } from '@/stores/yjs/validation';
 import { normalizeInvoiceRecord } from '@/utils/invoiceUtils';
 
-export const BACKUP_VERSION = '1.5';
-export const SUPPORTED_BACKUP_IMPORT_VERSIONS = Array.from(new Set(['1.0', '1.1', '1.3', '1.4', BACKUP_VERSION]));
+export const BACKUP_VERSION = '1.6';
+export const SUPPORTED_BACKUP_IMPORT_VERSIONS = Array.from(new Set(['1.0', '1.1', '1.3', '1.4', '1.5', BACKUP_VERSION]));
 
 export interface BackupPayload {
     version: string;
@@ -43,6 +44,7 @@ export interface BackupPayload {
     expenseRecurrences: ExpenseRecurrence[];
     dailyGoals: DailyGoal[];
     plannerAttachments: PlannerAttachment[];
+    focusItems: FocusItem[];
     preferences: Preferences;
 }
 
@@ -54,8 +56,9 @@ export type NormalizedBackupImportPayload = BackupImportPayload & {
     backupType?: 'automatic' | 'manual';
 };
 
-type BackupPayloadInput = Omit<BackupPayload, 'version' | 'exportDate'> & {
+type BackupPayloadInput = Omit<BackupPayload, 'version' | 'exportDate' | 'focusItems'> & {
     exportDate?: string;
+    focusItems?: FocusItem[];
 };
 
 export function createBackupPayload({
@@ -77,6 +80,7 @@ export function createBackupPayload({
     expenseRecurrences,
     dailyGoals,
     plannerAttachments,
+    focusItems = [],
     preferences,
 }: BackupPayloadInput): BackupPayload {
     return {
@@ -99,6 +103,7 @@ export function createBackupPayload({
         expenseRecurrences,
         dailyGoals,
         plannerAttachments,
+        focusItems,
         preferences,
     };
 }
@@ -198,6 +203,7 @@ export function parseBackupImportJson(backupJson: string): NormalizedBackupImpor
     const expenseRecurrences = assertOptionalArray(parsed.expenseRecurrences, 'expenseRecurrences') as ExpenseRecurrence[];
     const dailyGoals = assertOptionalArray(parsed.dailyGoals, 'dailyGoals') as DailyGoal[];
     const plannerAttachments = assertOptionalArray(parsed.plannerAttachments, 'plannerAttachments') as PlannerAttachment[];
+    const focusItems = assertOptionalArray(parsed.focusItems, 'focusItems') as FocusItem[];
     const preferences = parsed.preferences === undefined ? {} : assertObject(parsed.preferences, 'preferences') as Preferences;
 
     return validateBackupImportPayload({
@@ -220,6 +226,7 @@ export function parseBackupImportJson(backupJson: string): NormalizedBackupImpor
         expenseRecurrences,
         dailyGoals,
         plannerAttachments,
+        focusItems,
         preferences,
     });
 }
@@ -241,6 +248,7 @@ export function validateBackupImportPayload(data: NormalizedBackupImportPayload)
     const expenseRecurrences = data.expenseRecurrences || [];
     const dailyGoals = data.dailyGoals || [];
     const plannerAttachments = data.plannerAttachments || [];
+    const focusItems = data.focusItems || [];
     const preferences = data.preferences || {};
 
     const projectIds = collectUniqueIds(projects, 'project', true);
@@ -259,6 +267,7 @@ export function validateBackupImportPayload(data: NormalizedBackupImportPayload)
     collectUniqueIds(expenseRecurrences, 'expense recurrence');
     collectUniqueIds(dailyGoals, 'daily goal');
     collectUniqueIds(plannerAttachments, 'planner attachment');
+    collectUniqueIds(focusItems, 'focus item');
 
     for (const task of tasks) {
         if (task.parentTaskId && !taskIds.has(task.parentTaskId)) {
@@ -317,6 +326,7 @@ export function validateBackupImportPayload(data: NormalizedBackupImportPayload)
         expenseRecurrences: expenseRecurrences.map((recurrence) => validateCollectionEntity<ExpenseRecurrence>('expenseRecurrences', recurrence, `backup expense recurrence ${recurrence.id}`)),
         dailyGoals: dailyGoals.map((goal) => validateCollectionEntity<DailyGoal>('dailyGoals', goal, `backup daily goal ${goal.id}`)),
         plannerAttachments: plannerAttachments.map((attachment) => validateCollectionEntity<PlannerAttachment>('plannerAttachments', attachment, `backup planner attachment ${attachment.id}`)),
+        focusItems: focusItems.map((item) => validateCollectionEntity<FocusItem>('focusItems', item, `backup focus item ${item.id}`)),
         preferences: validatePreferencesRecord(preferences as Record<string, unknown>, 'backup preferences'),
     };
 }
@@ -335,6 +345,7 @@ export function getBackupImportCounts(data: BackupImportPayload) {
         invoiceTemplates: data.invoiceTemplates?.length || 0,
         paymentMethods: data.paymentMethods?.length || 0,
         plannerAttachments: data.plannerAttachments?.length || 0,
+        focusItems: data.focusItems?.length || 0,
         projects: data.projects?.length || 0,
         tasks: data.tasks?.length || 0,
         taxReturnPeriods: data.taxReturnPeriods?.length || 0,

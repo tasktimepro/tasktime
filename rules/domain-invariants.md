@@ -187,3 +187,5 @@ These invariants summarize critical production contracts. They supplement the de
 - Private Worker source, deployment state, raw provider identifiers, secrets, and internal operational runbooks remain outside the public repository.
 
 Changes touching these areas require focused regression coverage and the relevant broader release checks.
+
+Focus selections are references to existing tasks, never a second task state. A selection is identified by task ID plus a fresh selection ID, with one concrete occurrence for recurring tasks. Removing a stale selection cannot remove a later add. Selection alone never starts or stops time, changes task schedule, or affects billing. A proven completed or archived task can retire its matching selection idempotently; a temporarily missing task cannot be pruned merely because a lookup failed. Sound ownership, activation and deadlines are browser-local and never enter Yjs or time entries.

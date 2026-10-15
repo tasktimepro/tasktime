@@ -1799,6 +1799,19 @@ describe('YjsStore reconnect sync tracking', () => {
         store.destroy()
     })
 
+    it('rejects a portable export with an invalid Focus selection without deleting it', async () => {
+        const store = new YjsStore()
+        await store.initialize()
+        store.focusItems.set('wrong-key', {
+            id: 'task-1', taskId: 'task-1', selectionId: 'selection-1', position: 1, addedAt: 100,
+        })
+
+        await expect(store.exportBackupData({ backupType: 'manual' })).rejects.toThrow(/focus selections/i)
+        expect(store.focusItems.has('wrong-key')).toBe(true)
+
+        store.destroy()
+    })
+
     it('clears discovered persisted docs outside the default year range', async () => {
         const store = new YjsStore()
         await store.initialize()
@@ -2452,7 +2465,7 @@ describe('YjsStore timer reconciliation', () => {
             exportDate: '2026-07-14T11:00:00.000Z',
         })
         expect(exported).toEqual(expect.objectContaining({
-            version: '1.5',
+            version: '1.6',
             invoices: [expect.objectContaining({
                 id: 'invoice-canceled',
                 status: 'canceled',

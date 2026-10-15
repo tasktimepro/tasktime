@@ -579,6 +579,16 @@ export interface PlannerAttachment {
     estimatedHours?: number | null;
 }
 
+/** An explicit, persistent selection of one task or recurring occurrence. */
+export interface FocusItem {
+    id: string;
+    taskId: string;
+    selectionId: string;
+    occurrenceDate?: string;
+    position: number;
+    addedAt: number;
+}
+
 export interface PlannerItemBase {
     key: string;
     title: string;
@@ -656,6 +666,7 @@ export interface Preferences {
     weeklyGoalTargetEarnings?: number | null;
     systemNotificationsEnabled?: boolean;
     systemNotificationTime?: string;
+    focusReminderMinutes?: 0 | 20 | 30 | 40 | 60;
     backupEnabled?: boolean;
     backupFrequencyHours?: number;
 }

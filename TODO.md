@@ -50,6 +50,7 @@
 
 ## Ideas
 
+- feature/focus branch:
 [ ] Focus mode - think how we can do this best.
     - Today we work on multiple projects or tasks at a time because a lot of the work is managed by AI. With this focus mode, when I enter it, I imagine a super clean overlay on top of everything, with the options to attached existing tasks, or create new ones directly inline (can be assigned to projects too)
     - These are the tasks you plan to do today/next so they remain here until you check them off - once checked, they disappear from this space
@@ -57,7 +58,7 @@
     - This view might be the best view to contain pomodoro? Let me know
 We might bring some of this previous idea I had earlier into this too:
 [ ] Timed sessions with sound alerts - I want to work on this for 1hour
-    - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on
+    - We must think were this should be placed, as a setting, or a global option in a project for example, and we choose which task we want to work on - But now maybe integrated with this focus mode idea/pomodoro options from above
     [ ] This can also be an alert reminder settings in account that when a time passes a certain amount, we ping with a sound, and when we have push notifications, also have that choice
     - Pomodoro? Is this the same and does it apply here?
 I would perhaps just take the subtle sound effect for a ping option that can go on every 20, 30, 40, 60 minutes. As a gentle reminder that you're in focus mode and that a timer is ongoing

@@ -6,7 +6,7 @@ All persisted entities use string identifiers. Timestamps are epoch milliseconds
 
 | Document | Collections |
 |---|---|
-| `core` | Projects, active tasks, clients, business information/assets, current invoices, templates, payment methods, expense categories, tax periods, active expenses/recurrences, planner attachments, goals, preferences, timers, and other always-loaded collections |
+| `core` | Projects, active tasks, clients, business information/assets, current invoices, templates, payment methods, expense categories, tax periods, active expenses/recurrences, planner attachments, Focus selections, goals, preferences, timers, and other always-loaded collections |
 | `entries-active` | Recent `timeEntries` |
 | `entries-{year}` | Historical `timeEntries` for a year |
 | `tasks-archived` | Archived `tasks` |
@@ -38,7 +38,7 @@ reconciliation keeps one canonical copy; legacy task duplicates prefer the
 archive destination, while one-way archives retain the freshest valid record
 and re-evaluate whether it still meets the archive predicate.
 
-Validated collection keys are: `projects`, `tasks`, `timeEntries`, `clients`, `businessInfos`, `businessBrandAssets`, `invoices`, `invoiceTemplates`, `emailTemplates`, `paymentMethods`, `expenseCategories`, `taxReturnPeriods`, `expenses`, `expenseRecurrences`, `plannerAttachments`, `dailyGoals`, `preferences`, and `timers`.
+Validated collection keys are: `projects`, `tasks`, `timeEntries`, `clients`, `businessInfos`, `businessBrandAssets`, `invoices`, `invoiceTemplates`, `emailTemplates`, `paymentMethods`, `expenseCategories`, `taxReturnPeriods`, `expenses`, `expenseRecurrences`, `plannerAttachments`, `focusItems`, `dailyGoals`, `preferences`, and `timers`.
 
 ## Cloud workspace binding
 
@@ -197,8 +197,9 @@ category; individually changed expense categories remain untouched.
 ## Planning and preferences
 
 - `PlannerAttachment`: required identity, referenced entity type (`client|project|task`), reference ID, mode (`static|date|weekday`), order, and creation timestamp; optional date/weekday/estimate according to mode.
+- `FocusItem`: one `core.focusItems` map record per task, keyed by its task ID. Required `id` and `taskId` are the same nonempty task ID; `selectionId` is a fresh nonempty identifier for each new selection; `position` and `addedAt` are finite numbers. A recurring selection has one optional, real local `YYYY-MM-DD` `occurrenceDate`; a one-time selection has none. Selection identity, occurrence and date stay in one atomic plain-object map value. References derive task/project names live. A valid reference to a temporarily missing task remains stored and is presented as unavailable; completion elsewhere retires only a proven matching selection. Focus order does not change task order.
 - `DailyGoal`: required identity, weekday `0..6`, creation time; optional hour/earnings targets and update time.
-- `Preferences`: optional currency/date/time/theme/default view/week start/display/sort/billable/sync/goal/notification/backup settings. Missing preferences use application defaults.
+- `Preferences`: optional currency/date/time/theme/default view/week start/display/sort/billable/sync/goal/notification/backup settings and `focusReminderMinutes` (`0|20|30|40|60`, missing means Off). Missing preferences use application defaults. Audio readiness, deadline and tab ownership are never persisted.
 
 ## Relationship invariants
 
@@ -207,6 +208,7 @@ category; individually changed expense categories remain untouched.
 - Project `invoiceIds[]` references separate invoice entities.
 - Invoice/expense/task/client/project/template references remain explicit IDs, not embedded mutable source records, except immutable billing/branding snapshots.
 - Planner attachments reference entities and do not duplicate ownership.
+- Focus selections reference real tasks and never duplicate task, time, billing, or project records. Task/project deletion and archival remove known matching references; transiently unresolved references are retained.
 - Deletion and import must validate relationships; billing/claimed records receive stricter protection than unbilled/unclaimed records.
 
 The executable counterparts are `src/stores/yjs/types.ts` and `src/stores/yjs/validation.ts`. Any discrepancy is contract drift requiring reconciliation, not permission to silently prefer one source.

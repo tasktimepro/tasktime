@@ -10,6 +10,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
+vi.mock('./components/focus/FocusOverlay', () => ({
+    FocusOverlay: () => null,
+}))
+
 const createMatchMedia = (matchesByQuery = {}) => vi.fn().mockImplementation((query) => ({
     matches: Boolean(matchesByQuery[query]),
     media: query,

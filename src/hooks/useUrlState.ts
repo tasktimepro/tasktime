@@ -16,6 +16,7 @@ type UrlParams = {
     preselectedClientId: string | null;
     expenseClientId: string | null;
     expenseProjectId: string | null;
+    focus: boolean;
 };
 
 type UrlUpdateParams = Partial<{
@@ -109,7 +110,8 @@ function getParamsFromUrl(): UrlParams {
         tab: params.get('tab') || null,
         preselectedClientId: params.get('preselectedClientId') || null,
         expenseClientId: params.get('clientId') || null,
-        expenseProjectId: params.get('projectId') || null
+        expenseProjectId: params.get('projectId') || null,
+        focus: params.get('focus') === '1'
     };
 }
 
@@ -249,6 +251,7 @@ export const useUrlState = () => {
         if (mergedParams.preselectedClientId) queryParams.preselectedClientId = mergedParams.preselectedClientId;
         if (mergedParams.expenseClientId) queryParams.clientId = mergedParams.expenseClientId;
         if (mergedParams.expenseProjectId) queryParams.projectId = mergedParams.expenseProjectId;
+        if (currentState.focus) queryParams.focus = '1';
 
         const newUrl = buildUrl(path, queryParams);
 

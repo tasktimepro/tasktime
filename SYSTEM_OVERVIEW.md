@@ -13,6 +13,7 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   It remains available after launch cleanup for returning local-only users.
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
+- **Focus:** The full-window overlay uses a small `core.focusItems` Yjs map of task references and order, while real task/project/timer hooks remain authoritative. It includes quick attachment/creation, guarded completion/removal, and optional browser-local single-tab sound reminders. Portable backup `1.6` includes selections; older versions import with an empty list.
 - **React context identity:** Yjs and billing context objects live in UI-independent
   shared modules so lazy Reports imports after development hot updates retain
   their mounted providers. Store lifecycle and entitlement policy are unchanged.

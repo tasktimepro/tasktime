@@ -51,6 +51,7 @@ const DEFAULT_PREFERENCES: Preferences = {
     defaultBillable: false,
     projectSort: 'createdAt',
     clientSort: 'createdAt',
+    focusReminderMinutes: 0,
 };
 
 /**

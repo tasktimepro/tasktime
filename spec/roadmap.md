@@ -1,5 +1,10 @@
 # Implementation Roadmap
 
+The cross-project Focus feature is implemented locally on `feature/focus` as
+one coordinated slice. Its product and compatibility scope, acceptance matrix,
+and remaining release/owner gates are recorded in the private infrastructure
+plan at `tasktime-infra/docs/todo/focus-mode-implementation-plan.md`.
+
 This roadmap describes the current production project rather than pretending it is greenfield.
 
 ## Phase 0 — Production foundation (completed)

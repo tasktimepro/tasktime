@@ -4,6 +4,7 @@ import * as currencyUtils from '@/utils/currencyUtils';
 import { objectToYMap, readEntity, updateEntityFields } from '@/stores/yjs/entityUtils';
 import type { AgentCommandContext } from '@/agent/types';
 import { AgentCommandError } from '@/agent/types';
+import { addFocusTaskCommand, listFocusTasksCommand, moveFocusTaskCommand, removeFocusTaskCommand } from './focus';
 import {
     addManualTimeEntryCommand,
     archiveClientCommand,
@@ -250,6 +251,7 @@ function createContext(): AgentCommandContext & {
         expenseCategories: Y.Map<string, unknown>;
         expenseRecurrences: Y.Map<string, unknown>;
         plannerAttachments: Y.Map<string, unknown>;
+        focusItems: Y.Map<string, unknown>;
         dailyGoals: Y.Map<string, unknown>;
         taxReturnPeriods: Y.Map<string, unknown>;
     };
@@ -276,6 +278,7 @@ function createContext(): AgentCommandContext & {
     const expenseCategories = coreDoc.getMap('expenseCategories');
     const expenseRecurrences = coreDoc.getMap('expenseRecurrences');
     const plannerAttachments = coreDoc.getMap('plannerAttachments');
+    const focusItems = coreDoc.getMap('focusItems');
     const dailyGoals = coreDoc.getMap('dailyGoals');
     const taxReturnPeriods = coreDoc.getMap('taxReturnPeriods');
     const entries = activeEntriesDoc.getMap('timeEntries');
@@ -336,6 +339,7 @@ function createContext(): AgentCommandContext & {
         expenseCategories,
         expenseRecurrences,
         plannerAttachments,
+        focusItems,
         dailyGoals,
         taxReturnPeriods,
         activeTimeEntries: entries,
@@ -676,6 +680,7 @@ function createContext(): AgentCommandContext & {
             expenseCategories,
             expenseRecurrences,
             plannerAttachments,
+            focusItems,
             dailyGoals,
             taxReturnPeriods,
         },
@@ -8368,4 +8373,20 @@ it('lets agents pause and resume recurrence and manage category colors through t
     const category = createExpenseCategoryCommand(context, { name: 'Tools', color: '#3b82f6' });
     expect(category.color).toBe('#3b82f6');
     expect(updateExpenseCategoryCommand(context, { expenseCategoryId: category.id, updates: { color: null } }).color).toBeNull();
+});
+
+it('exposes Focus selection with guarded agent add, move, and remove operations', () => {
+    const context = createContext();
+    context.maps.tasks.set('focus-one', objectToYMap({ id: 'focus-one', title: 'One', projectId: 'project-1' }));
+    context.maps.tasks.set('focus-two', objectToYMap({ id: 'focus-two', title: 'Two', projectId: 'project-1' }));
+
+    const first = addFocusTaskCommand(context, { taskId: 'focus-one', idempotencyKey: 'focus-add-one' });
+    expect(addFocusTaskCommand(context, { taskId: 'focus-one' }).selectionId).toBe(first.selectionId);
+    const second = addFocusTaskCommand(context, { taskId: 'focus-two' });
+    expect(listFocusTasksCommand(context).groups[0].items.map(item => item.taskId)).toEqual(['focus-one', 'focus-two']);
+    moveFocusTaskCommand(context, { taskId: second.taskId, selectionId: second.selectionId, direction: 'up' });
+    expect(listFocusTasksCommand(context).groups[0].items.map(item => item.taskId)).toEqual(['focus-two', 'focus-one']);
+    expect(() => removeFocusTaskCommand(context, { taskId: first.taskId, selectionId: 'stale' })).toThrow(AgentCommandError);
+    expect(removeFocusTaskCommand(context, { taskId: first.taskId, selectionId: first.selectionId }).taskId).toBe(first.taskId);
+    expect(context.maps.tasks.has(first.taskId)).toBe(true);
 });

@@ -10,6 +10,7 @@
   ],
   "contracts": {
     "tools": [
+      "tasktime__add_focus_task",
       "tasktime__add_manual_time_entry",
       "tasktime__archive_business_brand_asset",
       "tasktime__archive_client",
@@ -83,6 +84,7 @@
       "tasktime__list_expense_categories",
       "tasktime__list_expense_recurrences",
       "tasktime__list_expenses",
+      "tasktime__list_focus_tasks",
       "tasktime__list_invoice_templates",
       "tasktime__list_invoices",
       "tasktime__list_payment_methods",
@@ -99,6 +101,7 @@
       "tasktime__mark_invoice_unpaid",
       "tasktime__mark_tax_return_period_filed",
       "tasktime__mark_tax_return_period_paid",
+      "tasktime__move_focus_task",
       "tasktime__open_account_view",
       "tasktime__open_client_view",
       "tasktime__open_dashboard_view",
@@ -120,6 +123,7 @@
       "tasktime__refresh_invoice_draft",
       "tasktime__refresh_pairing",
       "tasktime__remove_daily_goal",
+      "tasktime__remove_focus_task",
       "tasktime__remove_planner_attachment",
       "tasktime__restore_backup_json",
       "tasktime__restore_cloud_backup",

@@ -101,6 +101,20 @@ try {
   assert(taskId, `create_task did not return a task id: ${JSON.stringify(taskResult)}`)
   log(`created task ${taskId}`)
 
+  const selected = payload(await callTool(bridgeLines, bridge, 'add_focus_task', {
+    taskId,
+    idempotencyKey: `focus-${testStamp}`,
+  }))
+  assert(selected.taskId === taskId && selected.selectionId, 'add_focus_task did not return the selection')
+  const focusList = payload(await callTool(bridgeLines, bridge, 'list_focus_tasks'))
+  assert(focusList.groups?.some(group => group.items?.some(item => item.taskId === taskId)), 'list_focus_tasks did not return the selection')
+  const removedFocus = payload(await callTool(bridgeLines, bridge, 'remove_focus_task', {
+    taskId,
+    selectionId: selected.selectionId,
+  }))
+  assert(removedFocus.selectionId === selected.selectionId, 'remove_focus_task did not remove the selection')
+  log('validated Focus add, list and remove through the packaged MCP bridge')
+
   await assertNavigation(bridgeLines, bridge, page, projectId, projectTitle)
 
   const timerStart = await callTool(bridgeLines, bridge, 'start_timer', {

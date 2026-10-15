@@ -48,6 +48,29 @@ describe('backupData', () => {
         expect(payload.emailTemplates).toEqual([]);
     });
 
+    it('round-trips Focus references and cadence without duplicating tasks', () => {
+        const focusItem = { id: 'task-1', taskId: 'task-1', selectionId: 'selected-1', position: 1, addedAt: 100 };
+        const payload = createBackupPayload({
+            ...baseInput,
+            tasks: [{ id: 'task-1', title: 'Plan the next work' }],
+            focusItems: [focusItem],
+            preferences: { focusReminderMinutes: 30 },
+        });
+        const restored = parseBackupImportJson(JSON.stringify(payload));
+        expect(restored.focusItems).toEqual([focusItem]);
+        expect(restored.tasks).toHaveLength(1);
+        expect(restored.preferences.focusReminderMinutes).toBe(30);
+        expect(getBackupImportCounts(restored).focusItems).toBe(1);
+        expect(() => parseBackupImportJson(JSON.stringify({
+            ...payload,
+            focusItems: [{ ...focusItem, id: 'wrong' }],
+        }))).toThrow(/Focus item ID/);
+        expect(() => parseBackupImportJson(JSON.stringify({
+            ...payload,
+            focusItems: [{ ...focusItem, occurrenceDate: '2026-02-30' }],
+        }))).toThrow(/calendar date/);
+    });
+
     it('preserves additive project and task planning fields', () => {
         const payload = createBackupPayload({
             ...baseInput,
@@ -227,7 +250,7 @@ describe('backupData', () => {
         }))).toThrow('Invalid invoices entity in backup invoice invoice-1');
     });
 
-    it('round-trips canceled invoices in version 1.5 while retaining project relationships and face value', () => {
+    it('round-trips canceled invoices in the current format while retaining project relationships and face value', () => {
         const canceledAt = Date.parse('2026-07-14T09:30:00Z');
         const payload = createBackupPayload({
             ...baseInput,
@@ -256,7 +279,7 @@ describe('backupData', () => {
         });
         const parsed = parseBackupImportJson(JSON.stringify(payload));
 
-        expect(parsed.version).toBe('1.5');
+        expect(parsed.version).toBe(BACKUP_VERSION);
         expect(parsed.projects[0].invoiceIds).toEqual(['invoice-canceled']);
         expect(parsed.invoices).toEqual([
             expect.objectContaining({

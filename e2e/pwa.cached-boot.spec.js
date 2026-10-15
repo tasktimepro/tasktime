@@ -108,6 +108,24 @@ test.describe('PWA smoke', () => {
         expect(errors).toEqual([]);
     });
 
+    test('opens Focus offline for the first time and retains its shortlist after reload', async ({ page, context }) => {
+        await page.addInitScript(() => localStorage.setItem('tasktime-onboarding-completed', 'true'));
+        await page.goto('/projects');
+        await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+        await waitForActiveServiceWorker(page);
+        await context.setOffline(true);
+
+        await page.goto('/?focus=1');
+        const dialog = page.getByRole('dialog', { name: 'Focus' });
+        await expect(dialog).toBeVisible();
+        await dialog.getByRole('button', { name: 'Add tasks', exact: true }).click();
+        await dialog.getByRole('textbox', { name: 'New task title' }).fill('Offline Focus work');
+        await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+        await expect(dialog.getByRole('region', { name: 'Unassigned' })).toContainText('Offline Focus work');
+        await page.reload();
+        await expect(dialog.getByRole('region', { name: 'Unassigned' })).toContainText('Offline Focus work');
+    });
+
     test('excludes public navigation from the active service worker and emits a site redirect', async ({ page, context }) => {
         await page.goto('/');
         await waitForActiveServiceWorker(page);

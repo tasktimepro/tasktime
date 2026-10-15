@@ -29,6 +29,7 @@ import { createBackupPayload, validateBackupImportPayload, type BackupImportPayl
 import { parseStoredDate } from '@/utils/dateUtils';
 import { getTaskIdsWithDescendants } from '@/utils/taskUtils';
 import { generateId } from '@/utils/idUtils';
+import { readFocusItems, retireCompletedFocusTasks } from './focusOperations';
 import { readEntity, objectToYMap, collectEntities, forEachEntity, updateEntityFields } from './entityUtils';
 import { collectValidatedEntities, validateCollectionEntity } from './validation';
 import {
@@ -67,6 +68,7 @@ import type {
     MultiTimerState,
     TaxReturnPeriod,
     PlannerAttachment,
+    FocusItem,
     DailyGoal,
     ArchiveTransition,
 } from './types';
@@ -173,6 +175,9 @@ export class YjsStore {
     private activeSyncScope: SyncPersistenceScope = { ...DEFAULT_GOOGLE_SYNC_SCOPE };
     private backupManager: CloudBackupManager | null = null;
     private _isReady: boolean = false;
+    private readonly handleFocusSourceChange = () => {
+        if (this._isReady) retireCompletedFocusTasks(this);
+    };
     private driveSyncMode: DriveSyncMode = 'manual';
 
     // Core docs (always loaded after init)
@@ -231,6 +236,10 @@ export class YjsStore {
         this.cleanupOrphanedPlannerAttachments();
 
         this._isReady = true;
+        this._coreDoc.getMap('tasks').observeDeep(this.handleFocusSourceChange);
+        this._coreDoc.getMap('projects').observeDeep(this.handleFocusSourceChange);
+        this._coreDoc.getMap('focusItems').observe(this.handleFocusSourceChange);
+        retireCompletedFocusTasks(this);
 
         try {
             await this.reconcileInvoiceBillingOperations({ includeCompleted: false });
@@ -342,6 +351,11 @@ export class YjsStore {
     get plannerAttachments(): Y.Map<string, PlannerAttachment> {
         this.assertReady();
         return this._coreDoc!.getMap('plannerAttachments');
+    }
+
+    get focusItems(): Y.Map<string, FocusItem> {
+        this.assertReady();
+        return this._coreDoc!.getMap('focusItems');
     }
 
     get dailyGoals(): Y.Map<string, DailyGoal> {
@@ -563,6 +577,7 @@ export class YjsStore {
             } as unknown as Record<string, unknown>);
             (archivedMap as any).set(candidateTaskId, entityMap);
             this.tasks.delete(candidateTaskId);
+            this.focusItems.delete(candidateTaskId);
         });
 
         console.log(`[YjsStore] Archived task subtree ${taskId} (${taskIdsToArchive.length} task(s))`);
@@ -2513,6 +2528,11 @@ export class YjsStore {
             ]);
         }
 
+        const focusItems = readFocusItems(this);
+        if (focusItems.length !== this.focusItems.size) {
+            throw new Error('Saved Focus selections are invalid; backup export cannot safely preserve them.');
+        }
+
         return createBackupPayload({
             exportDate: options.exportDate,
             backupType: options.backupType,
@@ -2532,6 +2552,7 @@ export class YjsStore {
             expenseRecurrences: collectEntities(this.expenseRecurrences as any),
             dailyGoals: collectEntities(this.dailyGoals as any),
             plannerAttachments: collectEntities(this.plannerAttachments as any),
+            focusItems,
             preferences: Object.fromEntries(this.preferences.entries()) as Preferences,
         });
     }
@@ -2657,6 +2678,11 @@ export class YjsStore {
         for (const attachment of data.plannerAttachments || []) {
             const validated = validateCollectionEntity<PlannerAttachment>('plannerAttachments', attachment, `import planner attachment ${attachment.id}`);
             (this.plannerAttachments as any).set(validated.id, objectToYMap(validated as unknown as Record<string, unknown>));
+        }
+
+        for (const item of data.focusItems || []) {
+            const validated = validateCollectionEntity<FocusItem>('focusItems', item, `import focus item ${item.id}`);
+            this.focusItems.set(validated.id, validated);
         }
 
         const validatedPreferences = validateCollectionEntity<Preferences>('preferences', data.preferences || {}, 'import preferences');
@@ -2937,6 +2963,11 @@ export class YjsStore {
      */
     destroy(): void {
         console.log('[YjsStore] Destroying...');
+        if (this._coreDoc) {
+            this._coreDoc.getMap('tasks').unobserveDeep(this.handleFocusSourceChange);
+            this._coreDoc.getMap('projects').unobserveDeep(this.handleFocusSourceChange);
+            this._coreDoc.getMap('focusItems').unobserve(this.handleFocusSourceChange);
+        }
         this.driveProvider?.disconnect();
         this.driveProvider = null;
         this.backupManager = null;
@@ -3058,6 +3089,7 @@ export class YjsStore {
                 'expenseRecurrences',
                 'timers',
                 'plannerAttachments',
+                'focusItems',
                 'dailyGoals',
                 'invoices',
             ].some((mapName) => doc.getMap(mapName).size > 0)

@@ -752,3 +752,24 @@ Release assessment: the unpublished core patch remains v1.6.3, with no
 published bridge, MCP Registry, OpenClaw, Claude or ClawHub artifact changes.
 The private Worker CORS update precedes that app release; the public site is
 an independent source and production artifact release.
+## October 10 Focus — `feature/focus`, local implementation under final review
+
+The cross-project Focus overlay is implemented locally with a saved Yjs
+shortlist, existing-task multi-select, inline project-assigned creation,
+group ordering, task/timer-backed completion, guarded Undo, removal, and
+optional browser-local sound reminders. Portable backup export is now `1.6`
+with historical `1.5` import retained; local recovery and agent read/add/remove/
+move paths include Focus. The matching source contracts and implementation plan
+are updated. Focused unit, agent, backup and deletion tests pass, along with
+desktop/phone Chromium, Firefox and WebKit interaction journeys. The complete
+unit/coverage stage passes 298 suites and 3,099 tests (one existing skip);
+the final core gate also passes 127 Chromium smoke checks, five installed-PWA
+checks, production and recovery builds, site-contract export, audit, lint and
+typecheck. Evidence: `/private/tmp/tasktime-focus-release-gate-final3.log`.
+An additional production-build Focus-first offline/reload check passes, making
+the PWA suite six of six (evidence: `/private/tmp/tasktime-focus-pwa-final.log`).
+The lockfile-only security fix yields a clean audit, and `release:agent` passes
+with aligned generated artifacts (evidence:
+`/private/tmp/tasktime-focus-agent-gate-final.log`). This branch is uncommitted
+and has not been published or deployed; owner review and any release require
+separate action.
