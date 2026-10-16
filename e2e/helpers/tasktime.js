@@ -201,12 +201,16 @@ function parseMultipartUpload(request) {
         const headers = part.slice(0, separatorIndex);
         const body = part.slice(separatorIndex + 4).replace(/\r\n$/, '');
 
-        if (headers.includes('name="metadata"') || headers.includes('Content-Type: application/json')) {
+        // Multipart/related puts metadata first. The file part may also be
+        // application/json (the sync manifest), and must remain file content.
+        if (headers.includes('name="metadata"')
+            || (!metadata && headers.includes('Content-Type: application/json'))) {
             metadata = JSON.parse(body);
+            continue;
         }
 
         if (headers.includes('name="file"')
-            || (headers.includes('Content-Type:') && !headers.includes('Content-Type: application/json'))) {
+            || headers.includes('Content-Type:')) {
             fileBuffer = Buffer.from(body, 'latin1');
         }
     }

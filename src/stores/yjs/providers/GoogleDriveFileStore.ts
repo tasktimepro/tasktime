@@ -45,6 +45,16 @@ function belongsToNamespace(name: string, namespace: CloudNamespace): boolean {
     return namespace === 'backups' ? isBackup : !isBackup;
 }
 
+/** Read the immutable upload bytes for recovery verification. */
+function readUploadBody(body: Blob): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(body);
+    });
+}
+
 /**
  * Google Drive appDataFolder adapter. It owns every Google REST path, opaque
  * file ID, multipart body, retry, and provider-error decision.
@@ -558,25 +568,30 @@ export class GoogleDriveFileStore implements CloudFileStore {
     private async reconcileDirectCreate(
         opaqueId: string,
         logicalName: string,
-        mimeType: string,
+        body: Blob,
     ): Promise<boolean> {
+        // Keep the recovery deadline active through response-body consumption.
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), GoogleDriveFileStore.REQUEST_TIMEOUT_MS);
         try {
-            const fields = encodeURIComponent('id,name,mimeType,parents,trashed');
+            const fields = encodeURIComponent('id,name,mimeType,spaces,trashed');
             const response = await this.request(
                 `/files/${encodeURIComponent(opaqueId)}?fields=${fields}`,
+                { signal: controller.signal },
             );
             const file = await response.json() as {
                 id?: unknown;
                 name?: unknown;
                 mimeType?: unknown;
-                parents?: unknown;
+                spaces?: unknown;
                 trashed?: unknown;
             };
             const matches = file.id === opaqueId
                 && file.name === logicalName
-                && file.mimeType === mimeType
-                && Array.isArray(file.parents)
-                && file.parents.includes('appDataFolder')
+                && file.mimeType === body.type
+                // Drive returns opaque parent IDs; spaces identifies app-data membership.
+                && Array.isArray(file.spaces)
+                && file.spaces.includes('appDataFolder')
                 && file.trashed !== true;
 
             if (!matches) {
@@ -587,12 +602,30 @@ export class GoogleDriveFileStore implements CloudFileStore {
                 );
             }
 
+            // A later attempt can reuse this ID with newer bytes. Metadata alone
+            // must not acknowledge an earlier payload as the current upload.
+            const content = await this.request(`/files/${encodeURIComponent(opaqueId)}?alt=media`, {
+                signal: controller.signal,
+            });
+            const actual = new Uint8Array(await content.arrayBuffer());
+            const expected = new Uint8Array(await readUploadBody(body));
+            if (actual.length !== expected.length || !actual.every((byte, index) => byte === expected[index])) {
+                throw new CloudFileStoreError(
+                    'conflict',
+                    'Google Drive returned different content for an allocated TaskTime file ID.',
+                    { provider: this.provider },
+                );
+            }
+
             this.setCachedObject(logicalName, opaqueId);
             this.pendingCreateIds.delete(logicalName);
             return true;
         } catch (error) {
+            if (controller.signal.aborted) throw new DriveConnectivityError();
             if (error instanceof DriveFileNotFoundError) return false;
             throw error;
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 
@@ -622,7 +655,7 @@ export class GoogleDriveFileStore implements CloudFileStore {
         } catch (error) {
             if (
                 error instanceof DriveConnectivityError
-                && await this.reconcileDirectCreate(opaqueId, logicalName, body.type)
+                && await this.reconcileDirectCreate(opaqueId, logicalName, body)
             ) {
                 return { logicalName, opaqueId, modifiedTime: '' };
             }
@@ -650,7 +683,7 @@ export class GoogleDriveFileStore implements CloudFileStore {
 
         const driveError = await GoogleDriveFileStore.normalizeDriveError(response);
         const ambiguous = response.status === 409 || response.status >= 500;
-        if (ambiguous && await this.reconcileDirectCreate(opaqueId, logicalName, body.type)) {
+        if (ambiguous && await this.reconcileDirectCreate(opaqueId, logicalName, body)) {
             return { logicalName, opaqueId, modifiedTime: '' };
         }
 

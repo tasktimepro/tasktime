@@ -4,6 +4,7 @@ import {
     createRemoteDriveFixture,
     createStatefulDriveFixture,
     installMockDirectDriveRoutes,
+    projectsHeadingName,
     seedStoredGoogleSession,
 } from './helpers/tasktime.js';
 
@@ -88,3 +89,122 @@ for (const provider of ['google-drive', 'dropbox']) {
         });
     }
 }
+
+test('Google Drive recovers an accepted delta upload returning fileIdInUse without losing local or remote work', async ({ page, browserName }) => {
+    const capturedUploadBodies = [];
+    if (browserName === 'webkit') {
+        // Playwright's WebKit request API omits Blob bodies. Copy their bytes
+        // for the provider fixture while sending the original fetch unchanged.
+        await page.exposeFunction('__captureDriveUploadBody', (url, bytes) => {
+            capturedUploadBodies.push({ url, body: Buffer.from(bytes) });
+        });
+        await page.addInitScript(() => {
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = async (input, options) => {
+                if (typeof input === 'string'
+                    && input.startsWith('https://www.googleapis.com/upload/drive/v3/')
+                    && options?.body instanceof Blob) {
+                    await window.__captureDriveUploadBody(input, Array.from(new Uint8Array(await options.body.arrayBuffer())));
+                }
+                return originalFetch(input, options);
+            };
+        });
+    }
+    await page.addInitScript(() => localStorage.setItem('tasktime-onboarding-completed', 'true'));
+    const retainedTitle = 'Retained remote project';
+    const newTitle = 'Project saved during upload recovery';
+    const drive = createStatefulDriveFixture(createRemoteDriveFixture({
+        projects: [{ id: 'retained-project', title: retainedTitle, isPersonal: true }],
+    }));
+    const handleRoute = drive.handleRoute;
+    let armed = false;
+    let recoveredId = null;
+    let readbacks = 0;
+    const syncErrors = [];
+    page.on('pageerror', error => syncErrors.push(error.message));
+    page.on('console', message => {
+        if (/\[DriveSync\].*(Sync failed|Failed to push)/.test(message.text())) syncErrors.push(message.text());
+    });
+    drive.handleRoute = async route => {
+        let request = route.request();
+        const url = new URL(request.url());
+        if (browserName === 'webkit' && url.pathname.startsWith('/upload/drive/v3/')) {
+            const originalRequest = request;
+            const originalRoute = route;
+            const bodyIndex = capturedUploadBodies.findIndex(entry => entry.url === request.url());
+            expect(bodyIndex).toBeGreaterThanOrEqual(0);
+            const [{ body }] = capturedUploadBodies.splice(bodyIndex, 1);
+            request = {
+                url: () => originalRequest.url(),
+                method: () => originalRequest.method(),
+                headers: () => originalRequest.headers(),
+                postDataBuffer: () => originalRequest.postDataBuffer() ?? body,
+            };
+            route = { request: () => request, fulfill: response => originalRoute.fulfill(response) };
+        }
+        if (armed && !recoveredId && request.method() === 'POST'
+            && request.postDataBuffer()?.toString('latin1').includes('tasktime-yjs-core-delta-')) {
+            // Keep the accepted bytes, then model Google's response to a replay
+            // of the same pre-generated ID after an ambiguous upload outcome.
+            return handleRoute({
+                request: () => request,
+                fulfill: async response => {
+                    recoveredId = JSON.parse(response.body).id;
+                    await route.fulfill({
+                        ...response,
+                        status: 409,
+                        body: JSON.stringify({ error: { errors: [{ reason: 'fileIdInUse' }] } }),
+                    });
+                },
+            });
+        }
+        if (recoveredId && request.method() === 'GET'
+            && url.pathname === `/drive/v3/files/${recoveredId}`
+            && url.searchParams.has('fields')) {
+            readbacks += 1;
+            const file = drive.files.find(candidate => candidate.id === recoveredId);
+            return route.fulfill({
+                headers: { 'Access-Control-Allow-Origin': 'http://127.0.0.1:3101' },
+                json: {
+                    ...file,
+                    mimeType: 'application/octet-stream',
+                    parents: ['opaque-application-data-folder-id'],
+                    spaces: ['appDataFolder'],
+                    trashed: false,
+                },
+            });
+        }
+        return handleRoute(route);
+    };
+    await installMockDirectDriveRoutes(page, drive);
+    await page.goto('/projects');
+    await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
+    await page.evaluate(() => {
+        const store = window.__TASKTIME_STORE__;
+        store.preferences.set('autoSyncEnabled', true);
+        store.preferences.set('autoSyncMode', 'sync');
+        store.preferences.set('backupEnabled', false);
+    });
+    await seedStoredGoogleSession(page, {
+        sessionId: 'upload-recovery-session', userId: 'fixture', email: 'upload-recovery@example.test',
+    });
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
+
+    armed = true;
+    await createPersonalProject(page, newTitle);
+    await expect.poll(() => readbacks).toBe(1);
+    await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
+    expect(drive.readCurrentSyncedCoreProjectTitles().sort()).toEqual([newTitle, retainedTitle].sort());
+    expect(drive.uploads.filter(({ metadata }) => metadata.id === recoveredId)).toHaveLength(1);
+    expect(drive.proxyRequestCount()).toBe(0);
+    expect(syncErrors).toEqual([]);
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'In sync', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: newTitle, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: retainedTitle, exact: true })).toBeVisible();
+    expect(drive.readCurrentSyncedCoreProjectTitles().sort()).toEqual([newTitle, retainedTitle].sort());
+    expect(syncErrors).toEqual([]);
+    expect(capturedUploadBodies).toEqual([]);
+});

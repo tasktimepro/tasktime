@@ -1,3 +1,91 @@
+## October 16 production-readiness review — local release checks green
+
+The CLI recheck found the same five active TaskTime App incident groups, each
+still at one occurrence, no local incidents, and no open runtime improvement
+findings. The final homepage check at 08:07 UTC remains passing (HTTP 200), and
+the latest incident occurrence is still October 15 at 10:41 UTC. No new captured failure
+justifies widening the app patch. Historical token-service network failures
+remain distinct from the reproduced Drive create-recovery defect; production
+metadata readback is still unavailable, so the exact cause of every captured
+409 is not claimed. Incidents remain open until the fix is verified in production.
+
+The second review reproduced one gap in the proposed recovery path: the existing
+request helper stopped its timer at response headers, allowing a stalled metadata
+or content body to hold recovery open. Two red regressions now pass with a recovery
+abort deadline kept active through both reads. Timeout releases the operation,
+cleans up its timer, and retains the allocated ID for later retry. The runtime
+correction still stays in `GoogleDriveFileStore`; normal auth, sync scheduling,
+cloud file names, schemas, and pending-data ownership are unchanged.
+
+The security gate is now clear. Only eight existing lockfile entries changed:
+`brace-expansion` 1.1.21/2.1.7/5.0.12, DOMPurify 3.4.17, `fast-uri` 3.1.8,
+`serialize-javascript` 7.1.2, and `source-map-js` 1.2.2. All are patch upgrades;
+DOMPurify is the only runtime dependency changed and its minimum is raised to
+3.4.17. The other affected entries are development dependencies. No new package
+or override was added. `audit:security` reports zero vulnerabilities.
+
+The recovery journey now passes Chromium, Firefox, and WebKit, preserving both
+remote and local work after reload. WebKit's fixture copies the outgoing Blob
+bytes through a browser binding because Playwright omits them from request
+inspection; the original fetch and body are sent unchanged. This removes the
+prior skipped recovery case without changing app code or claiming a live Google
+account canary. Docker checks pass 293 unit suites / 3,097 tests (one existing
+skip), configured per-file coverage, lint, typecheck, six artifact checks,
+production and recovery builds, site-contract export, five PWA checks, and all
+123 Chromium smoke journeys, including PDF sanitization, Manual/Backup/Sync
+behavior, multi-device/tab convergence, and expired-session recovery. No local
+release blocker remains. Logs are
+`/private/tmp/tasktime-oct16-*.log`.
+
+Release scope is core-app v1.6.5, a SemVer patch. Worker, independent site source,
+agent protocols, and published agent package metadata are unchanged. The owner
+authorized committing, pushing, production deployment, and resolving the five
+reviewed incidents. Exact-source CI, prepared production artifact review, and
+live verification are pending; incidents will be resolved after those checks.
+The unrelated pre-existing `TODO.md` edit is preserved outside this patch.
+
+## October 15 Drive upload recovery — local fix; publication not authorized
+
+The authenticated DebugBundle CLI found no local incidents and five active
+production groups. The October 7 token-service incident matches the screenshot
+timestamp; its network/DNS failures also affect billing. October 15 token
+requests have status zero rather than an HTTP authorization rejection. Separate
+delta-upload groups contain Google `409 fileIdInUse`; the outer sync group 52 ms
+later appears to report the same failed pass. Metadata readback was not captured,
+so the precise production recovery failure remains unproven. The owner reports
+the app is now In sync. Read-only recheck at 20:20 UTC found no new occurrences
+after 10:41 UTC and a passing homepage check (HTTP 200); this does not independently
+verify authenticated sync or absence of data loss.
+
+A local regression reproduced rejection of a valid accepted upload because
+`GoogleDriveFileStore` checked `parents` for the `appDataFolder` alias. Recovery
+now verifies `spaces`, retains the ID/name/MIME/trashed checks, and downloads the
+same file to compare exact bytes before acknowledging success. A second red
+regression showed why that byte check is necessary: an allocated ID retained
+after an uncertain attempt can contain older bytes on a later call. Mismatched
+or unreadable content fails closed, leaving pending work for normal recovery.
+Only this adapter changes runtime behavior; auth, scheduling, cloud names,
+persisted schemas, and the Worker remain unchanged. Google documents the
+[spaces/parents distinction](https://developers.google.com/workspace/drive/api/reference/rest/v3/files)
+and [pre-generated-ID retry behavior](https://developers.google.com/workspace/drive/api/guides/manage-uploads).
+
+Docker validation passes 293 unit suites / 3,095 tests (one existing skip),
+configured per-file coverage, lint, typecheck, six artifact checks, app and
+recovery builds, site-contract export, five PWA checks, and all 123 Chromium
+smoke journeys. The new real-app recovery journey passes in Chromium and
+Firefox, retaining existing remote work and a new local project through sync
+and reload, with one upload for the recovered ID. Its stateful fixture correctly
+retains JSON manifest bodies; WebKit is explicitly skipped because Playwright
+does not expose the Blob upload bodies needed by this fixture. This is synthetic
+provider evidence, not a replay of the owner's live account.
+
+The unchanged dependency tree currently fails `audit:security`: five findings,
+including two high-severity packages (`brace-expansion`, `source-map-js`). Resolve
+that separate release gate before publication; no dependency updates were folded
+into this fix. Logs: `/private/tmp/tasktime-drive-recovery-*.log`. `AGENTS.md`
+records the requested CLI-first DebugBundle preference. Changes are uncommitted
+and undeployed; live user data and incident lifecycle state were not modified.
+
 ## September 28 core v1.6.4 yearly repeat update — published and verified
 
 The shared task repeat picker now offers Every Year with month/day selection in

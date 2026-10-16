@@ -582,9 +582,11 @@ describe('ManifestManager', () => {
                 id: 'stable-id',
                 name: 'tasktime-yjs-core.bin',
                 mimeType: 'application/octet-stream',
-                parents: ['appDataFolder'],
+                parents: ['opaque-application-data-folder-id'],
+                spaces: ['appDataFolder'],
                 trashed: false,
             }, { status: 200 }))
+            .mockResolvedValueOnce(new Response('payload'))
         vi.stubGlobal('fetch', fetchMock)
         const { manager } = directManager()
 
@@ -593,7 +595,7 @@ describe('ManifestManager', () => {
             new Blob(['payload'], { type: 'application/octet-stream' }),
         )).resolves.toBe('stable-id')
 
-        expect(fetchMock).toHaveBeenCalledTimes(3)
+        expect(fetchMock).toHaveBeenCalledTimes(4)
         expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/upload/'))).toHaveLength(1)
         expect(fetchMock.mock.calls[2][0]).toContain('/files/stable-id?fields=')
     })

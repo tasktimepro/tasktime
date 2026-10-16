@@ -4,6 +4,7 @@
 
 - IndexedDB persists every managed Yjs document locally.
 - Cloud sync exchanges deltas/manifests directly with the selected Google Drive or Dropbox provider using a short-lived memory-only access token. It uses metadata checks, throttling, and cross-tab locking.
+- After an ambiguous Google Drive create response, recovery reads the same pre-generated file ID and verifies its ID, name, MIME type, application-data `spaces` membership, and that it is not marked trashed. It then reads the stored content and requires an exact byte match with the attempted upload before accepting it. The recovery abort deadline stays active through metadata and content response-body reads; a timeout preserves the allocated ID for later retry. The `parents` field contains folder IDs, not the application-data space name. A matching accepted upload is reused without another create; conflicting metadata or content remains an error, preserving pending local work.
 - Manual, backup, and sync modes follow the trigger matrix in `AGENTS.md`.
 - In automatic modes, rich project-note edits wait for a 1.5-second quiet period and then use the ordinary mode-specific sync pipeline. Manual mode keeps notes local until an explicit sync.
 - Sync mode checks the manifest every five minutes while the app is visible; hidden tabs do not run periodic provider checks. Focus and online cooldowns remain separate.

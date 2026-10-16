@@ -21,6 +21,7 @@ export default defineConfig({
                 'src/utils/**',
                 'src/recovery/localWorkspaceRecovery.ts',
                 'src/stores/yjs/providers/CloudSyncProvider.ts',
+                'src/stores/yjs/providers/GoogleDriveFileStore.ts',
                 'src/stores/yjs/validation.ts',
                 'src/stores/yjs/workspaceDeletion.ts',
                 'src/stores/yjs/YjsDocManager.ts',

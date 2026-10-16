@@ -1,3 +1,29 @@
+## October 16 production-readiness review — local release checks green
+
+The DebugBundle CLI shows no new incident occurrences or open improvement
+findings. The surgical Drive recovery correction now also bounds stalled
+response-body reads, with red/green regressions and preserved retry state.
+Compatible patch dependency updates clear all audit findings. The recovery
+journey passes Chromium, Firefox, and WebKit; the prior WebKit fixture gap is
+closed. Unit coverage (3,097 passing tests), lint, typecheck, artifact checks,
+production/recovery builds, contract export, PWA checks, and all 123 Chromium
+smoke journeys pass. No local release blocker remains. The owner authorized the
+core-app v1.6.5 commit, push, production deployment, and resolution of the five
+reviewed incidents. Exact-source CI and the production artifact/deployment checks
+are pending. See `app-status.md` for scope and evidence.
+
+## October 15 Drive upload recovery — locally validated; release gate open
+
+CLI incident evidence and the owner's In sync status support a recovered network
+interruption; separate Drive `409 fileIdInUse` groups led to a reproduced adapter
+recovery defect. The local correction verifies application-data space membership
+and exact uploaded bytes before accepting an uncertain create. Runtime changes
+stay in `GoogleDriveFileStore`; production data/contracts and auth are unchanged.
+Unit coverage, focused Chromium/Firefox recovery, lint, typecheck, production/PWA
+and recovery builds, and all 123 Chromium smoke journeys pass. Existing
+dependency advisories block the security release gate. Nothing is committed or
+deployed. See `app-status.md` for evidence, limitations, and logs.
+
 ## September 28 core v1.6.4 yearly repeat update — published and verified
 
 The core app task repeat picker now exposes its existing yearly month/day

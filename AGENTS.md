@@ -373,6 +373,7 @@ docker compose --project-name tasktime-tools run --rm app npm run <script>
 
 <!-- debugbundle:start -->
 ## DebugBundle
+- Use the authenticated `debugbundle` CLI as the primary interface for local and hosted investigations. Use explicit `--source cloud --project-id <id>` for hosted incident listings; use a connector only when the CLI is unavailable or lacks the required capability, or the user requests it.
 - Use DebugBundle for runtime failures, production/customer-facing incidents, endpoint downtime, notification/webhook delivery failures, health-check failures, specific incident reports, or symptoms likely to have generated captured events.
 - For deterministic local code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first; do not check DebugBundle incidents unless runtime evidence is needed or the user asks.
 - Read `.agents/skills/debugbundle/SKILL.md` for the full DebugBundle workflow.
