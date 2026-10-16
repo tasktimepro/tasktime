@@ -1,3 +1,17 @@
+## October 16 core v1.6.5 Drive recovery — published and verified
+
+Core source `c07fabb` passed exact-source CI `38883520166` and production
+preparation `38883631895`. Deployment `38886400945` published the verified
+live-billing archive to `tasktime-app`. Both live routes return 200; all 28
+served static files match the prepared archive, and fresh anonymous browser
+startup passes on Dashboard and Account. The verified v1.6.4 rollback archive
+is retained privately. All five reviewed DebugBundle incidents were resolved
+through the CLI and independently read back as resolved; the active queue is
+empty. Recovered network interruptions remain distinct from the corrected
+Drive upload recovery defect. No Worker, site, or agent release was needed.
+Authenticated retained-profile sync remains owner-managed. See `app-status.md`
+for exact release evidence. Earlier entries below are historical checkpoints.
+
 ## October 16 production-readiness review — local release checks green
 
 The DebugBundle CLI shows no new incident occurrences or open improvement

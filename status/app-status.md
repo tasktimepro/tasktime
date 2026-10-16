@@ -1,3 +1,51 @@
+## October 16 core v1.6.5 Drive recovery — published and verified
+
+The owner-authorized patch is committed and pushed as
+`c07fabbece05a207460231b7dde5a69b7ae34ba0`. The correction stays in the Drive
+adapter's ambiguous-create recovery path: verify application-data space and
+exact content, bound metadata/content reads, and preserve retry state on failure.
+Compatible dependency patches clear the security audit. Auth, sync scheduling,
+persisted data, Worker, independent site, and agent artifacts are unchanged.
+
+Exact-source CI `38883520166` and production preparation `38883631895` both
+passed the full release gate: zero audit vulnerabilities, lint/typecheck,
+six artifact tests, 293 unit suites / 3,097 passing tests (one existing skip),
+configured coverage, all 123 Chromium smoke journeys, five PWA checks,
+site-contract export, and recovery build. The new recovery journey also passed
+locally in Chromium, Firefox, and WebKit. Preparation retained `live` billing
+mode and produced SHA-256
+`5413a49a55d2f06111a7fbffc225b3c414e2f6a2bdf19d01070967534b49645f`.
+The release verifier checked its source, infrastructure, workflow provenance,
+and bytes before deployment `38886400945` published the same archive without
+rebuilding it.
+
+Independent live verification at 10:20 UTC found `/` and `/account` returning
+200 and referencing `assets/index-K5fEqmo1.js` (build `1.6.5-1792145781971`).
+All 28 served non-HTML static files match the archive byte-for-byte; `_redirects`
+is deployment configuration. Fresh anonymous Chromium checks render onboarding
+on Dashboard and preferences on Account, with no uncaught errors or failed
+assets. A separate DebugBundle homepage test passes HTTP 200. These checks do
+not claim an authenticated Google account or retained-browser sync canary.
+
+The five reviewed production incidents were resolved through the authenticated
+CLI at 10:23 UTC and independently read back as resolved. The active TaskTime App
+queue is empty. The two token-service incidents are closed as recovered network
+interruptions supported by the captured evidence and the owner's In sync report;
+the two delta-upload incidents and outer sync report are closed after deploying
+the verified recovery correction. The precise cause of every historical 409
+remains unproven without its missing provider metadata. No capture suppression,
+token refresh policy, or user data was changed.
+
+The v1.6.4 rollback archive from preparation `36481193899` was verified against
+all 28 pre-release production static files and retained in private operational
+evidence with SHA-256
+`79b8c4d4d4ac178bd6fdb7d3d74667bcad8fe54f7a0b2b6d41c2b81972ae405b`.
+That evidence also retains the new archive, workflow logs, live byte checks,
+browser result, and incident lifecycle readbacks. No tag, package, or agent
+artifact publication was requested or performed. The unrelated `TODO.md` edit
+and private Focus-mode plan remain outside the release commits. Earlier entries
+below are historical checkpoints.
+
 ## October 16 production-readiness review — local release checks green
 
 The CLI recheck found the same five active TaskTime App incident groups, each
