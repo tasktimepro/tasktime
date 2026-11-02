@@ -112,6 +112,13 @@ describe('InvoicePreviewModal', () => {
         expect(screen.queryByText('uwittwer@gmail.com')).not.toBeInTheDocument();
     });
 
+    it('uses Draft wording for a saved draft fallback preview', () => {
+        render(<InvoicePreviewModal isOpen onClose={vi.fn()} invoice={{ status: 'draft', invoiceNumber: 'DRAFT-1' }} />);
+        expect(screen.getByRole('dialog', { name: 'Draft Preview - DRAFT-1' })).toBeVisible();
+        expect(screen.getByRole('heading', { name: 'DRAFT', exact: true })).toBeVisible();
+        expect(screen.getByText('Draft #DRAFT-1')).toBeVisible();
+    });
+
     it('renders an optional download action in the default footer', () => {
         const onDownload = vi.fn();
 

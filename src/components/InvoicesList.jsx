@@ -3,7 +3,7 @@ import { DocumentTextIcon, PencilIcon, ArrowDownTrayIcon, EyeIcon, CheckIcon, Pl
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -96,6 +96,8 @@ const InvoicesList = ({
     const [pendingUnpaidInvoice, setPendingUnpaidInvoice] = useState(null);
     const [isMarkingInvoiceUnpaid, setIsMarkingInvoiceUnpaid] = useState(false);
     const [emailInvoice, setEmailInvoice] = useState(null);
+    const [pendingSentInvoice, setPendingSentInvoice] = useState(null);
+    const [isMarkingInvoiceSent, setIsMarkingInvoiceSent] = useState(false);
     const [emailSendType, setEmailSendType] = useState('invoice');
     const [pendingUndoInvoice, setPendingUndoInvoice] = useState(null);
     const [undoConfirmationText, setUndoConfirmationText] = useState('');
@@ -124,6 +126,7 @@ const InvoicesList = ({
         invoices: allActiveInvoices,
         updateInvoice,
         markAsPaid,
+        markAsSent,
         updatePaymentDetails,
         markAsUnpaid,
         undoLatestInvoice,
@@ -511,7 +514,7 @@ const InvoicesList = ({
         try {
             const htmlContent = getCurrentInvoiceHtmlContent(invoice, clients, businessBrandAssets);
             
-            const filename = `invoice-${invoice.invoiceNumber}.pdf`;
+            const filename = `${invoice.status === 'draft' ? 'draft' : 'invoice'}-${invoice.invoiceNumber}.pdf`;
             
             await generatePDF(htmlContent, filename);
         } catch (error) {
@@ -835,6 +838,22 @@ const InvoicesList = ({
         }
     }, [handleTabChange, isMarkingInvoiceUnpaid, markAsUnpaid, pendingUnpaidInvoice, showError, showSuccess]);
 
+    const handleConfirmMarkSent = async () => {
+        if (!pendingSentInvoice || isMarkingInvoiceSent) return;
+        setIsMarkingInvoiceSent(true);
+        try {
+            const updated = await markAsSent(pendingSentInvoice.id);
+            if (!updated?.sentAt) throw new Error('Invoice could not be marked as sent. Refresh the list and try again.');
+            setReconciledSentAt(current => ({ ...current, [updated.id]: updated.sentAt }));
+            setPendingSentInvoice(null);
+            showSuccess(`Invoice ${pendingSentInvoice.invoiceNumber} marked as sent.`);
+        } catch (error) {
+            showError(error.message || 'Unable to mark this invoice as sent.');
+        } finally {
+            setIsMarkingInvoiceSent(false);
+        }
+    };
+
     /**
      * Mark an unpaid finalized invoice as paid.
      */
@@ -1117,31 +1136,32 @@ const InvoicesList = ({
                                         )}
 
                                         {/* Email actions: Send Invoice or Send Reminder */}
-                                        {emailRecoveryReady
-                                            && !invoiceIsPaid
+                                        {!invoiceIsPaid
                                             && !invoiceIsCanceled
                                             && invoiceStatus !== 'draft'
-                                            && !effectiveSentAt
-                                            && !invoiceSendProtected && (
+                                            && !effectiveSentAt && (
                                             <Button
                                                 onClick={() => handleOpenEmailModal(invoice, 'invoice')}
                                                 variant="ghost"
                                                 size="icon"
-                                                title="Send Invoice by Email"
+                                                disabled={!emailRecoveryReady || invoiceSendProtected}
+                                                title={invoiceSendProtected ? 'Delivery pending' : !emailRecoveryReady ? 'Checking delivery status' : 'Send Invoice by Email'}
+                                                aria-label={invoiceSendProtected ? 'Delivery pending' : !emailRecoveryReady ? 'Checking delivery status' : 'Send Invoice by Email'}
                                             >
                                                 <Send className="h-5 w-5" />
                                             </Button>
                                         )}
-                                        {emailRecoveryReady
-                                            && !invoiceIsPaid
+                                        {!invoiceIsPaid
+                                            && !invoiceIsCanceled
                                             && effectiveSentAt
-                                            && invoiceIsOverdue
-                                            && !reminderSendProtected && (
+                                            && invoiceIsOverdue && (
                                             <Button
                                                 onClick={() => handleOpenEmailModal(invoice, 'reminder')}
                                                 variant="ghost"
                                                 size="icon"
-                                                title="Send Payment Reminder"
+                                                disabled={!emailRecoveryReady || reminderSendProtected}
+                                                title={reminderSendProtected ? 'Reminder delivery pending' : !emailRecoveryReady ? 'Checking reminder status' : 'Send Payment Reminder'}
+                                                aria-label={reminderSendProtected ? 'Reminder delivery pending' : !emailRecoveryReady ? 'Checking reminder status' : 'Send Payment Reminder'}
                                             >
                                                 <Bell className="h-5 w-5" />
                                             </Button>
@@ -1175,6 +1195,15 @@ const InvoicesList = ({
                                                     <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                                                     <span>Download</span>
                                                 </DropdownMenuItem>
+                                                {!invoiceIsCanceled && !invoiceIsPaid && invoiceStatus !== 'draft' && !effectiveSentAt && (
+                                                    <DropdownMenuItem
+                                                        onClick={() => setPendingSentInvoice(invoice)}
+                                                        className="cursor-pointer hover:bg-accent focus:bg-accent"
+                                                    >
+                                                        <CheckIcon className="h-4 w-4 mr-2" />
+                                                        <span>Mark as sent</span>
+                                                    </DropdownMenuItem>
+                                                )}
                                                 {!invoiceIsCanceled && invoiceIsPaid && invoiceHasEditablePaymentDetails && (
                                                     <DropdownMenuItem
                                                         onClick={() => openPaymentDetailsModal(invoice, 'edit-payment')}
@@ -1208,6 +1237,7 @@ const InvoicesList = ({
                                                         <span>Delete draft</span>
                                                     </DropdownMenuItem>
                                                 )}
+                                                {(invoiceCanBeUndone || invoiceCanBeCanceled) && <DropdownMenuSeparator />}
                                                 {invoiceCanBeUndone && (
                                                     <DropdownMenuItem
                                                         onClick={() => handleOpenUndoModal(invoice)}
@@ -1275,7 +1305,6 @@ const InvoicesList = ({
             <InvoicePreviewModal
                 isOpen={showPreview && !!selectedInvoice}
                 onClose={() => setShowPreview(false)}
-                title={selectedInvoice ? `Invoice Preview - ${selectedInvoice.invoiceNumber}` : ''}
                 invoice={selectedInvoice}
                 htmlContent={selectedInvoice ? getCurrentInvoiceHtmlContent(selectedInvoice, clients, businessBrandAssets) : ''}
                 footer={previewModalFooter}
@@ -1441,6 +1470,29 @@ const InvoicesList = ({
                     description="Use Edit payment details instead when you only need to reconcile the received conversion."
                     variant="warning"
                 />
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(pendingSentInvoice)}
+                onClose={() => { if (!isMarkingInvoiceSent) setPendingSentInvoice(null); }}
+                title="Mark invoice as sent?"
+                description={`Record that you have already sent invoice ${pendingSentInvoice?.invoiceNumber || ''} outside TaskTime. This will not send an email.`}
+                footer={(
+                    <div className="flex flex-wrap justify-end gap-3">
+                        <Button variant="outline" disabled={isMarkingInvoiceSent} onClick={() => setPendingSentInvoice(null)}>
+                            Cancel
+                        </Button>
+                        <Button loading={isMarkingInvoiceSent} loadingText="Marking as sent" onClick={handleConfirmMarkSent}>
+                            Mark as sent
+                        </Button>
+                    </div>
+                )}
+            >
+                {pendingSentInvoice && protectedEmailActions[`${pendingSentInvoice.id}:invoice`] && (
+                    <Notice variant="warning" title="Email delivery is still unconfirmed">
+                        Marking this invoice as sent does not cancel an email already in progress.
+                    </Notice>
+                )}
             </Modal>
 
             <Modal

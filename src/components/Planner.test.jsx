@@ -92,7 +92,7 @@ describe('Planner', () => {
             writable: true,
             value: vi.fn().mockImplementation(() => ({
                 matches,
-                media: '(max-width: 767px)',
+                media: '(max-width: 1279px)',
                 onchange: null,
                 addEventListener: vi.fn(),
                 removeEventListener: vi.fn(),

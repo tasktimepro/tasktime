@@ -16,6 +16,7 @@ const invoiceHookMocks = vi.hoisted(() => ({
     invoices: [],
     updateInvoice: vi.fn(),
     markAsPaid: vi.fn(),
+    markAsSent: vi.fn(),
     updatePaymentDetails: vi.fn(),
     markAsUnpaid: vi.fn(),
     undoLatestInvoice: vi.fn(),
@@ -81,6 +82,7 @@ vi.mock('../hooks/useInvoices.ts', () => ({
         invoices: invoiceHookMocks.invoices,
         updateInvoice: invoiceHookMocks.updateInvoice,
         markAsPaid: invoiceHookMocks.markAsPaid,
+        markAsSent: invoiceHookMocks.markAsSent,
         updatePaymentDetails: invoiceHookMocks.updatePaymentDetails,
         markAsUnpaid: invoiceHookMocks.markAsUnpaid,
         undoLatestInvoice: invoiceHookMocks.undoLatestInvoice,
@@ -168,6 +170,8 @@ describe('InvoicesList', () => {
     beforeEach(() => {
 
         updateUrlMock.mockClear()
+        invoiceHookMocks.markAsSent.mockReset()
+        invoiceHookMocks.markAsSent.mockResolvedValue({ id: 'inv-1', status: 'sent', sentAt: 1793628000000 })
         invoiceHookMocks.markAsPaid.mockReset()
         invoiceHookMocks.markAsPaid.mockResolvedValue(undefined)
         invoiceHookMocks.updatePaymentDetails.mockReset()
@@ -729,7 +733,50 @@ describe('InvoicesList', () => {
         expect(screen.queryByText('Emailed')).not.toBeInTheDocument()
     })
 
-    it('hides the send action while a lifecycle-bound delivery is unresolved', async () => {
+    it('keeps the send control in place while background discovery refreshes', async () => {
+        hostedEmailMocks.enabled = true
+        const invoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [invoice]
+        render(<InvoicesList projectInvoices={[invoice]} />)
+        const send = await screen.findByTitle('Send Invoice by Email')
+        let finishDiscovery
+        emailRecoveryMocks.findUnreconciledEmailAttemptForRecovery.mockImplementation(() => new Promise(resolve => {
+            finishDiscovery = resolve
+        }))
+        await act(async () => window.dispatchEvent(new Event('tasktime:email-attempts-changed')))
+        expect(send).toBeInTheDocument()
+        expect(send).toBeDisabled()
+        await act(async () => finishDiscovery(null))
+        expect(screen.getByTitle('Send Invoice by Email')).toBe(send)
+        expect(send).toBeEnabled()
+    })
+
+    it('records manual delivery after confirmation and removes the send action', async () => {
+        const invoice = { ...baseInvoice, sentAt: null }
+        invoiceHookMocks.invoices = [invoice]
+        render(<InvoicesList projectInvoices={[invoice]} />)
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Mark as sent' }))
+        const dialog = screen.getByRole('dialog', { name: 'Mark invoice as sent?' })
+        expect(invoiceHookMocks.markAsSent).not.toHaveBeenCalled()
+        await user.click(within(dialog).getByRole('button', { name: 'Mark as sent' }))
+        await waitFor(() => expect(invoiceHookMocks.markAsSent).toHaveBeenCalledWith(invoice.id))
+        expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
+        expect(screen.getByText('Sent')).toBeInTheDocument()
+        expect(emailRecoveryMocks.checkEmailAttemptStatus).not.toHaveBeenCalled()
+    })
+
+    it('keeps manual delivery unsaved when its confirmation is cancelled', async () => {
+        render(<InvoicesList projectInvoices={[baseInvoice]} />)
+        await user.click(screen.getByRole('button', { name: 'More actions' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Mark as sent' }))
+        const dialog = screen.getByRole('dialog', { name: 'Mark invoice as sent?' })
+        await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+        expect(invoiceHookMocks.markAsSent).not.toHaveBeenCalled()
+        expect(screen.getByTitle('Send Invoice by Email')).toBeInTheDocument()
+    })
+
+    it('keeps the send action visible but disabled while a lifecycle-bound delivery is unresolved', async () => {
         hostedEmailMocks.enabled = true
         const unsentInvoice = { ...baseInvoice, sentAt: null }
         invoiceHookMocks.invoices = [unsentInvoice]
@@ -758,9 +805,9 @@ describe('InvoicesList', () => {
             />
         )
 
-        await waitFor(() => {
-            expect(screen.queryByTitle('Send Invoice by Email')).not.toBeInTheDocument()
-        })
+        const pendingSend = await screen.findByRole('button', { name: 'Delivery pending' })
+        expect(pendingSend).toBeVisible()
+        expect(pendingSend).toBeDisabled()
         expect(emailRecoveryMocks.checkEmailAttemptStatus).toHaveBeenCalledOnce()
         expect(invoiceHookMocks.updateInvoice).not.toHaveBeenCalled()
     })
@@ -1760,6 +1807,14 @@ describe('InvoicesList', () => {
 
         expect(tablist.className.includes('flex-wrap')).toBe(true)
         expect(markPaidButton.parentElement?.className.includes('flex-wrap')).toBe(true)
+    })
+
+    it('uses Draft wording for a saved draft preview and download filename', async () => {
+        render(<InvoicesList projectInvoices={[{ ...baseInvoice, status: 'draft' }]} selectedTab="draft" />)
+        await user.click(screen.getByTitle('Preview Invoice'))
+        expect(screen.getByRole('dialog', { name: /Draft Preview/ })).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Download PDF' }))
+        expect(pdfMocks.generatePDF).toHaveBeenCalledWith(expect.any(String), `draft-${baseInvoice.invoiceNumber}.pdf`)
     })
 
     it('uses current invoice html when stored html is stale', async () => {

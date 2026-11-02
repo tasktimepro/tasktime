@@ -1,7 +1,7 @@
 {
   "name": "tasktime",
   "private": true,
-  "version": "1.6.5",
+  "version": "1.6.6",
   "license": "AGPL-3.0-only",
   "type": "module",
   "bin": {
@@ -37,7 +37,7 @@
     "release:agent": "npm run build:agent-bridge && npm run build:openclaw-plugin && npm run smoke:agent-bridge && npm run smoke:agent-bundles && npm run smoke:agent-live"
   },
   "dependencies": {
-    "@debugbundle/sdk-browser": "3.0.0",
+    "@debugbundle/sdk-browser": "3.2.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -78,7 +78,7 @@
     "uuid": "^13.0.2",
     "y-indexeddb": "^9.0.12",
     "yjs": "^13.6.29",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -103,7 +103,7 @@
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.1",
-    "vite": "^7.3.6",
+    "vite": "^7.3.7",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.1.11"
   }

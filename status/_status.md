@@ -1,3 +1,72 @@
+## November 2 v1.6.6 and agent v1.2.1 — release authorized; local gate green
+
+The owner authorized production publication and GitHub releases. Core v1.6.6
+includes invoice-email recovery, manual delivery, draft PDF/copy improvements,
+tablet layouts and reviewed security updates. Bridge/MCP/OpenClaw/Claude v1.2.1
+ship the patched bundled validator; the standalone skill remains unchanged.
+The complete Docker release gate passes with 3,110 app tests, 133 Chromium and
+five PWA checks. The agent gate and 416 private Worker tests pass. Exact-source
+CI, package dry runs and production promotion remain pending. The separate site's
+security/pin update awaits its own approval. Unrelated TODO/Focus work is excluded.
+
+## November 2 Planner day-button sizing — locally validated
+
+Day buttons share the available width from 72px to 112px each, then center as
+a group. Phones retain horizontal scrolling with the first and last day fully
+reachable. Six light/dark Chromium/Firefox/WebKit cases, the existing selector
+interaction test and focused lint pass. Screenshots were inspected. Changes
+remain local and uncommitted; the earlier broader tablet gates are below.
+
+## November 2 tablet Planner and Account layouts — locally validated
+
+Planner uses the existing single-day layout below 1280px, retaining the selected
+day across resizing and visible compact-card menus. Account tabs wrap within the
+page, using pills below 1280px and underlined tabs above. Phone navigation and
+stored work are unchanged. All 3,110 app tests with coverage, lint, typecheck and
+production build pass, plus 12 cross-browser tablet checks and 18 existing related
+browser journeys. Light/dark screenshots were inspected. Changes remain local,
+uncommitted and unpublished.
+
+## November 2 saved-draft action wording — locally validated
+
+Renamed Refresh Work to **Update with latest work**, with matching notice,
+confirmation and result messages. The confirmation explains that saved linked
+selections and overrides are replaced; draft behavior and contracts are unchanged.
+Four desktop/mobile Chromium cases, 53 component tests and focused lint pass.
+Changes remain local and uncommitted.
+
+## November 2 invoice preview and draft PDF presentation — locally validated
+
+Unsaved composer previews retain the normal Invoice heading without a draft
+banner. Saved drafts use Draft as their document heading/number label and default
+download prefix, also without a banner; finalization restores Invoice wording.
+Browser and agent exports agree. All 3,110 app tests with coverage, lint,
+typecheck, production build and 12 desktop/mobile Chromium/Firefox/WebKit checks
+pass. Actual PDF downloads and rendered output were inspected. The local app
+remains running for owner review; changes are uncommitted and unpublished.
+
+## November 2 invoice email recovery and manual delivery — locally validated
+
+Fixed browser IDB transaction expiry during email recovery, Send/status races,
+and repeated recovery writes. Invoice send/reminder controls stay in place while
+disabled, and confirmed **Mark as sent** persists manual delivery without email.
+The owner received all three authorized synthetic trial/complimentary-Pro test
+messages. Approved Vite/diagnostics SDK/Zod security updates clear all high and
+critical findings; the runtime dependency audit reports zero vulnerabilities.
+Twenty-six low/moderate development-tool findings remain below the configured
+release threshold. A separate precached validation chunk keeps the production
+build within the default PWA per-asset limit.
+
+All local release checks pass: 3,107 app tests with coverage, lint/typecheck,
+six artifact checks, 127 Chromium smoke checks, five production PWA checks,
+contract export and recovery build. Eighteen cross-browser email checks and
+bridge/managed-bundle/live-agent checks also pass. The 416 private Worker tests
+pass after correcting two stale trial-date fixtures; Worker runtime is unchanged.
+Core and agent distribution patch releases are required because patched Zod is
+embedded in the bridge and its OpenClaw/Claude vendors. Standalone skill/site
+source is unchanged; the site's pinned recovery-reader adoption needs its own
+review. Changes remain uncommitted and unpublished. See `app-status.md`.
+
 ## October 16 core v1.6.5 Drive recovery — published and verified
 
 Core source `c07fabb` passed exact-source CI `38883520166` and production

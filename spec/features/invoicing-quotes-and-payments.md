@@ -11,10 +11,11 @@
   are provisional; finalization allocates a current unused final number.
 - Drafts appear separately from Outstanding and offer edit, explicit finalize
   and confirmed delete actions. Sending and payment actions require finalization.
-  Preview/download clearly identify an unfinalized document as Draft, including
-  a new invoice preview before its first save.
+  Saved drafts use Draft in place of the Invoice heading and number label in
+  previews/downloads, without an additional draft banner. A new invoice preview
+  before its first save uses the normal Invoice heading and never saves or bills.
 - A saved draft captures selected source entries, linked expenses, rates and
-  adjustments. Reopening does not silently add later work. Explicit Refresh Work
+  adjustments. Reopening does not silently add later work. **Update with latest work**
   rebuilds linked work from current eligibility for the selected projects and
   period, after explaining that linked-line selections and overrides are reset;
   manual items, invoice notes and overall discount/shipping/tax settings remain.
@@ -38,6 +39,10 @@
 - Finalization snapshots billing/currency/branding data and applies source billing state once. Completed replay respects later deletion, cancellation, draft state, and archived placement; pending recovery can still finish its prepared invoice.
 - Finalization reconciles compatible legacy duplicate task copies, preserves merged-parent pricing/rate inheritance, and rejects conflicting copies or unsupported nested merged tasks before source billing state changes.
 - Payments record their financial context. **Mark as unpaid** is a confirmed correction for a mistakenly recorded payment: it removes `paidAt` and the payment-currency snapshot, preserves the finalized invoice and its billing-source claims, and returns the invoice to effective Outstanding or Overdue. It does not record or issue a refund.
+- **Mark as sent** records confirmed manual delivery for a finalized, unpaid,
+  uncanceled invoice. It persists the existing `sentAt` field once, preserves
+  billing and payment state, removes the initial Send action, and sends no email.
+  It does not cancel any unresolved hosted send.
 - Undo latest invoice uses stored billing snapshots to restore eligible source records safely.
 - Cancellation is a terminal, void-like workflow for finalized unpaid invoices whose effective status is sent or overdue. It preserves the invoice, number, original totals, immutable snapshots, sent metadata, and project links while releasing only billing sources still owned by that invoice.
 - Cancellation requires a trimmed reason of 1–500 characters and exact invoice-number confirmation. It is journaled, retry-safe, and shared by the browser and agent surfaces.

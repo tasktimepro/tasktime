@@ -289,8 +289,8 @@ const InvoiceModal = ({
         >
             <form id="invoice-form" onSubmit={handleSave} className="space-y-5">
                 {editingInvoice && !isQuoteMode && (
-                    <Notice title="Saved draft" description="Work stays as saved until you refresh it. Finalizing checks the selected work and marks it billed.">
-                        <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={onRefreshWork}>Refresh Work</Button>
+                    <Notice title="Saved draft" description="Work and rates stay as saved. Update this draft to use the latest unbilled work and rates. Finalizing marks the selected work as billed.">
+                        <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={onRefreshWork}>Update with latest work</Button>
                     </Notice>
                 )}
                 {/* Client & Project Details */}

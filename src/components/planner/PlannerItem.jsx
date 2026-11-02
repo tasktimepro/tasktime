@@ -267,8 +267,8 @@ const PlannerItem = ({
                     'min-w-0 flex-1',
                     isMobileLayout && 'space-y-0.5',
                     // Reserve the desktop action space only while the action is visible.
-                    canShowMenu && 'md:group-hover/item:pr-8 md:group-focus-within/item:pr-8',
-                    canShowMenu && menuOpen && 'md:pr-8'
+                    canShowMenu && !isMobileLayout && 'md:group-hover/item:pr-8 md:group-focus-within/item:pr-8',
+                    canShowMenu && !isMobileLayout && menuOpen && 'md:pr-8'
                 )}>
                     <div className={cn(
                         isProjectDeadlineItem
@@ -307,7 +307,7 @@ const PlannerItem = ({
                     />
                 )}
 
-                {/* Desktop menus leave the text flow; phones retain an always-visible action. */}
+                {/* Grid menus leave the text flow; compact cards retain an always-visible action. */}
                 {canShowMenu && (
                     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
                         <DropdownMenuTrigger asChild>
@@ -315,11 +315,10 @@ const PlannerItem = ({
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
                                 className={cn(
-                                    'ml-auto shrink-0 rounded p-1 md:absolute md:right-0',
+                                    'ml-auto shrink-0 rounded p-1 opacity-100',
                                     'hover:bg-muted focus:outline-none focus:opacity-100 cursor-pointer',
-                                    'opacity-100 md:group-hover/item:opacity-100 md:group-focus-within/item:opacity-100',
-                                    'md:group-hover/item:pointer-events-auto md:group-focus-within/item:pointer-events-auto',
-                                    menuOpen ? 'md:opacity-100' : 'md:opacity-0 md:pointer-events-none'
+                                    !isMobileLayout && 'md:absolute md:right-0 md:group-hover/item:opacity-100 md:group-focus-within/item:opacity-100 md:group-hover/item:pointer-events-auto md:group-focus-within/item:pointer-events-auto',
+                                    !isMobileLayout && (menuOpen ? 'md:opacity-100' : 'md:opacity-0 md:pointer-events-none')
                                 )}
                                 aria-label="Item options"
                             >

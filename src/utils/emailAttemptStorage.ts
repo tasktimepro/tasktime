@@ -488,10 +488,12 @@ export async function markEmailAttemptMetadataApplied(
     nowMs = Date.now(),
 ): Promise<boolean> {
     try {
+        // WebCrypto yields outside IndexedDB's request queue. Finish it before
+        // opening the transaction so browsers cannot auto-commit before put().
+        const fingerprint = await createBillingSessionFingerprint(lifecycle.sessionId);
         const db = await getDb();
         const transaction = db.transaction(STORE, 'readwrite');
         const value: unknown = await transaction.store.get(attemptId);
-        const fingerprint = await createBillingSessionFingerprint(lifecycle.sessionId);
         if (!valid(value)
             || value.provider !== lifecycle.provider
             || value.generation !== lifecycle.generation
@@ -499,9 +501,13 @@ export async function markEmailAttemptMetadataApplied(
             await transaction.done;
             return false;
         }
+        if (value.metadataAppliedAt !== null) {
+            await transaction.done;
+            return true;
+        }
         await transaction.store.put({
             ...value,
-            metadataAppliedAt: value.metadataAppliedAt ?? nowMs,
+            metadataAppliedAt: nowMs,
             updatedAt: nowMs,
         }, attemptId);
         await transaction.done;
@@ -518,18 +524,24 @@ export async function releasePendingEmailAttemptWithoutDurableEvidence(
     nowMs = Date.now(),
 ): Promise<boolean> {
     try {
+        const fingerprint = await createBillingSessionFingerprint(lifecycle.sessionId);
         const db = await getDb();
         const transaction = db.transaction(STORE, 'readwrite');
         const value: unknown = await transaction.store.get(attemptId);
-        const fingerprint = await createBillingSessionFingerprint(lifecycle.sessionId);
         if (!valid(value)
             || value.provider !== lifecycle.provider
             || value.generation !== lifecycle.generation
             || value.sessionIdFingerprint !== fingerprint
-            || value.state !== 'pending'
+            || (value.state !== 'pending' && value.state !== 'rejected')
             || value.metadataAppliedAt !== null) {
             await transaction.done;
             return false;
+        }
+        // The modal and list can reconcile the same authoritative absence.
+        // Treat an already released marker as success without another event.
+        if (value.state === 'rejected') {
+            await transaction.done;
+            return true;
         }
         await transaction.store.put({ ...value, state: 'rejected', updatedAt: nowMs }, attemptId);
         await transaction.done;
@@ -547,10 +559,10 @@ export async function updateEmailAttemptState(
     nowMs = Date.now(),
 ): Promise<boolean> {
     try {
+        const fingerprint = await createBillingSessionFingerprint(lifecycle.sessionId);
         const db = await getDb();
         const transaction = db.transaction(STORE, 'readwrite');
         const value: unknown = await transaction.store.get(attemptId);
-        const fingerprint = await createBillingSessionFingerprint(lifecycle.sessionId);
         if (!valid(value)
             || value.provider !== lifecycle.provider
             || value.generation !== lifecycle.generation

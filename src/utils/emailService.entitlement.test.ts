@@ -22,6 +22,7 @@ vi.mock('@/config/billingFeatures', () => ({
 }));
 vi.mock('@/utils/debugbundle', () => ({ captureDebugBundleIncident: vi.fn() }));
 vi.mock('./emailAttemptStorage', () => ({
+    EMAIL_ATTEMPTS_CHANGED_EVENT: 'tasktime:email-attempts-changed',
     EmailAttemptBindingConflictError: class EmailAttemptBindingConflictError extends Error {},
     EmailAttemptCapacityError: class EmailAttemptCapacityError extends Error {},
     findBoundEmailAttemptByIdempotency: storage.find,
@@ -609,6 +610,41 @@ describe('entitled email client boundary', () => {
         })).rejects.toMatchObject({ type: 'quota_exceeded' });
         expect(storage.release).not.toHaveBeenCalled();
     });
+
+    it('does not let background discovery query status before the active send reserves its attempt', async () => {
+        const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(projection), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+        })))
+        vi.stubGlobal('fetch', fetchMock)
+        storage.store.mockImplementationOnce(async () => {
+            await expect(checkEmailAttemptStatus({
+                sessionId: lifecycle.sessionId, billingLifecycle: lifecycle, attemptId,
+            })).rejects.toMatchObject({ type: 'pending', attemptId })
+            expect(fetchMock).not.toHaveBeenCalled()
+            return { created: true, record: {} }
+        })
+        await expect(sendInvoiceEmail({
+            sessionId: lifecycle.sessionId, billingLifecycle: lifecycle, attemptId,
+            invoiceId: 'invoice-1', invoiceNumber: 'INV-1', to: 'client@example.com',
+            subject: 'Invoice', bodyText: 'Attached.', pdfBase64: 'JVBERi0=',
+            sendType: 'invoice', documentSnapshot: { id: 'invoice-1' },
+        })).resolves.toMatchObject({ success: true })
+        await expect(checkEmailAttemptStatus({
+            sessionId: lifecycle.sessionId, billingLifecycle: lifecycle, attemptId,
+        })).resolves.toEqual(projection)
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('defers status while another tab owns the send lock', async () => {
+        const fetchMock = vi.fn()
+        vi.stubGlobal('fetch', fetchMock)
+        vi.stubGlobal('navigator', { locks: { request: vi.fn((_name, _options, callback) => callback(null)) } })
+        await expect(checkEmailAttemptStatus({
+            sessionId: lifecycle.sessionId, billingLifecycle: lifecycle, attemptId,
+        })).rejects.toMatchObject({ type: 'pending', attemptId })
+        expect(fetchMock).not.toHaveBeenCalled()
+        expect(storage.release).not.toHaveBeenCalled()
+    })
 
     it('checks durable status without creating a new attempt', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(projection), {

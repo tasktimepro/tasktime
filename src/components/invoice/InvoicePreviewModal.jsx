@@ -35,9 +35,10 @@ const InvoicePreviewModal = ({
     downloadLabel = 'Download PDF'
 }) => {
     const isQuoteMode = invoice?.documentMode === 'quote';
+    const documentLabel = isQuoteMode ? 'Quote' : invoice?.status === 'draft' ? 'Draft' : 'Invoice';
     const isCanceled = !isQuoteMode && isInvoiceCanceled(invoice);
     const previewHtml = htmlContent || invoice?.htmlContent || '';
-    const previewTitle = title || (invoice ? `${isQuoteMode ? 'Quote' : 'Invoice'} Preview - ${invoice.invoiceNumber}` : `${isQuoteMode ? 'Quote' : 'Invoice'} Preview`);
+    const previewTitle = title || (invoice ? `${documentLabel} Preview - ${invoice.invoiceNumber}` : `${documentLabel} Preview`);
     const modalContentRef = useRef(null);
     const previewPageRef = useRef(null);
     const [previewScale, setPreviewScale] = useState(1);
@@ -185,8 +186,8 @@ const InvoicePreviewModal = ({
             ) : (
                 <div className="space-y-4">
                     <div className="text-center border-b pb-4">
-                        <h1 className="text-2xl font-bold text-foreground">{isQuoteMode ? 'QUOTE' : 'INVOICE'}</h1>
-                        <p className="text-muted-foreground">{isQuoteMode ? 'Quote' : 'Invoice'} #{invoice?.invoiceNumber}</p>
+                        <h1 className="text-2xl font-bold text-foreground">{documentLabel.toUpperCase()}</h1>
+                        <p className="text-muted-foreground">{documentLabel} #{invoice?.invoiceNumber}</p>
                         <p className="text-muted-foreground">Date: {invoice?.date ? toDisplayDate(invoice.date) : '—'}</p>
                     </div>
                     

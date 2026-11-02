@@ -23,22 +23,22 @@ jobs:
       - name: Read published npm and MCP versions
         run: |
           set -euo pipefail
-          test "$(npm view @tasktimepro/agent-bridge@1.2.0 version)" = "1.2.0"
-          test "$(npm view @tasktimepro/openclaw@1.2.0 version)" = "1.2.0"
+          test "$(npm view @tasktimepro/agent-bridge@1.2.1 version)" = "1.2.1"
+          test "$(npm view @tasktimepro/openclaw@1.2.1 version)" = "1.2.1"
           node --input-type=module -e '
-            const r = await fetch("https://registry.modelcontextprotocol.io/v0.1/servers/pro.tasktime%2Fagent-bridge/versions/1.2.0");
+            const r = await fetch("https://registry.modelcontextprotocol.io/v0.1/servers/pro.tasktime%2Fagent-bridge/versions/1.2.1");
             if (!r.ok) throw Error("MCP registry unavailable");
             const result = await r.json();
-            if ((result.server ?? result).version !== "1.2.0") throw Error("Unexpected MCP version");
+            if ((result.server ?? result).version !== "1.2.1") throw Error("Unexpected MCP version");
           '
       - name: Verify ClawHub plugin files against reviewed source
         run: |
-          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package inspect @tasktimepro/openclaw --version 1.2.0 --json > /tmp/plugin.json
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" package inspect @tasktimepro/openclaw --version 1.2.1 --json > /tmp/plugin.json
           node --input-type=module -e '
             import fs from "node:fs";
             import crypto from "node:crypto";
             const x = JSON.parse(fs.readFileSync("/tmp/plugin.json", "utf8"));
-            if (x.package.name !== "@tasktimepro/openclaw" || x.owner.handle !== "tasktimepro" || x.version.version !== "1.2.0" || x.package.scanStatus !== "clean" || !x.version.files.length) throw Error("Unexpected plugin identity or scan");
+            if (x.package.name !== "@tasktimepro/openclaw" || x.owner.handle !== "tasktimepro" || x.version.version !== "1.2.1" || x.package.scanStatus !== "clean" || !x.version.files.length) throw Error("Unexpected plugin identity or scan");
             for (const file of x.version.files) {
               if (file.path.includes("..") || file.path.startsWith("/")) throw Error("Invalid artifact path");
               const actual = crypto.createHash("sha256").update(fs.readFileSync("integrations/openclaw/tasktime/" + file.path)).digest("hex");

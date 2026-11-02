@@ -1,7 +1,8 @@
 /**
  * MobileDaySelector - Day tabs for mobile planner view
  * 
- * Shows horizontal scrollable day tabs for mobile screens.
+ * Shares available width between day tabs up to 7rem each, then centers the row.
+ * Narrow screens retain horizontally scrollable tabs with a 4.5rem minimum.
  * Highlights today and allows selecting a day to view.
  */
 
@@ -25,7 +26,7 @@ const MobileDaySelector = ({
     const today = useTodayDate();
 
     return (
-        <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-[2px] scrollbar-hide sm:-mx-5 sm:px-5">
+        <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-[2px] scrollbar-hide sm:-mx-5 sm:px-5 md:mx-0 md:px-0">
             {weekDays.map((day) => {
                 const isSelected = day.dateStr === selectedDateStr;
                 const isToday = isSameDay(day.date, today);
@@ -36,7 +37,7 @@ const MobileDaySelector = ({
                         variant={isSelected ? "secondary" : "outline"}
                         size="sm"
                         className={cn(
-                            'flex h-auto min-w-[4.5rem] flex-shrink-0 flex-col items-center gap-1.5 rounded-xl px-3 py-2.5',
+                            'flex h-auto min-w-[4.5rem] max-w-28 basis-18 grow shrink-0 flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 first:ml-auto last:mr-auto',
                             isToday && !isSelected && 'text-foreground',
                             isSelected && 'shadow-sm'
                         )}

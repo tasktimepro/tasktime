@@ -8,6 +8,7 @@ import { captureDebugBundleIncident } from '@/utils/debugbundle';
 import type { EmailSendType } from './emailTemplateUtils';
 import type { BillingLifecycle } from './billingStorage';
 import {
+    EMAIL_ATTEMPTS_CHANGED_EVENT,
     EmailAttemptBindingConflictError,
     EmailAttemptCapacityError,
     findBoundEmailAttemptByIdempotency,
@@ -65,6 +66,40 @@ export type EmailSendError =
 const EMAIL_INCIDENT_THROTTLE_MS = 15 * 60 * 1000;
 const EMAIL_RESPONSE_MAX_BYTES = 65_536;
 const EMAIL_SEND_RETRY_DELAY_MS = 250;
+
+const activeEmailSends = new Set<string>();
+
+/** Keep automatic status checks behind the send that creates their reservation. */
+async function withEmailAttemptOperation<T>(
+    attemptId: string | null,
+    operation: 'send' | 'status',
+    run: () => Promise<T>,
+): Promise<T> {
+    if (!attemptId) return run();
+    const pending = () => createPendingEmailError(attemptId, 'TaskTime is confirming this email delivery.');
+    if (activeEmailSends.has(attemptId)) throw pending();
+
+    const execute = async () => {
+        if (operation === 'send') activeEmailSends.add(attemptId);
+        try {
+            return await run();
+        } finally {
+            if (operation === 'send') {
+                activeEmailSends.delete(attemptId);
+                window.dispatchEvent(new Event(EMAIL_ATTEMPTS_CHANGED_EVENT));
+            }
+        }
+    };
+    // Acquire before the local marker is visible to this or another tab. A
+    // premature status lookup can otherwise tombstone a not-yet-reserved send.
+    if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+        return navigator.locks.request(`tasktime-email-attempt:${attemptId}`, { ifAvailable: true }, lock => {
+            if (!lock) throw pending();
+            return execute();
+        });
+    }
+    return execute();
+}
 
 export interface EmailAttemptProjectionV1 {
     version: 1;
@@ -272,300 +307,314 @@ export async function sendInvoiceEmail(
         params = { ...params, attemptId: recoveredAttemptId };
     }
     const attemptId = entitledFlow ? params.attemptId! : null;
-    const body = JSON.stringify({
-        ...(entitledFlow ? { version: 1, attemptId, idempotencyKey } : {}),
-        invoiceId: params.invoiceId,
-        invoiceNumber: params.invoiceNumber,
-        to: params.to,
-        forwardTo: params.forwardTo,
-        fromName: params.fromName,
-        subject: params.subject,
-        bodyText: params.bodyText,
-        replyTo: params.replyTo,
-        pdfBase64: params.pdfBase64,
-        sendType: params.sendType,
-        attachmentTitle: params.attachmentTitle,
-    });
-    let localAttemptWasCreated = false;
-    if (entitledFlow) {
-        try {
-            const stored = await storeEmailAttemptWithDisposition({
-                lifecycle: params.billingLifecycle!,
-                attemptId: attemptId!,
-                sendType: params.sendType,
-                idempotencyKey: idempotencyKey!,
-                documentId: params.invoiceId,
-                serializedPayload: body,
-                documentSnapshot: params.documentSnapshot,
-            });
-            localAttemptWasCreated = stored.created;
-        } catch (error) {
-            if (error instanceof EmailAttemptBindingConflictError
-                || (isRecord(error) && error.code === 'EMAIL_ATTEMPT_BINDING_CONFLICT')) {
-                throw createEmailError(
-                    'attempt_conflict',
-                    'TaskTime could not safely resume this email attempt. Close this draft and reopen it before trying again.',
-                );
-            }
-            if (error instanceof EmailAttemptCapacityError
-                || (isRecord(error) && error.code === 'EMAIL_ATTEMPT_CAPACITY')) {
-                throw createEmailError(
-                    'attempt_capacity',
-                    'TaskTime must finish reconciling earlier email deliveries before another send can start.',
-                );
-            }
-            throw error;
-        }
-    }
-
-    let response: Response | null = null;
-    let responseData: unknown;
-    let lastPendingProjection: EmailAttemptProjectionV1 | null = null;
-
-    let requestError: unknown = null;
-    for (let requestIndex = 0; requestIndex < (entitledFlow ? 2 : 1); requestIndex += 1) {
-        let shouldRetry = false;
-        try {
-            const controller = new AbortController();
-            const timeout = entitledFlow ? window.setTimeout(() => controller.abort(), 20_000) : null;
+    return withEmailAttemptOperation(attemptId, 'send', async () => {
+        const body = JSON.stringify({
+            ...(entitledFlow ? { version: 1, attemptId, idempotencyKey } : {}),
+            invoiceId: params.invoiceId,
+            invoiceNumber: params.invoiceNumber,
+            to: params.to,
+            forwardTo: params.forwardTo,
+            fromName: params.fromName,
+            subject: params.subject,
+            bodyText: params.bodyText,
+            replyTo: params.replyTo,
+            pdfBase64: params.pdfBase64,
+            sendType: params.sendType,
+            attachmentTitle: params.attachmentTitle,
+        });
+        let localAttemptWasCreated = false;
+        if (entitledFlow) {
             try {
-                response = await fetch(`${workerUrl}/email/invoice`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Session-Id': params.sessionId,
-                    },
-                    body,
-                    ...(entitledFlow ? { signal: controller.signal } : {}),
+                const stored = await storeEmailAttemptWithDisposition({
+                    lifecycle: params.billingLifecycle!,
+                    attemptId: attemptId!,
+                    sendType: params.sendType,
+                    idempotencyKey: idempotencyKey!,
+                    documentId: params.invoiceId,
+                    serializedPayload: body,
+                    documentSnapshot: params.documentSnapshot,
                 });
-                responseData = await readBoundedResponseJson(response);
-            } finally {
-                if (timeout !== null) window.clearTimeout(timeout);
+                localAttemptWasCreated = stored.created;
+            } catch (error) {
+                if (error instanceof EmailAttemptBindingConflictError
+                    || (isRecord(error) && error.code === 'EMAIL_ATTEMPT_BINDING_CONFLICT')) {
+                    throw createEmailError(
+                        'attempt_conflict',
+                        'TaskTime could not safely resume this email attempt. Close this draft and reopen it before trying again.',
+                    );
+                }
+                if (error instanceof EmailAttemptCapacityError
+                    || (isRecord(error) && error.code === 'EMAIL_ATTEMPT_CAPACITY')) {
+                    throw createEmailError(
+                        'attempt_capacity',
+                        'TaskTime must finish reconciling earlier email deliveries before another send can start.',
+                    );
+                }
+                throw error;
             }
-            requestError = null;
-            if (entitledFlow && requestIndex === 0) {
-                shouldRetry = response.status >= 500;
-                if (response.status === 202) {
-                    const pendingProjection = parseEmailAttemptProjection(responseData, attemptId!);
-                    const hasPendingPart = pendingProjection.primary.outcome === 'pending'
-                        || pendingProjection.forward?.outcome === 'pending';
-                    if (pendingProjection.state === 'pending' || hasPendingPart) {
-                        lastPendingProjection = pendingProjection;
-                        await updateEmailAttemptState(
-                            attemptId!,
-                            params.billingLifecycle!,
-                            pendingProjection.state,
-                        );
-                        shouldRetry = true;
+        }
+
+        let response: Response | null = null;
+        let responseData: unknown;
+        let lastPendingProjection: EmailAttemptProjectionV1 | null = null;
+
+        let requestError: unknown = null;
+        for (let requestIndex = 0; requestIndex < (entitledFlow ? 2 : 1); requestIndex += 1) {
+            let shouldRetry = false;
+            try {
+                const controller = new AbortController();
+                const timeout = entitledFlow ? window.setTimeout(() => controller.abort(), 20_000) : null;
+                try {
+                    response = await fetch(`${workerUrl}/email/invoice`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Session-Id': params.sessionId,
+                        },
+                        body,
+                        ...(entitledFlow ? { signal: controller.signal } : {}),
+                    });
+                    responseData = await readBoundedResponseJson(response);
+                } finally {
+                    if (timeout !== null) window.clearTimeout(timeout);
+                }
+                requestError = null;
+                if (entitledFlow && requestIndex === 0) {
+                    shouldRetry = response.status >= 500;
+                    if (response.status === 202) {
+                        const pendingProjection = parseEmailAttemptProjection(responseData, attemptId!);
+                        const hasPendingPart = pendingProjection.primary.outcome === 'pending'
+                            || pendingProjection.forward?.outcome === 'pending';
+                        if (pendingProjection.state === 'pending' || hasPendingPart) {
+                            lastPendingProjection = pendingProjection;
+                            await updateEmailAttemptState(
+                                attemptId!,
+                                params.billingLifecycle!,
+                                pendingProjection.state,
+                            );
+                            shouldRetry = true;
+                        }
                     }
                 }
+                if (!shouldRetry) break;
+            } catch (error) {
+                requestError = error;
+                if (!(entitledFlow && requestIndex === 0)) break;
             }
-            if (!shouldRetry) break;
-        } catch (error) {
-            requestError = error;
-            if (!(entitledFlow && requestIndex === 0)) break;
+            await new Promise(resolve => window.setTimeout(resolve, EMAIL_SEND_RETRY_DELAY_MS));
         }
-        await new Promise(resolve => window.setTimeout(resolve, EMAIL_SEND_RETRY_DELAY_MS));
-    }
 
-    if (requestError) {
-        const error = requestError;
-        if (entitledFlow && attemptId) {
-            const pending = createPendingEmailError(
-                attemptId,
-                'Delivery confirmation is pending. Check this attempt before starting another send.',
-                lastPendingProjection?.primary.outcome === 'accepted'
-                    ? lastPendingProjection.primary.acceptedAt!
-                    : undefined,
-            );
+        if (requestError) {
+            const error = requestError;
+            if (entitledFlow && attemptId) {
+                const pending = createPendingEmailError(
+                    attemptId,
+                    'Delivery confirmation is pending. Check this attempt before starting another send.',
+                    lastPendingProjection?.primary.outcome === 'accepted'
+                        ? lastPendingProjection.primary.acceptedAt!
+                        : undefined,
+                );
+                captureInvoiceEmailIncident({
+                    incidentKey: 'invoice.email_send_confirmation_pending',
+                    message: 'TaskTime Pro invoice email delivery confirmation is pending',
+                    error,
+                    context: incidentContext,
+                });
+                throw pending;
+            }
+            const networkError = createEmailError('network', 'Unable to reach the email service. Check your connection and try again.');
             captureInvoiceEmailIncident({
-                incidentKey: 'invoice.email_send_confirmation_pending',
-                message: 'TaskTime Pro invoice email delivery confirmation is pending',
+                incidentKey: 'invoice.email_send_network_failed',
+                message: 'TaskTime Pro invoice email send failed to reach the worker',
                 error,
                 context: incidentContext,
             });
-            throw pending;
+            throw networkError;
         }
-        const networkError = createEmailError('network', 'Unable to reach the email service. Check your connection and try again.');
+
+        if (!response) {
+            throw createEmailError('network', 'Unable to reach the email service. Check your connection and try again.');
+        }
+
+        if (response.ok && entitledFlow) {
+            let data: EmailAttemptProjectionV1;
+            try {
+                data = parseEmailAttemptProjection(responseData, attemptId!);
+            } catch {
+                throw createPendingEmailError(
+                    attemptId!,
+                    'Delivery confirmation is pending. Check this attempt before starting another send.',
+                    lastPendingProjection?.primary.outcome === 'accepted'
+                        ? lastPendingProjection.primary.acceptedAt!
+                        : undefined,
+                );
+            }
+            await updateEmailAttemptState(
+                attemptId!,
+                params.billingLifecycle!,
+                data.state,
+            );
+            if (data.state === 'pending'
+                || data.primary.outcome === 'pending'
+                || data.forward?.outcome === 'pending') {
+                throw createPendingEmailError(
+                    attemptId!,
+                    'Delivery confirmation is pending. Check this attempt before starting another send.',
+                    data.primary.outcome === 'accepted' ? data.primary.acceptedAt! : undefined,
+                );
+            }
+            if (data.state === 'rejected' || data.primary.outcome !== 'accepted') {
+                throw createEmailError('provider', 'Email delivery was rejected.');
+            }
+            const result: SendInvoiceEmailResult = {
+                success: true,
+                remaining: data.quota.effectiveRemaining,
+                attemptId: attemptId!,
+                attemptState: data.state as 'partial' | 'completed',
+                primaryAcceptedAt: data.primary.acceptedAt!,
+            };
+            if (params.forwardTo) result.forwarded = data.forward?.outcome === 'accepted';
+            return result;
+        }
+
+        if (response.ok) {
+            if (!isRecord(responseData)) {
+                throw createEmailError('provider', 'Email service returned an invalid response.');
+            }
+            const result: SendInvoiceEmailResult = {
+                success: true,
+                remaining: Number.isSafeInteger(responseData.remaining)
+                    ? Number(responseData.remaining)
+                    : undefined,
+            };
+
+            if (typeof responseData.forwarded === 'boolean') {
+                result.forwarded = responseData.forwarded;
+            }
+
+            return result;
+        }
+
+        // Parse structured error from Worker
+        const errorData = isRecord(responseData)
+            ? responseData as { error?: string; code?: string; details?: string | Record<string, unknown>; message?: string; remaining?: number }
+            : undefined;
+
+        const errorCode = errorData?.code || errorData?.error || '';
+        const details = typeof errorData?.details === 'string'
+            ? errorData.details
+            : errorData?.message || errorData?.error || errorData?.code || '';
+        const releaseFreshLocalAttempt = async () => {
+            if (entitledFlow && attemptId && localAttemptWasCreated) {
+                await releasePendingEmailAttemptWithoutDurableEvidence(
+                    attemptId,
+                    params.billingLifecycle!,
+                );
+            }
+        };
+
+        if (errorCode === 'ENTITLEMENT_REQUIRED' || errorCode === 'BILLING_SUSPENDED') {
+            await releaseFreshLocalAttempt();
+            throw createEmailError(
+                errorCode === 'ENTITLEMENT_REQUIRED' ? 'entitlement_required' : 'billing_suspended',
+                errorCode === 'ENTITLEMENT_REQUIRED'
+                    ? 'Hosted email sending requires a Pro trial or subscription.'
+                    : 'Resolve billing before starting a new hosted email send.',
+            );
+        }
+
+        if (response.status === 401 || response.status === 403) {
+            await releaseFreshLocalAttempt();
+            throw createEmailError('auth', details || 'Session expired. Please reconnect cloud sync.');
+        }
+
+        if (errorCode === 'quota_exceeded' || errorCode === 'QUOTA_EXCEEDED') {
+            await releaseFreshLocalAttempt();
+            const quotaMessage = details && details !== errorCode
+                ? details
+                : 'Monthly email limit reached';
+            const projectedRemaining = typeof errorData?.details === 'object'
+                && Number.isSafeInteger(errorData.details.remaining)
+                ? Number(errorData.details.remaining)
+                : errorData?.remaining ?? 0;
+
+            throw createEmailError(
+                'quota_exceeded',
+                quotaMessage,
+                projectedRemaining,
+            );
+        }
+
+        if (errorCode === 'already_sent' || errorCode === 'ALREADY_SENT') {
+            await releaseFreshLocalAttempt();
+            throw createEmailError('already_sent', 'This invoice has already been emailed');
+        }
+
+        if (errorCode === 'RATE_LIMITED') {
+            await releaseFreshLocalAttempt();
+            throw createEmailError('rate_limited', 'Too many hosted email requests. Wait a moment before trying again.');
+        }
+
+        if (errorCode === 'IDEMPOTENCY_CONFLICT') {
+            await releaseFreshLocalAttempt();
+            throw createEmailError(
+                'attempt_conflict',
+                'This email action no longer matches its original request. Close the draft and reopen it before trying again.',
+            );
+        }
+
+        if (errorCode === 'CLIENT_UPGRADE_REQUIRED') {
+            await releaseFreshLocalAttempt();
+            throw createEmailError(
+                'client_upgrade_required',
+                'Update TaskTime before using hosted email. Your draft and manual delivery options remain available.',
+            );
+        }
+
+        if (entitledFlow
+            && attemptId
+            && (errorCode === 'ACCOUNT_OPERATION_IN_PROGRESS'
+                || errorCode === 'PROVIDER_IDEMPOTENCY_CONFLICT')) {
+            throw createPendingEmailError(
+                attemptId,
+                'Delivery confirmation is pending. TaskTime will check this attempt before another send can start.',
+                lastPendingProjection?.primary.outcome === 'accepted'
+                    ? lastPendingProjection.primary.acceptedAt!
+                    : undefined,
+            );
+        }
+
+        if (response.status === 400) {
+            await releaseFreshLocalAttempt();
+            throw createEmailError('validation', details || 'Invalid email request');
+        }
+
+        if (response.status >= 500) {
+            const error = entitledFlow && attemptId
+                ? createPendingEmailError(
+                    attemptId,
+                    'TaskTime is confirming whether delivery started.',
+                    lastPendingProjection?.primary.outcome === 'accepted'
+                        ? lastPendingProjection.primary.acceptedAt!
+                        : undefined,
+                )
+                : createEmailError('provider', details || 'Email service error. Please try again later.');
+            captureInvoiceEmailIncident({
+                incidentKey: 'invoice.email_send_provider_failed',
+                message: 'TaskTime Pro invoice email provider request failed',
+                error,
+                context: {
+                    ...incidentContext,
+                    status: response.status,
+                },
+            });
+            throw error;
+        }
+
+        const error = createEmailError('network', details || `Unexpected error (${response.status})`);
         captureInvoiceEmailIncident({
             incidentKey: 'invoice.email_send_network_failed',
-            message: 'TaskTime Pro invoice email send failed to reach the worker',
-            error,
-            context: incidentContext,
-        });
-        throw networkError;
-    }
-
-    if (!response) {
-        throw createEmailError('network', 'Unable to reach the email service. Check your connection and try again.');
-    }
-
-    if (response.ok && entitledFlow) {
-        let data: EmailAttemptProjectionV1;
-        try {
-            data = parseEmailAttemptProjection(responseData, attemptId!);
-        } catch {
-            throw createPendingEmailError(
-                attemptId!,
-                'Delivery confirmation is pending. Check this attempt before starting another send.',
-                lastPendingProjection?.primary.outcome === 'accepted'
-                    ? lastPendingProjection.primary.acceptedAt!
-                    : undefined,
-            );
-        }
-        await updateEmailAttemptState(
-            attemptId!,
-            params.billingLifecycle!,
-            data.state,
-        );
-        if (data.state === 'pending'
-            || data.primary.outcome === 'pending'
-            || data.forward?.outcome === 'pending') {
-            throw createPendingEmailError(
-                attemptId!,
-                'Delivery confirmation is pending. Check this attempt before starting another send.',
-                data.primary.outcome === 'accepted' ? data.primary.acceptedAt! : undefined,
-            );
-        }
-        if (data.state === 'rejected' || data.primary.outcome !== 'accepted') {
-            throw createEmailError('provider', 'Email delivery was rejected.');
-        }
-        const result: SendInvoiceEmailResult = {
-            success: true,
-            remaining: data.quota.effectiveRemaining,
-            attemptId: attemptId!,
-            attemptState: data.state as 'partial' | 'completed',
-            primaryAcceptedAt: data.primary.acceptedAt!,
-        };
-        if (params.forwardTo) result.forwarded = data.forward?.outcome === 'accepted';
-        return result;
-    }
-
-    if (response.ok) {
-        if (!isRecord(responseData)) {
-            throw createEmailError('provider', 'Email service returned an invalid response.');
-        }
-        const result: SendInvoiceEmailResult = {
-            success: true,
-            remaining: Number.isSafeInteger(responseData.remaining)
-                ? Number(responseData.remaining)
-                : undefined,
-        };
-
-        if (typeof responseData.forwarded === 'boolean') {
-            result.forwarded = responseData.forwarded;
-        }
-
-        return result;
-    }
-
-    // Parse structured error from Worker
-    const errorData = isRecord(responseData)
-        ? responseData as { error?: string; code?: string; details?: string | Record<string, unknown>; message?: string; remaining?: number }
-        : undefined;
-
-    const errorCode = errorData?.code || errorData?.error || '';
-    const details = typeof errorData?.details === 'string'
-        ? errorData.details
-        : errorData?.message || errorData?.error || errorData?.code || '';
-    const releaseFreshLocalAttempt = async () => {
-        if (entitledFlow && attemptId && localAttemptWasCreated) {
-            await releasePendingEmailAttemptWithoutDurableEvidence(
-                attemptId,
-                params.billingLifecycle!,
-            );
-        }
-    };
-
-    if (errorCode === 'ENTITLEMENT_REQUIRED' || errorCode === 'BILLING_SUSPENDED') {
-        await releaseFreshLocalAttempt();
-        throw createEmailError(
-            errorCode === 'ENTITLEMENT_REQUIRED' ? 'entitlement_required' : 'billing_suspended',
-            errorCode === 'ENTITLEMENT_REQUIRED'
-                ? 'Hosted email sending requires a Pro trial or subscription.'
-                : 'Resolve billing before starting a new hosted email send.',
-        );
-    }
-
-    if (response.status === 401 || response.status === 403) {
-        await releaseFreshLocalAttempt();
-        throw createEmailError('auth', details || 'Session expired. Please reconnect cloud sync.');
-    }
-
-    if (errorCode === 'quota_exceeded' || errorCode === 'QUOTA_EXCEEDED') {
-        await releaseFreshLocalAttempt();
-        const quotaMessage = details && details !== errorCode
-            ? details
-            : 'Monthly email limit reached';
-        const projectedRemaining = typeof errorData?.details === 'object'
-            && Number.isSafeInteger(errorData.details.remaining)
-            ? Number(errorData.details.remaining)
-            : errorData?.remaining ?? 0;
-
-        throw createEmailError(
-            'quota_exceeded',
-            quotaMessage,
-            projectedRemaining,
-        );
-    }
-
-    if (errorCode === 'already_sent' || errorCode === 'ALREADY_SENT') {
-        await releaseFreshLocalAttempt();
-        throw createEmailError('already_sent', 'This invoice has already been emailed');
-    }
-
-    if (errorCode === 'RATE_LIMITED') {
-        await releaseFreshLocalAttempt();
-        throw createEmailError('rate_limited', 'Too many hosted email requests. Wait a moment before trying again.');
-    }
-
-    if (errorCode === 'IDEMPOTENCY_CONFLICT') {
-        await releaseFreshLocalAttempt();
-        throw createEmailError(
-            'attempt_conflict',
-            'This email action no longer matches its original request. Close the draft and reopen it before trying again.',
-        );
-    }
-
-    if (errorCode === 'CLIENT_UPGRADE_REQUIRED') {
-        await releaseFreshLocalAttempt();
-        throw createEmailError(
-            'client_upgrade_required',
-            'Update TaskTime before using hosted email. Your draft and manual delivery options remain available.',
-        );
-    }
-
-    if (entitledFlow
-        && attemptId
-        && (errorCode === 'ACCOUNT_OPERATION_IN_PROGRESS'
-            || errorCode === 'PROVIDER_IDEMPOTENCY_CONFLICT')) {
-        throw createPendingEmailError(
-            attemptId,
-            'Delivery confirmation is pending. TaskTime will check this attempt before another send can start.',
-            lastPendingProjection?.primary.outcome === 'accepted'
-                ? lastPendingProjection.primary.acceptedAt!
-                : undefined,
-        );
-    }
-
-    if (response.status === 400) {
-        await releaseFreshLocalAttempt();
-        throw createEmailError('validation', details || 'Invalid email request');
-    }
-
-    if (response.status >= 500) {
-        const error = entitledFlow && attemptId
-            ? createPendingEmailError(
-                attemptId,
-                'TaskTime is confirming whether delivery started.',
-                lastPendingProjection?.primary.outcome === 'accepted'
-                    ? lastPendingProjection.primary.acceptedAt!
-                    : undefined,
-            )
-            : createEmailError('provider', details || 'Email service error. Please try again later.');
-        captureInvoiceEmailIncident({
-            incidentKey: 'invoice.email_send_provider_failed',
-            message: 'TaskTime Pro invoice email provider request failed',
+            message: 'TaskTime Pro invoice email send returned an unexpected worker response',
             error,
             context: {
                 ...incidentContext,
@@ -573,19 +622,7 @@ export async function sendInvoiceEmail(
             },
         });
         throw error;
-    }
-
-    const error = createEmailError('network', details || `Unexpected error (${response.status})`);
-    captureInvoiceEmailIncident({
-        incidentKey: 'invoice.email_send_network_failed',
-        message: 'TaskTime Pro invoice email send returned an unexpected worker response',
-        error,
-        context: {
-            ...incidentContext,
-            status: response.status,
-        },
     });
-    throw error;
 }
 
 export async function checkEmailAttemptStatus(input: {
@@ -602,76 +639,78 @@ export async function checkEmailAttemptStatus(input: {
     if (!workerUrl || input.billingLifecycle.sessionId !== input.sessionId) {
         throw createEmailError('auth', 'Confirm the active TaskTime cloud account before checking delivery.');
     }
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 10_000);
-    try {
-        const response = await fetch(`${workerUrl}/email/attempt/status`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Session-Id': input.sessionId,
-            },
-            body: JSON.stringify({ version: 1, attemptId: input.attemptId }),
-            signal: controller.signal,
-        });
-        const responseData = await readBoundedResponseJson(response);
-        if (!response.ok) {
-            const errorCode = isRecord(responseData) && typeof responseData.code === 'string'
-                ? responseData.code
-                : '';
-            if (response.status === 404 && errorCode === 'ATTEMPT_NOT_FOUND') {
-                if (input.recoveryBinding) {
+    return withEmailAttemptOperation(input.attemptId, 'status', async () => {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 10_000);
+        try {
+            const response = await fetch(`${workerUrl}/email/attempt/status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Id': input.sessionId,
+                },
+                body: JSON.stringify({ version: 1, attemptId: input.attemptId }),
+                signal: controller.signal,
+            });
+            const responseData = await readBoundedResponseJson(response);
+            if (!response.ok) {
+                const errorCode = isRecord(responseData) && typeof responseData.code === 'string'
+                    ? responseData.code
+                    : '';
+                if (response.status === 404 && errorCode === 'ATTEMPT_NOT_FOUND') {
+                    if (input.recoveryBinding) {
+                        throw createDormantEmailError(
+                            input.attemptId,
+                            'Reconnect the cloud account used for this delivery attempt to confirm it.',
+                        );
+                    }
+                    const released = await releasePendingEmailAttemptWithoutDurableEvidence(
+                        input.attemptId,
+                        input.billingLifecycle,
+                    );
+                    if (released) {
+                        throw createEmailError(
+                            'attempt_not_found',
+                            'No hosted send was started. You can send this email now.',
+                        );
+                    }
+                }
+                throw createEmailError(
+                    response.status === 401 || response.status === 403 ? 'auth' : 'provider',
+                    'Delivery status could not be confirmed.',
+                );
+            }
+            const projection = parseEmailAttemptProjection(responseData, input.attemptId);
+            if (input.recoveryBinding) {
+                const rebound = await rebindEmailAttemptAfterOwnedStatus({
+                    attemptId: input.attemptId,
+                    lifecycle: input.billingLifecycle,
+                    documentId: input.recoveryBinding.documentId,
+                    sendType: input.recoveryBinding.sendType,
+                    state: projection.state,
+                    allowProviderChange: input.recoveryBinding.kind === 'cross-provider-status-proof',
+                });
+                if (!rebound) {
                     throw createDormantEmailError(
                         input.attemptId,
                         'Reconnect the cloud account used for this delivery attempt to confirm it.',
                     );
                 }
-                const released = await releasePendingEmailAttemptWithoutDurableEvidence(
+            } else {
+                await updateEmailAttemptState(
                     input.attemptId,
                     input.billingLifecycle,
-                );
-                if (released) {
-                    throw createEmailError(
-                        'attempt_not_found',
-                        'No hosted send was started. You can send this email now.',
-                    );
-                }
-            }
-            throw createEmailError(
-                response.status === 401 || response.status === 403 ? 'auth' : 'provider',
-                'Delivery status could not be confirmed.',
-            );
-        }
-        const projection = parseEmailAttemptProjection(responseData, input.attemptId);
-        if (input.recoveryBinding) {
-            const rebound = await rebindEmailAttemptAfterOwnedStatus({
-                attemptId: input.attemptId,
-                lifecycle: input.billingLifecycle,
-                documentId: input.recoveryBinding.documentId,
-                sendType: input.recoveryBinding.sendType,
-                state: projection.state,
-                allowProviderChange: input.recoveryBinding.kind === 'cross-provider-status-proof',
-            });
-            if (!rebound) {
-                throw createDormantEmailError(
-                    input.attemptId,
-                    'Reconnect the cloud account used for this delivery attempt to confirm it.',
+                    projection.state,
                 );
             }
-        } else {
-            await updateEmailAttemptState(
-                input.attemptId,
-                input.billingLifecycle,
-                projection.state,
-            );
+            return projection;
+        } catch (error) {
+            if (isEmailSendError(error)) throw error;
+            throw createEmailError('network', 'Delivery status could not be confirmed. Try again when online.');
+        } finally {
+            window.clearTimeout(timeout);
         }
-        return projection;
-    } catch (error) {
-        if (isEmailSendError(error)) throw error;
-        throw createEmailError('network', 'Delivery status could not be confirmed. Try again when online.');
-    } finally {
-        window.clearTimeout(timeout);
-    }
+    });
 }
 
 function createEmailError(type: 'quota_exceeded', message: string, remaining: number): EmailSendError;

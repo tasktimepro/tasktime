@@ -66,6 +66,39 @@ test.describe('Invoice email smoke', () => {
         expect(sendRequests).toEqual([]);
     });
 
+    test('records manual delivery without sending an email and retains it after reload', async ({ page }, testInfo) => {
+        const sendRequests = [];
+        await page.route('**/email/invoice', route => {
+            sendRequests.push(route.request().url());
+            return route.abort();
+        });
+        const projectTitle = 'PW Manual Email Project';
+        await createTrackedInvoice(page, {
+            projectTitle,
+            clientTitle: 'PW Manual Email Client',
+            clientName: 'Manual Email Client',
+            taskTitle: 'PW Manual Email Task',
+            templateName: 'PW Manual Email Template',
+        });
+        const invoiceCard = getInvoiceCardByProject(page, projectTitle);
+        await invoiceCard.getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Mark as sent', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: 'Mark invoice as sent?' });
+        await expect(dialog).toBeVisible();
+        await page.screenshot({ path: testInfo.outputPath('manual-sent-desktop.png') });
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(dialog.getByRole('button', { name: 'Mark as sent', exact: true })).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath('manual-sent-mobile.png') });
+        await dialog.getByRole('button', { name: 'Mark as sent', exact: true }).click();
+        await expect(dialog).not.toBeVisible();
+        await expect(invoiceCard.getByText('Sent', { exact: true })).toBeVisible();
+        await expect(invoiceCard.getByTitle('Send Invoice by Email')).toHaveCount(0);
+        await page.reload();
+        await expect(getInvoiceCardByProject(page, projectTitle).getByText('Sent', { exact: true })).toBeVisible();
+        await page.screenshot({ path: testInfo.outputPath('manual-sent-persisted-mobile.png') });
+        expect(sendRequests).toEqual([]);
+    });
+
     test('Send Invoice button is not shown on paid invoices', async ({ page }) => {
 
         const now = Date.now();

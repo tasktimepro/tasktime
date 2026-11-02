@@ -50,6 +50,11 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Verify npm publisher authentication
+        run: npm whoami --registry=https://registry.npmjs.org
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Verify npm package contents
         working-directory: integrations/openclaw/tasktime
         run: npm pack --dry-run

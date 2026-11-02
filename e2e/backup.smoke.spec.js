@@ -225,9 +225,10 @@ test.describe('Backup smoke', () => {
 
         await editDialog.getByRole('button', { name: 'Preview invoice' }).click();
 
-        const previewDialog = page.getByRole('dialog', { name: 'Invoice Preview - RET-2026-004' });
+        const previewDialog = page.getByRole('dialog', { name: 'Draft Preview - RET-2026-004' });
         await expect(previewDialog).toBeVisible();
         await expect(page.getByTestId('invoice-preview-page')).toBeVisible();
         await expect(page.getByTestId('invoice-preview-page')).toContainText('RET-2026-004');
+        await expect(previewDialog.locator('.invoice-document h1')).toHaveText('DRAFT');
     });
 });

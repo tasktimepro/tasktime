@@ -88,6 +88,10 @@ export default defineConfig(({ mode }) => {
             // out of the app's startup vendor chunk. The PWA precaches this chunk.
             if (/\/node_modules\/(?:recharts|victory-vendor|d3-[^/]+|@reduxjs\/toolkit|@standard-schema\/utils|react-redux|redux(?:-thunk)?|reselect|immer|internmap|es-toolkit|eventemitter3|decimal\.js-light|tiny-invariant)\//.test(id)) return 'charts';
 
+            // Precache validation separately to keep the shared vendor chunk
+            // within the PWA's 2 MiB per-asset budget.
+            if (id.includes('/node_modules/zod/')) return 'validation';
+
             if (id.includes('@radix-ui')) return 'radix';
             if (id.includes('lucide-react')) return 'icons';
             if (id.includes('date-fns')) return 'date-fns';

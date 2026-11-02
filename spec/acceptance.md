@@ -77,6 +77,17 @@
 
 ## Task and account polish
 
+- Portrait tablets use Planner's single-day layout below 1280px, with all seven
+  days reachable and item menus visible without hover. Switching between compact
+  and seven-column layouts preserves the selected day and stored work.
+- Planner day buttons expand evenly to fill available space up to 7rem each,
+  then center as a group. Phones retain a 4.5rem minimum and horizontal scrolling
+  that reaches both the first and last day.
+- Account tabs wrap within the available content width, including with expanded
+  sidebar navigation. Phones and tablets use compact pill tabs below 1280px;
+  wider screens retain underlined tabs. Tabs, content and sidebar do not overlap
+  or cause horizontal page scrolling in either theme.
+
 - Disable recurrence/Enable recurrence is available only in recurring-task
   three-dot menus, using calendar-off/calendar-check icons without timer pause/play
   icons. It survives reload/provider sync, excludes missed
@@ -309,6 +320,9 @@
   even if the dashboard was not visited online. Cache matching may ignore Vary
   only for same-origin `/assets/` URLs in the generated build manifest; other
   requests retain existing cache/privacy behavior.
+- The installed PWA reloads existing local records and saves new records while
+  offline. The validation library is a separate precached chunk so startup
+  dependencies stay within the default per-asset precache limit.
 
 ## Expenses overview regression boundary
 
@@ -358,9 +372,9 @@
 ## Billing and finance
 
 - Save Draft supports incomplete preparation; Drafts is separate from Outstanding and exposes Continue Draft and confirmed Delete Draft. Sending and recording payment require finalization, and draft PDFs clearly say Draft.
-- UI and agents can edit and finalize each other's drafts without changing saved currency, prices, manual lines, adjustments or source selection on reopen. Refresh Work is explicit and resets linked work to current eligibility while retaining invoice-level settings.
+- UI and agents can edit and finalize each other's drafts without changing saved currency, prices, manual lines, adjustments or source selection on reopen. **Update with latest work** is explicit and confirmed; it resets linked work to current eligibility while retaining invoice-level settings.
 - Saving/deleting drafts leaves entries, expenses, quoted tasks, project invoice references and numbering untouched. Finalization checks full history, saved source conflicts, matching line totals, available numbers and concurrent/pending edits before applying billing once. Automatic numbering skips existing finalized/archived numbers; manual conflicts are editable.
-- Client-only expense drafts refresh through the same UI/agent operation, preserve period/currency scope and manual lines, and fail without mutation when required conversion rates are missing. Unsaved invoice previews also carry the Draft notice. Mobile invoice footers retain Preview/Save Draft/Finalize Invoice, with the header close control available at 320px.
+- Client-only expense drafts refresh through the same UI/agent operation, preserve period/currency scope and manual lines, and fail without mutation when required conversion rates are missing. Unsaved invoice previews use the normal Invoice heading without a draft banner. Saved draft previews and PDFs use Draft as the document heading and number label, without an extra box or notice; their default download filename starts with `draft-`. Mobile invoice footers retain Preview/Save Draft/Finalize Invoice, with the header close control available at 320px.
 - Invoice preview includes only eligible selected work/expenses and its totals equal the visible line calculation, adjustments, and tax.
 - Invoice source timestamps remain exact, while invoice-facing task summaries, notices, and default pricing ignore sub-minute remainders. The resulting whole-minute, two-decimal-hours value finalizes unchanged without a false reduction or adjustment; real reductions are rejected once with every affected task named and no internal identifiers shown.
 - A finite value entered in an invoice number field produces the same numeric hours, rate, quantity, amount, and total in the visible preview, saved invoice tasks/project breakdowns, immutable billing snapshot, and finalization plan. Compatible legacy task copies may supply missing fields; conflicting copies or unsupported nested merged subtasks are rejected by task name before billing state changes.
@@ -656,7 +670,8 @@
   Pending provider acceptance is written before Send to a privacy-minimized,
   lifecycle-bound non-Yjs attempt store and returns a D1-only automatic status-
   check path. The modal stops its loading state after a bounded interval, the
-  list suppresses duplicate Send while the attempt is unresolved, and a later
+  list keeps Send in place but disabled while discovering or reconciling an
+  unresolved attempt, and a later
   accepted result removes Send and shows Sent without user intervention. One
   byte-identical same-attempt retry remains provider-idempotent; no recovery path
   creates a second logical send. Reload/account switch/transfer never exposes or
@@ -666,7 +681,14 @@
   matching invoice still lacks its sent timestamp. This includes primary-
   accepted/optional-forward-rejected partial completion. Terminal sent metadata
   converges once, an already-sent invoice stops polling, and a changed, deleted,
-  or canceled current document is never mutated.
+  or canceled current document is never mutated. Status cannot overtake an
+  in-flight Send for the same attempt, including across tabs with Web Locks.
+  Repeated missing-attempt recovery converges without repeated local writes.
+- A finalized, unpaid, uncanceled invoice without sent metadata offers **Mark as
+  sent** in its action menu. Confirmation records one persistent sent timestamp,
+  removes the initial Send action, and sends no email. Repeating the operation
+  preserves that timestamp and billing/payment state. An unresolved hosted send
+  is not canceled by manually recording delivery, and the confirmation says so.
 - Provider loss does not prevent a subscriber obtaining invoices or canceling
   through the approved Stripe-hosted login or audited support route. Provider,
   product-data, billing, cancellation, and billing-profile deletion remain

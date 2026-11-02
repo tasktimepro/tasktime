@@ -5,7 +5,7 @@
  * - Pinned clients/projects
  * - Recurring and due tasks
  * 
- * Responsive: Shows day tabs + single day on mobile, full grid on desktop.
+ * Responsive: Shows day tabs + a single day below 1280px, full grid on wider screens.
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -138,7 +138,7 @@ const Planner = ({
             return false;
         }
 
-        return window.matchMedia('(max-width: 767px)').matches;
+        return window.matchMedia('(max-width: 1279px)').matches;
     });
 
     useEffect(() => {
@@ -146,7 +146,7 @@ const Planner = ({
             return undefined;
         }
 
-        const mediaQuery = window.matchMedia('(max-width: 767px)');
+        const mediaQuery = window.matchMedia('(max-width: 1279px)');
         const handleChange = (event) => {
             setIsMobileLayout(event.matches);
         };
@@ -668,7 +668,7 @@ const Planner = ({
     return (
         <div
             className={cn(
-                'flex flex-col gap-3 md:gap-4',
+                'flex min-w-0 flex-col gap-3 xl:gap-4',
                 isMobileLayout && 'min-h-0'
             )}
             style={isMobileLayout ? undefined : {
@@ -704,8 +704,8 @@ const Planner = ({
                 />
             </div>
 
-            {/* Mobile: Day selector tabs */}
-            <div className="md:hidden flex-shrink-0">
+            {/* Phones and tablets: Day selector tabs */}
+            <div className="xl:hidden flex-shrink-0">
                 <MobileDaySelector
                     weekDays={weekDays}
                     selectedDateStr={selectedDay?.dateStr}
@@ -713,9 +713,9 @@ const Planner = ({
                 />
             </div>
 
-            {/* Mobile: Single day view */}
+            {/* Phones and tablets: Single day view */}
             {selectedDay && (
-                <div className="md:hidden flex-1 min-h-0 overflow-hidden">
+                <div className="xl:hidden flex-1 min-h-0 overflow-hidden">
                     <MobileDayCard
                         date={selectedDay.date}
                         dateStr={selectedDay.dateStr}
@@ -739,8 +739,8 @@ const Planner = ({
                 </div>
             )}
 
-            {/* Desktop: Week grid (hidden on mobile) */}
-            <div className="hidden md:grid grid-cols-7 gap-2 flex-1 overflow-hidden">
+            {/* Wide screens: Week grid */}
+            <div className="hidden xl:grid grid-cols-7 gap-2 flex-1 overflow-hidden">
                 {weekDays.map((day, index) => (
                     <DayColumn
                         key={day.dateStr}

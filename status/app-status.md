@@ -1,3 +1,203 @@
+## November 2 v1.6.6 and agent v1.2.1 — release authorized; local gate green
+
+The owner authorized publishing the affected TaskTime releases, including
+GitHub releases. Core is a compatible v1.6.6 patch. Patched Zod changes the
+bridge's shipped bytes, so bridge/MCP/OpenClaw/Claude advance to v1.2.1 and the
+Claude marketplace metadata to v1.4.1. Both bridge vendors match the canonical
+build. The MCP manifest uses the canonical app origin. The unchanged standalone
+ClawHub skill stays at v1.3.0. npm dry runs now verify publisher authentication
+before packing, so invalid credentials fail before publication.
+
+The final full local release gate passes: all 293 suites / 3,110 app tests (one
+existing skip), coverage thresholds, lint, typecheck, six artifact checks, 133
+Chromium smoke cases, five production PWA checks, contract export and recovery
+build. The full agent gate, including browser-to-MCP timer/invoice flows, passes.
+All 44 private Worker suites / 416 tests pass; its runtime is unchanged. The
+gate initially exposed a stale imported-draft preview locator, now reconciled
+to Draft Preview and a DRAFT heading without weakening the import assertions.
+The dependency audit has zero high/critical findings and retains 26 low/moderate
+development-tool findings; runtime audit evidence is recorded above.
+
+Evidence: `/private/tmp/tasktime-v166-release-gate-final.log`,
+`/private/tmp/tasktime-v166-agent-gate.log`,
+`/private/tmp/tasktime-v166-worker-gate.log`, and
+`/private/tmp/tasktime-v166-backup-draft.log`. Exact-source CI, registry dry runs,
+package publication, production artifact preparation/promotion and live checks
+are pending. The separate site has fresh security findings; automatic approval
+review blocked its dependency update and separate owner approval was requested.
+Site source remains unchanged. Unrelated TODO and Focus work remains excluded.
+
+## November 2 Planner day-button sizing — locally validated
+
+The owner requested that the compact Planner day row fill its available width
+until the buttons reach a maximum, then center. Buttons now grow evenly from
+4.5rem to 7rem. A common flex basis keeps selected/outlined buttons the same
+outer width, and automatic edge margins center the capped row without clipping
+the beginning of an overflowing phone rail. Selection and navigation are unchanged.
+
+The geometry regression failed against the old fixed widths, then six final
+light/dark Chromium/Firefox/WebKit cases passed across phone/tablet/desktop
+resizing. Assertions cover equal widths, the cap, centered placement, and fully
+reachable first/last buttons on phones. The existing selector interaction test
+and focused lint pass; stretched/capped screenshots were visually inspected.
+Evidence: `/private/tmp/tasktime-planner-day-sizing-{red,browsers-final,unit,lint}.log`.
+The prior broader tablet gates below remain the most recent full-suite/build
+run. This follow-up changes local presentation only and remains uncommitted.
+
+## November 2 tablet Planner and Account layouts — locally validated
+
+The owner's portrait-tablet examples exposed two width problems: Planner used
+seven columns from 768px, and Account's fixed tab row overflowed the content.
+Planner now aligns its media-query state and CSS layout at 1280px, reusing day
+selection/cards below that width. Selected days survive resizing between layouts.
+Compact cards keep project/client menus visible at tablet widths rather than
+inheriting desktop hover-only controls, and the day rail retains tablet gutters.
+Account tabs wrap without clipping or horizontal page scrolling: compact pills
+below 1280px, underlined tabs with a wrapping fallback on wider screens. The
+shell's phone navigation breakpoint and persisted contracts remain unchanged.
+
+Red browser checks demonstrated the hidden tablet day selector and Account main
+overflow before the fix. Twelve final Chromium/Firefox/WebKit cases pass across
+both themes, 390–1440px, portrait/landscape sizes, the 1279/1280px boundary,
+day preservation, all six Account tab labels and expanded/collapsed navigation.
+The test reads geometry atomically and waits for sidebar transitions so resizing
+cannot compare rectangles from different layout frames. Eighteen existing
+Account/Planner/sign-in journeys pass, including the updated compact-card menu
+checks at 820/1024px and desktop checks at 1280/1440px. Tablet and desktop
+screenshots were visually inspected.
+
+All 293 app suites / 3,110 tests (one existing skip), configured coverage, lint,
+typecheck and production build pass. Evidence:
+`/private/tmp/tasktime-tablet-layout-{red,browsers-final}.log`,
+`/private/tmp/tasktime-tablet-related-browsers.log`, and
+`/private/tmp/tasktime-tablet-{coverage,lint-final,typecheck,build}.log`.
+The local app remains available for owner review. No physical iPad acceptance,
+commit or release is implied; unrelated work is preserved.
+
+## November 2 saved-draft action wording — locally validated
+
+The owner found Refresh Work unclear. The button and confirmation now say
+**Update with latest work**. The saved-draft notice explains retained work/rates,
+and the confirmation describes replacement with current eligible time, tasks and
+expenses, including reset selections, edited hours/rates and merged rows. Retained
+manual items and invoice settings remain explicit. Result messages agree; no
+operation, persistence or agent-interface behavior changed.
+
+The existing browser check failed against the old label, then all four affected
+desktop/mobile Chromium flows passed with the new wording. Both component suites
+(53 tests) and focused lint pass. Desktop/mobile screenshots were inspected.
+Evidence: `/private/tmp/tasktime-draft-wording-{red,browser,unit,lint}.log`.
+Changes remain uncommitted and unpublished.
+
+## November 2 invoice preview and draft PDF presentation — locally validated
+
+The owner changed the presentation requirement: unsaved invoice previews should
+show the normal Invoice heading, while saved drafts should use Draft in place of
+the document heading and number label, with no additional draft box. The composer
+now preserves its current document status instead of forcing every preview to
+draft. The shared PDF renderer uses that status for labels and always rebuilds
+saved drafts, including those with stale stored HTML. Preview modal titles and
+fallbacks agree, and default browser/agent draft filenames start with `draft-`;
+custom agent filenames remain supported. Quotes, finalization guards, source
+billing, provisional numbering and persisted entity shapes retain their existing
+behavior. Finalized records return to Invoice wording.
+
+Red/green regressions cover both document layouts, stale draft HTML, unsaved
+composer state, saved draft preview/download, fallback labels and agent export.
+All 293 app suites / 3,110 tests (one existing skip) and configured coverage
+thresholds pass; `pdfUtils.ts` has 92.44% statement coverage. Lint, typecheck and
+the production build pass. Twelve browser cases across Chromium/Firefox/WebKit
+cover desktop and phone previews, real PDF downloads, continued draft editing,
+and finalization back to Invoice. All six PDFs have valid signatures/EOF markers;
+desktop/mobile screenshots and a rendered download were visually inspected.
+Evidence is in `/private/tmp/tasktime-invoice-draft-{red,green,coverage,lint,typecheck,build}.log`
+and `/private/tmp/tasktime-invoice-draft-browser-final.log`. The local app remains
+running with these changes for owner review. This slice adds core app behavior
+only; the earlier security-related agent distribution scope still applies.
+Changes remain uncommitted and unpublished, with unrelated work preserved.
+
+## November 2 invoice email recovery and manual delivery — locally validated
+
+Investigation reproduced two browser defects behind stuck delivery recovery:
+WebCrypto hashing after opening an IDB write transaction lets browsers commit
+before the write, while publishing a pending marker before the first Send can
+let background status acquire the account claim or retain absence evidence
+before reservation. Hashing now precedes each affected transaction. Send/status
+operations coordinate per attempt using Web Locks and a same-tab send guard.
+Repeated release/application confirmations converge without further writes or
+change events. Lifecycle, snapshot, terminal-outcome and duplicate-send checks
+remain in place; recovery itself never sends a message.
+
+Invoice Send/reminder icons remain visible but disabled while discovery or
+recovery runs. The action menu offers confirmed **Mark as sent** for an unsent,
+finalized, unpaid, uncanceled invoice. It writes the existing sent timestamp
+once, preserves billing/payment state, removes initial Send, and warns that an
+unresolved hosted attempt is not canceled. No persisted shape or migration is
+needed. Tests retain manual delivery across reload with zero send requests.
+
+Read-only operational checks found the status route enabled and evidence
+consistent with a send failing before durable reservation. The original 409
+response body was unavailable, so its exact cause and original invoice delivery
+are not claimed as proven. An isolated real-D1 Worker harness successfully sent
+one active-trial primary plus a complimentary-Pro primary and forward copy after
+trial expiry. The owner confirmed all three in the inbox. Exact retries/status
+returned the same outcomes without extra mail or quota consumption. Both phases
+preserved canonical Pro report/email access, unlimited active clients, cloud
+sync, automatic backups and push. No evidence implicates trial expiry in this
+incident. Production account settings and product data were not changed.
+
+The owner separately approved security updates after release-readiness review
+found four high-severity dependency findings. Vite is now 7.3.7, the browser
+diagnostics SDK 3.2.0, and Zod 4.6.7, with compatible minimums and a reviewed lock.
+The installed runtime dependency audit reports zero vulnerabilities; the full
+audit has no high/critical findings and retains 26 low/moderate development-tool
+findings below the repository's configured release-blocking threshold.
+
+The first broad release run caught the upgraded vendor bundle exceeding the
+default 2 MiB PWA precache limit. A red build reproduces that failure. Keeping
+Zod in a dedicated precached validation chunk fixes it without increasing the
+limit or omitting offline assets. The production PWA regression now reloads
+existing local records, saves a new project offline, and retains both after
+another reload. Persisted validation schemas and the SW cache policy are unchanged.
+
+All local release-gate components now pass: 293 app suites / 3,107 passing tests
+(one existing skip), configured coverage thresholds, lint, typecheck, six
+artifact checks, 127 Chromium smoke checks, five production PWA checks, contract
+export and recovery build. The full run passed through the Chromium suite before
+the precache guard failed; after the chunking correction, the affected PWA,
+lint/artifact, contract-export and recovery-build checks were rerun green.
+All 44 private Worker suites / 416 tests pass with a 15-second default test timeout for the busy
+local host; two previously failing fixtures now derive their trial end dates
+from their current start times. All 18 focused email browser checks pass across
+Chromium, Firefox and WebKit with the approved updates installed, including real
+IDB auto-commit timing, repeated absence recovery, cross-tab coordination and
+desktop/mobile manual delivery.
+Desktop/mobile screenshots were reviewed. The browser helper now recognises
+both existing mobile and desktop invoice-card padding.
+
+The bridge embeds Zod, so its canonical build and both OpenClaw/Claude vendored
+copies were regenerated. They match SHA-256
+`7e8a53abe0988cfcd6a486872d3e231007bf295c1838d9ddef35fa29887a73d9`.
+Bridge smoke, both managed launchers and the real browser-to-MCP smoke pass,
+including timer and invoice operations. The native OpenClaw runtime and tool
+catalog did not change.
+
+Local evidence includes `/private/tmp/tasktime-email-approved-release-gate.log`,
+`/private/tmp/tasktime-email-pwa-budget-{red,green}.log`,
+`/private/tmp/tasktime-email-approved-{runtime-audit,browsers,bundles,agent-live,contract,recovery}.log`,
+`/private/tmp/tasktime-email-worker-final.log`, and
+`/private/tmp/tasktime-email-live-test.log`. Private live-test receipts remain
+ignored in the infrastructure checkout with a guard against accidental resends.
+Release scope is now a core app patch plus patched bridge/MCP and managed
+OpenClaw/Claude distributions because their shipped bridge bytes changed.
+The standalone ClawHub skill and Worker runtime need no release. The independent
+site's pinned recovery reader remains unchanged; adopting the newly rebuilt
+reader requires its own review. Version/release metadata, exact-source CI,
+artifact preparation, rollback verification, publication and live production
+checks remain release steps after owner authorization. Changes remain
+uncommitted and unpublished. The unrelated `TODO.md` edit and private Focus-mode
+plan remain untouched. Earlier entries below are historical checkpoints.
+
 ## October 16 core v1.6.5 Drive recovery — published and verified
 
 The owner-authorized patch is committed and pushed as

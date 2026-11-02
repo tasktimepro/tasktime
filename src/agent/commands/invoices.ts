@@ -1393,7 +1393,7 @@ function getInvoicePdfFilename(invoice: Invoice, filename?: string): string {
         return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
     }
 
-    return `invoice-${invoice.invoiceNumber}.pdf`;
+    return `${invoice.status === 'draft' ? 'draft' : 'invoice'}-${invoice.invoiceNumber}.pdf`;
 }
 
 function buildProjectQuoteDocument(

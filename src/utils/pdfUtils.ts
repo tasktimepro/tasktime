@@ -118,6 +118,7 @@ type PaymentMethodInfo = {
 
 type InvoiceData = {
     documentMode?: 'invoice' | 'quote';
+    status?: 'draft' | 'sent' | 'paid' | 'overdue' | 'canceled';
     project?: ProjectInfo;
     projectId?: string | null;
     projectIds?: string[];
@@ -172,7 +173,6 @@ type StoredInvoice = InvoiceData & {
     clientId?: string | null;
     invoiceNumber?: string;
     htmlContent?: string | null;
-    status?: 'draft' | 'sent' | 'paid' | 'overdue' | 'canceled';
     canceledAt?: number | null;
     cancellationReason?: string | null;
 };
@@ -594,6 +594,7 @@ const getHeaderPlacement = (logoPlacement: InvoiceTemplateLogoPlacement) => {
 export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     const {
         documentMode = 'invoice',
+        status,
         project,
         projectBreakdowns = [],
         clientExpenseItems = [],
@@ -627,8 +628,9 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
     } = invoiceData;
     const resolvedTotal = typeof total === 'number' ? total : (typeof totalAmount === 'number' ? totalAmount : 0);
     const isQuoteDocument = documentMode === 'quote';
-    const documentTitle = isQuoteDocument ? 'QUOTE' : 'INVOICE';
-    const documentLabel = isQuoteDocument ? 'Quote' : 'Invoice';
+    const isDraftDocument = !isQuoteDocument && status === 'draft';
+    const documentLabel = isQuoteDocument ? 'Quote' : isDraftDocument ? 'Draft' : 'Invoice';
+    const documentTitle = documentLabel.toUpperCase();
 
     // Filter out subtasks that are already merged into parent tasks
     const mergedTaskIds = new Set<string>();
@@ -833,7 +835,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                 page-break-inside: avoid;
             }
         </style>
-        <div class="invoice-document" style="font-family: ${invoiceDocumentFontFamily}; width: 100%; max-width: none; margin: 0; padding: ${invoiceDocumentPadding}; box-sizing: border-box; background-color: #ffffff; color: #111827; color-scheme: light; -webkit-text-fill-color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; forced-color-adjust: none;">
+        <div class="invoice-document"${isDraftDocument ? ' data-invoice-draft="true"' : ''} style="font-family: ${invoiceDocumentFontFamily}; width: 100%; max-width: none; margin: 0; padding: ${invoiceDocumentPadding}; box-sizing: border-box; background-color: #ffffff; color: #111827; color-scheme: light; -webkit-text-fill-color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; forced-color-adjust: none;">
             ${topAccentBarMarkup}
             ${renderHeader()}
 
@@ -1187,7 +1189,7 @@ export const createInvoiceHTML = (invoiceData: InvoiceData): string => {
                 page-break-inside: avoid;
             }
         </style>
-        <div class="invoice-document" style="font-family: ${invoiceDocumentFontFamily}; width: 100%; max-width: none; margin: 0; padding: ${invoiceDocumentPadding}; box-sizing: border-box; background-color: #ffffff; color: #111827; color-scheme: light; -webkit-text-fill-color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; forced-color-adjust: none;">
+        <div class="invoice-document"${isDraftDocument ? ' data-invoice-draft="true"' : ''} style="font-family: ${invoiceDocumentFontFamily}; width: 100%; max-width: none; margin: 0; padding: ${invoiceDocumentPadding}; box-sizing: border-box; background-color: #ffffff; color: #111827; color-scheme: light; -webkit-text-fill-color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; forced-color-adjust: none;">
             ${topAccentBarMarkup}
             ${renderHeader()}
 
@@ -1586,6 +1588,7 @@ export const buildInvoiceHtmlContent = (
 
     return createInvoiceHTML({
         documentMode: invoice.documentMode,
+        status: invoice.status,
         project: invoice.project,
         projectId: invoice.projectId,
         projectIds: invoice.projectIds,
@@ -1638,7 +1641,7 @@ export const getCurrentInvoiceHtmlContent = (
         : buildInvoiceHtmlContent(invoice, clients, businessBrandAssets);
 
     return isDraft
-        ? `<div data-invoice-draft="true" style="padding:12px 20px;margin-bottom:16px;border:2px solid #525252;background:#f5f5f5;color:#262626;text-align:center;page-break-inside:avoid"><strong style="font-size:22px;letter-spacing:0.15em">DRAFT</strong><p style="margin:4px 0 0;font-size:12px">For review. Not issued or payable. Automatic invoice numbers are provisional.</p></div>${currentHtml}`
+        ? currentHtml
         : applyInvoiceCancellationTreatment(currentHtml, invoice);
 };
 

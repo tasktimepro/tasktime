@@ -150,6 +150,25 @@ describe('emailAttemptStorage', () => {
         ]));
     });
 
+    it('settles repeated recovery from multiple consumers without extra writes', async () => {
+        const lifecycle = { provider: 'google-drive' as const, generation: 1, sessionId: 'settled-session' };
+        for (const suffix of ['missing', 'accepted']) {
+            await storeEmailAttempt({
+                lifecycle, attemptId: suffix, sendType: 'invoice', idempotencyKey: suffix,
+                documentId: suffix, ...attemptEvidence(suffix),
+            });
+        }
+        await expect(releasePendingEmailAttemptWithoutDurableEvidence('missing', lifecycle)).resolves.toBe(true);
+        const afterRelease = store.put.mock.calls.length;
+        await expect(releasePendingEmailAttemptWithoutDurableEvidence('missing', lifecycle)).resolves.toBe(true);
+        expect(store.put).toHaveBeenCalledTimes(afterRelease);
+        await updateEmailAttemptState('accepted', lifecycle, 'completed');
+        await expect(markEmailAttemptMetadataApplied('accepted', lifecycle)).resolves.toBe(true);
+        const afterApplied = store.put.mock.calls.length;
+        await expect(markEmailAttemptMetadataApplied('accepted', lifecycle)).resolves.toBe(true);
+        expect(store.put).toHaveBeenCalledTimes(afterApplied);
+    });
+
     it('matches only the unchanged current document snapshot without storing its content', async () => {
         const lifecycle = { provider: 'google-drive' as const, generation: 2, sessionId: 'session-2' };
         const attemptId = 'f85f92e3-1584-4d77-8292-3a9977adcf52';

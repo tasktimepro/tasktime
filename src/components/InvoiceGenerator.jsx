@@ -2538,9 +2538,9 @@ const InvoiceGenerator = ({
             setMergedSubtasks({});
             setRefreshedDraft(refreshed);
             setShowRefreshConfirm(false);
-            showSuccess('Draft refreshed and saved. Review the updated work and total before finalizing.');
+            showSuccess('Draft updated and saved. Review the work and total before finalizing.');
         } catch (error) {
-            showError(error.message || 'Unable to refresh this draft.');
+            showError(error.message || 'Unable to update this draft with the latest work.');
         } finally {
             savingRef.current = false;
             setIsSaving(false);
@@ -2644,8 +2644,8 @@ const InvoiceGenerator = ({
             return;
         }
 
-        // Previewing never issues an invoice; downloaded previews must say so too.
-        setPreviewInvoice(isQuoteMode ? documentData : { ...documentData, status: 'draft' });
+        // Preserve saved draft labels; previewing itself never saves or finalizes.
+        setPreviewInvoice(documentData);
         setShowPreview(true);
     };
 
@@ -2953,13 +2953,13 @@ const InvoiceGenerator = ({
                     isLoading={!isQuoteMode && billingCandidatesLoading}
                 />
             )}
-            <Modal isOpen={showRefreshConfirm} onClose={() => !isSaving && setShowRefreshConfirm(false)} title="Refresh draft work?" size="sm"
+            <Modal isOpen={showRefreshConfirm} onClose={() => !isSaving && setShowRefreshConfirm(false)} title="Update draft with latest work?" size="sm"
                 footer={<div className="flex justify-end gap-2">
-                    <Button variant="secondary" disabled={isSaving} onClick={() => setShowRefreshConfirm(false)}>Keep Current Work</Button>
-                    <Button loading={isSaving} onClick={handleRefreshWork}>Refresh Work</Button>
+                    <Button variant="secondary" disabled={isSaving} onClick={() => setShowRefreshConfirm(false)}>Keep Saved Work</Button>
+                    <Button loading={isSaving} onClick={handleRefreshWork}>Update with latest work</Button>
                 </div>}
             >
-                <p className="text-sm text-muted-foreground">Rebuild and save the linked work for the selected projects and billing period. This resets task and expense selections, hours, rates, and merged rows. Manual items, notes, discount, shipping, and tax settings are kept.</p>
+                <p className="text-sm text-muted-foreground">Replace this draft's saved work with the latest unbilled time, tasks and expenses for the selected projects and billing period. This resets task and expense selections, edited hours and rates, and merged rows. Manual items, notes, discount, shipping and tax settings stay as saved.</p>
             </Modal>
             {/* Invoice Generation Modal */}
             {showInvoiceForm && (
@@ -3105,7 +3105,6 @@ const InvoiceGenerator = ({
             <InvoicePreviewModal
                 isOpen={showPreview && !!previewInvoice}
                 onClose={() => setShowPreview(false)}
-                title={previewInvoice ? `${previewInvoice.documentMode === 'quote' ? 'Quote' : 'Invoice'} Preview - ${previewInvoice.invoiceNumber}` : ''}
                 invoice={previewInvoice}
                 htmlContent={previewInvoice ? getCurrentInvoiceHtmlContent(previewInvoice, clients, businessBrandAssets) : ''}
             />

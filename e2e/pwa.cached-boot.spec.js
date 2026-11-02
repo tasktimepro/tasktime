@@ -48,7 +48,7 @@ test.describe('PWA smoke', () => {
         expect(await page.evaluate(async () => new URL((await navigator.serviceWorker.ready).scope).origin)).toBe(new URL(page.url()).origin);
     });
 
-    test('stays usable offline after the production service worker is active', async ({ browser }) => {
+    test('reloads and saves local records offline after the production service worker is active', async ({ browser }) => {
         const context = await browser.newContext();
 
         try {
@@ -67,6 +67,14 @@ test.describe('PWA smoke', () => {
             await expect(page.getByRole('heading', { name: projectsHeadingName })).toBeVisible();
             await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
             await expect(page.getByText("You're offline")).toBeVisible();
+
+            await page.reload();
+            await expect(page.getByRole('heading', { name: projectTitle })).toBeVisible();
+            const offlineProjectTitle = `${projectTitle} offline`;
+            await createPersonalProject(page, offlineProjectTitle);
+            await page.reload();
+            await expect(page.getByRole('heading', { name: projectTitle, exact: true })).toBeVisible();
+            await expect(page.getByRole('heading', { name: offlineProjectTitle, exact: true })).toBeVisible();
         } finally {
             await context.close();
         }

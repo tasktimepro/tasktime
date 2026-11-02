@@ -414,24 +414,14 @@ const Account = ({
 
             {/* Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={handleSectionChange}>
-                <TabsList className={cn(
-                    'w-full bg-transparent rounded-none',
-                    isMobileLayout
-                        ? 'h-auto flex-wrap justify-start gap-2 border-0 p-0'
-                        : 'justify-start border-b border-border p-0'
-                )}>
+                <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 rounded-none border-0 bg-transparent p-0 xl:gap-x-8 xl:border-b xl:border-border">
                     {sideNavItems.map((item) => {
                         const Icon = item.icon;
                         return (
                             <TabsTrigger
                                 key={item.id}
                                 value={item.id}
-                                className={cn(
-                                    'flex items-center font-medium text-sm whitespace-nowrap transition-colors',
-                                    isMobileLayout
-                                        ? 'rounded-full border border-border bg-transparent px-3 py-1.5 text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none'
-                                        : 'mr-8 border-b-2 border-transparent rounded-none bg-transparent px-1 py-2 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-foreground hover:border-border'
-                                )}
+                                className="flex items-center whitespace-nowrap rounded-full border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:shadow-none xl:rounded-none xl:border-x-0 xl:border-t-0 xl:border-b-2 xl:border-transparent xl:px-1 xl:py-2 xl:hover:border-border xl:data-[state=active]:border-primary xl:data-[state=active]:bg-transparent"
                             >
                                 <Icon className="h-4 w-4 mr-2" />
                                 {item.name}

@@ -6,6 +6,9 @@ Let users understand exactly what will be billed, what changed after finalizatio
 
 - Invoice creation begins from eligible unbilled work and expenses, then moves through selection and preview before mutation.
 - Draft editing keeps line descriptions, quantities, rates, adjustments, tax, branding, payment instructions, and totals visible.
+- Saved drafts use the Draft heading and number label in previews and PDFs,
+  without a separate draft banner. Unsaved composer previews retain Invoice
+  wording; previewing neither saves the record nor applies billing markers.
 - Finalization is visually distinct from preview/export and explains its billing consequences.
 - Payment controls capture date, amount/method, and relevant currency context.
 - Expense views provide filters, due/recurrence context, paid state, categories, project/client links, and tax status.
@@ -206,6 +209,18 @@ presenting partial totals as complete.
 - Current invoice, expense-conversion, payment, allocation, and report accounting uses deterministic two-decimal precision. Multi-project remainders use a stable largest-remainder allocation so their sum equals the canonical invoice total.
 - Exchange rates are USD-relative adapter data cached for up to 24 hours. Finalized invoice selections and paid invoice/expense records preserve the source amount, target amount/currency, and effective rate used at the event; missing required rates fail closed rather than inventing a 1:1 conversion.
 - Reports prefer immutable event snapshots for finalized/paid values. Current rates are used only for live values that do not yet have an applicable stored snapshot, with conversion failure surfaced instead of silently changing currencies.
+
+## Invoice delivery experience
+
+- Initial Send and payment-reminder icons retain their positions while delivery
+  discovery or recovery runs. They are disabled with an accessible checking or
+  pending label until the action is safe; confirmed initial delivery removes Send.
+- The action menu offers **Mark as sent** for an unsent finalized, unpaid,
+  uncanceled invoice. Confirmation names the invoice and explains that this
+  records delivery outside TaskTime without sending email. If a hosted attempt
+  remains unresolved, it explains that recording delivery does not cancel it.
+- Saving prevents duplicate confirmation or dismissal; failures keep the dialog
+  open with an error. Success shows Sent, hides initial Send, and survives reload.
 
 ## Payment correction experience
 

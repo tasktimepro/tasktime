@@ -23,6 +23,17 @@ Keep every primary work area reachable while preserving context for running time
 
 ## States and behavior
 
+- Planner uses its day selector and single-day cards below 1280px, including
+  portrait tablets. At 1280px and above it shows the seven-day grid. Resizing
+  preserves the selected day; compact cards retain visible item-menu controls.
+  Day buttons share the available width from 4.5rem to 7rem each. Once capped,
+  the row is centered; narrower screens keep horizontal scrolling with both
+  ends reachable.
+- Account uses wrapping pill tabs below 1280px and underlined tabs on wider
+  screens. Tabs may wrap when the sidebar leaves less room, keeping every
+  destination reachable without horizontal page scrolling or clipped content.
+- These content layouts do not change the shell's phone navigation breakpoint.
+
 - Back/forward and deep links update content through `useUrlState`.
 - Missing project/client deep links return to their collection rather than rendering stale detail.
 - Offline and sync status remain visible without blocking local work.

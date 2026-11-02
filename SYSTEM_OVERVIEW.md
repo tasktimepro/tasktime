@@ -13,6 +13,9 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   It remains available after launch cleanup for returning local-only users.
 
 - **Browser app:** React 19/Vite PWA under `src/`. It provides all product screens and owns Yjs-backed mutations.
+- **Responsive content:** Planner uses day cards below 1280px and a seven-day
+  grid at 1280px and wider. Account tabs wrap within the content width, using
+  compact pills below 1280px. The shell's phone navigation breakpoint is separate.
 - **React context identity:** Yjs and billing context objects live in UI-independent
   shared modules so lazy Reports imports after development hot updates retain
   their mounted providers. Store lifecycle and entitlement policy are unchanged.
@@ -60,6 +63,10 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   fallback, plus complete public metadata/sitemap checks. App noindex metadata
   remains crawlable. Each repository's release gate independently blocks on
   high/critical dependency findings; functional green is not security approval.
+- **Offline build:** Zod validation has a separate precached chunk so the shared
+  vendor chunk stays within the default 2 MiB per-asset precache budget. The
+  production PWA checks reload existing local records and persist new records
+  while offline.
 - **Origin roles:** `src/config/origins.ts` explicitly distinguishes the
   marketing/documentation, application, optional
   Worker, and agent-documentation origins. Production values are exact HTTPS
@@ -118,7 +125,10 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   Push schema to its isolated local database so an empty developer checkout does
   not make the otherwise-independent recovery invocation fail.
 - **Hosted-email recovery:** The browser persists a privacy-minimized,
-  lifecycle-bound attempt before Send. A single byte-identical retry reuses the
+  lifecycle-bound attempt before Send. Per-attempt Web Locks and a same-tab
+  send guard prevent status from racing that first reservation; local writes
+  perform session hashing before opening their IndexedDB transactions.
+  A single byte-identical retry reuses the
   same attempt and provider idempotency key; all later browser reconciliation is
   D1-only and provider-free. Status may use bounded, privacy-minimized
   coordination evidence to make a definitive missing-attempt result safe, but it
@@ -129,7 +139,9 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   Worker reservation exists. Reconciliation runs automatically on discovery and
   after an entitled-send `5xx`; the modal stops loading after a short bounded
   check while the list continues background recovery and suppresses duplicate
-  Send. Accepted metadata is written once only if the current document still
+  Send with a stable disabled control. Manual **Mark as sent** records external
+  delivery after confirmation without sending mail. Accepted metadata is written
+  once only if the current document still
   matches its send-time snapshot. If the provider result was marked applied but
   the matching Yjs sent timestamp did not survive a crash or reload, the missing
   timestamp opts that retained terminal marker back into owned, no-send status
@@ -171,7 +183,8 @@ The Yjs store is split into documents so current work stays loaded and historica
    operations and source selections. Reopening preserves captured prices and work;
    refresh deliberately replaces linked selections within the saved project/client
    scope and period, including client-only expenses. Drafts neither claim work nor
-   advance invoice numbers; saved and unsaved previews/PDFs are visibly unissued.
+   advance invoice numbers. Saved draft previews/PDFs use the Draft heading and
+   number label without a banner; unsaved previews retain normal Invoice wording.
    Finalization checks current complete history, pricing consistency and number
    availability before the replay-safe billing operation; sending/payment follow
    finalization.

@@ -120,7 +120,7 @@ test('gives Planner project and client titles the hidden menu space until hover 
     });
     await page.goto('/planner');
 
-    for (const width of [1440, 1024]) {
+    for (const width of [1440, 1280]) {
         await page.setViewportSize({ width, height: 1000 });
         for (const type of ['project', 'client']) {
             const card = page.getByRole('button', { name: `Long ${type} name for the weekly planning card Item options`, exact: true }).first();
@@ -165,7 +165,7 @@ test('gives Planner project and client titles the hidden menu space until hover 
         }
     }
 
-    for (const width of [390, 320]) {
+    for (const width of [1024, 820, 390, 320]) {
         await page.setViewportSize({ width, height: 844 });
         for (const type of ['project', 'client']) {
             const card = page.getByRole('button', { name: `Long ${type} name for the weekly planning card Item options`, exact: true }).first();

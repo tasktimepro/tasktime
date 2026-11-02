@@ -1109,5 +1109,5 @@ export async function createTrackedInvoice(page, {
 export function getInvoiceCardByProject(page, projectTitle) {
     return page
         .getByText(`Project: ${projectTitle}`)
-        .locator('xpath=ancestor::div[contains(@class, "p-4")][1]');
+        .locator('xpath=ancestor::div[contains(@class, "p-4") or contains(@class, "p-3")][1]');
 }

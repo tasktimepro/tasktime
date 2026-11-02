@@ -79,7 +79,7 @@ describe('useInvoices', () => {
             await result.current.markAsPaid('c')
         })
 
-        expect(update).toHaveBeenCalledWith('a', { status: 'sent', paidAt: null, paymentCurrencySnapshot: undefined })
+        expect(update).toHaveBeenCalledWith('a', { status: 'sent', sentAt: expect.any(Number) })
         expect(update).toHaveBeenCalledWith('c', expect.objectContaining({
             status: 'paid',
             paymentCurrencySnapshot: expect.objectContaining({
@@ -87,6 +87,30 @@ describe('useInvoices', () => {
                 preferredCurrencyAtPayment: 'EUR',
             }),
         }))
+    })
+
+    it('records manual sending once without changing payment data', () => {
+        const invoice = { id: 'manual', status: 'sent', sentAt: null }
+        const update = vi.fn((id, changes) => Object.assign(invoice, changes))
+        mockUseYjs.mockReturnValue({ store: { preferences: mockPreferences }, isReady: true })
+        mockUseYjsCollection.mockReturnValue({ items: [invoice], get: () => invoice, update })
+        const { result } = renderHook(() => useInvoices())
+        act(() => result.current.markAsSent('manual'))
+        expect(update).toHaveBeenCalledWith('manual', { status: 'sent', sentAt: expect.any(Number) })
+        const sentAt = invoice.sentAt
+        act(() => result.current.markAsSent('manual'))
+        expect(invoice.sentAt).toBe(sentAt)
+        expect(update).toHaveBeenCalledOnce()
+    })
+
+    it.each(['draft', 'paid', 'canceled'])('refuses manual sending of a %s invoice', (status) => {
+        const invoice = { id: 'manual', status }
+        const update = vi.fn()
+        mockUseYjs.mockReturnValue({ store: { preferences: mockPreferences }, isReady: true })
+        mockUseYjsCollection.mockReturnValue({ items: [invoice], get: () => invoice, update })
+        const { result } = renderHook(() => useInvoices())
+        expect(() => result.current.markAsSent('manual')).toThrow()
+        expect(update).not.toHaveBeenCalled()
     })
 
     it('requests archived invoices when includeArchived is true', async () => {

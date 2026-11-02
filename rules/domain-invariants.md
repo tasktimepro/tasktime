@@ -171,7 +171,10 @@ These invariants summarize critical production contracts. They supplement the de
   changed, deleted, or canceled document remains untouched. A retained terminal
   completion may be rediscovered only when the matching invoice still lacks sent
   metadata, and must be re-proven through owned no-send status before idempotent
-  application; an already-sent invoice does not poll again.
+  application; an already-sent invoice does not poll again. Browser Send/status
+  coordination begins before publishing a local attempt marker. Non-IndexedDB
+  asynchronous work completes before a write transaction opens, and repeated
+  absence/application confirmation emits no redundant write or change event.
 - Provider transfer across hosted-identity and email D1 databases uses a durable
   prepare/commit/apply journal and fences both accounts until completion. It
   never exposes partially moved entitlement/quota state or activates the target

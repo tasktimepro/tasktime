@@ -55,6 +55,10 @@ Production topology (independently approved artifact deployments)
 
 ## Dependency direction
 
+- `vite.config.js` puts Zod into a separate precached validation chunk, keeping
+  the shared vendor bundle below the PWA's default per-asset cache limit without
+  changing persisted validation schemas or the service worker's cache policy.
+
 - `src/recovery/` reads existing old-origin IndexedDB updates into in-memory Yjs
   documents, then uses `utils/backupData.ts` for portable validation. Its standalone
   bundle is manually checksum-pinned into site; it never imports the app lifecycle,
@@ -64,6 +68,9 @@ Production topology (independently approved artifact deployments)
   visibility does not change the independent builds or public website output;
   see `contracts/site-distribution.md`.
 - Components call hooks or focused domain/application functions; they do not create parallel persistence paths.
+- `Planner` keeps its media-query state and CSS grid breakpoint aligned at
+  1280px. Compact day cards keep item actions visible independently of viewport
+  hover styles; Account tab wrapping remains local to its content layout.
 - Hooks expose Yjs-backed collections and mutations through `YjsContext`/`YjsStore`.
 - `App.jsx` onboarding and `useExpenseCategories` only present existing data;
   neither creates starter records on mount. Explicit creation stays in the
@@ -207,7 +214,11 @@ Production topology (independently approved artifact deployments)
   one failure cannot abandon the other. Browser status checks remain D1-only
   and automatically converge the invoice list without a manual recovery button,
   including reapplying a retained terminal result when Yjs sent metadata was not
-  persisted before a crash. It
+  persisted before a crash. `emailService` coordinates Send/status per attempt;
+  `emailAttemptStorage` keeps WebCrypto outside IDB write transactions and makes
+  repeated recovery idempotent. `InvoicesList` retains disabled delivery controls
+  during recovery and records confirmed manual delivery through `useInvoices`.
+  It
   does not inject sandbox-only banners or developer-facing notices into product
   screens. Startup requires the ignored local Resend credential rather than
   allowing a partially configured hosted-email path to return 503 later. The

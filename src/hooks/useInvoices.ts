@@ -232,10 +232,14 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
             throw new Error('Finalize this draft before marking it sent.');
         }
 
+        if (isInvoicePaid(invoice)) {
+            throw new Error('Paid invoices cannot be marked as sent.');
+        }
+        if (invoice.sentAt) return invoice;
+
         return update(id, {
             status: 'sent',
-            paidAt: null,
-            paymentCurrencySnapshot: undefined,
+            sentAt: Date.now(),
         });
     }, [get, update]);
 

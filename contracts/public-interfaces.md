@@ -74,7 +74,7 @@ is additive hook state, with no persisted task-schema change.
 
 `useInvoices.saveInvoiceDraft`, `refreshInvoiceDraft`, `deleteInvoiceDraft`, and `finalizeInvoice` share `invoiceDraftOperations` with the agent commands. Save/refresh/finalize load complete archived billing history and compare the expected draft again before mutation. Stale editors cannot overwrite, delete or finalize a changed record. Save and confirmed delete have no billing, project-link or numbering side effects. Finalization validates line totals, retained source selections, number uniqueness and pending source claims before entering the replay-safe journal.
 
-`refresh_invoice_draft` accepts `invoiceId`, `confirmRefresh: true`, and optional `exchangeRates`; it replaces linked selections for the saved project/client and period scope with current eligible work and rates, retaining manual items and invoice adjustments. Client-only expense drafts need no project, duplicate client expenses are included once, and missing conversion rates leave the saved draft unchanged. It returns `{ invoice }`. `delete_invoice_draft` accepts `invoiceId` and `confirmDelete: true`, returning `{ invoiceId, deleted: true }`. Both require read/write scopes and agent approval; invalid confirmation is `INVALID_INPUT`, missing records are `NOT_FOUND`, and stale/finalized/pending records are `CONFLICT`. `finalize_invoice` retains its billing scope, explicit confirmation and idempotency contract for both UI-created and agent-created drafts. Draft PDFs and unsaved invoice previews are marked as unissued; send/payment commands require finalization.
+`refresh_invoice_draft` accepts `invoiceId`, `confirmRefresh: true`, and optional `exchangeRates`; it replaces linked selections for the saved project/client and period scope with current eligible work and rates, retaining manual items and invoice adjustments. Client-only expense drafts need no project, duplicate client expenses are included once, and missing conversion rates leave the saved draft unchanged. It returns `{ invoice }`. `delete_invoice_draft` accepts `invoiceId` and `confirmDelete: true`, returning `{ invoiceId, deleted: true }`. Both require read/write scopes and agent approval; invalid confirmation is `INVALID_INPUT`, missing records are `NOT_FOUND`, and stale/finalized/pending records are `CONFLICT`. `finalize_invoice` retains its billing scope, explicit confirmation and idempotency contract for both UI-created and agent-created drafts. Saved draft PDFs use the Draft document heading/number label and a `draft-` default filename without a separate banner; custom export filenames remain supported. Unsaved composer previews use Invoice wording and never persist or finalize a record. Send/payment commands still require finalization.
 
 `update_invoice_draft` also accepts `draftNumberMode: 'automatic' | 'manual'`.
 Editing `invoiceNumber` without a mode selects manual numbering; switching to
@@ -247,7 +247,11 @@ partial result is eligible only when the primary customer copy was accepted;
 the optional rejected forward remains a warning. Status recovery never starts or
 replays a send, and an invoice with sent metadata does not continue polling;
 disabled, unauthenticated, malformed, and unavailable responses remain
-fail-closed.
+fail-closed. Browser Send and status operations coordinate per attempt through
+Web Locks, with a same-tab active-send guard, before exposing the local marker;
+automatic status must not race ahead of its first reservation. Session hashing
+finishes before opening IndexedDB write transactions. Repeated release or
+metadata-application confirmation succeeds without another write or change event.
 
 The planned `GET /billing/catalog` and license JWKS are public, sanitized,
 credential-free, bounded-cache resources. Authenticated status and all billing/

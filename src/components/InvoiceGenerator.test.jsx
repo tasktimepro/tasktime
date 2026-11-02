@@ -613,13 +613,13 @@ describe('InvoiceGenerator', () => {
         expect(capturedInvoiceModalProps?.openedFromProjectContext).toBe(false)
     })
 
-    it('marks a new invoice preview as an unissued draft without saving or billing it', async () => {
+    it('previews a new invoice without marking it as a saved draft or billing it', async () => {
         const user = userEvent.setup()
         renderGenerator()
         await user.click(screen.getByRole('button', { name: 'Open Invoice' }))
         act(() => capturedInvoiceModalProps.handlePreviewInvoice())
         await waitFor(() => expect(pdfMocks.getCurrentInvoiceHtmlContent).toHaveBeenCalledWith(
-            expect.objectContaining({ status: 'draft' }), expect.anything(), expect.anything()
+            expect.objectContaining({ status: 'sent' }), expect.anything(), expect.anything()
         ))
         expect(invoiceHookMocks.finalizeInvoice).not.toHaveBeenCalled()
         expect(invoiceHookMocks.saveInvoiceDraft).not.toHaveBeenCalled()

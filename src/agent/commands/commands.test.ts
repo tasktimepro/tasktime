@@ -7715,6 +7715,11 @@ describe('agent commands', () => {
             }),
         }));
 
+        context.maps.invoices.get('invoice-pdf')!.set('status', 'draft');
+        await expect(exportInvoicePdfCommand(context, { invoiceId: 'invoice-pdf' })).resolves.toMatchObject({
+            filename: 'draft-INV-PDF.pdf',
+        });
+
         context.permissions = new Set(['read']);
         await expect(executeAgentCommand(context, 'export_invoice_pdf', {
             invoiceId: 'invoice-pdf',

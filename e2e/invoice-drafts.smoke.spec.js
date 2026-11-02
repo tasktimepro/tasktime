@@ -67,9 +67,9 @@ for (const width of [1440, 390]) {
                 const start = new Date('2026-09-11T10:00:00+02:00').getTime();
                 window.__TASKTIME_STORE__.activeTimeEntries.set('later-entry', objectToYMap({ id: 'later-entry', taskId: 'draft-task', start, end: start + 3600000 }));
             });
-            await dialog.getByRole('button', { name: 'Refresh Work', exact: true }).click();
-            await page.getByRole('dialog', { name: 'Refresh draft work?' }).getByRole('button', { name: 'Refresh Work', exact: true }).click();
-            await expect(page.getByRole('dialog', { name: 'Refresh draft work?' })).not.toBeVisible();
+            await dialog.getByRole('button', { name: 'Update with latest work', exact: true }).click();
+            await page.getByRole('dialog', { name: 'Update draft with latest work?' }).getByRole('button', { name: 'Update with latest work', exact: true }).click();
+            await expect(page.getByRole('dialog', { name: 'Update draft with latest work?' })).not.toBeVisible();
             state = await readState(page);
             expect(state.invoices[0].total).toBe(100);
             expect(state.invoices[0].billingSelectionSnapshot.entries).toHaveLength(2);
@@ -86,7 +86,7 @@ for (const width of [1440, 390]) {
             await expect(page.getByRole('tab', { name: 'Outstanding (1)' })).toBeVisible();
         });
 
-        test('keeps mobile closing available and marks unsaved previews as drafts', async ({ page }) => {
+        test('keeps mobile closing available and previews unsaved invoices without a draft banner', async ({ page }, testInfo) => {
             if (width === 390) await page.setViewportSize({ width: 320, height: 740 });
             await page.goto('/projects/draft-project');
             await page.getByRole('button', { name: /^Generate Invoice/ }).first().click();
@@ -101,7 +101,10 @@ for (const width of [1440, 390]) {
             expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
             await dialog.getByRole('button', { name: 'Preview invoice', exact: true }).click();
             const preview = page.getByRole('dialog', { name: /Invoice Preview/ });
-            await expect(preview.locator('[data-invoice-draft="true"]')).toContainText('Not issued or payable');
+            await expect(preview.locator('.invoice-document h1')).toHaveText('INVOICE');
+            await expect(preview.locator('[data-invoice-draft="true"]')).toHaveCount(0);
+            await expect(preview.getByText('For review. Not issued or payable.', { exact: false })).toHaveCount(0);
+            await preview.screenshot({ path: testInfo.outputPath('unsaved-invoice-preview.png') });
             await preview.getByRole('button', { name: 'Close dialog', exact: true }).click();
             await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
             await expect(dialog).not.toBeVisible();
@@ -109,6 +112,38 @@ for (const width of [1440, 390]) {
             expect(state.invoices).toHaveLength(0);
             expect(state.entries[0].billedInvoiceId).toBeUndefined();
             expect(state.templates[0].currentSequentialNumber).toBe(1);
+        });
+
+        test('previews and downloads saved drafts using the Draft heading without a banner', async ({ page }, testInfo) => {
+            const { invoice } = await createDraft(page);
+            await page.goto('/invoices?tab=draft');
+            await page.getByTitle('Preview Invoice').click();
+            const preview = page.getByRole('dialog', { name: /Draft Preview/ });
+            await expect(preview.locator('.invoice-document h1')).toHaveText('DRAFT');
+            await expect(preview.locator('.invoice-document')).toContainText(`Draft: #${invoice.invoiceNumber}`);
+            await expect(preview.getByText('For review. Not issued or payable.', { exact: false })).toHaveCount(0);
+            await preview.screenshot({ path: testInfo.outputPath('saved-draft-preview.png') });
+            const downloading = page.waitForEvent('download');
+            await preview.getByRole('button', { name: 'Download PDF', exact: true }).click();
+            const download = await downloading;
+            expect(download.suggestedFilename()).toBe(`draft-${invoice.invoiceNumber}.pdf`);
+            await download.saveAs(testInfo.outputPath('saved-draft.pdf'));
+            const state = await readState(page);
+            expect(state.invoices[0].status).toBe('draft');
+            expect(state.entries[0].billedInvoiceId).toBeUndefined();
+            await preview.getByRole('button', { name: 'Close dialog', exact: true }).click();
+            await page.getByRole('button', { name: 'Continue Draft' }).click();
+            const editor = page.getByRole('dialog', { name: 'Edit Invoice', exact: true });
+            await editor.getByRole('button', { name: 'Preview invoice', exact: true }).click();
+            await expect(preview.locator('.invoice-document h1')).toHaveText('DRAFT');
+            await preview.getByRole('button', { name: 'Close dialog', exact: true }).click();
+            await editor.getByRole('button', { name: 'Finalize Invoice', exact: true }).click();
+            await expect(editor).not.toBeVisible();
+            await page.goto('/invoices?tab=outstanding');
+            await page.getByTitle('Preview Invoice').click();
+            const finalizedPreview = page.getByRole('dialog', { name: /Invoice Preview/ });
+            await expect(finalizedPreview.locator('.invoice-document h1')).toHaveText('INVOICE');
+            await expect(finalizedPreview.locator('[data-invoice-draft="true"]')).toHaveCount(0);
         });
 
         test('refreshes a client-only expense draft in the UI and finalizes it through the agent', async ({ page }) => {
@@ -127,9 +162,9 @@ for (const width of [1440, 390]) {
             await page.goto('/invoices?tab=draft');
             await page.getByRole('button', { name: 'Continue Draft' }).click();
             const dialog = page.getByRole('dialog', { name: 'Edit Invoice' });
-            await dialog.getByRole('button', { name: 'Refresh Work', exact: true }).click();
-            await page.getByRole('dialog', { name: 'Refresh draft work?' }).getByRole('button', { name: 'Refresh Work', exact: true }).click();
-            await expect(page.getByRole('dialog', { name: 'Refresh draft work?' })).not.toBeVisible();
+            await dialog.getByRole('button', { name: 'Update with latest work', exact: true }).click();
+            await page.getByRole('dialog', { name: 'Update draft with latest work?' }).getByRole('button', { name: 'Update with latest work', exact: true }).click();
+            await expect(page.getByRole('dialog', { name: 'Update draft with latest work?' })).not.toBeVisible();
             let state = await readState(page);
             expect(state.invoices[0].total).toBe(30);
             expect(state.invoices[0].billingSelectionSnapshot.expenses.map(expense => expense.expenseId)).toEqual(['client-travel']);
