@@ -1,3 +1,22 @@
+## November 2 agent v1.2.1 — published and independently verified
+
+Bridge/MCP v1.2.1 and OpenClaw npm/ClawHub v1.2.1 are published from clean
+core source `5782df7f54f6cfb610521eb94067f8981eed0d9e`. Claude ships plugin
+v1.2.1 / marketplace v1.4.1 from that source and the `agents-v1.2.1` GitHub
+release. The patched bundled validator and canonical app URL are included;
+public command schemas, pairing, approvals and persisted work remain compatible.
+Both npm tarballs match every reviewed source file (four bridge, eleven
+OpenClaw). All eleven ClawHub files also match, with official publisher,
+source-linked commit/path and clean package scan state. This is artifact/source
+metadata verification, not a claim of independent registry source attestation.
+
+Exact-source CI `41533114460`, the full local bridge/managed/live-MCP gate and
+read-only publication verifier `41538270537` pass. Initial OpenClaw/ClawHub
+visibility checks timed out after accepted uploads; the later independent
+verification supersedes them without republishing immutable versions. The
+standalone skill is unchanged at v1.3.0; its existing optional `card.missing`
+warning remains, with matching artifact, publisher and passing security result.
+
 ## September 16 approved agent publications
 
 Bridge/MCP 1.2.0 and OpenClaw npm/native-plugin 1.2.0 are published. Public registry

@@ -1,3 +1,33 @@
+## November 3 core v1.6.6 — published and verified
+
+The owner-authorized release is live from clean source
+`5782df7f54f6cfb610521eb94067f8981eed0d9e`, with published GitHub tag/release
+`v1.6.6`. Exact-source CI `41533114460` and the separate production preparation
+passed. The full app gate includes 3,110 tests with coverage, lint/typecheck,
+six artifact checks, 133 Chromium journeys, five production PWA checks and
+contract/recovery builds. Focused cross-browser invoice/email/tablet and the
+bridge/managed/live-MCP gates also pass; private Worker checks pass 416 tests
+and typecheck with only two corrected time-relative trial fixtures.
+
+Production promotion reused the reviewed live-billing archive without rebuilding.
+All 30 served files match, allowing only documented Cloudflare HTML/robots
+transformations; `/` and `/account` return 200 and reference the expected bundle.
+Twelve fresh-browser route/viewport checks pass across Dashboard, Account and
+Planner at 390, 768, 1024 and 1440px, with no page errors or document overflow.
+Account tabs stay visible and tablet Planner uses the single-day layout. Live
+screenshots were reviewed. Worker health passes; the three older sync incidents
+and their occurrence counts remain unchanged from the pre-release baseline.
+
+The runtime audit is clear; no high/critical findings remain, while 26 low/moderate
+development-tool advisories remain below the configured blocking threshold.
+Agent v1.2.1 and the independently approved site update are published and verified;
+the unchanged standalone skill remains v1.3.0. No Worker runtime, production
+account state or customer data was changed. Exact preparation/deployment receipts,
+artifact hashes, verified prior app/site rollback archives and live evidence are
+retained privately. Retained authenticated workspace/device acceptance remains
+owner-managed; the owner already confirmed all three authorized synthetic emails.
+Earlier local/unpublished entries below are historical checkpoints.
+
 ## November 2 v1.6.6 and agent v1.2.1 — release authorized; local gate green
 
 The owner authorized publishing the affected TaskTime releases, including

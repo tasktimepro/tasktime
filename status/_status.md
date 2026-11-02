@@ -1,3 +1,23 @@
+## November 3 v1.6.6 and agent v1.2.1 — published and verified
+
+Core v1.6.6 is live at https://app.tasktime.pro from source `5782df7`.
+Exact-source CI, production preparation and archive-only deployment passed.
+All 30 served files match the tested artifact, allowing only recorded Cloudflare
+HTML/robots transformations. Twelve fresh-browser checks pass on Dashboard,
+Account and Planner at 390, 768, 1024 and 1440px; screenshots were reviewed.
+Runtime monitoring is unchanged from its pre-release baseline and health passes.
+
+Core and agent GitHub releases are published. npm bridge/OpenClaw, MCP and
+ClawHub v1.2.1 pass independent file/version/publisher verification. The separate
+site's approved security/pin and catalogue-layout update is also live and released,
+with zero advisories, all 27 production browser checks and 281 served files verified.
+Core has zero runtime/high/critical advisories; 26 low/moderate development-tool
+findings remain below its release threshold. No Worker runtime deployment or
+customer-data mutation was required. Rollback archives are retained privately.
+Unrelated TODO/Focus work is excluded. Retained signed-in workspace/device
+acceptance remains owner-managed. Earlier pending/local entries are historical;
+see `app-status.md`, `agent-status.md` and the site's independent `STATUS.md`.
+
 ## November 2 v1.6.6 and agent v1.2.1 — release authorized; local gate green
 
 The owner authorized production publication and GitHub releases. Core v1.6.6
