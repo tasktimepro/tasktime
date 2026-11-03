@@ -1,5 +1,6 @@
 # Updates
 
+
 ## Priority
 
 [ ] Check about indexing blog issues - ONGOING
@@ -18,9 +19,6 @@
         [ ] MCP
     [ ] Glama
     [ ] MCP.so
-
-[ ] Setup chatGPT work as we did for DebugBundle
-    [ ] Keep publishing blog posts related to tasktime pro with the real world, including usage with agents and all agents including ChatGPT/Codex, Claude/Claude Code, Gemini, Muse, Copilot, etc.
 
 [ ] Think about publishing an official supported chatGPT plugin
 
@@ -50,6 +48,7 @@
 
 ## Ideas
 
+- feature/focus branch:
 [ ] Focus mode - think how we can do this best.
     - Today we work on multiple projects or tasks at a time because a lot of the work is managed by AI. With this focus mode, when I enter it, I imagine a super clean overlay on top of everything, with the options to attached existing tasks, or create new ones directly inline (can be assigned to projects too)
     - These are the tasks you plan to do today/next so they remain here until you check them off - once checked, they disappear from this space
