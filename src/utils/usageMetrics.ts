@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { recordProductActivity } from './productAnalytics';
 
 const DB_NAME = 'tasktime-usage-metrics';
 const DB_VERSION = 1;
@@ -272,6 +273,8 @@ export function markMeaningfulActivity(action: UsageMetricsAction = 'generic_act
     if (!isBrowser()) {
         return;
     }
+
+    recordProductActivity(action);
 
     void enqueue(async () => {
         const state = await readState();

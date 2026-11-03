@@ -4,12 +4,19 @@ import { APP_VERSION } from '@/constants/app'
 const initSpy = vi.fn()
 const captureExceptionSpy = vi.fn()
 const setContextSpy = vi.fn()
+const analyticsSpies = { pageView: vi.fn(), track: vi.fn(), funnel: vi.fn(), convert: vi.fn() }
+const analyticsConfiguration = {
+    enabled: false, privacyMode: 'standard', consentRequired: false, trackPageViews: false, trackRouteChanges: false,
+    trackSessions: true, trackReferrers: true, trackActions: false, trackFrictionSignals: false,
+    journeySampleRate: 0,
+}
 
 vi.mock('@debugbundle/sdk-browser', () => ({
     createDebugBundleBrowserSdk: () => ({
         init: initSpy,
         captureException: captureExceptionSpy,
         setContext: setContextSpy,
+        analytics: analyticsSpies,
     }),
 }))
 
@@ -23,6 +30,7 @@ describe('debugbundle utility', () => {
         vi.clearAllMocks()
         vi.unstubAllEnvs()
         vi.useRealTimers()
+        vi.unstubAllGlobals()
     })
 
     it('does not initialize when the project token is missing or blank', async () => {
@@ -57,6 +65,7 @@ describe('debugbundle utility', () => {
             projectToken: 'project-token',
             environment: 'staging',
             service: 'tasktime-app',
+            analytics: analyticsConfiguration,
             tracePropagationTargets: ['https://sync.tasktime.pro/auth/'],
         })
         expect(setContextSpy).toHaveBeenCalledWith('deploy', { version: APP_VERSION })
@@ -75,6 +84,7 @@ describe('debugbundle utility', () => {
             projectToken: 'token',
             environment: 'development',
             service: 'tasktime-app',
+            analytics: analyticsConfiguration,
         })
 
         vi.resetModules()
@@ -83,6 +93,10 @@ describe('debugbundle utility', () => {
         vi.stubEnv('VITE_DEBUGBUNDLE_ENVIRONMENT', undefined)
         vi.stubEnv('VITE_SYNC_WORKER_URL', undefined)
         vi.stubEnv('PROD', true)
+        vi.stubGlobal('window', {
+            location: { origin: 'https://app.tasktime.pro', pathname: '/' },
+            addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        })
 
         debugBundleModule = await loadDebugBundleModule()
 
@@ -91,7 +105,21 @@ describe('debugbundle utility', () => {
             projectToken: 'token',
             environment: 'production',
             service: 'tasktime-app',
+            analytics: { ...analyticsConfiguration, enabled: true },
         })
+        expect(analyticsSpies.pageView).toHaveBeenCalledWith({ path: '/' })
+        expect(analyticsSpies.funnel).toHaveBeenCalledWith('app_activation', 'app_opened')
+    })
+
+    it('keeps analytics off for production previews outside the configured app origin', async () => {
+        vi.stubEnv('VITE_DEBUGBUNDLE_PROJECT_TOKEN', 'token')
+        vi.stubEnv('VITE_DEBUGBUNDLE_ENVIRONMENT', 'production')
+        vi.stubEnv('VITE_APP_ORIGIN', 'https://app.tasktime.pro')
+        vi.stubEnv('PROD', true)
+        const { initializeDebugBundle } = await loadDebugBundleModule()
+        expect(initializeDebugBundle()).toBe(true)
+        expect(initSpy.mock.calls[0][0].analytics.enabled).toBe(false)
+        expect(analyticsSpies.pageView).not.toHaveBeenCalled()
     })
 
     it('captures exceptions only after initialization and with a non-null error', async () => {

@@ -1,3 +1,19 @@
+## November 3 standard anonymous site analytics — locally validated, unreleased
+
+The owner approved standard mode and a brief, accurate policy disclosure.
+SDK 3.2.0 stores a random project-scoped first-party browser identifier and sends
+its hash to recognise repeat browsers. No account identity or app linking is
+added; the three existing intent funnels retain their meaning. Sessions still
+restart on full page loads, so visitor hashes measure browser reach. Hosted site
+settings are standard with consent_required false; only privacy_mode changed.
+The currently published client remains strict until this source is released.
+
+The full independent gate passes: zero dependency findings, 17 native checks,
+53 built pages and 27 browser checks, including real SDK visitor continuity
+across reloads and navigation. Final policy/config assertions also pass. Source
+remains uncommitted and unpublished. Publish this site policy/runtime before the
+independent app patch. No dependency, agent, Worker or discovery snapshot change.
+
 ## September 27 blog updates — published and verified
 
 The complete site-only blog update is live: 36 posts, relevant dark WebP covers,

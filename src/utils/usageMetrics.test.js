@@ -10,6 +10,9 @@ import {
 } from './usageMetrics.ts';
 
 const persistedValues = new Map();
+const { recordProductActivitySpy } = vi.hoisted(() => ({ recordProductActivitySpy: vi.fn() }));
+
+vi.mock('./productAnalytics', () => ({ recordProductActivity: recordProductActivitySpy }));
 
 const mockDb = {
     get: vi.fn(async (_storeName, key) => persistedValues.get(key)),
@@ -85,6 +88,11 @@ describe('usageMetrics', () => {
                 sent: false,
             }),
         ]);
+    });
+
+    it('forwards only the existing action category to product analytics', () => {
+        markMeaningfulActivity('timer_start');
+        expect(recordProductActivitySpy).toHaveBeenCalledExactlyOnceWith('timer_start');
     });
 
     it('increments meaningfulActionCount on each call to markMeaningfulActivity', async () => {

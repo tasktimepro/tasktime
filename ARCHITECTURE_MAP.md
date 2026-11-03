@@ -27,7 +27,7 @@ Browser / PWA
         ├── Dropbox App Folder direct data path (production optional)
         ├── provider-neutral hosted identity (production control plane)
         ├── Shared Stripe/D1 billing + public catalog/signed-license control plane (deployed)
-        ├── DebugBundle endpoint (optional app diagnostics; independent site diagnostics and aggregate analytics)
+        ├── DebugBundle endpoint (optional diagnostics and separate app/site aggregate analytics)
         └── exchange-rate / email / push integrations as configured
 
 Local agent process
@@ -163,6 +163,13 @@ Production topology (independently approved artifact deployments)
   auth-request deadlines. Both auth hooks use it for retained-session status;
   `YjsContext` uses it for temporary initial connection failures. Token providers
   retain their existing in-memory ownership and stale-generation fencing.
+- `utils/productAnalytics` receives the initialized production SDK and existing
+  `usageMetrics` action categories. It emits fixed section paths and a bounded
+  timer funnel without workspace records, record IDs or account identity. The
+  SDK owns its project-scoped random browser identifier and hashed visitor signal;
+  a full reload changes the session ID while retaining that visitor hash.
+  `contracts/product-analytics.md` defines the reporting limits; automatic
+  analytics route capture stays off.
 - `utils/debugbundle` opts only the configured Worker `/auth/` path into the
   browser SDK's cross-origin trace headers, after the private Worker's app-origin
   CORS allowlist accepts `X-DebugBundle-Trace-Id`. Direct provider file requests

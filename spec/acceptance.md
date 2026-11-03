@@ -10,6 +10,14 @@
 
 ## Local-first and compatibility
 
+- Production analytics sends only fixed app section paths and approved successful
+  action names. A real-SDK payload test excludes record IDs, URL secrets and
+  account identity, while verifying a stable project-scoped visitor hash across
+  reloads and a different hash for another project. Blocked visitor storage falls
+  back to session-only capture. Diagnostics and legacy usage counters keep working;
+  analytics failure cannot block navigation or product mutations. The timer
+  funnel and public-site intent funnels retain their distinct meanings.
+
 - Empty-state titles and descriptions use no full stops across the app, including
   shared EmptyState, custom list/tab placeholders, and no-data form/report notices.
 - First load, onboarding completion/reload, and opening or cancelling expense

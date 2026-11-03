@@ -212,6 +212,7 @@ release-gate:
 	$(APP_RUN) npm run test:build-artifacts
 	$(APP_RUN) npm run test:coverage
 	$(APP_RUN) npm run test:e2e:smoke
+	$(APP_RUN) npm run test:e2e:analytics
 	$(APP_RUN) npm run test:e2e:pwa:smoke
 	$(APP_RUN) npm run export:site-contract
 	$(APP_RUN) npm run build:site-recovery

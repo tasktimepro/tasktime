@@ -1,3 +1,46 @@
+## November 3 v1.6.7 and site analytics — release authorized
+
+The owner authorized committing all pending TaskTime changes, pushing and
+publishing the affected releases. Core is a compatible v1.6.7 patch; the site
+ships its independent analytics/privacy update and reviewed core/recovery pins.
+Pending TODO edits are included as a separate planning commit. The complete
+local app and site gates passed. Exact-source CI and archive preparation/promotion
+are next, with the site disclosure published before the app. No shipped agent
+artifact or Worker runtime changed, so neither requires publication.
+
+## November 3 standard anonymous analytics — locally validated, unreleased
+
+Standard mode supersedes the initial strict candidate following owner approval.
+The SDK stores its own random project-scoped browser identifier and emits only a
+derived visitor hash; no account, metrics-device or provider identity is attached.
+This SDK-owned localStorage key is an explicit analytics exception, not product
+storage. Existing Yjs data, usage counters, sync and command contracts are unchanged.
+Consent prompts remain disabled; automatic app URL capture and journey sampling
+remain off. Exact production app-origin gating is retained.
+
+A full reload still starts a new session while preserving the visitor hash; report
+browser reach with visitor counts. The timer funnel remains page-session scoped.
+Website/app hashes remain separate. Public privacy wording now briefly describes
+the stored browser identifier. Both hosted projects were set to standard and read
+back, changing only privacy_mode. Current published clients remain strict until
+release; there is no new production app capture yet.
+
+Focused tests and all three production-browser analytics cases pass. Checks cover
+safe payloads, stable hashes across reloads, separate hashes per project, missing
+visitor storage, blocked requests and saved timer/task survival. The final full
+Docker core gate passes: 295 suites / 3,127 tests (one existing skip), coverage,
+lint/typecheck, six artifact checks, 133 Chromium smoke journeys, all three
+analytics browser cases, five PWA checks and contract/recovery builds. The new
+helper has 100% coverage. The audit threshold passes with zero high/critical
+findings and 26 existing low/moderate development-tool findings. Final independent
+site and policy/config checks pass. Private evidence is retained under
+`.debugbundle/local/reports/analytics-standard-2026-11-03/`.
+
+Changes remain uncommitted and unpublished. Local builds use test inputs and are
+not production promotion artifacts. Release the site policy/runtime first, then
+the core patch with exact-source CI/preparation and live verification. No Worker
+or agent distribution change; unrelated TODO preserved.
+
 ## November 3 core v1.6.6 — published and verified
 
 The owner-authorized release is live from clean source

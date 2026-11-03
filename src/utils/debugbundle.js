@@ -4,8 +4,9 @@
  */
 
 import { createDebugBundleBrowserSdk } from '@debugbundle/sdk-browser'
-import { SYNC_WORKER_CONFIG } from '@/config/syncWorker'
+import { SYNC_WORKER_CONFIG, TASKTIME_ORIGIN_CONFIG } from '@/config/syncWorker'
 import { APP_VERSION } from '@/constants/app'
+import { startProductAnalytics } from './productAnalytics'
 
 let isInitialized = false
 const debugBundle = createDebugBundleBrowserSdk()
@@ -123,11 +124,27 @@ export function initializeDebugBundle() {
         return false
     }
 
+    const analyticsEnabled = import.meta.env.PROD && getEnvironment() === 'production'
+        && window.location.origin === TASKTIME_ORIGIN_CONFIG.appOrigin
+
     try {
         debugBundle.init({
             projectToken,
             environment: getEnvironment(),
             service: 'tasktime-app',
+            analytics: {
+                enabled: analyticsEnabled,
+                privacyMode: 'standard',
+                consentRequired: false,
+                // Automatic paths can contain private record IDs. Send fixed sections instead.
+                trackPageViews: false,
+                trackRouteChanges: false,
+                trackSessions: true,
+                trackReferrers: true,
+                trackActions: false,
+                trackFrictionSignals: false,
+                journeySampleRate: 0,
+            },
             ...(SYNC_WORKER_CONFIG.workerUrl ? {
                 // Only Worker auth calls need cross-origin trace headers for sync failures.
                 tracePropagationTargets: [`${SYNC_WORKER_CONFIG.workerUrl}/auth/`],
@@ -144,6 +161,8 @@ export function initializeDebugBundle() {
     }
 
     isInitialized = true
+
+    if (analyticsEnabled) startProductAnalytics(debugBundle)
 
     return true
 }

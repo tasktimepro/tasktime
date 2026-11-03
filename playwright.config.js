@@ -14,6 +14,8 @@ const launchOptions = {
 
 export default defineConfig({
     testDir: './e2e',
+    // This suite needs the synthetic production build and its dedicated config.
+    testIgnore: 'product-analytics.spec.js',
     timeout: 60_000,
     expect: {
         timeout: 10_000,

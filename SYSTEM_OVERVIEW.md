@@ -80,8 +80,14 @@ This is a context-compression document. Detailed requirements live in `spec/`, d
   services.
 - **Operational evidence:** App and site use independent DebugBundle browser
   configuration and services (`tasktime-app`, `tasktime-site`). The site owns a
-  small optional bundled diagnostics and privacy-strict aggregate analytics module,
-  without app storage, persistent visitor identity or cross-site tracking.
+  small optional bundled diagnostics and anonymous aggregate analytics module,
+  without app workspace storage or cross-site tracking. Both use standard mode
+  with a separately stored random browser identifier and project-scoped visitor
+  hash for repeat-visitor measurement; no account identity is attached.
+  Production app analytics sends explicit fixed section views and allowlisted
+  successful-action names, with an app-open/timer-start/timer-stop funnel.
+  Automatic app analytics URL capture, account identity and journey sampling are
+  disabled; see `contracts/product-analytics.md` for reporting limits.
   The app opts the shared Worker `/auth/` origin/path into browser SDK trace
   propagation; the Worker permits the optional trace header on app-origin CORS
   requests. Provider file requests are outside that target. Deploy Worker CORS

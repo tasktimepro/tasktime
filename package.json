@@ -1,7 +1,7 @@
 {
   "name": "tasktime",
   "private": true,
-  "version": "1.6.6",
+  "version": "1.6.7",
   "license": "AGPL-3.0-only",
   "type": "module",
   "bin": {
@@ -32,8 +32,9 @@
     "test:e2e:smoke": "playwright test --workers=2 e2e/*.smoke.spec.js --project=chromium",
     "test:e2e:drive-browsers": "playwright test --workers=2 e2e/sync.smoke.spec.js --grep \"uploads through the direct Google transport\"",
     "test:e2e:pwa:smoke": "npm run build && playwright test -c playwright.pwa.config.js",
+    "test:e2e:analytics": "VITE_APP_ORIGIN=https://app.tasktime.pro VITE_DEBUGBUNDLE_PROJECT_TOKEN=dbundle_proj_synthetic_analytics_fixture VITE_DEBUGBUNDLE_ENVIRONMENT=production npm run build && playwright test -c playwright.analytics.config.js",
     "audit:security": "npm audit --audit-level=high",
-    "release": "npm run audit:security && npm run lint && npm run typecheck && npm run test:build-artifacts && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:pwa:smoke && npm run export:site-contract && npm run build:site-recovery",
+    "release": "npm run audit:security && npm run lint && npm run typecheck && npm run test:build-artifacts && npm run test:coverage && npm run test:e2e:smoke && npm run test:e2e:analytics && npm run test:e2e:pwa:smoke && npm run export:site-contract && npm run build:site-recovery",
     "release:agent": "npm run build:agent-bridge && npm run build:openclaw-plugin && npm run smoke:agent-bridge && npm run smoke:agent-bundles && npm run smoke:agent-live"
   },
   "dependencies": {

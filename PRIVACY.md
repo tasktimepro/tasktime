@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: September 11, 2026
+Last updated: November 3, 2026
 
 This repository-level policy summarizes how TaskTime Pro handles privacy in the public app, public source repository, packages, and same-device agent bridge. The canonical product policy is published at https://tasktime.pro/privacy/.
 
@@ -64,6 +64,16 @@ Metrics may include:
 - whether sync was enabled for a bucket
 
 Metrics must not include project names, task names, client names, invoice data, expense data, notes, report contents, email bodies, cloud sync file contents, or raw user records.
+
+When configured, the production app uses DebugBundle analytics for broad section
+views and fixed actions such as task creation and timer use. The website separately
+measures public page views, referring domains, campaign labels and app-opening or
+pricing-interest steps. Each stores a random browser identifier and sends a
+project-specific hash to recognise repeat visits; website and app identifiers
+are separate and are not linked to accounts or the existing metrics device ID.
+Analytics excludes work contents, actual record IDs, full URLs and other query
+values. An app-opening click records interest, not app use or a purchase. Blockers
+and browser storage settings can make these measurements incomplete.
 
 ## Runtime Diagnostics
 

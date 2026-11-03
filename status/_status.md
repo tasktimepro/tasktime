@@ -1,3 +1,45 @@
+## November 3 v1.6.7 and site analytics — release authorized
+
+The owner authorized committing all pending TaskTime changes, pushing and
+publishing the affected releases. Core is a compatible v1.6.7 patch; the site
+ships its independent analytics/privacy update and reviewed core/recovery pins.
+Pending TODO edits are included as a separate planning commit. The complete
+local app and site gates passed. Exact-source CI and archive preparation/promotion
+are next, with the site disclosure published before the app. No shipped agent
+artifact or Worker runtime changed, so neither requires publication.
+
+## November 3 standard anonymous analytics — locally validated, unreleased
+
+The owner approved standard anonymous analytics with a brief, accurate privacy
+explanation. This supersedes the earlier strict/session-only candidate. Browser
+SDK 3.2.0 remains unchanged. App and site use separate project-scoped random
+browser identifiers; only derived visitor hashes are sent. No account identity,
+workspace contents, record IDs, cross-site handoff or journey samples are added.
+Consent prompts remain disabled. Full reloads still start SDK sessions; repeat
+browser measurement uses the visitor hash, not the session count. Historical
+strict traffic cannot be retrospectively deduplicated.
+
+App and site hosted settings were updated and independently read back: only
+privacy_mode changed from strict to standard; consent_required remains false.
+The currently published clients remain strict until their independent source
+releases. The app still requires a production build on the configured exact app
+origin; old counters, customer work, providers, Worker and agent packages are
+unchanged. The policy briefly describes the stored random browser identifier.
+
+The full isolated Docker core gate passes: 295 suites / 3,127 tests (one existing
+skip), per-file coverage, lint/typecheck, six artifact checks, 133 Chromium smoke
+journeys, all three analytics browser cases, five PWA checks and contract/recovery
+builds. The new helper has 100% coverage. Checks cover reload continuity, project
+separation, raw-ID exclusion, blocked delivery and blocked visitor storage. Site
+passes its full gate (17 native, 27 browser checks) and final policy/config tests.
+The security threshold passes with zero high/critical findings; 26 existing
+low/moderate development-tool advisories remain. Private evidence is retained in
+`.debugbundle/local/reports/analytics-standard-2026-11-03/`.
+
+Changes remain uncommitted and unpublished, with unrelated TODO edits preserved.
+Publish the independent site policy/runtime before the app patch, followed by
+exact-source production preparation, archive promotion and live verification.
+
 ## November 3 v1.6.6 and agent v1.2.1 — published and verified
 
 Core v1.6.6 is live at https://app.tasktime.pro from source `5782df7`.
