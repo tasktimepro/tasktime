@@ -1,3 +1,21 @@
+## November 4 anonymous visitor analytics — published and verified
+
+Site source `b2aadbb` passed exact-source CI, preparation and archive-only
+promotion, with GitHub release `site-2026.11.04-analytics`. Its policy describes
+the stored random browser identifier and project-specific hash; account and
+website/app identity linking remain excluded. Clean core/recovery pins identify
+v1.6.7, with unchanged reader bytes.
+
+All 281 served files match the reviewed archive with only recorded Cloudflare
+transformations. Twenty responsive live checks and policy/catalogue visual review
+pass. Real hosted analytics accepts all observed events and preserves one visitor
+hash across refreshes/navigation. Aligned hourly reports contain the verification
+traffic; this is not an audience-growth claim. Health/incident monitoring is
+unchanged, and the previous archive is retained and verified. Site source CI,
+production gates and documentation follow-up CI pass. Core app v1.6.7 is now
+independently published and verified; no Worker or agent distribution changed.
+See the site's `STATUS.md` and private infrastructure for provenance and rollback.
+
 ## November 3 standard anonymous site analytics — locally validated, unreleased
 
 The owner approved standard mode and a brief, accurate policy disclosure.

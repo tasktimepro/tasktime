@@ -1,3 +1,31 @@
+## November 4 v1.6.7 and site analytics — published and verified
+
+The owner-authorized app v1.6.7 is live from source `394945e`, with its GitHub
+release published. The independent site analytics/privacy release is live from
+`b2aadbb`, tagged `site-2026.11.04-analytics`. App and site exact-source CI,
+production preparation and archive-only promotion passed. The app gate passed
+3,127 tests with required coverage, 133 smoke journeys, three analytics checks,
+five PWA checks, artifact checks, lint/typecheck and the security threshold.
+Site passed 17 native tests, 27 production browser checks and its reviewed pins.
+
+All 30 app and 281 site served files match their reviewed archives, allowing only
+recorded Cloudflare transformations. Twelve app and twenty site fresh-browser
+checks pass across phone/tablet/desktop sizes; screenshots were inspected. Real
+hosted analytics accepted every observed event with HTTP 202 and zero rejections.
+Three app page sessions retain one visitor hash, and aggregate reports confirm
+visitor recognition. Site continuity is independently verified. No account hash
+or raw browser identifier is sent. Website/app identities remain separate.
+
+Worker and saved app health checks pass. Existing production incidents and their
+occurrence counts match the pre-release baseline. Prior app/site archives were
+retained and verified for rollback; exact provenance and live evidence remain in
+private infrastructure. Customer work and provider/account state were not mutated.
+The pending TODO edits were committed separately as requested. No shipped agent
+artifact or Worker runtime changed, so those distributions were not republished.
+Retained signed-in workspace/device acceptance remains owner-managed. Older
+unreleased entries below are historical checkpoints; this is a documentation
+follow-up to the verified deployed sources, not another runtime release.
+
 ## November 3 v1.6.7 and site analytics — release authorized
 
 The owner authorized committing all pending TaskTime changes, pushing and
